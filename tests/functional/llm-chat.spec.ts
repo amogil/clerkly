@@ -1675,7 +1675,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
      Action: User sends a message
      Assertions: Retry limit is exhausted and kind:error is shown (no completed final_answer block)
      Requirements: llm-integration.9.5.5, llm-integration.9.6, llm-integration.12.2.2, llm-integration.12.3 */
-  test('should show error when final_answer summary_points is absent', async () => {
+  test('should retry tool call on invalid arguments, not persist tool_call, and show kind:error after retry limit', async () => {
     mockLLMServer.setStreamingMode(true);
     mockLLMServer.setOpenAIStreamScripts([
       {
@@ -1730,6 +1730,34 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expect(errorBubble).toContainText(
       'Model returned invalid completion format too many times. Please try again.'
     );
+
+    const agentId = (await getAgentIdsFromApi(context.window))[0];
+    const finalAnswerToolCallsCount = await context.window.evaluate(async (id) => {
+      const api = (
+        window as unknown as {
+          api: {
+            messages: {
+              list: (
+                agentId: string
+              ) => Promise<{ success: boolean; data?: Array<{ kind: string; payload?: unknown }> }>;
+            };
+          };
+        }
+      ).api;
+      const result = await api.messages.list(id);
+      if (!result.success || !result.data) {
+        return -1;
+      }
+      return result.data.filter((message) => {
+        if (message.kind !== 'tool_call') {
+          return false;
+        }
+        const payload = message.payload as { data?: { toolName?: string } };
+        return payload?.data?.toolName === 'final_answer';
+      }).length;
+    }, agentId);
+    expect(finalAnswerToolCallsCount).toBe(0);
+
     await expectNoToastError(context.window);
   });
 

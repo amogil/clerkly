@@ -5,7 +5,7 @@
 Данный документ описывает требования к фиче выполнения JavaScript-кода моделью через инструмент `code_exec` в изолированной песочнице Electron.
 Документ фиксирует только исполнение кода, безопасность, контракт API и persisted/runtime-поведение.
 Требования к визуальному отображению в чате находятся в спецификации `agents`.
-Вызов `code_exec` является обычным tool call и сохраняется в истории сообщений как `kind: tool_call` с `toolName = "code_exec"`.
+Вызов `code_exec` является обычным tool call и, при валидных аргументах, сохраняется в истории сообщений как `kind: tool_call` с `toolName = "code_exec"`.
 
 ## Глоссарий
 
@@ -164,7 +164,9 @@
   - `limit_exceeded` — превышение операционных лимитов (размер/ресурсы/время);
   - `internal_error` — внутренняя ошибка исполнения/bridge/pipeline.
 
-3.1.2.2.1. `invalid_tool_arguments` НЕ ДОЛЖЕН появляться в `output.error.code` для `code_exec`, так как при невалидных аргументах `code_exec` не запускается и persisted `tool_call(code_exec)` не создаётся (см. `llm-integration.11.2.3.*`).
+3.1.2.2.1. В chat-flow `invalid_tool_arguments` НЕ ДОЛЖЕН появляться в persisted `output.error.code` для `tool_call(code_exec)`, так как при невалидных аргументах `code_exec` не запускается и persisted `tool_call(code_exec)` не создаётся (см. `llm-integration.11.2.3.*`).
+
+3.1.2.2.2. Для прямого defensive-вызова runtime-слоя (вне chat-flow orchestration) `invalid_tool_arguments` MAY использоваться как диагностический код ошибки валидации входа.
 
 3.1.2.3. Поле `error.message` ДОЛЖНО быть человекочитаемым и достаточным для диагностики причины ошибки моделью.
 

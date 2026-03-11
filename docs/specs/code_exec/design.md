@@ -61,6 +61,8 @@ UI-визуализация исполнения описывается в `docs
 ```
 
 `output.error` добавляется только для terminal-состояний `error` и `timeout`.
+В chat-flow persisted `tool_call(code_exec)` не использует `error.code = "invalid_tool_arguments"`: невалидные аргументы отбрасываются на pipeline-validation этапе до запуска инструмента и до создания записи `tool_call`.
+Defensive runtime-валидация (`SandboxSessionManager.execute` при прямом вызове) может возвращать `invalid_tool_arguments` как локальный диагностический код.
 
 Lifecycle:
 - если sandbox runtime фактически стартовал: создание сообщения `status=running`, `done=false`;

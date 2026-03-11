@@ -753,6 +753,7 @@ export const OAUTH_CONFIG = {
 - сначала используется `process.env.CLERKLY_OAUTH_CLIENT_SECRET`;
 - если переменная не задана, скрипт пытается прочитать значение из `.env` в корне проекта;
 - если значение отсутствует в обоих источниках, сборка завершается с ошибкой (ненулевой код выхода).
+- если placeholder `__CLERKLY_OAUTH_CLIENT_SECRET__` отсутствует в build output, скрипт завершает работу с warning (без аварийного завершения сборки).
 
 **Важно:** При формировании `redirect_uri` из Client ID, функция `getOAuthConfig()` автоматически удаляет суффикс `.apps.googleusercontent.com` если он присутствует в Client ID, чтобы избежать дублирования в итоговом URL:
 
@@ -1410,6 +1411,7 @@ logger.error(`${operation} failed: ${error.message}`, {
 - Проверка отображения Login Screen при отсутствии токенов
 - Проверка обработки конкретных кодов ошибок (popup_closed_by_user, access_denied, network_error)
 - Проверка вызова правильных IPC методов
+- Проверка build-time инжекции OAuth секрета (`scripts/inject-oauth-client-secret.js`): `process.env`, fallback `.env`, fail-fast, placeholder-missing warning
 
 ### Функциональные Тесты
 

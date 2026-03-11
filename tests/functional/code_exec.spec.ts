@@ -248,7 +248,7 @@ test.describe('code_exec tool loop execution', () => {
      Action: user sends a message that triggers code_exec calls
      Assertions: invalid call is not persisted as terminal code_exec result; turn ends with persisted kind:error for the same turn
      Requirements: code_exec.5.1.4, code_exec.5.1.5, code_exec.6.3 */
-  test('should not persist successful terminal code_exec for invalid arguments', async () => {
+  test('should not persist any code_exec tool_call for invalid arguments', async () => {
     mockLLMServer.setStreamingMode(true);
     const invalidScripts = Array.from({ length: 20 }, (_, index) => ({
       toolCalls: [{ callId: `bad-${index + 1}`, toolName: 'code_exec', arguments: {} }],
@@ -266,14 +266,13 @@ test.describe('code_exec tool loop execution', () => {
 
     const agentId = (await getAgentIdsFromApi(window))[0];
     const toolCalls = await getToolCallMessages(agentId);
-    const hasTerminalCodeExec = toolCalls.some((entry) => {
+    const codeExecToolCalls = toolCalls.filter((entry) => {
       const payload = entry.payload as {
         data?: { toolName?: string; output?: { status?: string } };
       };
-      const status = payload?.data?.output?.status;
-      return payload?.data?.toolName === 'code_exec' && status !== 'running';
+      return payload?.data?.toolName === 'code_exec';
     });
-    expect(hasTerminalCodeExec).toBe(false);
+    expect(codeExecToolCalls).toHaveLength(0);
 
     await expect
       .poll(async () => {

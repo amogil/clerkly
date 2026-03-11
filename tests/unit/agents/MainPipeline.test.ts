@@ -387,6 +387,117 @@ describe('MainPipeline.run()', () => {
       1,
       true
     );
+    expect(messageManager.create).not.toHaveBeenCalledWith(
+      'agent-1',
+      'tool_call',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          toolName: 'final_answer',
+        }),
+      }),
+      1,
+      expect.anything()
+    );
+  });
+
+  it('does not persist tool_call for invalid code_exec arguments and emits kind:error after retries', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-code-invalid',
+          toolName: 'code_exec',
+          arguments: {},
+        });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(llmProvider.chat).toHaveBeenCalledTimes(3);
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'error',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          error: expect.objectContaining({
+            message: expect.stringContaining('invalid tool call arguments'),
+          }),
+        }),
+      }),
+      1,
+      true
+    );
+    expect(messageManager.create).not.toHaveBeenCalledWith(
+      'agent-1',
+      'tool_call',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          toolName: 'code_exec',
+        }),
+      }),
+      1,
+      expect.anything()
+    );
+    expect(messageManager.update).not.toHaveBeenCalledWith(
+      expect.any(Number),
+      'agent-1',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          toolName: 'code_exec',
+        }),
+      }),
+      expect.any(Boolean)
+    );
+  });
+
+  it('passes validation feedback to provider on retry after invalid tool arguments', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+    let attempt = 0;
+
+    llmProvider.chat.mockImplementation(async (msgs: ChatMessage[], _opts, onChunk) => {
+      attempt += 1;
+      if (attempt < 3) {
+        const hasRetryFeedback = msgs.some(
+          (msg) =>
+            msg.role === 'system' &&
+            typeof msg.content === 'string' &&
+            msg.content.includes('Tool call validation failed:')
+        );
+        if (attempt === 1) {
+          expect(hasRetryFeedback).toBe(false);
+        } else {
+          expect(hasRetryFeedback).toBe(true);
+        }
+      }
+      onChunk({
+        type: 'tool_call',
+        callId: `retry-invalid-${attempt}`,
+        toolName: 'code_exec',
+        arguments: {},
+      });
+      return { text: '' };
+    });
+
+    await pipeline.run('agent-1', 1);
+
+    expect(llmProvider.chat).toHaveBeenCalledTimes(3);
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'error',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          error: expect.objectContaining({
+            message: expect.stringContaining('invalid tool call arguments'),
+          }),
+        }),
+      }),
+      1,
+      true
+    );
   });
 
   it('accepts plain text on retry after initial empty turn without completion marker', async () => {

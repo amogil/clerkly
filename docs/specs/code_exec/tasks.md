@@ -123,8 +123,10 @@
 - [ ] Привести runtime-логику `MainPipeline` к единому контракту: schema/contract validation любого `tool_call` до создания persisted `kind: tool_call`.
 - [ ] Гарантировать, что при `invalid_tool_arguments` не создаются `message.created/message.updated` для `kind: tool_call` и не появляется запись инструмента в истории чата.
 - [ ] Сохранить текущий retry/repair flow (`maxRetries=2`) с возвратом диагностики в модель на каждой невалидной попытке.
+- [ ] Явно реализовать/документировать канал передачи validation-feedback модели между retry-попытками для невалидных аргументов (чтобы retry был не только повтором без диагностического контекста).
 - [ ] Гарантировать terminal fallback: при исчерпании retry/repair создавать только `kind:error` (без terminal `tool_call`).
 - [ ] Унифицировать поведение для обоих инструментов в текущем scope (`final_answer`, `code_exec`) без специальных исключений.
+- [ ] Заменить технически вводящее в заблуждение именование retry-exhaustion ошибки (`FinalAnswerRetryExhaustedError`) на общее для всех tool calls и синхронизировать тексты/ветки обработки.
 - [ ] Устранить расхождение `code_exec` контракта ошибок: согласовать `code_exec.3.1.2.2.1` с runtime/тестами (`SandboxSessionManager` сейчас возвращает `invalid_tool_arguments` при прямом вызове), зафиксировав единый boundary (pipeline-level vs tool-runtime-level).
 - [ ] Уточнить вводное требование `code_exec` (`requirements.md`, пункт 0/введение): persisted `tool_call(code_exec)` создаётся только для валидных вызовов, прошедших pre-execution validation.
 - [ ] Добавить/обновить unit-тесты `tests/unit/agents/MainPipeline.test.ts` на отсутствие persist `tool_call` при невалидных аргументах и на `kind:error` после retry-limit.
@@ -136,3 +138,8 @@
 - [ ] Обновить `docs/specs/llm-integration/design.md` coverage-table строкой `llm-integration.11.2.3.3` и привязать к конкретным тестам.
 - [ ] Сверить текстовые названия функциональных тестов в requirements/design с фактическими тест-кейсами в `tests/functional/llm-chat.spec.ts` и `tests/functional/code_exec.spec.ts`.
 - [ ] Прогнать `npm run validate` и после подтверждения пользователя `npm run test:functional`.
+
+#### Фаза 9: OAuth Build Injection Validation
+
+- [ ] Добавить unit-тесты для `scripts/inject-oauth-client-secret.js`: чтение `CLERKLY_OAUTH_CLIENT_SECRET` из `process.env`, fallback из `.env`, fail-fast при отсутствии значения.
+- [ ] Добавить тест-кейс на отсутствие placeholder в build output (скрипт не падает, но логирует warning) и зафиксировать это поведение в `docs/specs/google-oauth-auth/design.md`.

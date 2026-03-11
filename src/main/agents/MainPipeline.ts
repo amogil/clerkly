@@ -55,10 +55,10 @@ class InvalidToolArgumentsError extends Error {
   }
 }
 
-class FinalAnswerRetryExhaustedError extends Error {
+class InvalidToolCallRetryExhaustedError extends Error {
   constructor() {
     super(FINAL_ANSWER_RETRY_EXHAUSTED_MESSAGE);
-    this.name = 'FinalAnswerRetryExhaustedError';
+    this.name = 'InvalidToolCallRetryExhaustedError';
   }
 }
 
@@ -267,12 +267,17 @@ export class MainPipeline {
   }> {
     let attempts = 0;
     let invalidFinalAnswerSeen = false;
+    let validationFeedback: string | null = null;
     for (;;) {
       let meaningfulChunkSeen = false;
 
       try {
-        const output = await context.llmProvider.chat(
+        const chatMessagesForAttempt = this.buildRetryChatMessages(
           context.chatMessages,
+          validationFeedback
+        );
+        const output = await context.llmProvider.chat(
+          chatMessagesForAttempt,
           context.options,
           (chunk) => {
             if (signal?.aborted) {
@@ -378,6 +383,8 @@ export class MainPipeline {
           error instanceof InvalidToolArgumentsError;
         if (isInvalidFinalAnswer) {
           invalidFinalAnswerSeen = this.hasFinalAnswerToolCall(bufferedToolCalls);
+          validationFeedback =
+            error instanceof Error ? error.message : 'Invalid tool call arguments.';
         }
         const shouldRetryInvalidFinalAnswer =
           isInvalidFinalAnswer && attempts < MAX_INVALID_TOOL_CALL_RETRIES && !signal?.aborted;
@@ -387,7 +394,7 @@ export class MainPipeline {
 
         if (!shouldRetry) {
           if (isInvalidFinalAnswer) {
-            throw new FinalAnswerRetryExhaustedError();
+            throw new InvalidToolCallRetryExhaustedError();
           }
           throw error;
         }
@@ -402,6 +409,24 @@ export class MainPipeline {
         attempts += 1;
       }
     }
+  }
+
+  // Requirements: llm-integration.11.2.3, llm-integration.11.2.3.1, llm-integration.11.2.3.3
+  private buildRetryChatMessages(
+    baseChatMessages: ReturnType<PromptBuilder['buildMessages']>,
+    validationFeedback: string | null
+  ): ReturnType<PromptBuilder['buildMessages']> {
+    if (!validationFeedback) {
+      return baseChatMessages;
+    }
+
+    return [
+      ...baseChatMessages,
+      {
+        role: 'system',
+        content: `Tool call validation failed: ${validationFeedback}. Regenerate tool call with valid arguments and continue.`,
+      },
+    ];
   }
 
   /**
@@ -743,7 +768,7 @@ export class MainPipeline {
     signal: AbortSignal | undefined,
     lastLlmMessageId: number | null
   ): void {
-    if (error instanceof FinalAnswerRetryExhaustedError) {
+    if (error instanceof InvalidToolCallRetryExhaustedError) {
       if (lastLlmMessageId !== null) {
         try {
           this.hideIncompleteLlmMessage(lastLlmMessageId, agentId);

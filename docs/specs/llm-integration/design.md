@@ -848,6 +848,7 @@ User отправляет сообщение
 | llm-integration.11.2.3 | ✓ | ✓ |
 | llm-integration.11.2.3.1 | ✓ | ✓ |
 | llm-integration.11.2.3.2 | ✓ | ✓ |
+| llm-integration.11.2.3.3 | ✓ | ✓ |
 | llm-integration.11.3 | ✓ | ✓ |
 | llm-integration.11.3.1 | ✓ | ✓ |
 | llm-integration.11.3.1.1 | ✓ | ✓ |
