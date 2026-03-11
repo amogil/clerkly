@@ -1325,6 +1325,50 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     expect(errorInConversation).toBe(false);
   });
 
+  /* Preconditions: Existing non-terminal tool_call(code_exec) in chat history
+     Action: User sends next message
+     Assertions: running tool_call is excluded from provider request history
+     Requirements: llm-integration.11.3.1 */
+  test('should exclude running tool_call from model history', async () => {
+    mockLLMServer.setStreamingMode(true, {
+      content: '{"action":{"type":"text","content":"History check response"}}',
+      chunkDelayMs: 0,
+    });
+
+    context = await launchWithMockLLM();
+    const agentIds = await getAgentIdsFromApi(context.window);
+    const activeAgentId = agentIds[0];
+    expect(activeAgentId).toBeTruthy();
+
+    await context.window.evaluate(
+      async ({ agentId }) => {
+        // @ts-expect-error - window.api is exposed via contextBridge
+        const api = window.api;
+        await api.messages.create(agentId, 'tool_call', {
+          data: {
+            callId: 'running-call-1',
+            toolName: 'code_exec',
+            arguments: { code: '1+1' },
+            output: { status: 'running' },
+          },
+        });
+      },
+      { agentId: activeAgentId as string }
+    );
+
+    mockLLMServer.clearRequestLogs();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await messageInput.fill('Check history excludes running tool');
+    await messageInput.press('Enter');
+
+    const actionContent = context.window.locator('.message-llm-action-response').last();
+    await expect(actionContent).toBeVisible({ timeout: 15000 });
+    const lastRequest = mockLLMServer.getLastRequest();
+    expect(lastRequest).toBeDefined();
+    const requestDump = JSON.stringify(lastRequest?.body);
+    expect(requestDump).not.toContain('running-call-1');
+  });
+
   /* Preconditions: MockLLMServer configured for success and captures outgoing request
      Action: User sends a message
      Assertions: System prompt contains strict math delimiter instruction ($...$/$$...$$ only, no escaped dollars), including mixed prose guidance
@@ -1419,6 +1463,49 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     const llmBubbles = context.window.locator('.message-llm-response');
     await expect(llmBubbles).toHaveCount(1);
     await expect(context.window.locator('[data-testid="message-user"]')).toHaveCount(1);
+  });
+
+  /* Preconditions: First model response contains terminal code_exec(policy_denied), second returns text
+     Action: User sends one message
+     Assertions: pipeline immediately continues to next model step after terminal tool_result
+     Requirements: llm-integration.11.4, code_exec.4.5 */
+  test('should continue to next model step after terminal code_exec tool result', async () => {
+    mockLLMServer.setStreamingMode(true);
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        toolCalls: [
+          {
+            callId: 'code-loop-1',
+            toolName: 'code_exec',
+            arguments: { code: "fetch('https://example.com')", timeout_ms: 10000 },
+          },
+        ],
+      },
+      {
+        content: '{"action":{"type":"text","content":"Recovered after tool error"}}',
+      },
+    ]);
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await messageInput.fill('Use code_exec and continue');
+    await messageInput.press('Enter');
+
+    const actionContent = context.window.locator('.message-llm-action-response').last();
+    await expect(actionContent).toContainText('Recovered after tool error', { timeout: 15000 });
+    await expect(
+      context.window.locator('[data-testid="message-code-exec-block"]').last()
+    ).toBeVisible({
+      timeout: 5000,
+    });
+    await expect(
+      context.window.locator('[data-testid="message-code-exec-status"]').last()
+    ).not.toHaveText('running');
+
+    const requestCount = mockLLMServer
+      .getRequestLogs()
+      .filter((entry) => entry.method === 'POST' && entry.path === '/v1/responses').length;
+    expect(requestCount).toBe(2);
   });
 
   /* Preconditions: MockLLMServer scripted stream emits tool_call(final_answer) before text chunks in SSE order

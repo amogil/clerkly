@@ -107,6 +107,40 @@ describe('AgentMessage — tool_call', () => {
     expect(output).toHaveTextContent('"content": "result"');
   });
 
+  /* Preconditions: persisted kind:tool_call for code_exec with status/stdout/stderr
+     Action: render AgentMessage
+     Assertions: dedicated code_exec block with status and stream sections is rendered
+     Requirements: agents.7.4.5, agents.7.4.6, agents.7.4.7 */
+  it('should render code_exec tool_call block with status/stdout/stderr', () => {
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'tool_call',
+          done: true,
+          payload: {
+            data: {
+              callId: 'call-code',
+              toolName: 'code_exec',
+              arguments: { code: "console.log('ok')" },
+              output: {
+                status: 'success',
+                stdout: 'ok\\n',
+                stderr: 'warn\\n',
+                stdout_truncated: false,
+                stderr_truncated: false,
+              },
+            },
+          },
+        })}
+      />
+    );
+
+    expect(screen.getByTestId('message-code-exec-block')).toBeInTheDocument();
+    expect(screen.getByTestId('message-code-exec-status')).toHaveTextContent('success');
+    expect(screen.getByTestId('message-code-exec-stdout')).toHaveTextContent('ok');
+    expect(screen.getByTestId('message-code-exec-stderr')).toHaveTextContent('warn');
+  });
+
   /* Preconditions: persisted kind:tool_call for final_answer with summary_points
      Action: render AgentMessage
      Assertions: renders Final Answer checklist items without title/header

@@ -250,6 +250,64 @@ describe('MessageManager', () => {
       expect(result).toEqual([visibleUser, visibleLlm]);
       expect(result.map((m) => m.kind)).not.toContain('tool_call');
     });
+
+    /* Preconditions: Terminal tool_call messages exist (final_answer and code_exec success)
+       Action: Call listForModelHistory(agentId)
+       Assertions: terminal tool_call rows are included in model history
+       Requirements: llm-integration.11.3.1, llm-integration.11.3.1.1 */
+    it('should include terminal tool_call messages in model history', () => {
+      const visibleUser: Message = { ...mockMessage, id: 1, kind: 'user', hidden: false };
+      const finalAnswerTool: Message = {
+        ...mockMessage,
+        id: 2,
+        kind: 'tool_call',
+        hidden: false,
+        done: true,
+        payloadJson: JSON.stringify({
+          data: { toolName: 'final_answer', arguments: { summary_points: ['Done'] } },
+        }),
+      };
+      const codeExecTool: Message = {
+        ...mockMessage,
+        id: 3,
+        kind: 'tool_call',
+        hidden: false,
+        done: true,
+        payloadJson: JSON.stringify({
+          data: { toolName: 'code_exec', output: { status: 'success', stdout: 'ok' } },
+        }),
+      };
+
+      mockDbManager.messages.listByAgent = jest
+        .fn()
+        .mockReturnValue([visibleUser, finalAnswerTool, codeExecTool]);
+
+      const result = messageManager.listForModelHistory('agent-123');
+      expect(result).toEqual([visibleUser, finalAnswerTool, codeExecTool]);
+    });
+
+    /* Preconditions: Non-terminal tool_call message exists
+       Action: Call listForModelHistory(agentId)
+       Assertions: non-terminal tool_call row is excluded
+       Requirements: llm-integration.11.3.1.2 */
+    it('should exclude non-terminal tool_call messages from model history', () => {
+      const visibleUser: Message = { ...mockMessage, id: 1, kind: 'user', hidden: false };
+      const runningTool: Message = {
+        ...mockMessage,
+        id: 2,
+        kind: 'tool_call',
+        hidden: false,
+        done: false,
+        payloadJson: JSON.stringify({
+          data: { toolName: 'code_exec', output: { status: 'running' } },
+        }),
+      };
+
+      mockDbManager.messages.listByAgent = jest.fn().mockReturnValue([visibleUser, runningTool]);
+
+      const result = messageManager.listForModelHistory('agent-123');
+      expect(result).toEqual([visibleUser]);
+    });
   });
 
   describe('listPaginated', () => {

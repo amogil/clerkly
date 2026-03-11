@@ -205,7 +205,13 @@ import { AgentManager } from './agents/AgentManager';
 import { MessageManager } from './agents/MessageManager';
 import { AgentIPCHandlers } from './agents/AgentIPCHandlers';
 import { MainPipeline } from './agents/MainPipeline';
-import { PromptBuilder, FullHistoryStrategy, FinalAnswerFeature } from './agents/PromptBuilder';
+import {
+  PromptBuilder,
+  FullHistoryStrategy,
+  FinalAnswerFeature,
+  CodeExecFeature,
+} from './agents/PromptBuilder';
+import { SandboxSessionManager } from './code_exec/SandboxSessionManager';
 
 const BASE_SYSTEM_PROMPT = [
   'You are a helpful AI assistant.',
@@ -239,9 +245,10 @@ const BASE_SYSTEM_PROMPT = [
 
 const agentManager = new AgentManager(dbManager);
 const messageManager = new MessageManager(dbManager);
+const sandboxSessionManager = new SandboxSessionManager();
 const promptBuilder = new PromptBuilder(
   BASE_SYSTEM_PROMPT,
-  [new FinalAnswerFeature()],
+  [new FinalAnswerFeature(), new CodeExecFeature(sandboxSessionManager)],
   new FullHistoryStrategy()
 );
 const mainPipeline = new MainPipeline(messageManager, aiAgentSettingsManager, promptBuilder);
@@ -401,6 +408,7 @@ app.on('window-all-closed', () => {
 // Handle before-quit event
 app.on('before-quit', () => {
   logger.info('Application quitting...');
+  void sandboxSessionManager.shutdown();
   ipcMain.removeHandler('app:get-state');
   ipcMain.removeHandler('app:set-chats-ready');
   appCoordinator.stop();

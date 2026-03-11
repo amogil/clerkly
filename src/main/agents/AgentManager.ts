@@ -65,9 +65,14 @@ export class AgentManager {
       if (!lastMessage.done) {
         return AGENT_STATUS.IN_PROGRESS;
       }
-      return this.extractToolName(lastMessage) === 'final_answer'
-        ? AGENT_STATUS.COMPLETED
-        : AGENT_STATUS.AWAITING_RESPONSE;
+      const toolName = this.extractToolName(lastMessage);
+      if (toolName === 'final_answer') {
+        return AGENT_STATUS.COMPLETED;
+      }
+      if (toolName === 'code_exec') {
+        return AGENT_STATUS.IN_PROGRESS;
+      }
+      return AGENT_STATUS.AWAITING_RESPONSE;
     }
 
     return AGENT_STATUS.NEW;

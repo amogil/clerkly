@@ -12,10 +12,17 @@ export interface TestConnectionResult {
  * A single message in the chat history
  * Requirements: llm-integration.5.1
  */
-export interface ChatMessage {
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-}
+export type ChatMessage =
+  | {
+      role: 'user' | 'assistant' | 'system';
+      content: string;
+    }
+  | {
+      role: 'tool';
+      toolCallId: string;
+      toolName: string;
+      result: unknown;
+    };
 
 /**
  * Options for a chat request
@@ -76,7 +83,7 @@ export type ChatChunk =
       toolName: string;
       arguments: Record<string, unknown>;
       output: unknown;
-      status: 'success' | 'error';
+      status: 'success' | 'error' | 'timeout' | 'cancelled';
     }
   | {
       type: 'turn_error';

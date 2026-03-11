@@ -4,7 +4,7 @@
 
 Цель: реализовать безопасное выполнение JavaScript-кода моделью через `code_exec` в изолированной sandbox-среде.
 
-**Текущий статус:** Фаза 2 — Main/Sandbox архитектура (ожидает реализации)
+**Текущий статус:** Фаза 6 — Валидация (выполнена частично: покрытие приведено к факту, остаются недостающие functional-сценарии и полный functional-прогон)
 
 ---
 
@@ -25,54 +25,70 @@
 - ✅ Синхронизированы `docs/specs/agents/*` по UI-контракту `tool_call(code_exec)`.
 - ✅ Синхронизированы `docs/specs/llm-integration/*` по явной привязке `toolName="code_exec"` без изменения message kind.
 - ✅ Устранены противоречия по рендеру `final_answer` между `realtime-events` и `agents`.
+- ✅ Реализован `SandboxSessionManager` (one-call-one-sandbox, timeout/cancel/cleanup, shutdown cleanup).
+- ✅ Добавлен `code_exec` в prompt/tool layer и системные инструкции модели.
+- ✅ Интегрирован `code_exec` в `MainPipeline` с persisted lifecycle `running -> terminal` для `kind: tool_call`.
+- ✅ Добавлена нормализация `code_exec` статусов и ошибок (`success/error/timeout/cancelled`, `policy_denied/limit_exceeded/...`).
+- ✅ Реализован validation/retry контракт tool calls с `maxRetries=2` и совместимостью с `final_answer`.
+- ✅ Обновлены `PromptBuilder` и `MessageManager.listForModelHistory` на terminal-only replay для `tool_call`.
+- ✅ Добавлена сериализация terminal `tool_call` в AI SDK tool-result формат (`toolCallId/toolName/result`).
+- ✅ Добавлены и обновлены unit-тесты по `code_exec` и интеграции pipeline/history/UI.
+- ✅ Добавлен functional-файл `tests/functional/code_exec.spec.ts` (базовые сценарии рендера и статуса агента).
+- ✅ Добавлены `SandboxBridge`/`SandboxPolicy` и интеграция policy-allowlist + browser-level egress hardening в sandbox session.
+- ✅ Добавлен `CodeExecPersistenceMapper` и подключён в `MainPipeline` для записи terminal payload по единому контракту.
+- ✅ Расширены functional-тесты `code_exec.spec.ts` и `llm-chat.spec.ts` для history/continuation/limits/policy сценариев.
+- ✅ Добавлен functional-сценарий `invalid code_exec args -> bounded retry/repair -> persisted kind:error`.
+- ✅ Добавлены functional-сценарии по параллельным `code_exec` вызовам (`callId` correlation) и audit lifecycle-полям terminal результата.
+- ✅ Запущен `npm run validate` (успешно).
 
 ### В Работе
-- 🔄 Фаза 2: Подготовка к реализации main/sandbox runtime.
+- 🔄 Ожидает добавления недостающих functional-сценариев из тест-плана `docs/specs/code_exec/design.md` (timeout/cancel, allowlist/multithreading, shutdown, CPU/RAM `limit_exceeded`, realtime lifecycle).
+- 🔄 Ожидает отдельного запуска полного `npm run test:functional` по подтверждению пользователя.
 
 ### Запланировано
 
 #### Фаза 2: Main/Sandbox архитектура
 
-- [ ] Реализовать `SandboxSessionManager` для lifecycle sandbox runtime.
-  - [ ] Создание отдельной sandbox-инстанции на каждый вызов `code_exec` (one-call-one-sandbox).
-  - [ ] Timeout/cancel/cleanup политика.
-- [ ] Добавить sandbox preload bridge с whitelist API.
-- [ ] Добавить policy-валидации main process для sandbox запросов.
-- [ ] Реализовать browser-level egress enforcement (требования `code_exec.2.3.1-2.3.2`) с явной трассировкой `control -> verification`.
-  - [ ] `session.webRequest` deny для исходящих `http/https/ws/wss` и связанных egress-каналов до отправки запроса.
-  - [ ] Navigation/Open hardening: `setWindowOpenHandler(deny)` + блокировка `will-navigate`/`will-redirect`.
-  - [ ] Permission hardening: deny в `setPermissionRequestHandler` и `setPermissionCheckHandler`.
-  - [ ] Runtime hardening bridge/preload: блокировка `fetch`/`XMLHttpRequest`/`WebSocket`/`navigator.sendBeacon` с нормализацией в `status=error`, `error.code=policy_denied`.
-  - [ ] Runtime hardening navigation API: `window.open`/`location.assign`/`location.replace` должны давать terminal `policy_denied`, а не silent deny.
-  - [ ] CSP hardening sandbox-документа: `connect-src 'none'` и запрет внешних источников для сетевых подключений.
+- [x] Реализовать `SandboxSessionManager` для lifecycle sandbox runtime.
+  - [x] Создание отдельной sandbox-инстанции на каждый вызов `code_exec` (one-call-one-sandbox).
+  - [x] Timeout/cancel/cleanup политика.
+- [x] Добавить sandbox preload bridge с whitelist API.
+- [x] Добавить policy-валидации main process для sandbox запросов.
+- [x] Реализовать browser-level egress enforcement (требования `code_exec.2.3.1-2.3.2`) с явной трассировкой `control -> verification`.
+  - [x] `session.webRequest` deny для исходящих `http/https/ws/wss` и связанных egress-каналов до отправки запроса.
+  - [x] Navigation/Open hardening: `setWindowOpenHandler(deny)` + блокировка `will-navigate`/`will-redirect`.
+  - [x] Permission hardening: deny в `setPermissionRequestHandler` и `setPermissionCheckHandler`.
+  - [x] Runtime hardening bridge/preload: блокировка `fetch`/`XMLHttpRequest`/`WebSocket`/`navigator.sendBeacon` с нормализацией в `status=error`, `error.code=policy_denied`.
+  - [x] Runtime hardening navigation API: `window.open`/`location.assign`/`location.replace` должны давать terminal `policy_denied`, а не silent deny.
+  - [x] CSP hardening sandbox-документа: `connect-src 'none'` и запрет внешних источников для сетевых подключений.
 
 #### Фаза 3: LLM и pipeline интеграция
 
-- [ ] Добавить `code_exec` в prompt/tool layer.
-- [ ] Интегрировать `code_exec` в `MainPipeline`.
-  - [ ] Persist start/update/final lifecycle для `kind: tool_call` с `toolName='code_exec'`.
-  - [ ] Нормализация статусов `running/success/error/timeout/cancelled` и кодов ошибок по фиксированному словарю.
-  - [ ] Реализовать общий validation/retry контракт tool calls для `code_exec` (schema validation → feedback модели → bounded retry/repair `maxRetries=2` → при исчерпании обычный `kind:error` в чате, не `tool_call`-ошибка).
-  - [ ] Унифицировать этот же validation/retry flow для уже реализованного `final_answer` и остальных tool calls без расхождений по типу финальной ошибки.
-  - [ ] Мигрировать `PromptBuilder`/`MessageManager.listForModelHistory` на новую логику: terminal-результаты всех `tool_call` (`final_answer`, `code_exec`, включая `cancelled/error`) включаются в model history; non-terminal не включаются.
-  - [ ] Реализовать сериализацию terminal `tool_call` в AI SDK tool-result формат для model history (`toolCallId`, `toolName`, `result`).
-  - [ ] Гарантировать немедленный переход к следующему шагу `model` после terminal `tool_call` любого статуса (`success/error/timeout/cancelled`) в цикле `model -> tools -> model`.
-  - [ ] Выполнить проверку совместимости с уже реализованным `final_answer`: существующие persisted `tool_call(final_answer)` должны корректно участвовать в model history без скрытия и без миграции схемы БД.
+- [x] Добавить `code_exec` в prompt/tool layer.
+- [x] Интегрировать `code_exec` в `MainPipeline`.
+  - [x] Persist start/update/final lifecycle для `kind: tool_call` с `toolName='code_exec'`.
+  - [x] Нормализация статусов `running/success/error/timeout/cancelled` и кодов ошибок по фиксированному словарю.
+  - [x] Реализовать общий validation/retry контракт tool calls для `code_exec` (schema validation → feedback модели → bounded retry/repair `maxRetries=2` → при исчерпании обычный `kind:error` в чате, не `tool_call`-ошибка).
+  - [x] Унифицировать этот же validation/retry flow для уже реализованного `final_answer` и остальных tool calls без расхождений по типу финальной ошибки.
+  - [x] Мигрировать `PromptBuilder`/`MessageManager.listForModelHistory` на новую логику: terminal-результаты всех `tool_call` (`final_answer`, `code_exec`, включая `cancelled/error`) включаются в model history; non-terminal не включаются.
+  - [x] Реализовать сериализацию terminal `tool_call` в AI SDK tool-result формат для model history (`toolCallId`, `toolName`, `result`).
+  - [x] Гарантировать немедленный переход к следующему шагу `model` после terminal `tool_call` любого статуса (`success/error/timeout/cancelled`) в цикле `model -> tools -> model`.
+  - [x] Выполнить проверку совместимости с уже реализованным `final_answer`: существующие persisted `tool_call(final_answer)` должны корректно участвовать в model history без скрытия и без миграции схемы БД.
 
 #### Фаза 4: Тестирование
 
-- [ ] Добавить unit-тесты main/runtime/pipeline слоёв.
-- [ ] Переименовать functional test-файл под каноничное имя `tests/functional/code_exec.spec.ts` (если в коде ещё используется старое имя) и обновить все ссылки/запуски.
-- [ ] Добавить/обновить functional-тест `code_exec.spec.ts`: невалидные аргументы `code_exec` → bounded retry/repair → финальный `kind:error` в чате.
-- [ ] Добавить/обновить functional-тест `code_exec.spec.ts`: лимит входного кода `30 KiB` и ожидаемая ошибка валидации.
-- [ ] Добавить/обновить functional-тест `code_exec.spec.ts`: лимиты `stdout/stderr` по `10 KiB` и корректные флаги truncation.
-- [ ] Добавить/обновить functional-тест `code_exec.spec.ts`: для `window.open`/`location.assign`/`location.replace` возвращается terminal `policy_denied` (без silent deny и без исходящего запроса).
-- [ ] Добавить/обновить functional-тест `llm-chat.spec.ts`: включение terminal tool results (`final_answer`, `code_exec`, включая `error/timeout/cancelled`) в model history в AI SDK tool-result формате.
-- [ ] Добавить/обновить functional-тест `llm-chat.spec.ts`: non-terminal `tool_call` (`running`) не попадает в model history.
-- [ ] Добавить/обновить functional-тест `llm-chat.spec.ts`: после terminal `tool_call` любого статуса pipeline немедленно продолжает следующий шаг `model`.
+- [x] Добавить unit-тесты main/runtime/pipeline слоёв.
+- [x] Переименовать functional test-файл под каноничное имя `tests/functional/code_exec.spec.ts` (если в коде ещё используется старое имя) и обновить все ссылки/запуски.
+- [x] Добавить/обновить functional-тест `code_exec.spec.ts`: невалидные аргументы `code_exec` → bounded retry/repair → финальный `kind:error` в чате.
+- [x] Добавить/обновить functional-тест `code_exec.spec.ts`: лимит входного кода `30 KiB` и ожидаемая ошибка валидации.
+- [x] Добавить/обновить functional-тест `code_exec.spec.ts`: лимиты `stdout/stderr` по `10 KiB` и корректные флаги truncation.
+- [x] Добавить/обновить functional-тест `code_exec.spec.ts`: для `window.open`/`location.assign`/`location.replace` возвращается terminal `policy_denied` (без silent deny и без исходящего запроса).
+- [x] Добавить/обновить functional-тест `llm-chat.spec.ts`: включение terminal tool results (`final_answer`, `code_exec`, включая `error/timeout/cancelled`) в model history в AI SDK tool-result формате.
+- [x] Добавить/обновить functional-тест `llm-chat.spec.ts`: non-terminal `tool_call` (`running`) не попадает в model history.
+- [x] Добавить/обновить functional-тест `llm-chat.spec.ts`: после terminal `tool_call` любого статуса pipeline немедленно продолжает следующий шаг `model`.
 - [ ] Покрыть полный набор сценариев по детальному тест-плану из `docs/specs/code_exec/design.md` (раздел "Стратегия тестирования").
-- [ ] Обновить детальную матрицу покрытия по `code_exec.6.6` в `docs/specs/code_exec/design.md` после добавления/изменения тестов.
-- [ ] Выполнять тестовую реализацию в порядке: сначала unit, затем functional.
+- [x] Обновить детальную матрицу покрытия по `code_exec.6.6` в `docs/specs/code_exec/design.md` после добавления/изменения тестов.
+- [x] Выполнять тестовую реализацию в порядке: сначала unit, затем functional.
 
 #### Фаза 5: Синхронизация UI-спеков
 
@@ -82,5 +98,5 @@
 
 #### Фаза 6: Валидация
 
-- [ ] Запустить `npm run validate`.
+- [x] Запустить `npm run validate`.
 - [ ] После подтверждения пользователя запустить `npm run test:functional`.

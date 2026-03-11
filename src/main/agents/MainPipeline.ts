@@ -20,6 +20,12 @@ import { handleBackgroundError } from '../ErrorHandler';
 import { normalizeLLMError } from '../llm/ErrorNormalizer';
 import type { IToolExecutor } from '../tools/ToolRunner';
 import { ToolRunner } from '../tools/ToolRunner';
+import { makeCodeExecError, validateCodeExecInput } from '../code_exec/contracts';
+import { normalizeCodeExecOutput } from '../code_exec/SandboxSessionManager';
+import {
+  buildRunningToolPayload,
+  buildTerminalToolPayload,
+} from '../code_exec/CodeExecPersistenceMapper';
 
 import type { LLMProvider } from '../../types';
 
@@ -27,18 +33,25 @@ type BufferedToolCall = {
   callId: string;
   toolName: string;
   args: Record<string, unknown>;
-  resultStatus?: 'success' | 'error';
+  resultStatus?: 'success' | 'error' | 'timeout' | 'cancelled';
   resultOutput?: unknown;
 };
 
 const FINAL_ANSWER_RETRY_EXHAUSTED_MESSAGE =
-  'Model returned invalid completion format too many times. Please try again.';
-const MAX_INVALID_FINAL_ANSWER_RETRIES = 1;
+  'Model returned invalid tool call arguments too many times. Please try again.';
+const MAX_INVALID_TOOL_CALL_RETRIES = 2;
 
 class InvalidFinalAnswerContractError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'InvalidFinalAnswerContractError';
+  }
+}
+
+class InvalidToolArgumentsError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidToolArgumentsError';
   }
 }
 
@@ -346,7 +359,7 @@ export class MainPipeline {
             'Model returned no assistant text and no completion tool call'
           );
         }
-        this.validateFinalAnswerToolCalls(bufferedToolCalls);
+        this.validateToolCalls(bufferedToolCalls);
         if (invalidFinalAnswerSeen && !this.hasFinalAnswerToolCall(bufferedToolCalls)) {
           throw new InvalidFinalAnswerContractError(
             'Model did not return final_answer after invalid completion retry. Please try again.'
@@ -360,12 +373,14 @@ export class MainPipeline {
           accumulatedText,
         };
       } catch (error) {
-        const isInvalidFinalAnswer = error instanceof InvalidFinalAnswerContractError;
+        const isInvalidFinalAnswer =
+          error instanceof InvalidFinalAnswerContractError ||
+          error instanceof InvalidToolArgumentsError;
         if (isInvalidFinalAnswer) {
           invalidFinalAnswerSeen = this.hasFinalAnswerToolCall(bufferedToolCalls);
         }
         const shouldRetryInvalidFinalAnswer =
-          isInvalidFinalAnswer && attempts < MAX_INVALID_FINAL_ANSWER_RETRIES && !signal?.aborted;
+          isInvalidFinalAnswer && attempts < MAX_INVALID_TOOL_CALL_RETRIES && !signal?.aborted;
         const shouldRetrySilentFailure =
           !isInvalidFinalAnswer && attempts < 1 && !meaningfulChunkSeen && !signal?.aborted;
         const shouldRetry = shouldRetryInvalidFinalAnswer || shouldRetrySilentFailure;
@@ -393,33 +408,40 @@ export class MainPipeline {
    * Enforce strict runtime contract for final_answer.
    * Requirements: llm-integration.9.5.2, llm-integration.9.5.3, llm-integration.9.5.5, llm-integration.12.2.1
    */
-  private validateFinalAnswerToolCalls(bufferedToolCalls: Map<string, BufferedToolCall>): void {
+  private validateToolCalls(bufferedToolCalls: Map<string, BufferedToolCall>): void {
     for (const call of bufferedToolCalls.values()) {
-      if (call.toolName !== 'final_answer') {
-        continue;
-      }
-
-      const summaryPoints = call.args['summary_points'];
-      if (!Array.isArray(summaryPoints)) {
-        throw new InvalidFinalAnswerContractError('final_answer.summary_points is required');
-      }
-
-      if (summaryPoints.length < 1 || summaryPoints.length > 10) {
-        throw new InvalidFinalAnswerContractError(
-          'final_answer.summary_points must contain from 1 to 10 items'
-        );
-      }
-
-      for (const point of summaryPoints) {
-        if (typeof point !== 'string') {
-          throw new InvalidFinalAnswerContractError(
-            'final_answer.summary_points items must be strings'
+      if (call.toolName === 'code_exec') {
+        const validated = validateCodeExecInput(call.args);
+        if (!validated.ok) {
+          throw new InvalidToolArgumentsError(
+            validated.error?.message ?? 'Invalid code_exec arguments.'
           );
         }
-        if (point.length > 200) {
+      }
+
+      if (call.toolName === 'final_answer') {
+        const summaryPoints = call.args['summary_points'];
+        if (!Array.isArray(summaryPoints)) {
+          throw new InvalidFinalAnswerContractError('final_answer.summary_points is required');
+        }
+
+        if (summaryPoints.length < 1 || summaryPoints.length > 10) {
           throw new InvalidFinalAnswerContractError(
-            'final_answer.summary_points item length must be <= 200'
+            'final_answer.summary_points must contain from 1 to 10 items'
           );
+        }
+
+        for (const point of summaryPoints) {
+          if (typeof point !== 'string') {
+            throw new InvalidFinalAnswerContractError(
+              'final_answer.summary_points items must be strings'
+            );
+          }
+          if (point.length > 200) {
+            throw new InvalidFinalAnswerContractError(
+              'final_answer.summary_points item length must be <= 200'
+            );
+          }
         }
       }
     }
@@ -471,7 +493,7 @@ export class MainPipeline {
     toolName: string,
     args: Record<string, unknown>,
     output: unknown,
-    status: 'success' | 'error'
+    status: 'success' | 'error' | 'timeout' | 'cancelled'
   ): void {
     const existing = bufferedToolCalls.get(callId);
     if (existing) {
@@ -510,24 +532,78 @@ export class MainPipeline {
         arguments: argumentsPayload,
       };
 
-      if (!isFinalAnswer) {
-        const resultStatus = buffered.resultStatus ?? 'error';
-        const resultOutput =
-          buffered.resultOutput ?? `Tool "${buffered.toolName}" is not available.`;
-        payloadData.output = {
-          status: resultStatus,
-          content: this.stringifyToolOutput(resultOutput),
-        };
+      if (isFinalAnswer) {
+        this.messageManager.create(
+          agentId,
+          'tool_call',
+          { data: payloadData },
+          replyToMessageId,
+          true
+        );
+        continue;
       }
 
-      this.messageManager.create(
+      const startedAt = new Date().toISOString();
+      const runningPayload = buildRunningToolPayload(payloadData, startedAt);
+      const runningMessage = this.messageManager.create(
         agentId,
         'tool_call',
-        { data: payloadData },
+        runningPayload,
         replyToMessageId,
-        true
+        false
       );
+
+      const terminalStatus = buffered.resultStatus ?? 'error';
+      const terminalOutput = this.normalizeToolOutputPayload(
+        buffered.toolName,
+        terminalStatus,
+        buffered.resultOutput
+      );
+      const finishedAt = new Date().toISOString();
+      const terminalPayload = buildTerminalToolPayload(
+        payloadData,
+        terminalOutput,
+        startedAt,
+        finishedAt
+      );
+      this.messageManager.update(runningMessage.id, agentId, terminalPayload, true);
     }
+  }
+
+  private normalizeToolOutputPayload(
+    toolName: string,
+    status: 'success' | 'error' | 'timeout' | 'cancelled',
+    output: unknown
+  ): Record<string, unknown> {
+    if (toolName === 'code_exec') {
+      const normalized = normalizeCodeExecOutput(output);
+      if (status === 'cancelled') {
+        return { ...normalized, status: 'cancelled' };
+      }
+      if (status === 'timeout') {
+        return {
+          ...normalized,
+          status: 'timeout',
+          error:
+            normalized.error ??
+            makeCodeExecError('limit_exceeded', 'code_exec timeout limit exceeded.').error,
+        };
+      }
+      if (status === 'error' && !normalized.error) {
+        return {
+          ...normalized,
+          status: 'error',
+          error: makeCodeExecError('internal_error', 'code_exec failed.').error,
+        };
+      }
+      return { ...normalized, status } as Record<string, unknown>;
+    }
+
+    const safeOutput = output ?? `Tool "${toolName}" is not available.`;
+    return {
+      status,
+      content: this.stringifyToolOutput(safeOutput),
+    };
   }
 
   /**
@@ -803,11 +879,31 @@ export class MainPipeline {
         payload.data && typeof payload.data === 'object' && !Array.isArray(payload.data)
           ? (payload.data as Record<string, unknown>)
           : {};
-
-      data.output = {
-        status: 'error',
-        content: errorText,
-      };
+      const toolName = typeof data.toolName === 'string' ? data.toolName : '';
+      const cancelled = errorText === 'Request cancelled.';
+      if (toolName === 'code_exec') {
+        data.output = cancelled
+          ? {
+              status: 'cancelled',
+              stdout: '',
+              stderr: '',
+              stdout_truncated: false,
+              stderr_truncated: false,
+            }
+          : {
+              status: 'error',
+              stdout: '',
+              stderr: '',
+              stdout_truncated: false,
+              stderr_truncated: false,
+              error: { code: 'internal_error', message: errorText },
+            };
+      } else {
+        data.output = {
+          status: cancelled ? 'cancelled' : 'error',
+          content: errorText,
+        };
+      }
 
       this.messageManager.update(
         message.id,

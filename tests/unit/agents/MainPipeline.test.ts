@@ -239,10 +239,22 @@ describe('MainPipeline.run()', () => {
           callId: 'call-1',
           toolName: 'search_docs',
           arguments: { query: 'streaming' },
-          output: expect.objectContaining({ status: 'success' }),
+          output: expect.objectContaining({ status: 'running' }),
         }),
       }),
       1,
+      false
+    );
+    expect(messageManager.update).toHaveBeenCalledWith(
+      100,
+      'agent-1',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          callId: 'call-1',
+          toolName: 'search_docs',
+          output: expect.objectContaining({ status: 'success' }),
+        }),
+      }),
       true
     );
 
@@ -368,7 +380,7 @@ describe('MainPipeline.run()', () => {
         data: expect.objectContaining({
           error: expect.objectContaining({
             type: 'provider',
-            message: expect.stringContaining('invalid completion format'),
+            message: expect.stringContaining('invalid tool call arguments'),
           }),
         }),
       }),
@@ -434,16 +446,16 @@ describe('MainPipeline.run()', () => {
 
     await pipeline.run('agent-1', 1);
 
-    expect(llmProvider.chat).toHaveBeenCalledTimes(2);
-    expect(messageManager.hideAndMarkIncomplete).toHaveBeenCalledTimes(2);
-    expect(messageManager.hideAndMarkIncomplete).toHaveBeenNthCalledWith(2, 2, 'agent-1');
+    expect(llmProvider.chat).toHaveBeenCalledTimes(3);
+    expect(messageManager.hideAndMarkIncomplete).toHaveBeenCalledTimes(3);
+    expect(messageManager.hideAndMarkIncomplete).toHaveBeenNthCalledWith(3, 2, 'agent-1');
     expect(messageManager.create).toHaveBeenCalledWith(
       'agent-1',
       'error',
       expect.objectContaining({
         data: expect.objectContaining({
           error: expect.objectContaining({
-            message: expect.stringContaining('invalid completion format'),
+            message: expect.stringContaining('invalid tool call arguments'),
           }),
         }),
       }),
@@ -513,14 +525,23 @@ describe('MainPipeline.run()', () => {
     expect(toolCallCreates).toHaveLength(2);
 
     for (const call of toolCallCreates) {
-      expect(call[4]).toBe(true);
+      expect(call[4]).toBe(false);
       const payload = call[2] as { data?: Record<string, unknown> };
       expect(payload.data?.output).toEqual(
         expect.objectContaining({
-          status: 'success',
+          status: 'running',
         })
       );
     }
+    const terminalToolUpdates = (messageManager.update as jest.Mock).mock.calls.filter(
+      (call: unknown[]) =>
+        call[3] === true &&
+        typeof call[2] === 'object' &&
+        call[2] !== null &&
+        'data' in (call[2] as Record<string, unknown>) &&
+        (call[2] as { data?: { output?: { status?: string } } }).data?.output?.status === 'success'
+    );
+    expect(terminalToolUpdates).toHaveLength(2);
   });
 
   it('persists tool_call with error output when tool_result arrives with error status', async () => {
@@ -556,11 +577,22 @@ describe('MainPipeline.run()', () => {
           callId: 'call-stub',
           toolName: 'unknown_tool',
           output: expect.objectContaining({
-            status: 'error',
+            status: 'running',
           }),
         }),
       }),
       1,
+      false
+    );
+    expect(messageManager.update).toHaveBeenCalledWith(
+      100,
+      'agent-1',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          callId: 'call-stub',
+          output: expect.objectContaining({ status: 'error' }),
+        }),
+      }),
       true
     );
   });
@@ -1224,7 +1256,7 @@ describe('MainPipeline.run()', () => {
         }),
       }),
       1,
-      true
+      false
     );
   });
 
@@ -1315,7 +1347,7 @@ describe('MainPipeline.run()', () => {
         data: expect.objectContaining({
           error: expect.objectContaining({
             type: 'provider',
-            message: expect.stringContaining('invalid completion format'),
+            message: expect.stringContaining('invalid tool call arguments'),
           }),
         }),
       }),
@@ -1352,12 +1384,25 @@ describe('MainPipeline.run()', () => {
         data: expect.objectContaining({
           callId: 'call-circular',
           output: expect.objectContaining({
+            status: 'running',
+          }),
+        }),
+      }),
+      1,
+      false
+    );
+    expect(messageManager.update).toHaveBeenCalledWith(
+      100,
+      'agent-1',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          callId: 'call-circular',
+          output: expect.objectContaining({
             status: 'error',
             content: '[object Object]',
           }),
         }),
       }),
-      1,
       true
     );
   });

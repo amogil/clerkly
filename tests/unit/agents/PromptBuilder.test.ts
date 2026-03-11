@@ -9,7 +9,7 @@ import {
   FinalAnswerFeature,
   normalizePromptWhitespace,
 } from '../../../src/main/agents/PromptBuilder';
-import type { LLMTool } from '../../../src/main/llm/ILLMProvider';
+import type { ChatMessage, LLMTool } from '../../../src/main/llm/ILLMProvider';
 import type { Message } from '../../../src/main/db/schema';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -33,6 +33,14 @@ function makeBuilder(
   features: AgentFeature[] = []
 ): PromptBuilder {
   return new PromptBuilder(systemPrompt, features, new FullHistoryStrategy());
+}
+
+function expectTextMessage(
+  message: ChatMessage | undefined,
+  role: 'user' | 'assistant' | 'system'
+): asserts message is Extract<ChatMessage, { role: 'user' | 'assistant' | 'system' }> {
+  expect(message).toBeDefined();
+  expect(message?.role).toBe(role);
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -202,10 +210,12 @@ describe('PromptBuilder.build()', () => {
       const chatMessages = makeBuilder().buildMessages(msgs);
 
       expect(chatMessages).toHaveLength(3);
-      expect(chatMessages[1]).toMatchObject({ role: 'user' });
-      expect(chatMessages[2]).toMatchObject({ role: 'assistant' });
-      expect(chatMessages[1].content).toContain('Hello');
-      expect(chatMessages[2].content).toContain('Hi there!');
+      const userMsg = chatMessages[1];
+      const assistantMsg = chatMessages[2];
+      expectTextMessage(userMsg, 'user');
+      expectTextMessage(assistantMsg, 'assistant');
+      expect(userMsg.content).toContain('Hello');
+      expect(assistantMsg.content).toContain('Hi there!');
     });
 
     /* Preconditions: LLM message with model and reasoning* fields
@@ -232,14 +242,14 @@ describe('PromptBuilder.build()', () => {
 
       const chatMessages = makeBuilder().buildMessages(msgs);
       const assistant = chatMessages.find((m) => m.role === 'assistant');
-      expect(assistant).toBeDefined();
-      expect(assistant!.content).not.toContain('model');
-      expect(assistant!.content).not.toContain('My internal thoughts');
-      expect(assistant!.content).not.toContain('reasoning');
-      expect(assistant!.content).not.toContain('reasoning_summary');
-      expect(assistant!.content).not.toContain('reasoning_tokens');
-      expect(assistant!.content).not.toContain('excluded_from_replay');
-      expect(assistant!.content).toContain('Answer');
+      expectTextMessage(assistant, 'assistant');
+      expect(assistant.content).not.toContain('model');
+      expect(assistant.content).not.toContain('My internal thoughts');
+      expect(assistant.content).not.toContain('reasoning');
+      expect(assistant.content).not.toContain('reasoning_summary');
+      expect(assistant.content).not.toContain('reasoning_tokens');
+      expect(assistant.content).not.toContain('excluded_from_replay');
+      expect(assistant.content).toContain('Answer');
     });
   });
 });
@@ -320,13 +330,16 @@ describe('PromptBuilder.buildMessages()', () => {
 
     const chatMessages = makeBuilder().buildMessages(msgs);
 
-    expect(chatMessages[0].role).toBe('system');
-    expect(chatMessages[0].content).toContain('helpful AI assistant');
+    const systemMsg = chatMessages[0];
+    const userMsg = chatMessages[1];
+    const assistantMsg = chatMessages[2];
+    expectTextMessage(systemMsg, 'system');
+    expect(systemMsg.content).toContain('helpful AI assistant');
     expect(chatMessages).toHaveLength(3);
-    expect(chatMessages[1].role).toBe('user');
-    expect(chatMessages[1].content).toContain('Hello');
-    expect(chatMessages[2].role).toBe('assistant');
-    expect(chatMessages[2].content).toContain('Hi!');
+    expectTextMessage(userMsg, 'user');
+    expect(userMsg.content).toContain('Hello');
+    expectTextMessage(assistantMsg, 'assistant');
+    expect(assistantMsg.content).toContain('Hi!');
   });
 
   /* Preconditions: No messages
@@ -366,6 +379,46 @@ describe('PromptBuilder.buildMessages()', () => {
     expect(chatMessages).toHaveLength(3);
     expect(chatMessages[1].role).toBe('user');
     expect(chatMessages[2].role).toBe('assistant');
+  });
+
+  /* Preconditions: History contains terminal kind:tool_call message
+     Action: Call buildMessages()
+     Assertions: terminal tool_call is serialized as tool-result history item
+     Requirements: llm-integration.11.3.1.1, llm-integration.11.3.1.3 */
+  it('should include terminal tool_call messages in tool-result format', () => {
+    const msgs = [
+      makeMessage({
+        id: 1,
+        kind: 'user',
+        payloadJson: JSON.stringify({ data: { text: 'Question' } }),
+      }),
+      makeMessage({
+        id: 2,
+        kind: 'tool_call',
+        done: true,
+        payloadJson: JSON.stringify({
+          data: {
+            callId: 'call-1',
+            toolName: 'code_exec',
+            output: { status: 'success', stdout: 'ok' },
+          },
+        }),
+      }),
+      makeMessage({
+        id: 3,
+        kind: 'llm',
+        payloadJson: JSON.stringify({ data: { text: 'Answer' } }),
+      }),
+    ];
+
+    const chatMessages = makeBuilder().buildMessages(msgs);
+    expect(chatMessages).toHaveLength(4);
+    expect(chatMessages[2]).toMatchObject({
+      role: 'tool',
+      toolCallId: 'call-1',
+      toolName: 'code_exec',
+      result: expect.objectContaining({ status: 'success' }),
+    });
   });
 });
 

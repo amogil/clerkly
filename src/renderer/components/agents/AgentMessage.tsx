@@ -4,7 +4,7 @@ import { Check } from 'lucide-react';
 import { Message, MessageContent, MessageResponse } from '../ai-elements/message';
 import { Reasoning, ReasoningContent } from '../ai-elements/reasoning';
 import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from '../ai-elements/tool';
-import { Queue, QueueItem, QueueItemContent } from '../ai-elements/queue';
+import { Queue, QueueItem } from '../ai-elements/queue';
 import { toUIMessage } from '../../lib/messageMapper';
 import { normalizeMathDelimiters } from '../../lib/mathDelimiterNormalization';
 import type { MessageSnapshot } from '../../../shared/events/types';
@@ -141,6 +141,7 @@ export function AgentMessage({
       | {
           toolName?: unknown;
           arguments?: Record<string, unknown>;
+          output?: Record<string, unknown>;
         }
       | undefined;
 
@@ -191,6 +192,53 @@ export function AgentMessage({
 
     if (!toolPart) {
       return null;
+    }
+
+    if (toolData?.toolName === 'code_exec') {
+      const output = (toolData.output ?? {}) as {
+        status?: unknown;
+        stdout?: unknown;
+        stderr?: unknown;
+      };
+      const status =
+        typeof output.status === 'string' ? output.status : message.done ? 'success' : 'running';
+      const stdout = typeof output.stdout === 'string' ? output.stdout : '';
+      const stderr = typeof output.stderr === 'string' ? output.stderr : '';
+      const codeInput =
+        toolData.arguments && typeof toolData.arguments.code === 'string'
+          ? toolData.arguments.code
+          : JSON.stringify(toolData.arguments ?? {}, null, 2);
+
+      return (
+        <Message from="assistant" className="w-full max-w-full">
+          <Tool data-testid="message-code-exec-block">
+            <ToolHeader>
+              <div className="font-medium text-foreground">code_exec</div>
+              <div data-testid="message-code-exec-status" className="text-xs text-muted-foreground">
+                {status}
+              </div>
+            </ToolHeader>
+            <ToolContent>
+              <div>
+                <div className="mb-1 text-xs font-medium text-muted-foreground">Input code</div>
+                <ToolInput>{codeInput}</ToolInput>
+              </div>
+              {stdout.length > 0 ? (
+                <div>
+                  <div className="mb-1 text-xs font-medium text-muted-foreground">stdout</div>
+                  <ToolOutput data-testid="message-code-exec-stdout">{stdout}</ToolOutput>
+                </div>
+              ) : null}
+              {stderr.length > 0 ? (
+                <div>
+                  <div className="mb-1 text-xs font-medium text-muted-foreground">stderr</div>
+                  <ToolOutput data-testid="message-code-exec-stderr">{stderr}</ToolOutput>
+                </div>
+              ) : null}
+            </ToolContent>
+          </Tool>
+        </Message>
+      );
     }
 
     const toolName = toolPart.toolName;
