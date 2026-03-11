@@ -16,8 +16,8 @@ describe('inject-oauth-client-secret script', () => {
   let originalDotEnvContent = '';
   let originalSecret: string | undefined;
 
-  const runScript = (envOverrides: Record<string, string | undefined> = {}) =>
-    spawnSync('node', [scriptPath], {
+  const runScript = (envOverrides: Record<string, string | undefined> = {}, args: string[] = []) =>
+    spawnSync('node', [scriptPath, ...args], {
       cwd: process.cwd(),
       env: {
         ...process.env,
@@ -87,13 +87,24 @@ describe('inject-oauth-client-secret script', () => {
     expect(fs.readFileSync(targetPath, 'utf8')).toContain("clientSecret:'dotenv-secret'");
   });
 
-  it('fails with code 1 when secret is missing in process.env and .env', () => {
+  it('exits successfully in non-strict mode when secret is missing', () => {
     fs.writeFileSync(targetPath, "clientSecret:'__CLERKLY_OAUTH_CLIENT_SECRET__'", 'utf8');
 
     const result = runScript({ CLERKLY_OAUTH_CLIENT_SECRET: undefined });
 
+    expect(result.status).toBe(0);
+    expect(result.stderr.trim()).toBe('');
+    expect(fs.readFileSync(targetPath, 'utf8')).toContain('__CLERKLY_OAUTH_CLIENT_SECRET__');
+  });
+
+  it('fails with code 1 in strict mode when secret is missing in process.env and .env', () => {
+    fs.writeFileSync(targetPath, "clientSecret:'__CLERKLY_OAUTH_CLIENT_SECRET__'", 'utf8');
+
+    const result = runScript({ CLERKLY_OAUTH_CLIENT_SECRET: undefined }, ['--strict']);
+
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('CLERKLY_OAUTH_CLIENT_SECRET is not set');
+    expect(result.stderr).toContain('strict mode');
   });
 
   it('warns and exits successfully when placeholder is not found', () => {

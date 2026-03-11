@@ -7,6 +7,7 @@ const path = require('node:path');
 const PLACEHOLDER = '__CLERKLY_OAUTH_CLIENT_SECRET__';
 const targetPath = path.resolve(__dirname, '../dist/main/main/auth/OAuthConfig.js');
 const dotenvPath = path.resolve(__dirname, '../.env');
+const strictMode = process.argv.includes('--strict');
 
 function readEnvValueFromDotEnv(envFilePath, key) {
   if (!fs.existsSync(envFilePath)) {
@@ -60,10 +61,16 @@ if (!fs.existsSync(targetPath)) {
 }
 
 if (!clientSecret) {
-  console.error(
-    '[inject-oauth-client-secret] CLERKLY_OAUTH_CLIENT_SECRET is not set in process.env and was not found in .env. Build cannot continue.'
-  );
-  process.exit(1);
+  const missingSecretMessage =
+    '[inject-oauth-client-secret] CLERKLY_OAUTH_CLIENT_SECRET is not set in process.env and was not found in .env.';
+
+  if (strictMode) {
+    console.error(`${missingSecretMessage} Build cannot continue in strict mode.`);
+    process.exit(1);
+  }
+
+  // In non-strict mode we intentionally continue silently without injection.
+  process.exit(0);
 }
 
 const content = fs.readFileSync(targetPath, 'utf8');

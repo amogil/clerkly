@@ -151,6 +151,8 @@
 
 4.4. WHEN валидация проваливается, THE скрипт SHALL возвращать ненулевой код выхода
 
+4.5. THE команда `npm run validate` SHALL выполняться без обязательных runtime-secrets (`CLERKLY_OAUTH_CLIENT_SECRET`, `CLERKLY_OPENAI_API_KEY`)
+
 ### 5. Запуск Функциональных Тестов
 
 **ID:** testing.5
@@ -176,6 +178,10 @@
 5.7. IF окружение выполнения запрещает bind localhost-сокетов (например, sandbox-ограничения), THE функциональные тесты SHALL запускаться вне такого sandbox.
 
 5.8. IF запуск функциональных тестов выполняется в окружении без localhost bind permissions, THE инфраструктура SHALL считать ошибку `listen EPERM: operation not permitted 127.0.0.1` инфраструктурной ошибкой окружения, а НЕ продуктовой регрессией приложения.
+
+5.9. THE функциональные тесты SHALL НЕ требовать `CLERKLY_OAUTH_CLIENT_SECRET`; OAuth-сценарии SHALL использовать mock OAuth server (`CLERKLY_GOOGLE_API_URL`) и тестовые конфигурации.
+
+5.10. WHERE в функциональном наборе есть real-provider LLM сценарии, такие сценарии SHALL требовать только `CLERKLY_OPENAI_API_KEY` и НЕ SHALL требовать Google OAuth secret.
 
 ### 6. Требования к Окружению для Функциональных Тестов
 

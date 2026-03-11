@@ -543,7 +543,7 @@ interface MockTokenResponse {
 
 ### Команда `npm run validate`
 
-**Requirements**: testing.4.1, testing.4.2, testing.4.3, testing.4.4
+**Requirements**: testing.4.1, testing.4.2, testing.4.3, testing.4.4, testing.4.5
 
 Выполняет следующие проверки в указанном порядке:
 
@@ -589,10 +589,11 @@ echo "✅ Validation complete!"
 
 **НЕ включает**:
 - ❌ Функциональные тесты (Requirements: testing.4.2)
+- ❌ Обязательные runtime secrets (`CLERKLY_OAUTH_CLIENT_SECRET`, `CLERKLY_OPENAI_API_KEY`) (Requirements: testing.4.5)
 
 ### Отдельные Команды для Функциональных Тестов
 
-**Requirements**: testing.5.1, testing.5.2, testing.5.3, testing.5.4
+**Requirements**: testing.5.1, testing.5.2, testing.5.3, testing.5.4, testing.5.9, testing.5.10
 
 ```bash
 # Функциональные тесты (с реальным Electron, показывают окна)
@@ -611,23 +612,26 @@ npm run test:functional:single -- navigation.spec.ts
 npm test
 ```
 
-**Предупреждение пользователю**: 
+**Предупреждение пользователю**:
 
 **Requirements**: testing.5.4
 
 Перед запуском функциональных тестов пользователь должен быть предупрежден о том, что будут показаны окна на экране. Это реализовано через:
 
-1. **Сообщение в консоли** при запуске команды
-2. **Документацию в README.md**
-3. **Комментарии в package.json**
+1. **Операционный workflow** (агент/разработчик предупреждает перед запуском)
+2. **Документацию в AGENTS.md и testing-infrastructure**
 
 ```json
 {
   "scripts": {
-    "test:functional": "echo '⚠️  Functional tests will show windows on screen' && npm run rebuild:electron && npm run build && playwright test"
+    "test:functional": "npm run rebuild:electron && npm run build && playwright test"
   }
 }
 ```
+
+**Скоуп секретов для functional** (Requirements: testing.5.9, testing.5.10):
+- OAuth сценарии работают через Mock OAuth Server и не требуют `CLERKLY_OAUTH_CLIENT_SECRET`.
+- Real LLM сценарии используют только `CLERKLY_OPENAI_API_KEY`.
 
 ## Стратегия Тестирования
 
@@ -709,11 +713,23 @@ afterEach(() => {
 
 ```yaml
 # GitHub Actions example
-- name: Run validation (without functional tests)
-  run: npm run validate
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    environment: ci-env-validation
+    steps:
+      - run: npm run validate
 
-- name: Run functional tests on macOS for pull requests
-  run: npm run test:functional
+  functional:
+    runs-on: macos-latest
+    environment: ci-env-functional
+    steps:
+      - run: test -n "$CLERKLY_OPENAI_API_KEY"
+        env:
+          CLERKLY_OPENAI_API_KEY: ${{ secrets.CLERKLY_OPENAI_API_KEY }}
+      - run: npm run test:functional
+        env:
+          CLERKLY_OPENAI_API_KEY: ${{ secrets.CLERKLY_OPENAI_API_KEY }}
 ```
 
 ## Разделение Production Code и Reference Code
@@ -800,8 +816,8 @@ module.exports = {
 ```json
 {
   "scripts": {
-    "dev": "npm run build && electron .",
-    "dev:app": "npm run build && electron-builder --mac --dir && open release/mac-arm64/Clerkly.app"
+    "dev": "npm run build:strict && electron .",
+    "dev:app": "npm run build:strict && electron-builder --mac --dir && open release/mac-arm64/Clerkly.app"
   }
 }
 ```

@@ -47,7 +47,7 @@
 - ✅ Закрыт reviewer comment по `invalid_tool_arguments`: зафиксировано, что `code_exec` не запускается, `tool_call(code_exec)` не создаётся и ошибка возвращается как model response validation error.
 - ✅ Унифицирован invalid-tool-args flow в `MainPipeline`: validation-feedback передаётся модели на retry, persisted `tool_call` не создаётся для невалидных аргументов, при исчерпании retry создаётся только `kind:error`.
 - ✅ Добавлены unit-тесты `MainPipeline` на отсутствие persist `tool_call` при invalid args и на retry-feedback в последующие provider-вызовы.
-- ✅ Добавлены unit-тесты для `scripts/inject-oauth-client-secret.js` (env, `.env` fallback, fail-fast, placeholder warning).
+- ✅ Добавлены unit-тесты для `scripts/inject-oauth-client-secret.js` (env, `.env` fallback, non-strict pass-through, strict fail-fast, placeholder warning).
 - ✅ Синхронизированы `llm-integration/code_exec/google-oauth-auth` requirements/design и coverage-матрицы с новым контрактом.
 
 ### В Работе
@@ -144,5 +144,5 @@
 
 #### Фаза 9: OAuth Build Injection Validation
 
-- [x] Добавить unit-тесты для `scripts/inject-oauth-client-secret.js`: чтение `CLERKLY_OAUTH_CLIENT_SECRET` из `process.env`, fallback из `.env`, fail-fast при отсутствии значения.
+- [x] Добавить unit-тесты для `scripts/inject-oauth-client-secret.js`: чтение `CLERKLY_OAUTH_CLIENT_SECRET` из `process.env`, fallback из `.env`, pass-through в non-strict и fail-fast в strict-режиме при отсутствии значения.
 - [x] Добавить тест-кейс на отсутствие placeholder в build output (скрипт не падает, но логирует warning) и зафиксировать это поведение в `docs/specs/google-oauth-auth/design.md`.

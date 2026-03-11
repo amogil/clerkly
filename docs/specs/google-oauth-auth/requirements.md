@@ -229,7 +229,9 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
 
 1. "OAuth Client" ДОЛЖЕН хранить client_id как константу в конфигурационном файле кода И ДОЛЖЕН загружать client_secret из `CLERKLY_OAUTH_CLIENT_SECRET` (на этапе сборки приложения)
 2. КОГДА `CLERKLY_OAUTH_CLIENT_SECRET` отсутствует в `process.env`, build-time инжектор ДОЛЖЕН попытаться загрузить значение из файла `.env` в корне проекта
-3. ЕСЛИ `CLERKLY_OAUTH_CLIENT_SECRET` отсутствует и в `process.env`, и в `.env`, build-time инжектор ДОЛЖЕН завершать сборку с ошибкой (ненулевой код выхода)
+3. ЕСЛИ `CLERKLY_OAUTH_CLIENT_SECRET` отсутствует и в `process.env`, и в `.env`, ТО build-time инжектор ДОЛЖЕН:
+   - в strict-режиме сборки (`npm run build:strict`, `npm run start`, `npm run dev`, `npm run dev:app`) завершать сборку с ошибкой (ненулевой код выхода);
+   - в non-strict-режиме сборки (`npm run build`, `npm run validate`, `npm run test:functional*`) продолжать сборку без инъекции значения.
 4. "OAuth Client" ДОЛЖЕН использовать redirect_uri в формате "com.googleusercontent.apps.CLIENT_ID:/oauth2redirect" (reverse client ID format), где CLIENT_ID - это числовая часть Client ID без суффикса ".apps.googleusercontent.com"
 5. "OAuth Client" ДОЛЖЕН запрашивать следующие scopes: "openid", "email", "profile"
 6. "OAuth Client" ДОЛЖЕН использовать authorization endpoint: "https://accounts.google.com/o/oauth2/v2/auth"

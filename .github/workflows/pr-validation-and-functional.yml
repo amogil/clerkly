@@ -34,11 +34,7 @@ jobs:
         run: npm ci
 
       - name: Run validation
-        env:
-          CLERKLY_OAUTH_CLIENT_SECRET: ${{ secrets.CLERKLY_OAUTH_CLIENT_SECRET }}
-        run: |
-          test -n "$CLERKLY_OAUTH_CLIENT_SECRET"
-          npm run validate:verbose
+        run: npm run validate:verbose
 
   functional:
     if: github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository
