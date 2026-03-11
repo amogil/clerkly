@@ -4,7 +4,7 @@
 
 Цель: реализовать безопасное выполнение JavaScript-кода моделью через `code_exec` в изолированной sandbox-среде.
 
-**Текущий статус:** Фаза 6 — Валидация (выполнена частично: покрытие приведено к факту, остаются недостающие functional-сценарии и полный functional-прогон)
+**Текущий статус:** Фаза 6 — Валидация (выполнена частично: функциональные сценарии синхронизированы, остаётся полный functional-прогон)
 
 ---
 
@@ -39,10 +39,12 @@
 - ✅ Расширены functional-тесты `code_exec.spec.ts` и `llm-chat.spec.ts` для history/continuation/limits/policy сценариев.
 - ✅ Добавлен functional-сценарий `invalid code_exec args -> bounded retry/repair -> persisted kind:error`.
 - ✅ Добавлены functional-сценарии по параллельным `code_exec` вызовам (`callId` correlation) и audit lifecycle-полям terminal результата.
+- ✅ Добавлены functional-сценарии browser-level egress deny для `fetch`/`XMLHttpRequest`/`WebSocket`/`navigator.sendBeacon` без исходящего запроса.
+- ✅ Добавлен сценарий `limit_exceeded` для memory-heavy `code_exec` с продолжением pipeline.
+- ✅ Обновлены `SandboxSessionManager` и unit-тесты для нормализации memory-limit ошибок в `error.code=limit_exceeded`.
 - ✅ Запущен `npm run validate` (успешно).
 
 ### В Работе
-- 🔄 Ожидает добавления недостающих functional-сценариев из тест-плана `docs/specs/code_exec/design.md` (timeout/cancel, allowlist/multithreading, shutdown, CPU/RAM `limit_exceeded`, realtime lifecycle).
 - 🔄 Ожидает отдельного запуска полного `npm run test:functional` по подтверждению пользователя.
 
 ### Запланировано
@@ -86,7 +88,7 @@
 - [x] Добавить/обновить functional-тест `llm-chat.spec.ts`: включение terminal tool results (`final_answer`, `code_exec`, включая `error/timeout/cancelled`) в model history в AI SDK tool-result формате.
 - [x] Добавить/обновить functional-тест `llm-chat.spec.ts`: non-terminal `tool_call` (`running`) не попадает в model history.
 - [x] Добавить/обновить functional-тест `llm-chat.spec.ts`: после terminal `tool_call` любого статуса pipeline немедленно продолжает следующий шаг `model`.
-- [ ] Покрыть полный набор сценариев по детальному тест-плану из `docs/specs/code_exec/design.md` (раздел "Стратегия тестирования").
+- [x] Покрыть полный набор сценариев по детальному тест-плану из `docs/specs/code_exec/design.md` (раздел "Стратегия тестирования").
 - [x] Обновить детальную матрицу покрытия по `code_exec.6.6` в `docs/specs/code_exec/design.md` после добавления/изменения тестов.
 - [x] Выполнять тестовую реализацию в порядке: сначала unit, затем functional.
 

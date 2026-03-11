@@ -15,6 +15,9 @@ import { createSandboxToolsProxy } from './SandboxBridge';
 const POLICY_DENIED_NETWORK_MESSAGE =
   'Browser-level network APIs are not allowed in sandbox runtime.';
 const POLICY_DENIED_MULTITHREAD_MESSAGE = 'Multithreading APIs are not allowed in sandbox runtime.';
+const LIMIT_EXCEEDED_MEMORY_MESSAGE = `code_exec memory limit exceeded (${Math.round(
+  CODE_EXEC_LIMITS.sandboxMemoryLimitBytes / (1024 * 1024 * 1024)
+)} GiB).`;
 
 type SessionHandle = {
   id: string;
@@ -193,6 +196,16 @@ export class SandboxSessionManager {
           },
         };
       }
+      if (this.isMemoryLimitError(message)) {
+        const base = this.finalizeOutput('error', stdoutChunks, stderrChunks);
+        return {
+          ...base,
+          error: {
+            code: 'limit_exceeded',
+            message: `${LIMIT_EXCEEDED_MEMORY_MESSAGE} ${message}`,
+          },
+        };
+      }
 
       const base = this.finalizeOutput('error', stdoutChunks, stderrChunks);
       return {
@@ -203,6 +216,17 @@ export class SandboxSessionManager {
         },
       };
     }
+  }
+
+  // Requirements: code_exec.2.11.3, code_exec.3.1.2.3.1
+  private isMemoryLimitError(message: string): boolean {
+    const lower = message.toLowerCase();
+    return (
+      lower.includes('heap out of memory') ||
+      lower.includes('allocation failed') ||
+      lower.includes('invalid array length') ||
+      lower.includes('invalid string length')
+    );
   }
 
   private finalizeOutput(

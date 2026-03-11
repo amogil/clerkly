@@ -23,6 +23,7 @@ let window: Page;
 let mockOAuthServer: MockOAuthServer;
 let mockLLMServer: MockLLMServer;
 let mockLLMPort: number;
+let appClosedInTest: boolean;
 
 async function launchWithMockLLM() {
   const context = await launchElectronWithMockOAuth(mockOAuthServer, {
@@ -63,6 +64,56 @@ async function getAllMessages(agentId: string): Promise<Array<Record<string, unk
   }, agentId);
 }
 
+async function findCodeExecCallByCallId(
+  agentId: string,
+  callId: string
+): Promise<
+  | {
+      kind?: string;
+      done?: boolean;
+      replyToMessageId?: number | null;
+      payload?: {
+        data?: {
+          callId?: string;
+          toolName?: string;
+          output?: {
+            status?: string;
+            error?: { code?: string; message?: string };
+            started_at?: string;
+            finished_at?: string;
+            duration_ms?: number;
+          };
+        };
+      };
+    }
+  | undefined
+> {
+  const toolCalls = await getToolCallMessages(agentId);
+  return toolCalls.find((entry) => {
+    const payload = entry.payload as { data?: { callId?: string; toolName?: string } };
+    return payload?.data?.toolName === 'code_exec' && payload?.data?.callId === callId;
+  }) as
+    | {
+        kind?: string;
+        done?: boolean;
+        replyToMessageId?: number | null;
+        payload?: {
+          data?: {
+            callId?: string;
+            toolName?: string;
+            output?: {
+              status?: string;
+              error?: { code?: string; message?: string };
+              started_at?: string;
+              finished_at?: string;
+              duration_ms?: number;
+            };
+          };
+        };
+      }
+    | undefined;
+}
+
 test.beforeAll(async () => {
   mockOAuthServer = await createMockOAuthServer();
   mockLLMPort = await getFreePort();
@@ -80,6 +131,7 @@ test.afterAll(async () => {
 });
 
 test.beforeEach(async () => {
+  appClosedInTest = false;
   mockOAuthServer.setUserProfile({
     id: 'test-code-exec-user',
     email: 'code.exec@example.com',
@@ -94,7 +146,7 @@ test.beforeEach(async () => {
 });
 
 test.afterEach(async () => {
-  if (electronApp) {
+  if (electronApp && !appClosedInTest) {
     await electronApp.close();
   }
 });
@@ -605,6 +657,99 @@ test.describe('code_exec tool loop execution', () => {
     }
   });
 
+  /* Preconditions: local server tracks incoming requests, mock model emits fetch/xhr/websocket/sendBeacon in separate code_exec calls
+     Action: user sends a message that triggers browser-level network APIs inside sandbox runtime
+     Assertions: each terminal result is policy_denied and no outbound request reaches local server
+     Requirements: code_exec.2.3.1, code_exec.2.3.2 */
+  test('should deny fetch/xhr/websocket/sendBeacon and perform no network request', async () => {
+    const port = await getFreePort();
+    let requestCount = 0;
+    const localServer = http.createServer((_req, res) => {
+      requestCount += 1;
+      res.statusCode = 200;
+      res.end('ok');
+    });
+    await new Promise<void>((resolve) => localServer.listen(port, '127.0.0.1', () => resolve()));
+
+    try {
+      mockLLMServer.setStreamingMode(true);
+      mockLLMServer.setOpenAIStreamScripts([
+        {
+          toolCalls: [
+            {
+              callId: 'deny-fetch',
+              toolName: 'code_exec',
+              arguments: {
+                code: `await fetch('http://127.0.0.1:${port}/fetch-blocked')`,
+                timeout_ms: 10000,
+              },
+            },
+          ],
+        },
+        {
+          toolCalls: [
+            {
+              callId: 'deny-xhr',
+              toolName: 'code_exec',
+              arguments: {
+                code: `const xhr = new XMLHttpRequest(); xhr.open('GET', 'http://127.0.0.1:${port}/xhr-blocked', true); xhr.send();`,
+                timeout_ms: 10000,
+              },
+            },
+          ],
+        },
+        {
+          toolCalls: [
+            {
+              callId: 'deny-websocket',
+              toolName: 'code_exec',
+              arguments: {
+                code: `new WebSocket('ws://127.0.0.1:${port}/ws-blocked')`,
+                timeout_ms: 10000,
+              },
+            },
+          ],
+        },
+        {
+          toolCalls: [
+            {
+              callId: 'deny-sendbeacon',
+              toolName: 'code_exec',
+              arguments: {
+                code: `navigator.sendBeacon('http://127.0.0.1:${port}/beacon-blocked', 'x')`,
+                timeout_ms: 10000,
+              },
+            },
+          ],
+        },
+        {
+          content: '{"action":{"type":"text","content":"network APIs denied"}}',
+        },
+      ]);
+
+      await launchWithMockLLM();
+      await sendUserMessage('Try browser-level network APIs');
+      await expect(window.locator('.message-llm-action-response').last()).toContainText(
+        'network APIs denied',
+        {
+          timeout: 15000,
+        }
+      );
+
+      const agentId = (await getAgentIdsFromApi(window))[0];
+      const callIds = ['deny-fetch', 'deny-xhr', 'deny-websocket', 'deny-sendbeacon'];
+      for (const callId of callIds) {
+        const denied = await findCodeExecCallByCallId(agentId, callId);
+        expect(denied).toBeDefined();
+        expect(denied?.payload?.data?.output?.error?.code).toBe('policy_denied');
+      }
+      expect(requestCount).toBe(0);
+      await expectNoToastError(window);
+    } finally {
+      await new Promise<void>((resolve) => localServer.close(() => resolve()));
+    }
+  });
+
   /* Preconditions: first request finishes with terminal code_exec tool result, second request is sent
      Action: user sends two messages sequentially
      Assertions: second provider request includes terminal code_exec tool-result in model history
@@ -656,5 +801,390 @@ test.describe('code_exec tool loop execution', () => {
     expect(requestDump).toContain('hist-1');
     expect(requestDump).toContain('success');
     await expectNoToastError(window);
+  });
+
+  /* Preconditions: mock model emits long-running code_exec with explicit timeout, then next model response
+     Action: user sends a message
+     Assertions: terminal code_exec carries limit_exceeded timeout signal and pipeline continues to next model step
+     Requirements: code_exec.2.5, code_exec.3.1.2.6, code_exec.5.6, code_exec.6.3 */
+  test('should timeout long-running code_exec execution and continue loop', async () => {
+    mockLLMServer.setStreamingMode(true);
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        toolCalls: [
+          {
+            callId: 'timeout-1',
+            toolName: 'code_exec',
+            arguments: { code: 'while (true) {}', timeout_ms: 10000 },
+          },
+        ],
+      },
+      {
+        content: '{"action":{"type":"text","content":"timeout recovered"}}',
+      },
+    ]);
+
+    await launchWithMockLLM();
+    await sendUserMessage('Run code with timeout');
+    await expect(window.locator('.message-llm-action-response').last()).toContainText(
+      'timeout recovered',
+      { timeout: 20000 }
+    );
+
+    const agentId = (await getAgentIdsFromApi(window))[0];
+    const timeoutCall = await findCodeExecCallByCallId(agentId, 'timeout-1');
+    expect(timeoutCall?.payload?.data?.output?.error?.code).toBe('limit_exceeded');
+    expect(timeoutCall?.payload?.data?.output?.error?.message ?? '').toContain('timeout');
+    await expectNoToastError(window);
+  });
+
+  /* Preconditions: mock model emits memory-heavy code_exec and then next model response
+     Action: user sends a message
+     Assertions: terminal code_exec returns limit_exceeded with RAM limit diagnostic and pipeline continues
+     Requirements: code_exec.2.11.3, code_exec.3.1.2.3.1, code_exec.6.3 */
+  test('should return limit_exceeded for memory-heavy code_exec and continue loop', async () => {
+    mockLLMServer.setStreamingMode(true);
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        toolCalls: [
+          {
+            callId: 'memory-1',
+            toolName: 'code_exec',
+            arguments: { code: "const huge = 'x'.repeat(2 ** 31); console.log(huge.length);" },
+          },
+        ],
+      },
+      {
+        content: '{"action":{"type":"text","content":"memory handled"}}',
+      },
+    ]);
+
+    await launchWithMockLLM();
+    await sendUserMessage('Run memory heavy code');
+    await expect(window.locator('.message-llm-action-response').last()).toContainText(
+      'memory handled',
+      { timeout: 20000 }
+    );
+
+    const agentId = (await getAgentIdsFromApi(window))[0];
+    const memoryCall = await findCodeExecCallByCallId(agentId, 'memory-1');
+    expect(memoryCall?.payload?.data?.output?.error?.code).toBe('limit_exceeded');
+    expect(memoryCall?.payload?.data?.output?.error?.message ?? '').toContain('2 GiB');
+    await expectNoToastError(window);
+  });
+
+  /* Preconditions: mock model emits non-terminating code_exec call
+     Action: user sends a message and cancels active run
+     Assertions: cancel request succeeds and no kind:error is persisted for this turn
+     Requirements: code_exec.2.6, code_exec.3.1.2.4, code_exec.3.1.2.7, code_exec.4.5, code_exec.6.3 */
+  test('should cancel active code_exec execution without persisting kind:error', async () => {
+    mockLLMServer.setStreamingMode(true);
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        toolCalls: [
+          {
+            callId: 'cancel-1',
+            toolName: 'code_exec',
+            arguments: {
+              code: 'await new Promise(() => {});',
+              timeout_ms: 60000,
+            },
+          },
+        ],
+      },
+    ]);
+
+    await launchWithMockLLM();
+    const promptText = 'Start cancellable code_exec';
+    await sendUserMessage(promptText);
+
+    const agentId = (await getAgentIdsFromApi(window))[0];
+    await expect(window.locator('[data-testid="prompt-input-stop"]')).toBeVisible({
+      timeout: 5000,
+    });
+
+    const cancelResult = await window.evaluate(async (id) => {
+      const api = (window as unknown as { api: any }).api;
+      return await api.messages.cancel(id);
+    }, agentId as string);
+    expect(cancelResult?.success).toBe(true);
+
+    await expect(window.locator('[data-testid="prompt-input-send"]')).toBeVisible({
+      timeout: 5000,
+    });
+
+    await expect
+      .poll(async () => {
+        const messages = await getAllMessages(agentId);
+        const userTurn = [...messages].reverse().find((entry) => {
+          const payload = entry.payload as { data?: { text?: string } };
+          return entry.kind === 'user' && payload?.data?.text === promptText;
+        }) as { id?: number } | undefined;
+        const userTurnId = userTurn?.id;
+        if (typeof userTurnId !== 'number') {
+          return -1;
+        }
+        return messages.filter(
+          (entry) => entry.kind === 'error' && entry.replyToMessageId === userTurnId
+        ).length;
+      })
+      .toBe(0);
+
+    await expectNoToastError(window);
+  });
+
+  /* Preconditions: mock model emits code_exec calls that invoke main-pipeline-only and non-allowlisted sandbox tools
+     Action: user sends a message
+     Assertions: both calls end with policy_denied and specific policy messages
+     Requirements: code_exec.2.7, code_exec.2.8, code_exec.2.8.1 */
+  test('should deny main-pipeline-only and non-allowlisted sandbox tools', async () => {
+    mockLLMServer.setStreamingMode(true);
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        toolCalls: [
+          {
+            callId: 'tool-deny-main',
+            toolName: 'code_exec',
+            arguments: {
+              code: "window.tools.final_answer({ summary_points: ['x'] })",
+              timeout_ms: 10000,
+            },
+          },
+        ],
+      },
+      {
+        toolCalls: [
+          {
+            callId: 'tool-deny-allowlist',
+            toolName: 'code_exec',
+            arguments: {
+              code: "window.tools.search_docs({ query: 'x' })",
+              timeout_ms: 10000,
+            },
+          },
+        ],
+      },
+      {
+        content: '{"action":{"type":"text","content":"policy handled"}}',
+      },
+    ]);
+
+    await launchWithMockLLM();
+    await sendUserMessage('Run forbidden sandbox tools');
+    await expect(window.locator('.message-llm-action-response').last()).toContainText(
+      'policy handled',
+      {
+        timeout: 15000,
+      }
+    );
+
+    const agentId = (await getAgentIdsFromApi(window))[0];
+    const mainDenied = await findCodeExecCallByCallId(agentId, 'tool-deny-main');
+    const allowlistDenied = await findCodeExecCallByCallId(agentId, 'tool-deny-allowlist');
+    expect(mainDenied?.payload?.data?.output?.error?.code).toBe('policy_denied');
+    expect(mainDenied?.payload?.data?.output?.error?.message ?? '').toContain(
+      'Main-pipeline-only tool is denied in sandbox runtime.'
+    );
+    expect(allowlistDenied?.payload?.data?.output?.error?.code).toBe('policy_denied');
+    expect(allowlistDenied?.payload?.data?.output?.error?.message ?? '').toContain(
+      'Tool is not allowed in sandbox allowlist.'
+    );
+    await expectNoToastError(window);
+  });
+
+  /* Preconditions: mock model emits code_exec call that uses Worker API
+     Action: user sends a message
+     Assertions: terminal policy_denied is returned with multithreading denial reason
+     Requirements: code_exec.2.9, code_exec.2.9.1 */
+  test('should deny multithreading APIs in sandbox runtime', async () => {
+    mockLLMServer.setStreamingMode(true);
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        toolCalls: [
+          {
+            callId: 'deny-worker',
+            toolName: 'code_exec',
+            arguments: {
+              code: "new Worker('data:text/javascript,postMessage(1)')",
+              timeout_ms: 10000,
+            },
+          },
+        ],
+      },
+      {
+        content: '{"action":{"type":"text","content":"worker denied"}}',
+      },
+    ]);
+
+    await launchWithMockLLM();
+    await sendUserMessage('Try multithreading API');
+    await expect(window.locator('.message-llm-action-response').last()).toContainText(
+      'worker denied',
+      {
+        timeout: 15000,
+      }
+    );
+
+    const agentId = (await getAgentIdsFromApi(window))[0];
+    const denied = await findCodeExecCallByCallId(agentId, 'deny-worker');
+    expect(denied?.payload?.data?.output?.error?.code).toBe('policy_denied');
+    expect(denied?.payload?.data?.output?.error?.message ?? '').toContain(
+      'Multithreading APIs are not allowed in sandbox runtime.'
+    );
+    await expectNoToastError(window);
+  });
+
+  /* Preconditions: runtime event subscription is active and mock model emits one code_exec success call
+     Action: user sends a message and waits for completion
+     Assertions: both message.created and message.updated are emitted for code_exec lifecycle in same callId
+     Requirements: code_exec.4.2, code_exec.4.3, code_exec.4.6 */
+  test('should publish message.created and message.updated for code_exec lifecycle', async () => {
+    mockLLMServer.setStreamingMode(true);
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        toolCalls: [
+          {
+            callId: 'evt-1',
+            toolName: 'code_exec',
+            arguments: {
+              code: "console.log('evt')",
+              timeout_ms: 10000,
+            },
+          },
+        ],
+      },
+      {
+        content: '{"action":{"type":"text","content":"evt done"}}',
+      },
+    ]);
+
+    await launchWithMockLLM();
+    await window.evaluate(() => {
+      const globalWindow = window as unknown as {
+        api: any;
+        __codeExecLifecycleEvents?: Array<{ type: string; payload: any }>;
+        __unsubscribeCodeExecEvents?: () => void;
+      };
+      globalWindow.__codeExecLifecycleEvents = [];
+      globalWindow.__unsubscribeCodeExecEvents = globalWindow.api.events?.onEvent(
+        (type: string, payload: unknown) => {
+          globalWindow.__codeExecLifecycleEvents?.push({ type, payload });
+        }
+      );
+    });
+
+    try {
+      await sendUserMessage('Emit lifecycle events');
+      await expect(window.locator('.message-llm-action-response').last()).toContainText(
+        'evt done',
+        {
+          timeout: 15000,
+        }
+      );
+
+      await expect
+        .poll(async () => {
+          return await window.evaluate(() => {
+            const globalWindow = window as unknown as {
+              __codeExecLifecycleEvents?: Array<{ type: string; payload: any }>;
+            };
+            const events = globalWindow.__codeExecLifecycleEvents ?? [];
+            const codeExecEvents = events.filter((entry) => {
+              const message = entry.payload?.message;
+              return (
+                (entry.type === 'message.created' || entry.type === 'message.updated') &&
+                message?.kind === 'tool_call' &&
+                message?.payload?.data?.toolName === 'code_exec' &&
+                message?.payload?.data?.callId === 'evt-1'
+              );
+            });
+            const created = codeExecEvents.filter((entry) => entry.type === 'message.created');
+            const updated = codeExecEvents.filter((entry) => entry.type === 'message.updated');
+            return {
+              createdCount: created.length,
+              updatedCount: updated.length,
+              hasRunningCreated: created.some(
+                (entry) => entry.payload?.message?.payload?.data?.output?.status === 'running'
+              ),
+              hasTerminalUpdated: updated.some((entry) => {
+                const status = entry.payload?.message?.payload?.data?.output?.status;
+                const done = entry.payload?.message?.done;
+                return status === 'success' && done === true;
+              }),
+            };
+          });
+        })
+        .toEqual(
+          expect.objectContaining({
+            createdCount: expect.any(Number),
+            updatedCount: expect.any(Number),
+            hasRunningCreated: true,
+            hasTerminalUpdated: true,
+          })
+        );
+      const lifecycleCounters = await window.evaluate(() => {
+        const globalWindow = window as unknown as {
+          __codeExecLifecycleEvents?: Array<{ type: string; payload: any }>;
+        };
+        const events = globalWindow.__codeExecLifecycleEvents ?? [];
+        const codeExecEvents = events.filter((entry) => {
+          const message = entry.payload?.message;
+          return (
+            (entry.type === 'message.created' || entry.type === 'message.updated') &&
+            message?.kind === 'tool_call' &&
+            message?.payload?.data?.toolName === 'code_exec' &&
+            message?.payload?.data?.callId === 'evt-1'
+          );
+        });
+        return {
+          createdCount: codeExecEvents.filter((entry) => entry.type === 'message.created').length,
+          updatedCount: codeExecEvents.filter((entry) => entry.type === 'message.updated').length,
+        };
+      });
+      expect(lifecycleCounters.createdCount).toBeGreaterThanOrEqual(1);
+      expect(lifecycleCounters.updatedCount).toBeGreaterThanOrEqual(1);
+      await expectNoToastError(window);
+    } finally {
+      await window.evaluate(() => {
+        const globalWindow = window as unknown as { __unsubscribeCodeExecEvents?: () => void };
+        globalWindow.__unsubscribeCodeExecEvents?.();
+      });
+    }
+  });
+
+  /* Preconditions: active long-running code_exec execution is in-flight
+     Action: app receives close request
+     Assertions: shutdown completes within bounded time (no hanging close)
+     Requirements: code_exec.2.10, code_exec.2.10.1 */
+  test('should shutdown without hanging when code_exec is active', async () => {
+    mockLLMServer.setStreamingMode(true);
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        toolCalls: [
+          {
+            callId: 'shutdown-1',
+            toolName: 'code_exec',
+            arguments: {
+              code: 'await new Promise(() => {});',
+              timeout_ms: 60000,
+            },
+          },
+        ],
+      },
+    ]);
+
+    await launchWithMockLLM();
+    await sendUserMessage('Start run and close app');
+
+    await expect(window.locator('[data-testid="prompt-input-stop"]')).toBeVisible({
+      timeout: 5000,
+    });
+
+    const closedWithinBound = await Promise.race([
+      electronApp.close().then(() => true),
+      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 5000)),
+    ]);
+    expect(closedWithinBound).toBe(true);
+    appClosedInTest = true;
   });
 });

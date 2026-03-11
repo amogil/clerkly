@@ -238,8 +238,9 @@ Lifecycle:
 - `tests/functional/code_exec.spec.ts` — несколько вызовов в одном turn (включая параллельные) и корреляция по `callId`.
 - `tests/functional/code_exec.spec.ts` — persisted lifecycle/audit поля (`started_at`, `finished_at`, `duration_ms`) для terminal `code_exec`.
 - `tests/functional/code_exec.spec.ts` — browser-level безопасность (`policy_denied` для `window.open`, `location.assign`, `location.replace`).
-- `tests/functional/code_exec.spec.ts` — browser-level network egress enforcement (`window.open`, `location.assign`, `location.replace` блокируются с `policy_denied`, без исходящих запросов).
+- `tests/functional/code_exec.spec.ts` — browser-level network egress enforcement (`fetch`, `XMLHttpRequest`, `WebSocket`, `navigator.sendBeacon`, `window.open`, `location.assign`, `location.replace` блокируются с `policy_denied`, без исходящих запросов).
 - `tests/functional/code_exec.spec.ts` — лимиты `code`/`stdout`/`stderr` и truncated-флаги.
+- `tests/functional/code_exec.spec.ts` — timeout/cancel/shutdown lifecycle и `limit_exceeded` сигналы по ресурсоёмким сценариям.
 - `tests/functional/code_exec.spec.ts` — integration в общий `kind:tool_call` pipeline и продолжение цикла `model -> tools -> model`.
 - `tests/functional/llm-chat.spec.ts` — terminal `tool_call` включаются в model history, non-terminal не включаются, pipeline продолжает следующий шаг `model`.
 
@@ -256,7 +257,7 @@ Lifecycle:
 | code_exec.2.7-2.8.2 | `tests/unit/code_exec/SandboxBridge.test.ts` | - |
 | code_exec.2.9-2.9.1 | `tests/unit/code_exec/SandboxRuntime.test.ts` | - |
 | code_exec.2.10-2.10.1 | `tests/unit/code_exec/SandboxSessionManager.test.ts` | - |
-| code_exec.2.11-2.11.4 | `tests/unit/code_exec/SandboxSessionManager.test.ts` | - |
+| code_exec.2.11-2.11.4 | `tests/unit/code_exec/SandboxSessionManager.test.ts` | Частично: `tests/functional/code_exec.spec.ts` покрывает `limit_exceeded` terminal-path |
 | code_exec.3.1-3.1.1 | `tests/unit/code_exec/CodeExecToolSchema.test.ts` | `tests/functional/code_exec.spec.ts` |
 | code_exec.3.1.2-3.1.2.7 | `tests/unit/code_exec/CodeExecToolSchema.test.ts` | `tests/functional/code_exec.spec.ts` |
 | code_exec.3.1.3-3.1.5 | `tests/unit/code_exec/CodeExecToolSchema.test.ts` | `tests/functional/code_exec.spec.ts` |
@@ -273,6 +274,6 @@ Lifecycle:
 | code_exec.5.4-5.6 | `tests/unit/code_exec/SandboxSessionManager.test.ts` | - |
 | code_exec.5.7 | `tests/unit/code_exec/CodeExecPersistenceMapper.test.ts` | `tests/functional/code_exec.spec.ts` |
 | code_exec.6.1-6.2 | `tests/unit/agents/MainPipeline.test.ts`, `tests/unit/code_exec/*.test.ts` | `tests/functional/code_exec.spec.ts` |
-| code_exec.6.3 | `tests/unit/agents/MainPipeline.test.ts`, `tests/unit/code_exec/SandboxSessionManager.test.ts` | Частично: `tests/functional/code_exec.spec.ts` покрывает success/error/policy_denied; timeout/cancel не покрыты |
+| code_exec.6.3 | `tests/unit/agents/MainPipeline.test.ts`, `tests/unit/code_exec/SandboxSessionManager.test.ts` | `tests/functional/code_exec.spec.ts` |
 | code_exec.6.4 | `tests/unit/agents/MainPipeline.test.ts`, `tests/unit/code_exec/*.test.ts` | `tests/functional/code_exec.spec.ts` |
 | code_exec.6.5-6.6 | `tests/unit/code_exec/*.test.ts` | `tests/functional/code_exec.spec.ts`, `tests/functional/llm-chat.spec.ts` |

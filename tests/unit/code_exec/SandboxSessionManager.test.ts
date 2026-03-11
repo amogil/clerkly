@@ -102,6 +102,22 @@ describe('SandboxSessionManager.execute', () => {
     runSpy.mockRestore();
   });
 
+  it('maps memory allocation failures to limit_exceeded', async () => {
+    const manager = new SandboxSessionManager();
+    const runSpy = jest.spyOn(vm, 'runInContext').mockImplementation(() => {
+      throw new RangeError('Invalid string length');
+    });
+
+    const result = await manager.execute('agent-1', 'call-1', {
+      code: "const huge = 'x'.repeat(2 ** 31)",
+    });
+
+    expect(result.status).toBe('error');
+    expect(result.error?.code).toBe('limit_exceeded');
+    expect(result.error?.message ?? '').toContain('2 GiB');
+    runSpy.mockRestore();
+  });
+
   it('returns sandbox_runtime_error for generic runtime exceptions', async () => {
     const manager = new SandboxSessionManager();
     const result = await manager.execute('agent-1', 'call-1', {
