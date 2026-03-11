@@ -19,9 +19,12 @@ export type ChatMessage =
     }
   | {
       role: 'tool';
-      toolCallId: string;
-      toolName: string;
-      result: unknown;
+      content: Array<{
+        type: 'tool-result';
+        toolCallId: string;
+        toolName: string;
+        result: unknown;
+      }>;
     };
 
 /**

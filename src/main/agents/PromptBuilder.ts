@@ -212,12 +212,17 @@ export class PromptBuilder {
 
     return {
       role: 'tool',
-      toolCallId,
-      toolName,
-      result: {
-        status: outputStatus ?? 'success',
-        output: output ?? null,
-      },
+      content: [
+        {
+          type: 'tool-result',
+          toolCallId,
+          toolName,
+          result: {
+            status: outputStatus ?? 'success',
+            output: output ?? null,
+          },
+        },
+      ],
     };
   }
 

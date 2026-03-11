@@ -415,9 +415,14 @@ describe('PromptBuilder.buildMessages()', () => {
     expect(chatMessages).toHaveLength(4);
     expect(chatMessages[2]).toMatchObject({
       role: 'tool',
-      toolCallId: 'call-1',
-      toolName: 'code_exec',
-      result: expect.objectContaining({ status: 'success' }),
+      content: [
+        {
+          type: 'tool-result',
+          toolCallId: 'call-1',
+          toolName: 'code_exec',
+          result: expect.objectContaining({ status: 'success' }),
+        },
+      ],
     });
   });
 });
