@@ -4,7 +4,7 @@
 
 Цель: реализовать безопасное выполнение JavaScript-кода моделью через `code_exec` в изолированной sandbox-среде.
 
-**Текущий статус:** Фаза 8 — Gap Closure (в работе: синхронизация целевого контракта `invalid tool_call args` между requirements/design/code/tests)
+**Текущий статус:** Фаза 8 — Gap Closure (реализация завершена, ожидается только полный `npm run test:functional` по подтверждению пользователя)
 
 ---
 
@@ -45,11 +45,13 @@
 - ✅ Синхронизированы `code_exec` requirements/design с фактической реализацией lifecycle и resource-limit semantics (без несуществующего monitor/throttle loop).
 - ✅ Запущен `npm run validate` (успешно).
 - ✅ Закрыт reviewer comment по `invalid_tool_arguments`: зафиксировано, что `code_exec` не запускается, `tool_call(code_exec)` не создаётся и ошибка возвращается как model response validation error.
+- ✅ Унифицирован invalid-tool-args flow в `MainPipeline`: validation-feedback передаётся модели на retry, persisted `tool_call` не создаётся для невалидных аргументов, при исчерпании retry создаётся только `kind:error`.
+- ✅ Добавлены unit-тесты `MainPipeline` на отсутствие persist `tool_call` при invalid args и на retry-feedback в последующие provider-вызовы.
+- ✅ Добавлены unit-тесты для `scripts/inject-oauth-client-secret.js` (env, `.env` fallback, fail-fast, placeholder warning).
+- ✅ Синхронизированы `llm-integration/code_exec/google-oauth-auth` requirements/design и coverage-матрицы с новым контрактом.
 
 ### В Работе
 - 🔄 Ожидает отдельного запуска полного `npm run test:functional` по подтверждению пользователя.
-- 🔄 Follow-up: вернуть обязательный (`SHALL`) degraded/throttled mode для resource limits (`stderr` сигнал при best-effort containment) и синхронизировать код/спеки/покрытие.
-- 🔄 Follow-up: довести до целевого общего контракта по невалидным аргументам любого `tool_call` (без persisted `tool_call`, только retry/repair и затем `kind:error` при исчерпании).
 
 ### Запланировано
 
@@ -110,36 +112,37 @@
 
 #### Фаза 7: Resource Degraded Mode (SHALL)
 
-- [ ] Вернуть в `docs/specs/code_exec/requirements.md` и `design.md` обязательное требование degraded/throttled режима при приближении к CPU/RAM лимитам.
-- [ ] Реализовать monitor loop в `SandboxSessionManager` (интервал `monitorIntervalMs`) с best-effort containment.
-- [ ] Добавить обязательный диагностический сигнал в `stderr` при успешном завершении вызова в degraded режиме.
-- [ ] Сохранить terminal fallback: при невозможности удержать лимиты завершать вызов с `status=error`, `error.code=limit_exceeded`.
-- [ ] Добавить/обновить unit-тесты на degraded path и containment-fail path (`limit_exceeded`).
-- [ ] Добавить/обновить functional-тест на наличие degraded/throttled сигнала в `stderr`.
-- [ ] Обновить таблицу покрытия требований в `docs/specs/code_exec/design.md` после реализации.
+- [x] Вернуть в `docs/specs/code_exec/requirements.md` и `design.md` обязательное требование degraded/throttled режима при приближении к CPU/RAM лимитам.
+- [x] Реализовать monitor loop в `SandboxSessionManager` (интервал `monitorIntervalMs`) с best-effort containment.
+- [x] Добавить обязательный диагностический сигнал в `stderr` при успешном завершении вызова в degraded режиме.
+- [x] Сохранить terminal fallback: при невозможности удержать лимиты завершать вызов с `status=error`, `error.code=limit_exceeded`.
+- [x] Добавить/обновить unit-тесты на degraded path и containment-fail path (`limit_exceeded`).
+- [x] Добавить/обновить functional-тест на наличие degraded/throttled сигнала в `stderr`.
+- [x] Обновить таблицу покрытия требований в `docs/specs/code_exec/design.md` после реализации.
 
 #### Фаза 8: Invalid Tool Arguments (System Target Behavior)
 
-- [ ] Привести runtime-логику `MainPipeline` к единому контракту: schema/contract validation любого `tool_call` до создания persisted `kind: tool_call`.
-- [ ] Гарантировать, что при `invalid_tool_arguments` не создаются `message.created/message.updated` для `kind: tool_call` и не появляется запись инструмента в истории чата.
-- [ ] Сохранить текущий retry/repair flow (`maxRetries=2`) с возвратом диагностики в модель на каждой невалидной попытке.
-- [ ] Явно реализовать/документировать канал передачи validation-feedback модели между retry-попытками для невалидных аргументов (чтобы retry был не только повтором без диагностического контекста).
-- [ ] Гарантировать terminal fallback: при исчерпании retry/repair создавать только `kind:error` (без terminal `tool_call`).
-- [ ] Унифицировать поведение для обоих инструментов в текущем scope (`final_answer`, `code_exec`) без специальных исключений.
-- [ ] Заменить технически вводящее в заблуждение именование retry-exhaustion ошибки (`FinalAnswerRetryExhaustedError`) на общее для всех tool calls и синхронизировать тексты/ветки обработки.
-- [ ] Устранить расхождение `code_exec` контракта ошибок: согласовать `code_exec.3.1.2.2.1` с runtime/тестами (`SandboxSessionManager` сейчас возвращает `invalid_tool_arguments` при прямом вызове), зафиксировав единый boundary (pipeline-level vs tool-runtime-level).
-- [ ] Уточнить вводное требование `code_exec` (`requirements.md`, пункт 0/введение): persisted `tool_call(code_exec)` создаётся только для валидных вызовов, прошедших pre-execution validation.
-- [ ] Добавить/обновить unit-тесты `tests/unit/agents/MainPipeline.test.ts` на отсутствие persist `tool_call` при невалидных аргументах и на `kind:error` после retry-limit.
-- [ ] Добавить/обновить unit-тесты `tests/unit/agents/MainPipeline.test.ts` на отсутствие `message.created/message.updated(kind:tool_call)` при невалидных аргументах на всех retry-попытках.
-- [ ] Добавить/обновить functional-тесты `tests/functional/llm-chat.spec.ts` и `tests/functional/code_exec.spec.ts`: invalid args не создают `tool_call` в чате/истории на всех попытках.
-- [ ] Усилить существующий `tests/functional/code_exec.spec.ts` сценарий invalid args: проверять отсутствие любых persisted `tool_call(code_exec)` (не только отсутствие terminal `success`).
-- [ ] Добавить/обновить functional-сценарий для `final_answer`: invalid arguments не создают persisted `tool_call(final_answer)` и завершаются `kind:error` после retry-limit.
-- [ ] Обновить матрицы покрытия в `docs/specs/llm-integration/design.md` и `docs/specs/code_exec/design.md` с явной трассировкой этого контракта.
-- [ ] Обновить `docs/specs/llm-integration/design.md` coverage-table строкой `llm-integration.11.2.3.3` и привязать к конкретным тестам.
-- [ ] Сверить текстовые названия функциональных тестов в requirements/design с фактическими тест-кейсами в `tests/functional/llm-chat.spec.ts` и `tests/functional/code_exec.spec.ts`.
-- [ ] Прогнать `npm run validate` и после подтверждения пользователя `npm run test:functional`.
+- [x] Привести runtime-логику `MainPipeline` к единому контракту: schema/contract validation любого `tool_call` до создания persisted `kind: tool_call`.
+- [x] Гарантировать, что при `invalid_tool_arguments` не создаются `message.created/message.updated` для `kind: tool_call` и не появляется запись инструмента в истории чата.
+- [x] Сохранить текущий retry/repair flow (`maxRetries=2`) с возвратом диагностики в модель на каждой невалидной попытке.
+- [x] Явно реализовать/документировать канал передачи validation-feedback модели между retry-попытками для невалидных аргументов (чтобы retry был не только повтором без диагностического контекста).
+- [x] Гарантировать terminal fallback: при исчерпании retry/repair создавать только `kind:error` (без terminal `tool_call`).
+- [x] Унифицировать поведение для обоих инструментов в текущем scope (`final_answer`, `code_exec`) без специальных исключений.
+- [x] Заменить технически вводящее в заблуждение именование retry-exhaustion ошибки (`FinalAnswerRetryExhaustedError`) на общее для всех tool calls и синхронизировать тексты/ветки обработки.
+- [x] Устранить расхождение `code_exec` контракта ошибок: согласовать `code_exec.3.1.2.2.1` с runtime/тестами (`SandboxSessionManager` сейчас возвращает `invalid_tool_arguments` при прямом вызове), зафиксировав единый boundary (pipeline-level vs tool-runtime-level).
+- [x] Уточнить вводное требование `code_exec` (`requirements.md`, пункт 0/введение): persisted `tool_call(code_exec)` создаётся только для валидных вызовов, прошедших pre-execution validation.
+- [x] Добавить/обновить unit-тесты `tests/unit/agents/MainPipeline.test.ts` на отсутствие persist `tool_call` при невалидных аргументах и на `kind:error` после retry-limit.
+- [x] Добавить/обновить unit-тесты `tests/unit/agents/MainPipeline.test.ts` на отсутствие `message.created/message.updated(kind:tool_call)` при невалидных аргументах на всех retry-попытках.
+- [x] Добавить/обновить functional-тесты `tests/functional/llm-chat.spec.ts` и `tests/functional/code_exec.spec.ts`: invalid args не создают `tool_call` в чате/истории на всех попытках.
+- [x] Усилить существующий `tests/functional/code_exec.spec.ts` сценарий invalid args: проверять отсутствие любых persisted `tool_call(code_exec)` (не только отсутствие terminal `success`).
+- [x] Добавить/обновить functional-сценарий для `final_answer`: invalid arguments не создают persisted `tool_call(final_answer)` и завершаются `kind:error` после retry-limit.
+- [x] Обновить матрицы покрытия в `docs/specs/llm-integration/design.md` и `docs/specs/code_exec/design.md` с явной трассировкой этого контракта.
+- [x] Обновить `docs/specs/llm-integration/design.md` coverage-table строкой `llm-integration.11.2.3.3` и привязать к конкретным тестам.
+- [x] Сверить текстовые названия функциональных тестов в requirements/design с фактическими тест-кейсами в `tests/functional/llm-chat.spec.ts` и `tests/functional/code_exec.spec.ts`.
+- [x] Прогнать `npm run validate`.
+- [ ] После подтверждения пользователя прогнать полный `npm run test:functional`.
 
 #### Фаза 9: OAuth Build Injection Validation
 
-- [ ] Добавить unit-тесты для `scripts/inject-oauth-client-secret.js`: чтение `CLERKLY_OAUTH_CLIENT_SECRET` из `process.env`, fallback из `.env`, fail-fast при отсутствии значения.
-- [ ] Добавить тест-кейс на отсутствие placeholder в build output (скрипт не падает, но логирует warning) и зафиксировать это поведение в `docs/specs/google-oauth-auth/design.md`.
+- [x] Добавить unit-тесты для `scripts/inject-oauth-client-secret.js`: чтение `CLERKLY_OAUTH_CLIENT_SECRET` из `process.env`, fallback из `.env`, fail-fast при отсутствии значения.
+- [x] Добавить тест-кейс на отсутствие placeholder в build output (скрипт не падает, но логирует warning) и зафиксировать это поведение в `docs/specs/google-oauth-auth/design.md`.
