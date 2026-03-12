@@ -218,6 +218,14 @@ test.describe('code_exec tool_call rendering', () => {
       .locator('[data-testid="message-code-exec-input"]')
       .last()
       .evaluate((el) => el.className);
+    const blockClassName = await window
+      .locator('[data-testid="message-code-exec-block"]')
+      .last()
+      .evaluate((el) => el.className);
+    const statusClassName = await window
+      .locator('[data-testid="message-code-exec-status"]')
+      .last()
+      .evaluate((el) => el.className);
     const stdoutClassName = await window
       .locator('[data-testid="message-code-exec-stdout"]')
       .last()
@@ -226,6 +234,8 @@ test.describe('code_exec tool_call rendering', () => {
       .locator('[data-testid="message-code-exec-stderr"]')
       .last()
       .evaluate((el) => el.className);
+    expect(blockClassName).toContain('bg-transparent');
+    expect(statusClassName).toContain('bg-transparent');
     expect(inputClassName).toContain('bg-transparent');
     expect(stdoutClassName).toContain('bg-transparent');
     expect(stderrClassName).toContain('bg-transparent');

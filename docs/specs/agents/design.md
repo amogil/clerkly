@@ -1594,7 +1594,7 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 - Блок отображает persisted-статус выполнения (`running | success | error | timeout | cancelled`).
 - Для security/policy отказов используется `status=error` с соответствующим `error.code` (например, `policy_denied`).
 - При наличии отображаются `stdout` и `stderr` из persisted payload.
-- Секции `Input code`, `stdout` и `stderr` рендерятся без серого фона (transparent surface).
+- Для `tool_call(code_exec)` transparent-surface применяется ко всему блоку: корневой контейнер `Tool`, status-badge, секции `Input code`, `stdout`, `stderr`.
 - Рендер строится только по persisted snapshot (`message.created`/`message.updated`) без локальной реконструкции результата.
 
 ```tsx
@@ -1645,6 +1645,7 @@ if (message.kind === 'tool_call' && toolName === 'final_answer') {
 - Mermaid диаграммы
 - математика через KaTeX (inline и block)
 - сноски не поддерживаются
+- Для markdown code blocks в `llm`-ответах применяется semantic-класс `message-response-transparent-code-blocks`, который задаёт transparent-overrides для контейнеров `code-block`, `code-block-header`, `code-block-body`, `code-block-actions` и `pre` внутри `code-block-body`.
 
 Перед рендером применяется нормализация мат-делимитеров:
 - `\(...\)` -> `$...$`
@@ -1654,7 +1655,7 @@ if (message.kind === 'tool_call' && toolName === 'final_answer') {
 - fenced code и inline code при нормализации не изменяются
 
 ```typescript
-// Requirements: agents.7.7, agents.7.7.1
+// Requirements: agents.7.7, agents.7.7.1, agents.7.7.2
 import { MessageResponse } from '../ai-elements/message';
 import { normalizeMathDelimiters } from '../../lib/mathDelimiterNormalization';
 

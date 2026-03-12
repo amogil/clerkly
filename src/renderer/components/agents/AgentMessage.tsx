@@ -143,7 +143,7 @@ export function AgentMessage({
               data-testid="message-llm-action"
               className="w-full message-llm-action message-llm-action-response"
             >
-              <MessageResponse className="text-sm leading-relaxed break-words">
+              <MessageResponse className="message-response-transparent-code-blocks text-sm leading-relaxed break-words">
                 {llmText}
               </MessageResponse>
             </MessageContent>
@@ -229,7 +229,7 @@ export function AgentMessage({
 
       return (
         <Message from="assistant" className="w-full max-w-full">
-          <Tool data-testid="message-code-exec-block">
+          <Tool data-testid="message-code-exec-block" className="bg-transparent">
             <ToolHeader className="justify-start">
               <Code2
                 data-testid="message-code-exec-icon"
@@ -240,7 +240,7 @@ export function AgentMessage({
               </div>
               <div
                 data-testid="message-code-exec-status"
-                className="inline-flex items-center rounded-full border border-border/70 bg-background px-2 py-0.5 text-xs text-muted-foreground"
+                className="inline-flex items-center rounded-full border border-border/70 bg-transparent px-2 py-0.5 text-xs text-muted-foreground"
               >
                 <StatusIcon
                   data-testid="message-code-exec-status-icon"

@@ -186,3 +186,12 @@
     line-height: 1.5;
   }
 }
+
+/* agents.7.7.2: keep markdown code blocks transparent inside llm response */
+.message-response-transparent-code-blocks [data-streamdown='code-block'],
+.message-response-transparent-code-blocks [data-streamdown='code-block-header'],
+.message-response-transparent-code-blocks [data-streamdown='code-block-body'],
+.message-response-transparent-code-blocks [data-streamdown='code-block-actions'],
+.message-response-transparent-code-blocks [data-streamdown='code-block-body'] pre {
+  background-color: transparent !important;
+}
