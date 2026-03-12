@@ -1012,7 +1012,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
      Requirements: agents.4.24.3 */
   test('should not show toast when stop cancel request fails', async () => {
     mockLLMServer.setStreamingMode(true, {
-      content: '{"action":{"type":"text","content":"Long response"}}',
+      content: 'Long response '.repeat(30),
       chunkDelayMs: 300,
     });
 
