@@ -266,6 +266,8 @@ return await window.api.saveData('x', 'y');
 
 4.6.3. Статусы `success | error | timeout | cancelled` НЕ ДОЛЖНЫ использоваться как начальный status lifecycle-записи `tool_call(code_exec)`, поскольку они обозначают уже завершённое исполнение.
 
+4.6.4. ЕСЛИ в model-step, где запрошен `code_exec`, отсутствует post-tool `kind: llm` сегмент, ТО `tool_call(code_exec)` со статусом `running` ВСЁ РАВНО ДОЛЖЕН быть видимым в чате до terminal-обновления того же блока.
+
 4.7. Audit-поля lifecycle ДОЛЖНЫ быть монотонными:
   - `started_at` фиксируется один раз при старте и далее НЕ ДОЛЖЕН изменяться;
   - `finished_at` фиксируется один раз при переходе в terminal-состояние;

@@ -1390,12 +1390,19 @@ test.describe('code_exec tool loop execution', () => {
 
     try {
       await sendUserMessage('Emit lifecycle events');
+      await expect(window.locator('[data-testid="message-code-exec-status"]').last()).toContainText(
+        'running',
+        { timeout: 8000 }
+      );
       await expect(window.locator('.message-llm-action-response').last()).toContainText(
         'evt done',
         {
           timeout: 15000,
         }
       );
+      await expect(
+        window.locator('[data-testid="message-code-exec-status"]').last()
+      ).not.toContainText('running', { timeout: 8000 });
 
       await expect
         .poll(async () => {
@@ -1426,6 +1433,16 @@ test.describe('code_exec tool loop execution', () => {
                 const done = entry.payload?.message?.done;
                 return status === 'success' && done === true;
               }),
+              runningCreatedIndex: codeExecEvents.findIndex(
+                (entry) =>
+                  entry.type === 'message.created' &&
+                  entry.payload?.message?.payload?.data?.output?.status === 'running'
+              ),
+              terminalUpdatedIndex: codeExecEvents.findIndex((entry) => {
+                const status = entry.payload?.message?.payload?.data?.output?.status;
+                const done = entry.payload?.message?.done;
+                return entry.type === 'message.updated' && status === 'success' && done === true;
+              }),
             };
           });
         })
@@ -1435,8 +1452,39 @@ test.describe('code_exec tool loop execution', () => {
             updatedCount: expect.any(Number),
             hasRunningCreated: true,
             hasTerminalUpdated: true,
+            runningCreatedIndex: expect.any(Number),
+            terminalUpdatedIndex: expect.any(Number),
           })
         );
+      const eventOrder = await window.evaluate(() => {
+        const globalWindow = window as unknown as {
+          __codeExecLifecycleEvents?: Array<{ type: string; payload: any }>;
+        };
+        const events = globalWindow.__codeExecLifecycleEvents ?? [];
+        const codeExecEvents = events.filter((entry) => {
+          const message = entry.payload?.message;
+          return (
+            (entry.type === 'message.created' || entry.type === 'message.updated') &&
+            message?.kind === 'tool_call' &&
+            message?.payload?.data?.toolName === 'code_exec' &&
+            message?.payload?.data?.callId === 'evt-1'
+          );
+        });
+        const runningCreatedIndex = codeExecEvents.findIndex(
+          (entry) =>
+            entry.type === 'message.created' &&
+            entry.payload?.message?.payload?.data?.output?.status === 'running'
+        );
+        const terminalUpdatedIndex = codeExecEvents.findIndex((entry) => {
+          const status = entry.payload?.message?.payload?.data?.output?.status;
+          const done = entry.payload?.message?.done;
+          return entry.type === 'message.updated' && status === 'success' && done === true;
+        });
+        return { runningCreatedIndex, terminalUpdatedIndex };
+      });
+      expect(eventOrder.runningCreatedIndex).toBeGreaterThanOrEqual(0);
+      expect(eventOrder.terminalUpdatedIndex).toBeGreaterThanOrEqual(0);
+      expect(eventOrder.runningCreatedIndex).toBeLessThan(eventOrder.terminalUpdatedIndex);
       const lifecycleCounters = await window.evaluate(() => {
         const globalWindow = window as unknown as {
           __codeExecLifecycleEvents?: Array<{ type: string; payload: any }>;

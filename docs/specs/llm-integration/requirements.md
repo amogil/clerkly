@@ -437,6 +437,8 @@
 
 11.1.3. КОГДА `tool_call` валиден и создан в `running`, ТО post-tool LLM-сегмент ДОЛЖЕН начинать стримиться без ожидания terminal-результата `tool_call`.
 
+11.1.3.1. ЕСЛИ после `tool_call` в текущем model-step отсутствует post-tool `text`/`reasoning`, ТО persisted `tool_call` со статусом `running` ВСЁ РАВНО ДОЛЖЕН стать видимым в UI до его terminal-обновления в `message.updated`.
+
 11.1.4. КОГДА `tool_call` завершён terminal-результатом (`success | error | timeout | cancelled`), ТО система ДОЛЖНА обновить тот же persisted `kind: tool_call` до terminal-состояния (`done = true`) в том же блоке (без создания дублирующего terminal-блока).
 
 11.1.5. КОГДА в одном run присутствуют и стриминг LLM (`reasoning`/`text`), и `tool_call`, ТО видимый порядок сообщений ДОЛЖЕН быть: pre-tool LLM-сегмент -> `tool_call` (`running`) -> post-tool LLM-сегмент; terminal-обновление `tool_call` МОЖЕТ приходить позже и ДОЛЖНО применяться in-place.
@@ -488,6 +490,7 @@
 
 - `tests/functional/llm-chat.spec.ts` — "should create tool_call only after reasoning phase and start post-tool text without waiting terminal result"
 - `tests/functional/llm-chat.spec.ts` — "should keep visual order pre-tool llm -> tool_call(running) -> post-tool llm with in-place terminal update"
+- `tests/functional/llm-chat.spec.ts` — "should show running code_exec before terminal when first model step has no post-tool text"
 - `tests/functional/llm-chat.spec.ts` — "should reject model response containing more than one tool_call and run repair"
 - `tests/functional/llm-chat.spec.ts` — "should retry tool call on invalid arguments, not persist tool_call, and show kind:error after retry limit"
 - `tests/functional/llm-chat.spec.ts` — "should continue to next model step after terminal code_exec tool result"

@@ -1589,6 +1589,46 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expect(codeExecBlocks).toHaveCount(1);
   });
 
+  /* Preconditions: scripted response emits code_exec tool_call without post-tool text in the same model step
+     Action: User sends one message
+     Assertions: code_exec block must become running in UI before terminal completion and before next-step text
+     Requirements: llm-integration.11.1.2, llm-integration.11.1.3, agents.7.4.8.1, code_exec.4.6 */
+  test('should show running code_exec before terminal when first model step has no post-tool text', async () => {
+    mockLLMServer.setStreamingMode(true, { chunkDelayMs: 40 });
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        toolCalls: [
+          {
+            callId: 'no-post-text-1',
+            toolName: 'code_exec',
+            arguments: {
+              code: "await new Promise((resolve) => setTimeout(resolve, 1500)); console.log('finished');",
+              timeout_ms: 10000,
+            },
+          },
+        ],
+      },
+      {
+        content: '{"action":{"type":"text","content":"after terminal step"}}',
+      },
+    ]);
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await messageInput.fill('Check running before terminal without post-tool text');
+    await messageInput.press('Enter');
+
+    const codeExecStatus = context.window
+      .locator('[data-testid="message-code-exec-status"]')
+      .last();
+    await expect(codeExecStatus).toContainText('running', { timeout: 8000 });
+
+    const actionContent = context.window.locator('.message-llm-action-response').last();
+    await expect(actionContent).toContainText('after terminal step', { timeout: 15000 });
+    await expect(codeExecStatus).not.toContainText('running', { timeout: 8000 });
+    await expect(context.window.locator('[data-testid="message-code-exec-block"]')).toHaveCount(1);
+  });
+
   /* Preconditions: first response contains two tool calls (invalid), second response repairs to plain text
      Action: User sends message
      Assertions: pipeline runs repair and chat ends with repaired response without persisted tool_call from invalid attempt

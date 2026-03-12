@@ -787,6 +787,7 @@ User отправляет сообщение
 - `tests/functional/llm-chat.spec.ts` — "should exclude error messages from llm history"
 - `tests/functional/llm-chat.spec.ts` — "should create tool_call only after reasoning phase and start post-tool text without waiting terminal result"
 - `tests/functional/llm-chat.spec.ts` — "should keep visual order pre-tool llm -> tool_call(running) -> post-tool llm with in-place terminal update"
+- `tests/functional/llm-chat.spec.ts` — "should show running code_exec before terminal when first model step has no post-tool text"
 - `tests/functional/llm-chat.spec.ts` — "should retry tool call on invalid arguments, not persist tool_call, and show kind:error after retry limit"
 - `tests/functional/llm-chat.spec.ts` — "should continue to next model step after terminal code_exec tool result"
 - `tests/functional/llm-chat.spec.ts` — "should reject model response containing more than one tool_call and run repair"
@@ -920,6 +921,7 @@ User отправляет сообщение
 | llm-integration.11.1.1 | ✓ | ✓ |
 | llm-integration.11.1.2 | ✓ | ✓ |
 | llm-integration.11.1.3 | ✓ | ✓ |
+| llm-integration.11.1.3.1 | ✓ | ✓ |
 | llm-integration.11.1.4 | ✓ | ✓ |
 | llm-integration.11.1.5 | ✓ | ✓ |
 | llm-integration.11.1.6 | ✓ | ✓ |

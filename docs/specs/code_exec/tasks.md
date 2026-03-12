@@ -51,6 +51,7 @@
 - ✅ Синхронизированы `llm-integration/code_exec/google-oauth-auth` requirements/design и coverage-матрицы с новым контрактом.
 - ✅ В `MainPipeline` реализован 100ms batching для streaming `kind: llm` (persisted `message.updated` + delta-события) с force-flush на boundary-событиях (`tool_call/tool_result/done/error/abort`).
 - ✅ Добавлены плотные unit-тесты `MainPipeline` на throttling/buffering без потери данных и без нарушения порядка pre-tool/tool/post-tool.
+- ✅ Усилены functional-тесты `llm-chat.spec.ts` и `code_exec.spec.ts` для кейса отсутствия post-tool текста в первом model-step: `tool_call(code_exec)` обязан быть видимым в `running` до terminal update.
 
 ### В Работе
 - 🔄 Ожидает отдельного запуска полного `npm run test:functional` по подтверждению пользователя.

@@ -1244,6 +1244,63 @@ describe('MainPipeline.run()', () => {
     expect(tailReasoningOrder).toBeLessThan(runningToolCreateOrder);
   });
 
+  /* Preconditions: provider emits tool_call, then delays tool_result, and does not emit post-tool text
+     Action: run pipeline for one attempt
+     Assertions: running tool_call is persisted before terminal update even without post-tool llm segment
+     Requirements: llm-integration.11.1.2, llm-integration.11.1.3.1, code_exec.4.6 */
+  it('persists running tool_call before terminal update when model step has no post-tool text', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-no-post-text',
+          toolName: 'code_exec',
+          arguments: { code: "console.log('ok')" },
+        });
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        onChunk({
+          type: 'tool_result',
+          callId: 'call-no-post-text',
+          toolName: 'code_exec',
+          arguments: { code: "console.log('ok')" },
+          output: { status: 'success', stdout: 'ok\n', stderr: '' },
+          status: 'success',
+        });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const createMock = messageManager.create as jest.Mock;
+    const updateMock = messageManager.update as jest.Mock;
+
+    const runningCreateIndex = createMock.mock.calls.findIndex(
+      (call) =>
+        call[1] === 'tool_call' &&
+        call[2]?.data?.callId === 'call-no-post-text' &&
+        call[2]?.data?.output?.status === 'running' &&
+        call[4] === false
+    );
+    expect(runningCreateIndex).toBeGreaterThanOrEqual(0);
+
+    const terminalUpdateIndex = updateMock.mock.calls.findIndex(
+      (call) =>
+        call[2]?.data?.callId === 'call-no-post-text' &&
+        call[2]?.data?.output?.status === 'success' &&
+        call[3] === true
+    );
+    expect(terminalUpdateIndex).toBeGreaterThanOrEqual(0);
+
+    const runningCreateOrder = createMock.mock.invocationCallOrder[runningCreateIndex] ?? -1;
+    const terminalUpdateOrder = updateMock.mock.invocationCallOrder[terminalUpdateIndex] ?? -1;
+    expect(runningCreateOrder).toBeGreaterThan(0);
+    expect(terminalUpdateOrder).toBeGreaterThan(0);
+    expect(runningCreateOrder).toBeLessThan(terminalUpdateOrder);
+  });
+
   it('creates finalized llm message from result.text when no text chunks were emitted', async () => {
     const { pipeline, messageManager, llmProvider } = makeMocks();
 

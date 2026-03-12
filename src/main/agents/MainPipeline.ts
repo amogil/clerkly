@@ -297,6 +297,7 @@ export class MainPipeline {
       let pendingFirstType: 'reasoning' | 'text' | null = null;
       let lastFlushAt = 0;
       let flushTimer: ReturnType<typeof setTimeout> | null = null;
+      let pendingToolCallFlushTimer: ReturnType<typeof setTimeout> | null = null;
       let finalLlmMessageId: number | null = null;
       let toolCallsInCurrentStep = 0;
       let sawAnyToolCall = false;
@@ -308,6 +309,13 @@ export class MainPipeline {
         if (flushTimer) {
           clearTimeout(flushTimer);
           flushTimer = null;
+        }
+      };
+
+      const clearPendingToolCallFlushTimer = (): void => {
+        if (pendingToolCallFlushTimer) {
+          clearTimeout(pendingToolCallFlushTimer);
+          pendingToolCallFlushTimer = null;
         }
       };
 
@@ -395,6 +403,7 @@ export class MainPipeline {
       };
 
       const flushPendingToolCall = (): void => {
+        clearPendingToolCallFlushTimer();
         scheduleLlmFlush(true);
         if (!pendingToolCall) {
           return;
@@ -441,6 +450,17 @@ export class MainPipeline {
         pendingToolCall = null;
       };
 
+      const schedulePendingToolCallFlush = (): void => {
+        if (!pendingToolCall) {
+          return;
+        }
+        clearPendingToolCallFlushTimer();
+        pendingToolCallFlushTimer = setTimeout(() => {
+          pendingToolCallFlushTimer = null;
+          flushPendingToolCall();
+        }, STREAM_FLUSH_INTERVAL_MS);
+      };
+
       try {
         const chatMessagesForAttempt = this.buildRetryChatMessages(
           context.chatMessages,
@@ -465,6 +485,9 @@ export class MainPipeline {
               }
               pendingReasoningDelta += chunk.delta;
               scheduleLlmFlush();
+              if (pendingToolCall) {
+                schedulePendingToolCallFlush();
+              }
               return;
             }
 
@@ -511,6 +534,7 @@ export class MainPipeline {
                 toolName: chunk.toolName,
                 args: chunk.arguments,
               };
+              schedulePendingToolCallFlush();
               return;
             }
 
@@ -619,6 +643,7 @@ export class MainPipeline {
           finalAnswerOrder,
         };
       } catch (error) {
+        clearPendingToolCallFlushTimer();
         const isInvalidFinalAnswer =
           error instanceof InvalidFinalAnswerContractError ||
           error instanceof InvalidToolArgumentsError;
