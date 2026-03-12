@@ -546,12 +546,12 @@
   - status-badge,
   - секций `Input code`, `stdout` и `stderr`.
 
-7.4.6.6. Статус-badge блока `tool_call(code_exec)` ДОЛЖЕН содержать иконку статуса, соответствующую persisted-статусу выполнения:
-  - `running` → `LoaderCircle` (с анимацией вращения),
+7.4.6.6. Статус-badge компонента `Tool` (включая блок `tool_call(code_exec)`) ДОЛЖЕН содержать иконку статуса, соответствующую persisted-статусу выполнения:
+  - `running` → `Loader2` (с анимацией вращения),
   - `success` → `CircleCheck`,
   - `error` → `CircleX`,
   - `timeout` → `Clock3`,
-  - `cancelled` → `Ban`.
+  - `cancelled` → `CircleMinus`.
 
 7.4.6.7. Иконки статусов в status-badge `tool_call(code_exec)` ДОЛЖНЫ использовать цветовую кодировку (colorized icons), а не монохромный цвет.
 

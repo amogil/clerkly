@@ -1,14 +1,14 @@
 import React from 'react';
 // Requirements: llm-integration.7, llm-integration.3.4.1, llm-integration.3.4.4, agents.4.22, agents.4.9, agents.4.10.1, agents.4.10.2, agents.7.4
 import {
-  Ban,
   Check,
   ChevronDownIcon,
   CircleCheck,
+  CircleMinus,
   CircleX,
   Clock3,
   Code2,
-  LoaderCircle,
+  Loader2,
 } from 'lucide-react';
 import { Message, MessageContent, MessageResponse } from '../ai-elements/message';
 import { Reasoning, ReasoningContent } from '../ai-elements/reasoning';
@@ -33,15 +33,15 @@ function getCodeExecStatusIcon(status: string) {
     case 'success':
       return CircleCheck;
     case 'running':
-      return LoaderCircle;
+      return Loader2;
     case 'error':
       return CircleX;
     case 'timeout':
       return Clock3;
     case 'cancelled':
-      return Ban;
+      return CircleMinus;
     default:
-      return LoaderCircle;
+      return Loader2;
   }
 }
 
