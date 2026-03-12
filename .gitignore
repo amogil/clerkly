@@ -11,3 +11,5 @@ playwright-report/
 
 # Local environment variables (copy from .env.example)
 .env
+
+.vscode/
