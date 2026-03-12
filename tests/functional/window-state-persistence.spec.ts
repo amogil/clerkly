@@ -234,14 +234,26 @@ test.describe('Window State Persistence', () => {
     await context.window.waitForLoadState('domcontentloaded');
 
     // Get restored bounds
+    await expect
+      .poll(
+        async () => {
+          const bounds = await getWindowBounds(context.app);
+          return (
+            Math.abs(bounds.x - movedBounds.x) <= 10 && Math.abs(bounds.y - movedBounds.y) <= 10
+          );
+        },
+        { timeout: 10000 }
+      )
+      .toBe(true);
+
     const restoredBounds = await getWindowBounds(context.app);
     console.log(`Restored bounds: ${JSON.stringify(restoredBounds)}`);
 
     // Verify position was restored (with some tolerance)
-    expect(restoredBounds.x).toBeGreaterThanOrEqual(newX - 10);
-    expect(restoredBounds.x).toBeLessThanOrEqual(newX + 10);
-    expect(restoredBounds.y).toBeGreaterThanOrEqual(newY - 10);
-    expect(restoredBounds.y).toBeLessThanOrEqual(newY + 10);
+    expect(restoredBounds.x).toBeGreaterThanOrEqual(movedBounds.x - 10);
+    expect(restoredBounds.x).toBeLessThanOrEqual(movedBounds.x + 10);
+    expect(restoredBounds.y).toBeGreaterThanOrEqual(movedBounds.y - 10);
+    expect(restoredBounds.y).toBeLessThanOrEqual(movedBounds.y + 10);
 
     // Take screenshot
     await context.window.screenshot({ path: 'playwright-report/window-restored-position.png' });

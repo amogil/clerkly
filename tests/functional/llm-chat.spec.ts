@@ -1029,6 +1029,8 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
 
     const stopButton = context.window.locator('[data-testid="prompt-input-stop"]');
     await expect(stopButton).toBeVisible({ timeout: 5000 });
+    const appLoading = context.window.locator('[data-testid="app-loading-screen"]');
+    await expect(appLoading).toBeHidden({ timeout: 10000 });
     await stopButton.click();
 
     await expect(context.window.locator('[data-testid="prompt-input-send"]')).toBeVisible({
