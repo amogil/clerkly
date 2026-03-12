@@ -1,6 +1,7 @@
 // Requirements: llm-integration.1, llm-integration.2, llm-integration.5
 
 import { MainPipeline } from '../../../src/main/agents/MainPipeline';
+import { FullHistoryStrategy, PromptBuilder as PromptBuilderClass } from '../../../src/main/agents/PromptBuilder';
 import { MainEventBus } from '../../../src/main/events/MainEventBus';
 import {
   MessageLlmReasoningUpdatedEvent,
@@ -118,6 +119,61 @@ function makeMocks() {
   };
 }
 
+async function assertAiSdkModelMessages(messages: ChatMessage[]): Promise<void> {
+  if (typeof (globalThis as { TransformStream?: unknown }).TransformStream === 'undefined') {
+    const webStreams = await import('stream/web');
+    (globalThis as { TransformStream?: unknown }).TransformStream = webStreams.TransformStream;
+  }
+  const { modelMessageSchema } = await import('ai');
+  const parsed = (modelMessageSchema as { array: () => { safeParse: (v: unknown) => unknown } })
+    .array()
+    .safeParse(messages) as { success: boolean; error?: { issues?: Array<{ message: string }> } };
+  expect(parsed.success).toBe(true);
+}
+
+function assertToolReplayLinked(messages: ChatMessage[]): void {
+  const called = new Set<string>();
+  const completed = new Set<string>();
+
+  for (const message of messages as unknown as Array<Record<string, unknown>>) {
+    const role = message['role'];
+    const content = Array.isArray(message['content']) ? message['content'] : [];
+
+    if (role === 'assistant') {
+      for (const part of content) {
+        if (
+          part &&
+          typeof part === 'object' &&
+          (part as Record<string, unknown>)['type'] === 'tool-call'
+        ) {
+          const toolCallId = (part as Record<string, unknown>)['toolCallId'];
+          if (typeof toolCallId === 'string') called.add(toolCallId);
+        }
+      }
+    }
+
+    if (role === 'tool') {
+      for (const part of content) {
+        if (
+          part &&
+          typeof part === 'object' &&
+          (part as Record<string, unknown>)['type'] === 'tool-result'
+        ) {
+          const toolCallId = (part as Record<string, unknown>)['toolCallId'];
+          if (typeof toolCallId === 'string') {
+            expect(called.has(toolCallId)).toBe(true);
+            completed.add(toolCallId);
+          }
+        }
+      }
+    }
+  }
+
+  for (const toolCallId of called) {
+    expect(completed.has(toolCallId)).toBe(true);
+  }
+}
+
 describe('MainPipeline.run()', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -134,6 +190,40 @@ describe('MainPipeline.run()', () => {
     expect(createProvider('anthropic', 'k')).toBeDefined();
     expect(createProvider('google', 'k')).toBeDefined();
     expect(() => createProvider('unknown', 'k')).toThrow('Unknown provider: unknown');
+  });
+
+  it('sends AI SDK-valid linked replay history to provider.chat when terminal tool_call exists', async () => {
+    const { pipeline, llmProvider, messageManager, promptBuilder } = makeMocks();
+    const realPromptBuilder = new PromptBuilderClass('sys', [], new FullHistoryStrategy());
+
+    const userMsg = makeMessage(1, 'user');
+    userMsg.payloadJson = JSON.stringify({ data: { text: 'run code' } });
+    const terminalToolCall = makeMessage(2, 'tool_call');
+    terminalToolCall.payloadJson = JSON.stringify({
+      data: {
+        callId: 'call-main-pipeline',
+        toolName: 'code_exec',
+        arguments: { code: 'console.log(1)' },
+        output: { status: 'success', stdout: '1' },
+      },
+    });
+    messageManager.listForModelHistory = jest.fn().mockReturnValue([userMsg, terminalToolCall]);
+    promptBuilder.buildMessages = jest
+      .fn()
+      .mockImplementation((history: Message[]) => realPromptBuilder.buildMessages(history));
+
+    llmProvider.chat.mockImplementation(
+      async (messages: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        await assertAiSdkModelMessages(messages);
+        assertToolReplayLinked(messages);
+        onChunk({ type: 'text', delta: 'ok' });
+        return { text: 'ok' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(llmProvider.chat).toHaveBeenCalledTimes(1);
   });
 
   it('streams reasoning/text and finalizes llm message with data.text', async () => {

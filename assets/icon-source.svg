@@ -1,7 +1,7 @@
 <svg width="1024" height="1024" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <g transform="translate(16 16) scale(0.9) translate(-16 -16)">
+  <g transform="translate(16 16) scale(0.84) translate(-16 -16)">
     <rect x="0" y="0" width="32" height="32" rx="7.5" fill="url(#logo-gradient)" />
-    <g transform="translate(16 16) scale(1.12) translate(-16 -16)">
+    <g transform="translate(16 16) scale(1.344) translate(-16 -16)">
       <g>
         <circle cx="10" cy="12" r="2" fill="white" />
         <circle cx="10" cy="20" r="2" fill="white" />

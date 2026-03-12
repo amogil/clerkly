@@ -451,9 +451,9 @@
 
 11.3.1.3.1. Для каждого terminal `tool_call` в model history ДОЛЖНЫ передаваться:
   - `assistant` сообщение с `tool-call` (`toolCallId`, `toolName`, `input` из persisted `arguments`);
-  - `tool` сообщение с `tool-result` (`toolCallId`, `toolName`, `result`).
+  - `tool` сообщение с `tool-result` (`toolCallId`, `toolName`, `output`), где `output` сериализован в формате ToolResultOutput AI SDK (для JSON: `{ "type": "json", "value": ... }`).
 
-11.3.1.3.2. Поле `result` ДОЛЖНО содержать terminal-статус вызова (`success | error | timeout | cancelled`) и соответствующий output инструмента (включая ошибку, если она есть).
+11.3.1.3.2. Поле `output.value` ДОЛЖНО содержать terminal-статус вызова (`success | error | timeout | cancelled`) и соответствующий output инструмента (включая ошибку, если она есть).
 
 11.3.2. Runtime-поток tool-calling НЕ ДОЛЖЕН требовать отдельного realtime-сигнала; обработка ДОЛЖНА строиться по persisted `message.created`/`message.updated`.
 

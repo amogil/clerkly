@@ -247,7 +247,7 @@ CREATE TABLE messages (
      - для `kind:llm` передаём только текст ответа;
      - для `kind:tool_call` передаём AI SDK-совместимую связанную пару:
        - `assistant` с `tool-call` (`toolCallId`, `toolName`, `input`),
-       - `tool` с `tool-result` (`toolCallId`, `toolName`, `result`).
+       - `tool` с `tool-result` (`toolCallId`, `toolName`, `output`), где `output` соответствует ToolResultOutput AI SDK (`type` + `value`).
 4. Для всех поддерживаемых провайдеров формируем единый итоговый входной массив сообщений:
    - отдельный элемент `role: system` для системной инструкции;
    - отдельные элементы истории в хронологическом порядке (по одному элементу на каждое сообщение диалога).
@@ -275,11 +275,14 @@ CREATE TABLE messages (
       "type": "tool-result",
       "toolCallId": "call-123",
       "toolName": "code_exec",
-      "result": {
-        "status": "cancelled",
-        "output": {
-          "stdout": "",
-          "stderr": ""
+      "output": {
+        "type": "json",
+        "value": {
+          "status": "cancelled",
+          "output": {
+            "stdout": "",
+            "stderr": ""
+          }
         }
       }
     }
@@ -359,7 +362,7 @@ interface ChatMessage {
     | string
     | Array<
         | { type: 'text'; text: string }
-        | { type: 'tool-result'; toolCallId: string; toolName: string; result: unknown }
+        | { type: 'tool-result'; toolCallId: string; toolName: string; output: unknown }
       >;
 }
 
@@ -708,7 +711,9 @@ User отправляет сообщение
 - `tests/unit/llm/GoogleProvider.chat.test.ts` — streaming/tool-loop mapping, ошибки, usage
 - `tests/unit/llm/ErrorNormalizer.test.ts` — mapping AI SDK ошибок (`auth/rate_limit/provider/network/timeout/tool/protocol`)
 - `tests/unit/agents/PromptBuilder.test.ts` — формирование массива `messages`, исключения из replay
+- `tests/unit/agents/PromptModelContract.test.ts` — контрактная валидация `ModelMessage[]` (AI SDK schema), terminal-статусы `tool-result`, негативные кейсы `legacy result`, missing pair, mismatched `toolCallId`, malformed/non-terminal `tool_call`
 - `tests/unit/agents/MainPipeline.test.ts` — мок провайдера, полный цикл, ошибки, события
+- `tests/unit/agents/MainPipeline.test.ts` — integration guard: в `provider.chat` передаются schema-valid `ModelMessage[]` и связанная replay-пара `assistant(tool-call)` + `tool(tool-result)`
 - `tests/unit/agents/MainPipeline.test.ts` — порядок persist: `kind:llm(done=true)` фиксируется раньше persisted `kind:tool_call` в одном turn
 - `tests/unit/agents/AgentIPCHandlers.test.ts` — запуск pipeline при kind:user
 - `tests/unit/renderer/IPCChatTransport.test.ts` — обработка delta-stream (`reasoning/text`) и persisted `kind: tool_call` snapshot

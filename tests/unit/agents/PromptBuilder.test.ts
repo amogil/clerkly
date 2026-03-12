@@ -441,6 +441,47 @@ describe('PromptBuilder.buildMessages()', () => {
     expect(JSON.stringify(chatMessages[3])).not.toContain('"result"');
   });
 
+  /* Preconditions: Terminal kind:tool_call has timeout status
+     Action: Call buildMessages()
+     Assertions: tool-result output uses AI SDK ToolResultOutput envelope and preserves terminal status
+     Requirements: llm-integration.11.3.1.3, llm-integration.11.3.1.3.2 */
+  it('should encode terminal tool_result output as ToolResultOutput json envelope', () => {
+    const msgs = [
+      makeMessage({
+        id: 1,
+        kind: 'tool_call',
+        done: true,
+        payloadJson: JSON.stringify({
+          data: {
+            callId: 'call-timeout',
+            toolName: 'code_exec',
+            arguments: { code: 'while(true){}' },
+            output: { status: 'timeout', stdout: '', stderr: 'timed out' },
+          },
+        }),
+      }),
+    ];
+
+    const chatMessages = makeBuilder().buildMessages(msgs);
+    expect(chatMessages[2]).toMatchObject({
+      role: 'tool',
+      content: [
+        {
+          type: 'tool-result',
+          toolCallId: 'call-timeout',
+          toolName: 'code_exec',
+          output: {
+            type: 'json',
+            value: {
+              status: 'timeout',
+              output: { status: 'timeout', stdout: '', stderr: 'timed out' },
+            },
+          },
+        },
+      ],
+    });
+  });
+
   /* Preconditions: Terminal kind:tool_call has arguments payload
      Action: Call buildMessages()
      Assertions: replayed assistant tool-call includes original arguments as input
