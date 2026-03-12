@@ -33,6 +33,7 @@ type LlmSegmentState = {
   id: number | null;
   reasoning: string;
   text: string;
+  order: MessageOrderMeta | null;
 };
 
 type RunningToolState = {
@@ -43,11 +44,18 @@ type RunningToolState = {
   startedAt: string;
 };
 
+type MessageOrderMeta = {
+  runId: string;
+  attemptId: number;
+  sequence: number;
+};
+
 type StreamProcessingResult = {
   output: LLMChatResult;
   finalLlmMessageId: number | null;
   activeLlmMessageId: number | null;
   finalAnswerCall: { callId: string; args: Record<string, unknown> } | null;
+  finalAnswerOrder: MessageOrderMeta | null;
 };
 
 const FINAL_ANSWER_RETRY_EXHAUSTED_MESSAGE =
@@ -239,7 +247,8 @@ export class MainPipeline {
         agentId,
         context.replyToMessageId,
         streamResult.finalAnswerCall.callId,
-        streamResult.finalAnswerCall.args
+        streamResult.finalAnswerCall.args,
+        streamResult.finalAnswerOrder
       );
     }
     this.publishStepDiagnostics(agentId, userMessageId, streamResult.output);
@@ -264,14 +273,23 @@ export class MainPipeline {
     let attempts = 0;
     let invalidFinalAnswerSeen = false;
     let validationFeedback: string | null = null;
+    const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
     for (;;) {
       const attemptMessageIds = new Set<number>();
       const runningToolCalls = new Map<string, RunningToolState>();
-      let currentSegment: LlmSegmentState = { id: null, reasoning: '', text: '' };
+      const attemptId = attempts + 1;
+      let sequence = 0;
+      const nextOrder = (): MessageOrderMeta => ({
+        runId,
+        attemptId,
+        sequence: ++sequence,
+      });
+      let currentSegment: LlmSegmentState = { id: null, reasoning: '', text: '', order: null };
       let finalLlmMessageId: number | null = null;
       let toolCallsInResponse = 0;
       let finalAnswerCall: { callId: string; args: Record<string, unknown> } | null = null;
+      let finalAnswerOrder: MessageOrderMeta | null = null;
       let meaningfulChunkSeen = false;
 
       try {
@@ -298,6 +316,7 @@ export class MainPipeline {
                 agentId,
                 context.replyToMessageId,
                 context.options.model,
+                nextOrder,
                 setLastLlmMessageId,
                 attemptMessageIds
               );
@@ -323,6 +342,7 @@ export class MainPipeline {
                 agentId,
                 context.replyToMessageId,
                 context.options.model,
+                nextOrder,
                 setLastLlmMessageId,
                 attemptMessageIds
               );
@@ -364,12 +384,13 @@ export class MainPipeline {
               if (finalLlmMessageId !== null) {
                 setLastLlmMessageId(finalLlmMessageId);
               }
-              currentSegment = { id: null, reasoning: '', text: '' };
+              currentSegment = { id: null, reasoning: '', text: '', order: null };
 
               const payloadData: Record<string, unknown> = {
                 callId: chunk.callId,
                 toolName: chunk.toolName,
                 arguments: chunk.arguments,
+                order: nextOrder(),
               };
               const startedAt = new Date().toISOString();
               const runningPayload = buildRunningToolPayload(payloadData, startedAt);
@@ -448,11 +469,16 @@ export class MainPipeline {
             agentId,
             context.replyToMessageId,
             context.options.model,
-            output.text
+            output.text,
+            nextOrder()
           );
           attemptMessageIds.add(msg.id);
           finalLlmMessageId = msg.id;
           setLastLlmMessageId(msg.id);
+        }
+
+        if (finalAnswerCall) {
+          finalAnswerOrder = nextOrder();
         }
 
         if (signal?.aborted) {
@@ -461,6 +487,7 @@ export class MainPipeline {
             finalLlmMessageId,
             activeLlmMessageId: currentSegment.id,
             finalAnswerCall,
+            finalAnswerOrder,
           };
         }
 
@@ -480,6 +507,7 @@ export class MainPipeline {
           finalLlmMessageId,
           activeLlmMessageId: currentSegment.id,
           finalAnswerCall,
+          finalAnswerOrder,
         };
       } catch (error) {
         const isInvalidFinalAnswer =
@@ -573,7 +601,8 @@ export class MainPipeline {
     agentId: string,
     replyToMessageId: number,
     callId: string,
-    args: Record<string, unknown>
+    args: Record<string, unknown>,
+    order: MessageOrderMeta | null
   ): void {
     this.messageManager.create(
       agentId,
@@ -583,6 +612,7 @@ export class MainPipeline {
           callId,
           toolName: 'final_answer',
           arguments: this.normalizeFinalAnswerArguments(args),
+          order: order ?? undefined,
         },
       },
       replyToMessageId,
@@ -658,9 +688,14 @@ export class MainPipeline {
     agentId: string,
     replyToMessageId: number,
     model: string,
+    nextOrder: () => MessageOrderMeta,
     setLastLlmMessageId: (messageId: number) => void,
     attemptMessageIds: Set<number>
   ): number {
+    if (!segment.order) {
+      segment.order = nextOrder();
+    }
+
     const streamingPayload = {
       data: {
         model,
@@ -668,6 +703,7 @@ export class MainPipeline {
           ? { text: segment.reasoning, excluded_from_replay: true }
           : undefined,
         text: segment.text || undefined,
+        order: segment.order,
       },
     };
 
@@ -713,6 +749,7 @@ export class MainPipeline {
             ? { text: segment.reasoning, excluded_from_replay: true }
             : undefined,
           text: segment.text || undefined,
+          order: segment.order ?? undefined,
         },
       },
       true
@@ -724,7 +761,8 @@ export class MainPipeline {
     agentId: string,
     replyToMessageId: number,
     model: string,
-    text: string
+    text: string,
+    order: MessageOrderMeta
   ): { id: number } {
     return this.messageManager.create(
       agentId,
@@ -733,6 +771,7 @@ export class MainPipeline {
         data: {
           model,
           text,
+          order,
         },
       },
       replyToMessageId,

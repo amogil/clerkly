@@ -71,13 +71,18 @@ import { useAgentChat } from '../../../src/renderer/hooks/useAgentChat';
 
 // ── Fixtures ───────────────────────────────────────────────────────────────
 
-const makeSnapshot = (id: number, kind = 'user', hidden = false): MessageSnapshot => ({
+const makeSnapshot = (
+  id: number,
+  kind = 'user',
+  hidden = false,
+  order?: { runId: string; attemptId: number; sequence: number }
+): MessageSnapshot => ({
   id,
   agentId: 'agent-1',
   kind,
   timestamp: Date.now(),
   replyToMessageId: null,
-  payload: { data: { text: `msg ${id}` } },
+  payload: { data: { text: `msg ${id}`, order } },
   hidden,
   done: true,
 });
@@ -388,6 +393,38 @@ describe('useAgentChat hook', () => {
       });
 
       expect(result.current.rawMessages).toContainEqual(newMsg);
+    });
+
+    /* Preconditions: Hook mounted, messages from one run/attempt arrive out of sequence
+       Action: MESSAGE_CREATED emitted in order sequence 2 then 1
+       Assertions: rawMessages are sorted by payload.data.order.sequence
+       Requirements: agents.7.4.8 */
+    it('should sort MESSAGE_CREATED snapshots by sequence within one run attempt', async () => {
+      const { result } = renderHook(() => useAgentChat('agent-1'));
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      const createdHandler = mockSubscribe.mock.calls.find(
+        ([type]: [string]) => type === EVENT_TYPES.MESSAGE_CREATED
+      )?.[1];
+      expect(createdHandler).toBeDefined();
+
+      const seq2 = makeSnapshot(102, 'llm', false, {
+        runId: 'run-1',
+        attemptId: 1,
+        sequence: 2,
+      });
+      const seq1 = makeSnapshot(101, 'llm', false, {
+        runId: 'run-1',
+        attemptId: 1,
+        sequence: 1,
+      });
+
+      act(() => {
+        createdHandler({ message: seq2, timestamp: Date.now() });
+        createdHandler({ message: seq1, timestamp: Date.now() });
+      });
+
+      expect(result.current.rawMessages.map((m) => m.id)).toEqual([101, 102]);
     });
 
     /* Preconditions: Hook mounted, hidden message arrives

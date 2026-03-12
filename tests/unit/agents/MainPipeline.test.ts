@@ -902,6 +902,59 @@ describe('MainPipeline.run()', () => {
     );
   });
 
+  /* Preconditions: provider emits pre-tool reasoning, one valid tool_call, then post-tool text
+     Action: run pipeline for one attempt
+     Assertions: created llm/tool_call/llm messages carry deterministic order metadata with monotonic sequence
+     Requirements: llm-integration.11.1.5 */
+  it('adds run-attempt sequence order metadata to persisted pre-tool, tool_call, and post-tool messages', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({ type: 'reasoning', delta: 'pre ' });
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-ordered',
+          toolName: 'code_exec',
+          arguments: { code: "console.log('ok')" },
+        });
+        onChunk({ type: 'text', delta: 'post text' });
+        onChunk({
+          type: 'tool_result',
+          callId: 'call-ordered',
+          toolName: 'code_exec',
+          arguments: { code: "console.log('ok')" },
+          output: { status: 'success', stdout: 'ok\n', stderr: '' },
+          status: 'success',
+        });
+        return { text: 'post text' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const creates = (messageManager.create as jest.Mock).mock.calls;
+    const llmCreates = creates.filter((call) => call[1] === 'llm');
+    const toolCreates = creates.filter((call) => call[1] === 'tool_call');
+
+    expect(llmCreates).toHaveLength(2);
+    expect(toolCreates).toHaveLength(1);
+
+    const preOrder = (llmCreates[0]?.[2] as { data?: { order?: any } })?.data?.order;
+    const toolOrder = (toolCreates[0]?.[2] as { data?: { order?: any } })?.data?.order;
+    const postOrder = (llmCreates[1]?.[2] as { data?: { order?: any } })?.data?.order;
+
+    expect(preOrder).toEqual(
+      expect.objectContaining({ runId: expect.any(String), attemptId: 1, sequence: 1 })
+    );
+    expect(toolOrder).toEqual(
+      expect.objectContaining({ runId: preOrder.runId, attemptId: 1, sequence: 2 })
+    );
+    expect(postOrder).toEqual(
+      expect.objectContaining({ runId: preOrder.runId, attemptId: 1, sequence: 3 })
+    );
+  });
+
   it('creates finalized llm message from result.text when no text chunks were emitted', async () => {
     const { pipeline, messageManager, llmProvider } = makeMocks();
 

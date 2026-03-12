@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useChat, Chat } from '@ai-sdk/react';
 import { IPCChatTransport } from '../lib/IPCChatTransport';
 import { toUIMessages } from '../lib/messageMapper';
+import { sortMessageSnapshots } from '../lib/messageOrder';
 import { useEventSubscription } from '../events/useEventSubscription';
 import { EVENT_TYPES } from '../../shared/events/constants';
 import type {
@@ -78,7 +79,7 @@ export function useAgentChat(agentId: string | null): UseAgentChatResult {
     const result = await window.api.messages.list(agentId);
     if (result.success && result.data) {
       const snapshots = result.data as MessageSnapshot[];
-      setRawMessages(snapshots);
+      setRawMessages(sortMessageSnapshots(snapshots));
     }
   }, [agentId]);
 
@@ -124,8 +125,9 @@ export function useAgentChat(agentId: string | null): UseAgentChatResult {
       const result = await window.api.messages.list(agentId);
       if (result.success && result.data) {
         const snapshots = result.data as MessageSnapshot[];
-        setRawMessages(snapshots);
-        const uiMessages = await sanitizeUIMessages(toUIMessages(snapshots));
+        const sortedSnapshots = sortMessageSnapshots(snapshots);
+        setRawMessages(sortedSnapshots);
+        const uiMessages = await sanitizeUIMessages(toUIMessages(sortedSnapshots));
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         setMessages(uiMessages as any);
       }
@@ -150,7 +152,7 @@ export function useAgentChat(agentId: string | null): UseAgentChatResult {
 
     setRawMessages((prev) => {
       if (prev.some((m) => m.id === payload.message.id)) return prev;
-      return [...prev, payload.message];
+      return sortMessageSnapshots([...prev, payload.message]);
     });
   });
 
@@ -167,9 +169,11 @@ export function useAgentChat(agentId: string | null): UseAgentChatResult {
       setRawMessages((prev) => {
         const existingIndex = prev.findIndex((m) => m.id === payload.message.id);
         if (existingIndex === -1) {
-          return [...prev, payload.message];
+          return sortMessageSnapshots([...prev, payload.message]);
         }
-        return prev.map((m) => (m.id === payload.message.id ? payload.message : m));
+        return sortMessageSnapshots(
+          prev.map((m) => (m.id === payload.message.id ? payload.message : m))
+        );
       });
     }
   });
