@@ -91,6 +91,7 @@ CREATE TABLE messages (
 ```json
 {
   "data": {
+    "order": { "runId": "run-1700000000000-ab12cd34", "attemptId": 1, "sequence": 1 },
     "reasoning": { "text": "...", "excluded_from_replay": true },
     "text": "Hi! How can I help?"
   }
@@ -198,6 +199,7 @@ CREATE TABLE messages (
   "data": {
     "callId": "call-code-exec-1",
     "toolName": "code_exec",
+    "order": { "runId": "run-1700000000000-ab12cd34", "attemptId": 1, "sequence": 2 },
     "arguments": {
       "code": "console.log('ok')",
       "timeout_ms": 30000
@@ -313,6 +315,7 @@ CREATE TABLE messages (
 4) `message.updated` используется как snapshot persisted-состояния и финализации.
 5) `kind: tool_call` обрабатывается только через persisted snapshot (`message.created`/`message.updated`), включая промежуточный статус `running`.
 6) Визуальный порядок фиксируется каноническим `sequence` внутри `attemptId`, а не временем прихода события в renderer.
+7) Persisted payload включает `data.order = { runId, attemptId, sequence }`; renderer сортирует snapshots по этому ключу (с fallback на `timestamp,id` для legacy сообщений).
 
 ### Крайние случаи
 
@@ -741,6 +744,8 @@ User отправляет сообщение
 - `tests/unit/agents/MainPipeline.test.ts` — отклонение ответа модели с `tool_calls.length > 1` (retry/repair без persist `tool_call`)
 - `tests/unit/agents/AgentIPCHandlers.test.ts` — запуск pipeline при kind:user
 - `tests/unit/renderer/IPCChatTransport.test.ts` — обработка delta-stream (`reasoning/text`) и persisted `kind: tool_call` snapshot
+- `tests/unit/renderer/messageOrder.test.ts` — детерминированная сортировка snapshots по `data.order.{runId,attemptId,sequence}` с fallback на `timestamp,id`
+- `tests/unit/hooks/useAgentChat.test.ts` — применение сортировки при `message.created`/`message.updated` для out-of-order доставки
 - `tests/unit/events/MainEventBus.test.ts` и `tests/unit/events/RendererEventBus.test.ts` — порядок/доставка streaming событий без потери чанков
 - `tests/unit/db/repositories/MessagesRepository.test.ts` — kind как параметр
 - `tests/unit/db/repositories/MessagesRepository.test.ts` — семантика `done` для `kind:llm` и `kind:error`

@@ -108,7 +108,7 @@
 #### Фаза 6: Валидация
 
 - [x] Запустить `npm run validate`.
-- [ ] После подтверждения пользователя запустить `npm run test:functional`.
+- [x] Полный `npm run test:functional` вынесен в единый финальный пункт "Осталось" (ниже).
 
 #### Фаза 7: Resource Degraded Mode (SHALL)
 
@@ -140,7 +140,7 @@
 - [x] Обновить `docs/specs/llm-integration/design.md` coverage-table строкой `llm-integration.11.2.3.3` и привязать к конкретным тестам.
 - [x] Сверить текстовые названия функциональных тестов в requirements/design с фактическими тест-кейсами в `tests/functional/llm-chat.spec.ts` и `tests/functional/code_exec.spec.ts`.
 - [x] Прогнать `npm run validate`.
-- [ ] После подтверждения пользователя прогнать полный `npm run test:functional`.
+- [x] Полный `npm run test:functional` вынесен в единый финальный пункт "Осталось" (ниже).
 
 #### Фаза 9: OAuth Build Injection Validation
 
