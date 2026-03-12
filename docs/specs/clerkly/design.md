@@ -117,6 +117,23 @@ graph TB
 - **SQLite**: Легковесная встроенная база данных, не требует отдельного сервера, идеальна для локального хранения
 - **Jest + ts-jest**: Комплексное тестирование (unit) с полной поддержкой TypeScript
 
+### Иконка Приложения macOS
+
+Требование `clerkly.1.6` реализуется через стандартный pipeline `electron-builder` для macOS:
+
+- Source-asset: `assets/icon-source.png` (статичная версия логотипа Clerkly с экрана логина)
+- Генерация iconset: `assets/icon.iconset` (размеры 16/32/64/128/256/512/1024)
+- Финальный артефакт: `assets/icon.icns`
+- Build binding: `electron-builder` поле `mac.icon = "assets/icon.icns"`
+
+Для воспроизводимой сборки иконки используется скрипт:
+
+```bash
+npm run generate:icon:mac
+```
+
+Скрипт создает/обновляет `assets/icon.iconset` и `assets/icon.icns` на базе `assets/icon-source.png`.
+
 ## Компоненты и интерфейсы
 
 ### Компоненты Main Process
@@ -2134,6 +2151,7 @@ test('UI should render within 100ms', () => {
 | clerkly.1.3 | ✓ | ✓ |
 | clerkly.1.4 | ✓ | ✓ |
 | clerkly.1.5 | ✓ | - |
+| clerkly.1.6 | - | - |
 | clerkly.2.1 | ✓ | - |
 | clerkly.2.2 | - | ✓ |
 | clerkly.2.3 | ✓ | - |
@@ -2174,7 +2192,8 @@ test('UI should render within 100ms', () => {
 - \- - Требование не покрыто данным типом тестов
 
 **Примечания:**
-- Все функциональные требования (clerkly.1.x, clerkly.2.x) покрыты соответствующими типами тестов
+- Требование `clerkly.1.6` (иконка macOS) проверяется артефактно/интеграционно при сборке (`assets/icon.icns` + `electron-builder` конфигурация), без отдельного unit/functional теста
+- Все остальные функциональные требования (clerkly.1.x, clerkly.2.x) покрыты соответствующими типами тестов
 - Все нефункциональные требования (clerkly.nfr.x.x) покрыты соответствующими типами тестов
 - Функциональные тесты проверяют интеграцию между компонентами
 - Модульные тесты покрывают конкретные примеры, граничные случаи и обработку ошибок
@@ -2214,6 +2233,11 @@ test('UI should render within 100ms', () => {
 - Реализовано: Весь проект написан на TypeScript
 - Компоненты: Все компоненты
 - Тестирование: ts-jest для запуска TypeScript тестов
+
+**Требование 1.6 (Иконка приложения macOS):**
+- Реализовано: Сборка `assets/icon.icns` из статичного логотипа Clerkly и подключение в `electron-builder` (`mac.icon`)
+- Компоненты: Build resources (`assets/icon-source.png`, `assets/icon.iconset`, `assets/icon.icns`), скрипт `scripts/generate-mac-icon.sh`
+- Тестирование: Проверка артефактов сборки и наличия иконки в `.app` bundle
 
 **Требование 2.1 (Модульные тесты):**
 - Реализовано: Jest тесты для всех компонентов

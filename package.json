@@ -42,7 +42,8 @@
     "validate": "bash scripts/validate.sh",
     "validate:verbose": "bash scripts/validate.sh --verbose",
     "package": "electron-builder",
-    "package:mac": "electron-builder --mac"
+    "package:mac": "electron-builder --mac",
+    "generate:icon:mac": "bash scripts/generate-mac-icon.sh"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.58",

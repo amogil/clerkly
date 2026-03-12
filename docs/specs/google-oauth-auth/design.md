@@ -634,6 +634,7 @@ export function LoginScreen({ onLogin, isLoading, isDisabled }: LoginScreenProps
 
 // Содержимое компонента:
 // - Бренд-блок Clerkly: Logo component (size="lg", showText=true) в одном горизонтальном ряду с текстом "Clerkly" (text-4xl font-semibold)
+//   * В статичном логотипе боковые узлы непрозрачные (opacity=1), линии не просвечивают через круги
 // - Карта с заголовком "Welcome" (text-2xl font-semibold)
 // - Описание "Your autonomous AI agent that listens, organizes, and acts"
 // - Кнопка "Continue with Google" с иконкой Google

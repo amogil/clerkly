@@ -158,12 +158,12 @@ test.afterEach(async () => {
 test.describe('code_exec tool_call rendering', () => {
   /* Preconditions: authenticated app with one visible agent
      Action: create persisted kind:tool_call with toolName=code_exec and terminal output
-     Assertions: dedicated code_exec block renders status/stdout/stderr testids
+     Assertions: dedicated code_exec block renders Code header with icon/status and stream sections without gray input/output background
      Exception Rationale (testing.3.13): this test validates renderer behavior for an already persisted historical
      tool_call(code_exec) message and intentionally bypasses LLM transport; LLM+UI path coverage remains in
      code_exec tool-loop scenarios below.
      Requirements: agents.7.4.5, agents.7.4.6, agents.7.4.7 */
-  test('should render tool_call(code_exec) message block in chat', async () => {
+  test('should render tool_call(code_exec) message block with Code header/icon/status and transparent streams', async () => {
     await launchWithMockLLM();
     const agentId = (await getAgentIdsFromApi(window))[0];
     expect(agentId).toBeTruthy();
@@ -195,8 +195,15 @@ test.describe('code_exec tool_call rendering', () => {
     await expect(window.locator('[data-testid="message-code-exec-block"]').last()).toBeVisible({
       timeout: 5000,
     });
+    await expect(window.locator('[data-testid="message-code-exec-icon"]').last()).toBeVisible();
+    await expect(window.locator('[data-testid="message-code-exec-title"]').last()).toHaveText(
+      'Code'
+    );
     await expect(window.locator('[data-testid="message-code-exec-status"]').last()).toHaveText(
       'success'
+    );
+    await expect(window.locator('[data-testid="message-code-exec-input"]').last()).toContainText(
+      "console.log('ok')"
     );
     await expect(window.locator('[data-testid="message-code-exec-stdout"]').last()).toContainText(
       'ok'
@@ -204,6 +211,21 @@ test.describe('code_exec tool_call rendering', () => {
     await expect(window.locator('[data-testid="message-code-exec-stderr"]').last()).toContainText(
       'warn'
     );
+    const inputClassName = await window
+      .locator('[data-testid="message-code-exec-input"]')
+      .last()
+      .evaluate((el) => el.className);
+    const stdoutClassName = await window
+      .locator('[data-testid="message-code-exec-stdout"]')
+      .last()
+      .evaluate((el) => el.className);
+    const stderrClassName = await window
+      .locator('[data-testid="message-code-exec-stderr"]')
+      .last()
+      .evaluate((el) => el.className);
+    expect(inputClassName).toContain('bg-transparent');
+    expect(stdoutClassName).toContain('bg-transparent');
+    expect(stderrClassName).toContain('bg-transparent');
 
     await expectNoToastError(window);
   });

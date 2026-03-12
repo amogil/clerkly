@@ -109,9 +109,9 @@ describe('AgentMessage — tool_call', () => {
 
   /* Preconditions: persisted kind:tool_call for code_exec with status/stdout/stderr
      Action: render AgentMessage
-     Assertions: dedicated code_exec block with status and stream sections is rendered
+     Assertions: dedicated code_exec block renders Code header with icon/status and stream sections without gray input/output background
      Requirements: agents.7.4.5, agents.7.4.6, agents.7.4.7 */
-  it('should render code_exec tool_call block with status/stdout/stderr', () => {
+  it('should render code_exec tool_call block with Code header, icon, status, and streams', () => {
     render(
       <AgentMessage
         message={baseMessage({
@@ -136,9 +136,14 @@ describe('AgentMessage — tool_call', () => {
     );
 
     expect(screen.getByTestId('message-code-exec-block')).toBeInTheDocument();
+    expect(screen.getByTestId('message-code-exec-icon')).toBeInTheDocument();
+    expect(screen.getByTestId('message-code-exec-title')).toHaveTextContent('Code');
     expect(screen.getByTestId('message-code-exec-status')).toHaveTextContent('success');
+    expect(screen.getByTestId('message-code-exec-input')).toHaveClass('bg-transparent');
     expect(screen.getByTestId('message-code-exec-stdout')).toHaveTextContent('ok');
+    expect(screen.getByTestId('message-code-exec-stdout')).toHaveClass('bg-transparent');
     expect(screen.getByTestId('message-code-exec-stderr')).toHaveTextContent('warn');
+    expect(screen.getByTestId('message-code-exec-stderr')).toHaveClass('bg-transparent');
   });
 
   /* Preconditions: persisted kind:tool_call for final_answer with summary_points

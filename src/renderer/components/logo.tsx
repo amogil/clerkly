@@ -36,11 +36,11 @@ export function Logo({ size = 'md', showText = true, animated = false }: LogoPro
 
         {/* Neural network nodes - representing AI intelligence */}
         <g className={animated ? 'nodes' : ''}>
-          <circle cx="10" cy="12" r="2" fill="white" opacity="0.9" />
-          <circle cx="10" cy="20" r="2" fill="white" opacity="0.9" />
+          <circle cx="10" cy="12" r="2" fill="white" opacity={animated ? 0.9 : 1} />
+          <circle cx="10" cy="20" r="2" fill="white" opacity={animated ? 0.9 : 1} />
           <circle cx="16" cy="16" r="2.5" fill="white" />
-          <circle cx="22" cy="12" r="2" fill="white" opacity="0.9" />
-          <circle cx="22" cy="20" r="2" fill="white" opacity="0.9" />
+          <circle cx="22" cy="12" r="2" fill="white" opacity={animated ? 0.9 : 1} />
+          <circle cx="22" cy="20" r="2" fill="white" opacity={animated ? 0.9 : 1} />
         </g>
 
         {/* Connection lines - representing organization and structure */}

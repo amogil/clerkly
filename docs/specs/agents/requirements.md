@@ -535,9 +535,20 @@
 
 7.4.6.1. Для визуализации `tool_call(code_exec)` ДОЛЖЕН использоваться компонент AI Elements `Tool` (см. [https://elements.ai-sdk.dev/components/tool](https://elements.ai-sdk.dev/components/tool)).
 
+7.4.6.2. Заголовок блока `tool_call(code_exec)` ДОЛЖЕН содержать иконку `Code2` (из набора `lucide-react`).
+
+7.4.6.3. Заголовок блока `tool_call(code_exec)` ДОЛЖЕН отображать название инструмента как `Code` (с заглавной буквы).
+
+7.4.6.4. Статус выполнения `tool_call(code_exec)` ДОЛЖЕН отображаться сразу после названия `Code` в заголовке.
+
+7.4.6.5. Секции `Input code`, `stdout` и `stderr` в блоке `tool_call(code_exec)` ДОЛЖНЫ использовать прозрачный фон (`transparent`).
+
 7.4.7. Для `tool_call(code_exec)` UI ДОЛЖЕН иметь отдельные тестовые идентификаторы:
   - `data-testid="message-code-exec-block"` для корневого блока,
+  - `data-testid="message-code-exec-icon"` для иконки в заголовке,
+  - `data-testid="message-code-exec-title"` для названия `Code`,
   - `data-testid="message-code-exec-status"` для статуса,
+  - `data-testid="message-code-exec-input"` для секции Input code,
   - `data-testid="message-code-exec-stdout"` для секции stdout,
   - `data-testid="message-code-exec-stderr"` для секции stderr.
 
@@ -586,7 +597,7 @@
 - `tests/functional/llm-chat.spec.ts` - "should avoid duplicate line breaks between markdown blocks"
 - `tests/functional/llm-chat.spec.ts` - "should render tool_call(final_answer) as checklist block"
 - `tests/functional/llm-chat.spec.ts` - "should keep tool_call(final_answer) checklist always expanded"
-- `tests/functional/code_exec.spec.ts` - "should render tool_call(code_exec) message block in chat"
+- `tests/functional/code_exec.spec.ts` - "should render tool_call(code_exec) message block with Code header/icon/status and transparent streams"
 
 ---
 

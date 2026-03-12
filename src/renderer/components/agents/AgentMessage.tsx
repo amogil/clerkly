@@ -1,6 +1,6 @@
 import React from 'react';
 // Requirements: llm-integration.7, llm-integration.3.4.1, llm-integration.3.4.4, agents.4.22, agents.4.9, agents.4.10.1, agents.4.10.2, agents.7.4
-import { Check } from 'lucide-react';
+import { Check, Code2 } from 'lucide-react';
 import { Message, MessageContent, MessageResponse } from '../ai-elements/message';
 import { Reasoning, ReasoningContent } from '../ai-elements/reasoning';
 import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from '../ai-elements/tool';
@@ -212,27 +212,42 @@ export function AgentMessage({
       return (
         <Message from="assistant" className="w-full max-w-full">
           <Tool data-testid="message-code-exec-block">
-            <ToolHeader>
-              <div className="font-medium text-foreground">code_exec</div>
-              <div data-testid="message-code-exec-status" className="text-xs text-muted-foreground">
+            <ToolHeader className="justify-start">
+              <Code2
+                data-testid="message-code-exec-icon"
+                className="h-4 w-4 shrink-0 text-muted-foreground"
+              />
+              <div data-testid="message-code-exec-title" className="font-medium text-foreground">
+                Code
+              </div>
+              <div
+                data-testid="message-code-exec-status"
+                className="inline-flex items-center rounded-full border border-border/70 bg-background px-2 py-0.5 text-xs text-muted-foreground"
+              >
                 {status}
               </div>
             </ToolHeader>
             <ToolContent>
               <div>
                 <div className="mb-1 text-xs font-medium text-muted-foreground">Input code</div>
-                <ToolInput>{codeInput}</ToolInput>
+                <ToolInput data-testid="message-code-exec-input" className="bg-transparent">
+                  {codeInput}
+                </ToolInput>
               </div>
               {stdout.length > 0 ? (
                 <div>
                   <div className="mb-1 text-xs font-medium text-muted-foreground">stdout</div>
-                  <ToolOutput data-testid="message-code-exec-stdout">{stdout}</ToolOutput>
+                  <ToolOutput data-testid="message-code-exec-stdout" className="bg-transparent">
+                    {stdout}
+                  </ToolOutput>
                 </div>
               ) : null}
               {stderr.length > 0 ? (
                 <div>
                   <div className="mb-1 text-xs font-medium text-muted-foreground">stderr</div>
-                  <ToolOutput data-testid="message-code-exec-stderr">{stderr}</ToolOutput>
+                  <ToolOutput data-testid="message-code-exec-stderr" className="bg-transparent">
+                    {stderr}
+                  </ToolOutput>
                 </div>
               ) : null}
             </ToolContent>

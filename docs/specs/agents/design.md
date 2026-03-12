@@ -1588,9 +1588,12 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 **Сообщения выполнения кода (`kind: 'tool_call'`, `toolName: 'code_exec'`):**
 - Используется отдельный блок выполнения кода, не являющийся обычным текстовым bubble.
 - Блок строится на AI Elements `Tool` (см. [https://elements.ai-sdk.dev/components/tool](https://elements.ai-sdk.dev/components/tool)).
+- Заголовок блока отображает иконку выполнения кода (`Code2`) и название `Code`.
+- Сразу после названия `Code` отображается badge со статусом выполнения.
 - Блок отображает persisted-статус выполнения (`running | success | error | timeout | cancelled`).
 - Для security/policy отказов используется `status=error` с соответствующим `error.code` (например, `policy_denied`).
 - При наличии отображаются `stdout` и `stderr` из persisted payload.
+- Секции `Input code`, `stdout` и `stderr` рендерятся без серого фона (transparent surface).
 - Рендер строится только по persisted snapshot (`message.created`/`message.updated`) без локальной реконструкции результата.
 
 ```tsx
@@ -1766,6 +1769,9 @@ const STATUS_STYLES: Record<AgentStatus, StatusStyle> = {
 **Варианты:**
 - Страница логина: без анимации
 - Пустой стейт чата: с CSS-анимацией узлов
+
+**Статичное отображение (без анимации):**
+- Боковые узлы (левый верхний, левый нижний, правый верхний, правый нижний) рендерятся непрозрачными (`opacity=1`), чтобы линии связей не просвечивали через круги.
 
 **Детали CSS-анимации узлов (5 узлов нейронной сети):**
 - `pulse-subtle` (3.2s): верхний левый узел
