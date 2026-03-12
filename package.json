@@ -41,6 +41,8 @@
     "ai-elements:sync": "bash -lc 'set -euo pipefail; VER=\"${npm_package_config_ai_elements_version}\"; REF=\"ai-elements@${VER}\"; BASE=\"https://raw.githubusercontent.com/vercel/ai-elements/${REF}\"; mkdir -p src/renderer/components/ai-elements src/renderer/components/ui; for f in confirmation conversation message prompt-input reasoning shimmer tool queue; do curl -fsSL \"$BASE/packages/elements/src/$f.tsx\" -o \"src/renderer/components/ai-elements/$f.tsx\"; done; for f in button button-group collapsible separator tooltip scroll-area; do curl -fsSL \"$BASE/packages/shadcn-ui/components/ui/$f.tsx\" -o \"src/renderer/components/ui/$f.tsx\"; done; echo \"Synced AI Elements from tag: $REF\"'",
     "validate": "bash scripts/validate.sh",
     "validate:verbose": "bash scripts/validate.sh --verbose",
+    "validate:deps": "bash scripts/validate.sh --with-dependency-check",
+    "validate:verbose:deps": "bash scripts/validate.sh --verbose --with-dependency-check",
     "package": "electron-builder",
     "package:mac": "electron-builder --mac",
     "generate:icon:mac": "bash scripts/generate-mac-icon.sh"

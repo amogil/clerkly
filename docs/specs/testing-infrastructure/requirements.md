@@ -153,6 +153,8 @@
 
 4.5. THE команда `npm run validate` SHALL выполняться без обязательных runtime-secrets (`CLERKLY_OAUTH_CLIENT_SECRET`, `CLERKLY_OPENAI_API_KEY`)
 
+4.6. THE проверка устаревших зависимостей (`npm outdated`) SHALL быть отключена по умолчанию в `npm run validate` и SHALL запускаться только при явном флаге `--with-dependency-check` (или эквивалентной npm-команде с этим флагом).
+
 ### 5. Запуск Функциональных Тестов
 
 **ID:** testing.5

@@ -10,6 +10,8 @@ This document describes all rules, workflows, and work formats. These rules are 
 ```bash
 npm run validate          # full validation (TypeScript, ESLint, Prettier, unit tests)
 npm run validate:verbose  # same, with verbose output
+npm run validate:deps     # validate + optional dependency check (npm outdated)
+npm run validate:verbose:deps  # verbose validate + optional dependency check
 ```
 
 ### Tests

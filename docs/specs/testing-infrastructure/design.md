@@ -543,7 +543,7 @@ interface MockTokenResponse {
 
 ### Команда `npm run validate`
 
-**Requirements**: testing.4.1, testing.4.2, testing.4.3, testing.4.4, testing.4.5
+**Requirements**: testing.4.1, testing.4.2, testing.4.3, testing.4.4, testing.4.5, testing.4.6
 
 Выполняет следующие проверки в указанном порядке:
 
@@ -556,9 +556,16 @@ interface MockTokenResponse {
 **Скрипт валидации** (`scripts/validate.sh`):
 ```bash
 #!/bin/bash
-# Requirements: testing.4.1, testing.4.3, testing.4.4
+# Requirements: testing.4.1, testing.4.3, testing.4.4, testing.4.6
 
 set -e  # Exit on first error
+
+WITH_DEPENDENCY_CHECK=false
+for arg in "$@"; do
+  case "$arg" in
+    --with-dependency-check|--deps|-d) WITH_DEPENDENCY_CHECK=true ;;
+  esac
+done
 
 echo "🔍 Running validation..."
 
@@ -582,6 +589,11 @@ npm run test:unit
 echo "📊 Coverage check..."
 npm run test:coverage
 
+# Optional dependency check
+if [ "$WITH_DEPENDENCY_CHECK" = true ]; then
+  npm outdated || true
+fi
+
 echo "✅ Validation complete!"
 ```
 
@@ -590,6 +602,7 @@ echo "✅ Validation complete!"
 **НЕ включает**:
 - ❌ Функциональные тесты (Requirements: testing.4.2)
 - ❌ Обязательные runtime secrets (`CLERKLY_OAUTH_CLIENT_SECRET`, `CLERKLY_OPENAI_API_KEY`) (Requirements: testing.4.5)
+- ❌ Проверку `npm outdated` по умолчанию (Requirements: testing.4.6; включается флагом `--with-dependency-check`)
 
 ### Отдельные Команды для Функциональных Тестов
 
