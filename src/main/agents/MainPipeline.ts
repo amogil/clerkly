@@ -278,13 +278,11 @@ export class MainPipeline {
     for (;;) {
       const attemptMessageIds = new Set<number>();
       const runningToolCalls = new Map<string, RunningToolState>();
-      let pendingToolCall:
-        | {
-            callId: string;
-            toolName: string;
-            args: Record<string, unknown>;
-          }
-        | null = null;
+      let pendingToolCall: {
+        callId: string;
+        toolName: string;
+        args: Record<string, unknown>;
+      } | null = null;
       const attemptId = attempts + 1;
       let sequence = 0;
       const nextOrder = (): MessageOrderMeta => ({
