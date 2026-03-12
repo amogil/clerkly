@@ -53,15 +53,21 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
         }
 
         let finished = false;
-        let llmMessageId: number | null = null;
+        let activeLlmMessageId: number | null = null;
+        let streamMessageId: string | null = null;
+        let stepOpen = false;
         let reasoningId: string | null = null;
         let textPartId: string | null = null;
+        let finishTimer: ReturnType<typeof setTimeout> | null = null;
         const unsubscribers: (() => void)[] = [];
-        const protocolErrorText = 'Response stream error. Please try again later.';
 
         function finish() {
           if (finished) return;
           finished = true;
+          if (finishTimer) {
+            clearTimeout(finishTimer);
+            finishTimer = null;
+          }
           unsubscribers.forEach((u) => u());
           try {
             controller.close();
@@ -79,10 +85,50 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
           }
         }
 
-        function failProtocol() {
-          enqueue({ type: 'error', errorText: protocolErrorText });
-          enqueue({ type: 'finish' });
-          finish();
+        function cancelPendingFinish(): void {
+          if (finishTimer) {
+            clearTimeout(finishTimer);
+            finishTimer = null;
+          }
+        }
+
+        function ensureStreamStarted(messageId: number): void {
+          if (streamMessageId) return;
+          streamMessageId = String(messageId);
+          enqueue({ type: 'start', messageId: streamMessageId });
+        }
+
+        function closeCurrentStep(): void {
+          if (reasoningId) {
+            enqueue({ type: 'reasoning-end', id: reasoningId });
+            reasoningId = null;
+          }
+          if (textPartId) {
+            enqueue({ type: 'text-end', id: textPartId });
+            textPartId = null;
+          }
+          if (stepOpen) {
+            enqueue({ type: 'finish-step' });
+            stepOpen = false;
+          }
+        }
+
+        function ensureStepForMessage(messageId: number): void {
+          ensureStreamStarted(messageId);
+          if (activeLlmMessageId === messageId && stepOpen) return;
+          closeCurrentStep();
+          activeLlmMessageId = messageId;
+          enqueue({ type: 'start-step' });
+          stepOpen = true;
+        }
+
+        function scheduleFinishIfIdle(): void {
+          cancelPendingFinish();
+          finishTimer = setTimeout(() => {
+            closeCurrentStep();
+            enqueue({ type: 'finish' });
+            finish();
+          }, 0);
         }
 
         // Requirements: agents.12.7 — subscribe to MESSAGE_CREATED for llm/error messages
@@ -91,17 +137,10 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
           (payload: MessageCreatedPayload) => {
             const msg = payload.message;
             if (msg.agentId !== agentId) return;
+            cancelPendingFinish();
 
             if (msg.kind === 'llm') {
-              if (llmMessageId !== null && llmMessageId !== msg.id) {
-                return;
-              }
-              llmMessageId = msg.id;
-              // Start the assistant message stream only once per message id.
-              if (!textPartId && !reasoningId) {
-                enqueue({ type: 'start', messageId: String(msg.id) });
-                enqueue({ type: 'start-step' });
-              }
+              ensureStepForMessage(msg.id);
 
               // If message is already completed with text (non-streaming case), emit it now.
               const data = msg.payload.data as Record<string, unknown> | undefined;
@@ -111,9 +150,9 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
                 enqueue({ type: 'text-start', id: textPartId });
                 enqueue({ type: 'text-delta', id: textPartId, delta: text });
                 enqueue({ type: 'text-end', id: textPartId });
-                enqueue({ type: 'finish-step' });
-                enqueue({ type: 'finish' });
-                finish();
+                textPartId = null;
+                closeCurrentStep();
+                scheduleFinishIfIdle();
               }
             } else if (msg.kind === 'error') {
               // Requirements: llm-integration.3.4 — error messages
@@ -134,10 +173,9 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
           (payload: MessageUpdatedPayload) => {
             const msg = payload.message;
             if (msg.agentId !== agentId) return;
-            if (llmMessageId === null && msg.kind === 'llm' && msg.done) {
-              llmMessageId = msg.id;
-              enqueue({ type: 'start', messageId: String(msg.id) });
-              enqueue({ type: 'start-step' });
+            cancelPendingFinish();
+            if (activeLlmMessageId === null && msg.kind === 'llm' && msg.done) {
+              ensureStepForMessage(msg.id);
 
               const data = msg.payload.data as Record<string, unknown> | undefined;
               const reasoning = data?.reasoning as { text?: string } | undefined;
@@ -156,15 +194,15 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
                 enqueue({ type: 'text-end', id: doneTextId });
               }
 
-              enqueue({ type: 'finish-step' });
-              enqueue({ type: 'finish' });
-              finish();
+              closeCurrentStep();
+              scheduleFinishIfIdle();
               return;
             }
-            if (msg.id !== llmMessageId) return;
+            if (msg.id !== activeLlmMessageId) return;
 
             // Hidden = cancelled previous response, close stream without content
             if (msg.hidden) {
+              closeCurrentStep();
               finish();
               return;
             }
@@ -187,9 +225,8 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
                   enqueue({ type: 'text-end', id: doneTextId });
                 }
               }
-              enqueue({ type: 'finish-step' });
-              enqueue({ type: 'finish' });
-              finish();
+              closeCurrentStep();
+              scheduleFinishIfIdle();
             }
           }
         );
@@ -199,14 +236,8 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
           EVENT_TYPES.MESSAGE_LLM_REASONING_UPDATED,
           (payload: MessageLlmReasoningUpdatedPayload) => {
             if (payload.agentId !== agentId) return;
-            if (llmMessageId === null) {
-              llmMessageId = payload.messageId;
-              enqueue({ type: 'start', messageId: String(payload.messageId) });
-              enqueue({ type: 'start-step' });
-            } else if (llmMessageId !== payload.messageId) {
-              failProtocol();
-              return;
-            }
+            cancelPendingFinish();
+            ensureStepForMessage(payload.messageId);
 
             if (!reasoningId) {
               reasoningId = `reasoning-${payload.messageId}`;
@@ -220,14 +251,8 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
           EVENT_TYPES.MESSAGE_LLM_TEXT_UPDATED,
           (payload: MessageLlmTextUpdatedPayload) => {
             if (payload.agentId !== agentId) return;
-            if (llmMessageId === null) {
-              llmMessageId = payload.messageId;
-              enqueue({ type: 'start', messageId: String(payload.messageId) });
-              enqueue({ type: 'start-step' });
-            } else if (llmMessageId !== payload.messageId) {
-              failProtocol();
-              return;
-            }
+            cancelPendingFinish();
+            ensureStepForMessage(payload.messageId);
 
             if (!textPartId) {
               textPartId = `text-${payload.messageId}`;

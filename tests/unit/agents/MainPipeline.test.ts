@@ -544,6 +544,54 @@ describe('MainPipeline.run()', () => {
     );
   });
 
+  /* Preconditions: first attempt returns invalid final_answer, second attempt returns valid final_answer
+     Action: run pipeline with retry/repair
+     Assertions: persisted final_answer is created once with attemptId=2 in order metadata
+     Requirements: llm-integration.11.3.1, llm-integration.11.1.5 */
+  it('increments attemptId in order metadata after retry before persisting final_answer', async () => {
+    const { pipeline, messageManager, llmProvider } = makeMocks();
+
+    llmProvider.chat
+      .mockImplementationOnce(
+        async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+          onChunk({
+            type: 'tool_call',
+            callId: 'final-invalid',
+            toolName: 'final_answer',
+            arguments: {},
+          });
+          return { text: '' };
+        }
+      )
+      .mockImplementationOnce(
+        async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+          onChunk({
+            type: 'tool_call',
+            callId: 'final-valid',
+            toolName: 'final_answer',
+            arguments: { summary_points: ['ok after retry'] },
+          });
+          return { text: '' };
+        }
+      );
+
+    await pipeline.run('agent-1', 1);
+
+    const finalCalls = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) =>
+        call[1] === 'tool_call' &&
+        Boolean((call[2] as { data?: { toolName?: string } }).data?.toolName === 'final_answer')
+    );
+    expect(finalCalls).toHaveLength(1);
+    expect((finalCalls[0]?.[2] as { data?: { order?: unknown } }).data?.order).toEqual(
+      expect.objectContaining({
+        runId: expect.any(String),
+        attemptId: 2,
+        sequence: expect.any(Number),
+      })
+    );
+  });
+
   it('retries and fails when final_answer is combined with another tool call in same turn', async () => {
     const { pipeline, llmProvider, messageManager } = makeMocks();
     let attempt = 0;
@@ -1308,6 +1356,42 @@ describe('MainPipeline.run()', () => {
     const optionsArg = (llmProvider.chat as jest.Mock).mock.calls[0][1] as ChatOptions;
     expect(optionsArg.tools).toEqual([]);
     expect(toolExecutor.executeBatch).not.toHaveBeenCalled();
+  });
+
+  /* Preconditions: provider returns single valid final_answer tool_call
+     Action: run pipeline
+     Assertions: persisted final_answer includes order metadata
+     Requirements: llm-integration.11.1.5 */
+  it('persists final_answer with order metadata', async () => {
+    const { pipeline, messageManager, llmProvider } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'final-ordered',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['done'] },
+        });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const finalCall = (messageManager.create as jest.Mock).mock.calls.find(
+      (call: unknown[]) =>
+        call[1] === 'tool_call' &&
+        Boolean((call[2] as { data?: { toolName?: string } }).data?.toolName === 'final_answer')
+    );
+    expect(finalCall).toBeDefined();
+    expect((finalCall?.[2] as { data?: { order?: unknown } }).data?.order).toEqual(
+      expect.objectContaining({
+        runId: expect.any(String),
+        attemptId: 1,
+        sequence: expect.any(Number),
+      })
+    );
   });
 
   it('publishes diagnostic event on pipeline failures', async () => {

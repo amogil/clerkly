@@ -550,6 +550,37 @@ describe('useAgentChat hook', () => {
       expect(result.current.rawMessages).toContainEqual(updatedSnapshot);
     });
 
+    /* Preconditions: Hook mounted, two updates for same run/attempt arrive in reverse sequence
+       Action: MESSAGE_UPDATED events for sequence 2 then 1
+       Assertions: rawMessages order follows payload.data.order.sequence
+       Requirements: agents.7.4.8 */
+    it('should sort MESSAGE_UPDATED snapshots by sequence within one run attempt', async () => {
+      const { result } = renderHook(() => useAgentChat('agent-1'));
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      const updatedHandler = mockSubscribe.mock.calls.find(
+        ([type]: [string]) => type === EVENT_TYPES.MESSAGE_UPDATED
+      )?.[1];
+
+      const seq2 = makeSnapshot(302, 'llm', false, {
+        runId: 'run-2',
+        attemptId: 1,
+        sequence: 2,
+      });
+      const seq1 = makeSnapshot(301, 'tool_call', false, {
+        runId: 'run-2',
+        attemptId: 1,
+        sequence: 1,
+      });
+
+      act(() => {
+        updatedHandler({ message: seq2, timestamp: Date.now() });
+        updatedHandler({ message: seq1, timestamp: Date.now() });
+      });
+
+      expect(result.current.rawMessages.map((m) => m.id)).toEqual([301, 302]);
+    });
+
     /* Preconditions: Hook mounted, MESSAGE_UPDATED from different agent
        Action: MESSAGE_UPDATED event for other-agent
        Assertions: rawMessages NOT changed
