@@ -35,6 +35,23 @@ function getCodeExecStatusIcon(status: string) {
   }
 }
 
+function getCodeExecStatusIconColorClass(status: string) {
+  switch (status) {
+    case 'success':
+      return 'text-emerald-600';
+    case 'running':
+      return 'text-muted-foreground';
+    case 'error':
+      return 'text-red-600';
+    case 'timeout':
+      return 'text-amber-600';
+    case 'cancelled':
+      return 'text-zinc-500';
+    default:
+      return 'text-muted-foreground';
+  }
+}
+
 // Requirements: llm-integration.7, llm-integration.3.4.1, llm-integration.3.4.4, agents.4.22, agents.4.9, agents.4.10.1, agents.4.10.2
 export function AgentMessage({
   message,
@@ -226,6 +243,7 @@ export function AgentMessage({
           ? toolData.arguments.code
           : JSON.stringify(toolData.arguments ?? {}, null, 2);
       const StatusIcon = getCodeExecStatusIcon(status);
+      const statusIconColorClass = getCodeExecStatusIconColorClass(status);
 
       return (
         <Message from="assistant" className="w-full max-w-full">
@@ -244,7 +262,7 @@ export function AgentMessage({
               >
                 <StatusIcon
                   data-testid="message-code-exec-status-icon"
-                  className={`mr-1 h-3 w-3 shrink-0 ${status === 'running' ? 'animate-spin' : ''}`}
+                  className={`mr-1 h-3 w-3 shrink-0 ${statusIconColorClass} ${status === 'running' ? 'animate-spin' : ''}`}
                 />
                 {status}
               </div>

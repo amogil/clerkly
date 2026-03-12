@@ -553,6 +553,8 @@
   - `timeout` → `Clock3`,
   - `cancelled` → `Ban`.
 
+7.4.6.7. Иконки статусов в status-badge `tool_call(code_exec)` ДОЛЖНЫ использовать цветовую кодировку (colorized icons), а не монохромный цвет.
+
 7.4.7. Для `tool_call(code_exec)` UI ДОЛЖЕН иметь отдельные тестовые идентификаторы:
   - `data-testid="message-code-exec-block"` для корневого блока,
   - `data-testid="message-code-exec-icon"` для иконки в заголовке,
