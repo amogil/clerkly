@@ -340,7 +340,6 @@ export class MainPipeline {
       };
 
       try {
-
         const chatMessagesForAttempt = this.buildRetryChatMessages(
           context.chatMessages,
           validationFeedback

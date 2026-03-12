@@ -313,10 +313,7 @@ export function AgentMessage({
               </ToolHeader>
               <CollapsibleContent data-testid="message-code-exec-content">
                 <ToolContent>
-                  <ToolInput
-                    data-testid="message-code-exec-input"
-                    className="bg-transparent overflow-x-auto whitespace-pre [overflow-wrap:normal] [word-break:normal]"
-                  >
+                  <ToolInput data-testid="message-code-exec-input" className="bg-transparent">
                     <MessageResponse className="message-response-transparent-code-blocks message-response-code-exec-input text-xs leading-relaxed break-words">
                       {buildJavaScriptFence(codeInput)}
                     </MessageResponse>
@@ -324,10 +321,7 @@ export function AgentMessage({
                   {stdout.length > 0 ? (
                     <div>
                       <div className="mb-1 text-xs font-medium text-muted-foreground">stdout</div>
-                      <ToolOutput
-                        data-testid="message-code-exec-stdout"
-                        className="bg-transparent overflow-x-auto whitespace-pre [overflow-wrap:normal] [word-break:normal]"
-                      >
+                      <ToolOutput data-testid="message-code-exec-stdout" className="bg-transparent">
                         {stdout}
                       </ToolOutput>
                     </div>
@@ -335,10 +329,7 @@ export function AgentMessage({
                   {stderr.length > 0 ? (
                     <div>
                       <div className="mb-1 text-xs font-medium text-muted-foreground">stderr</div>
-                      <ToolOutput
-                        data-testid="message-code-exec-stderr"
-                        className="bg-transparent overflow-x-auto whitespace-pre [overflow-wrap:normal] [word-break:normal]"
-                      >
+                      <ToolOutput data-testid="message-code-exec-stderr" className="bg-transparent">
                         {stderr}
                       </ToolOutput>
                     </div>
@@ -380,22 +371,12 @@ export function AgentMessage({
           <ToolContent>
             <div>
               <div className="mb-1 text-xs font-medium text-muted-foreground">Input</div>
-              <ToolInput
-                data-testid="message-tool-call-input"
-                className="overflow-x-auto whitespace-pre [overflow-wrap:normal] [word-break:normal]"
-              >
-                {toolInput}
-              </ToolInput>
+              <ToolInput data-testid="message-tool-call-input">{toolInput}</ToolInput>
             </div>
             {toolPart.state === 'output-available' || toolPart.state === 'output-error' ? (
               <div>
                 <div className="mb-1 text-xs font-medium text-muted-foreground">Output</div>
-                <ToolOutput
-                  data-testid="message-tool-call-output"
-                  className="overflow-x-auto whitespace-pre [overflow-wrap:normal] [word-break:normal]"
-                >
-                  {toolOutput}
-                </ToolOutput>
+                <ToolOutput data-testid="message-tool-call-output">{toolOutput}</ToolOutput>
               </div>
             ) : null}
           </ToolContent>

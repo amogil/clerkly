@@ -205,6 +205,18 @@
   word-break: normal !important;
 }
 
+/* agents.7.4.9: keep explicit tool text/code sections unwrapped with horizontal scroll */
+[data-testid='message-code-exec-input'],
+[data-testid='message-code-exec-stdout'],
+[data-testid='message-code-exec-stderr'],
+[data-testid='message-tool-call-input'],
+[data-testid='message-tool-call-output'] {
+  white-space: pre !important;
+  overflow-x: auto !important;
+  overflow-wrap: normal !important;
+  word-break: normal !important;
+}
+
 /* agents.7.4.6.11: remove outer frame for code_exec input code block, keep inner code frame */
 .message-response-code-exec-input [data-streamdown='code-block'],
 .message-response-code-exec-input [data-streamdown='code-block-header'],

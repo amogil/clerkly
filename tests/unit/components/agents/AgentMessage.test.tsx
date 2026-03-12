@@ -171,16 +171,10 @@ describe('AgentMessage — tool_call', () => {
     expect(screen.getByTestId('message-code-exec-header')).toHaveClass('mb-2');
     expect(screen.queryByText('JavaScript')).not.toBeInTheDocument();
     expect(screen.getByTestId('message-code-exec-input')).toHaveClass('bg-transparent');
-    expect(screen.getByTestId('message-code-exec-input')).toHaveClass('overflow-x-auto');
-    expect(screen.getByTestId('message-code-exec-input')).toHaveClass('whitespace-pre');
     expect(screen.getByTestId('message-code-exec-stdout')).toHaveTextContent('ok');
     expect(screen.getByTestId('message-code-exec-stdout')).toHaveClass('bg-transparent');
-    expect(screen.getByTestId('message-code-exec-stdout')).toHaveClass('overflow-x-auto');
-    expect(screen.getByTestId('message-code-exec-stdout')).toHaveClass('whitespace-pre');
     expect(screen.getByTestId('message-code-exec-stderr')).toHaveTextContent('warn');
     expect(screen.getByTestId('message-code-exec-stderr')).toHaveClass('bg-transparent');
-    expect(screen.getByTestId('message-code-exec-stderr')).toHaveClass('overflow-x-auto');
-    expect(screen.getByTestId('message-code-exec-stderr')).toHaveClass('whitespace-pre');
   });
 
   /* Preconditions: persisted kind:tool_call for final_answer with summary_points
