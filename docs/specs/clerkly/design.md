@@ -121,8 +121,9 @@ graph TB
 
 Требование `clerkly.1.6` реализуется через стандартный pipeline `electron-builder` для macOS:
 
-- Source-of-truth: `assets/icon-source.svg` (статичная версия логотипа Clerkly с экрана логина)
+- Source-of-truth: React компонент `src/renderer/components/logo.tsx` (статичный `Logo`, без текста и анимации)
 - Форма app-icon: macOS-style скруглённый прямоугольник (squircle-like), с прозрачными углами
+- Генерация промежуточного SVG: `assets/icon-source.svg` из React-компонента через `scripts/generate-icon-source-svg.cjs`
 - Растеризация source в PNG: `assets/icon-source.png` (1024x1024, прозрачный фон) через Chromium renderer (Playwright), чтобы геометрия совпадала с UI-логотипом в Electron
 - Генерация iconset: `assets/icon.iconset` (размеры 16/32/64/128/256/512/1024)
 - Финальный артефакт: `assets/icon.icns`
@@ -139,7 +140,7 @@ graph TB
 npm run generate:icon:mac
 ```
 
-Скрипт создает/обновляет `assets/icon-source.png`, `assets/icon.iconset` и `assets/icon.icns` на базе `assets/icon-source.svg`.
+Скрипт создает/обновляет `assets/icon-source.svg`, `assets/icon-source.png`, `assets/icon.iconset` и `assets/icon.icns` на базе React-компонента `Logo`.
 
 ## Компоненты и интерфейсы
 

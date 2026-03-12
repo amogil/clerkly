@@ -5,16 +5,28 @@ interface LogoProps {
   size?: 'sm' | 'md' | 'lg';
   showText?: boolean;
   animated?: boolean;
+  iconSizePx?: number;
+  backgroundShape?: 'circle' | 'rounded-rect';
+  outerScale?: number;
+  symbolScale?: number;
 }
 
-export function Logo({ size = 'md', showText = true, animated = false }: LogoProps) {
+export function Logo({
+  size = 'md',
+  showText = true,
+  animated = false,
+  iconSizePx,
+  backgroundShape = 'circle',
+  outerScale = 1,
+  symbolScale = 1,
+}: LogoProps) {
   const sizes = {
     sm: { icon: 32, text: 'text-lg' },
     md: { icon: 40, text: 'text-2xl' },
     lg: { icon: 48, text: 'text-4xl' },
   };
 
-  const iconSize = sizes[size].icon;
+  const iconSize = iconSizePx ?? sizes[size].icon;
   const textClass = sizes[size].text;
 
   // Generate unique ID for gradient to avoid conflicts
@@ -31,56 +43,63 @@ export function Logo({ size = 'md', showText = true, animated = false }: LogoPro
         xmlns="http://www.w3.org/2000/svg"
         className={animated ? 'logo-animated' : ''}
       >
-        {/* Background circle with gradient */}
-        <circle cx="16" cy="16" r="16" fill={`url(#${gradientId})`} />
+        <g transform={`translate(16 16) scale(${outerScale}) translate(-16 -16)`}>
+          {backgroundShape === 'rounded-rect' ? (
+            <rect x="0" y="0" width="32" height="32" rx="7.5" fill={`url(#${gradientId})`} />
+          ) : (
+            <circle cx="16" cy="16" r="16" fill={`url(#${gradientId})`} />
+          )}
 
-        {/* Neural network nodes - representing AI intelligence */}
-        <g className={animated ? 'nodes' : ''}>
-          <circle cx="10" cy="12" r="2" fill="white" opacity={animated ? 0.9 : 1} />
-          <circle cx="10" cy="20" r="2" fill="white" opacity={animated ? 0.9 : 1} />
-          <circle cx="16" cy="16" r="2.5" fill="white" />
-          <circle cx="22" cy="12" r="2" fill="white" opacity={animated ? 0.9 : 1} />
-          <circle cx="22" cy="20" r="2" fill="white" opacity={animated ? 0.9 : 1} />
-        </g>
+          <g transform={`translate(16 16) scale(${symbolScale}) translate(-16 -16)`}>
+            {/* Neural network nodes - representing AI intelligence */}
+            <g className={animated ? 'nodes' : ''}>
+              <circle cx="10" cy="12" r="2" fill="white" opacity={animated ? 0.9 : 1} />
+              <circle cx="10" cy="20" r="2" fill="white" opacity={animated ? 0.9 : 1} />
+              <circle cx="16" cy="16" r="2.5" fill="white" />
+              <circle cx="22" cy="12" r="2" fill="white" opacity={animated ? 0.9 : 1} />
+              <circle cx="22" cy="20" r="2" fill="white" opacity={animated ? 0.9 : 1} />
+            </g>
 
-        {/* Connection lines - representing organization and structure */}
-        <g className={animated ? 'connections' : ''} opacity="0.6">
-          <line
-            x1="10"
-            y1="12"
-            x2="16"
-            y2="16"
-            stroke="white"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          />
-          <line
-            x1="10"
-            y1="20"
-            x2="16"
-            y2="16"
-            stroke="white"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          />
-          <line
-            x1="16"
-            y1="16"
-            x2="22"
-            y2="12"
-            stroke="white"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          />
-          <line
-            x1="16"
-            y1="16"
-            x2="22"
-            y2="20"
-            stroke="white"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          />
+            {/* Connection lines - representing organization and structure */}
+            <g className={animated ? 'connections' : ''} opacity="0.6">
+              <line
+                x1="10"
+                y1="12"
+                x2="16"
+                y2="16"
+                stroke="white"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+              <line
+                x1="10"
+                y1="20"
+                x2="16"
+                y2="16"
+                stroke="white"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+              <line
+                x1="16"
+                y1="16"
+                x2="22"
+                y2="12"
+                stroke="white"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+              <line
+                x1="16"
+                y1="16"
+                x2="22"
+                y2="20"
+                stroke="white"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+            </g>
+          </g>
         </g>
 
         <defs>

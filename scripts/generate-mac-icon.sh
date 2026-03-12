@@ -6,13 +6,21 @@ SOURCE_IMAGE="assets/icon-source.png"
 ICONSET_DIR="assets/icon.iconset"
 OUTPUT_ICNS="assets/icon.icns"
 
-if [[ ! -f "$SOURCE_VECTOR" ]]; then
-  echo "Source vector not found: $SOURCE_VECTOR" >&2
+if [[ ! -f "scripts/generate-icon-source-svg.cjs" ]]; then
+  echo "Missing source generator: scripts/generate-icon-source-svg.cjs" >&2
   exit 1
 fi
 
 if ! command -v node >/dev/null 2>&1; then
-  echo "node is required to rasterize $SOURCE_VECTOR" >&2
+  echo "node is required to generate icon sources" >&2
+  exit 1
+fi
+
+# Generate SVG source from React component (single source of truth).
+node scripts/generate-icon-source-svg.cjs
+
+if [[ ! -f "$SOURCE_VECTOR" ]]; then
+  echo "Generated source vector not found: $SOURCE_VECTOR" >&2
   exit 1
 fi
 

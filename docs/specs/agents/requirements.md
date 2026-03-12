@@ -581,6 +581,8 @@
 
 7.7.2. КОГДА `llm`-ответ содержит markdown code block, контейнеры code block в ответе ДОЛЖНЫ использовать прозрачный фон (`transparent`).
 
+7.7.3. КОГДА `llm`-ответ содержит markdown fenced code block с языком `text`/`plaintext`, длинные строки в таком блоке ДОЛЖНЫ переноситься по ширине блока и НЕ ДОЛЖНЫ вызывать горизонтальное переполнение области чата.
+
 7.8. Все timestamps ДОЛЖНЫ включать timezone offset и храниться в часовом поясе пользователя
 
 #### Функциональные Тесты
@@ -607,6 +609,7 @@
 - `tests/functional/llm-chat.spec.ts` - "should render markdown mermaid diagrams"
 - `tests/functional/llm-chat.spec.ts` - "should render markdown inline math"
 - `tests/functional/llm-chat.spec.ts` - "should render markdown block math"
+- `tests/functional/llm-chat.spec.ts` - "should wrap long lines in markdown fenced text code block without horizontal overflow"
 - `tests/functional/llm-chat.spec.ts` - "should render math when model returns LaTeX delimiters"
 - `tests/functional/llm-chat.spec.ts` - "should render math when model returns escaped dollar delimiters"
 - `tests/functional/llm-chat.spec.ts` - "should avoid duplicate line breaks between markdown blocks"

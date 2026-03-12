@@ -1647,6 +1647,7 @@ if (message.kind === 'tool_call' && toolName === 'final_answer') {
 - математика через KaTeX (inline и block)
 - сноски не поддерживаются
 - Для markdown code blocks в `llm`-ответах применяется semantic-класс `message-response-transparent-code-blocks`, который задаёт transparent-overrides для контейнеров `code-block`, `code-block-header`, `code-block-body`, `code-block-actions` и `pre` внутри `code-block-body`.
+- Для markdown fenced code blocks с языком `text`/`plaintext` в `llm`-ответах применяются wrap-overrides (`white-space: pre-wrap`, `overflow-wrap: anywhere`, `word-break: break-word`) чтобы длинные строки не создавали горизонтальный overflow чата.
 
 Перед рендером применяется нормализация мат-делимитеров:
 - `\(...\)` -> `$...$`

@@ -2184,6 +2184,25 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expect(context.window.locator('.message-llm-action-response pre code')).toBeVisible();
   });
 
+  /* Preconditions: MockLLMServer returns markdown fenced text block with long line
+     Action: User sends a message
+     Assertions: text block line wraps and does not cause horizontal overflow
+     Requirements: agents.7.7.3 */
+  test('should wrap long lines in markdown fenced text code block without horizontal overflow', async () => {
+    const longNumbersLine = Array.from({ length: 400 }, (_, index) => String(index + 2)).join(', ');
+    await renderMarkdownMessage(`\`\`\`text\n${longNumbersLine}\n\`\`\``);
+
+    const actionContent = context.window.locator('.message-llm-action-response').last();
+    const textCodeBlock = actionContent.locator('pre code.language-text').first();
+    await expect(textCodeBlock).toBeVisible();
+
+    const preHasHorizontalOverflow = await textCodeBlock.locator('..').evaluate((element) => {
+      const pre = element as HTMLElement;
+      return pre.scrollWidth > pre.clientWidth + 1;
+    });
+    expect(preHasHorizontalOverflow).toBe(false);
+  });
+
   /* Preconditions: MockLLMServer returns markdown table
      Action: User sends a message
      Assertions: table rendered
