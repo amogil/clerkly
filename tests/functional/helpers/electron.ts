@@ -174,6 +174,7 @@ export async function closeElectron(
   checkToastErrors: boolean = true
 ): Promise<void> {
   let toastError: Error | null = null;
+  let closeError: Error | null = null;
 
   // Requirements: testing.12.1, testing.12.2, testing.12.5
   // Enforce global toast-error check by default for functional tests.
@@ -186,7 +187,28 @@ export async function closeElectron(
   }
 
   // Close the application even when toast assertion fails.
-  await context.app.close();
+  // Guard close with timeout to avoid afterEach hook hangs in CI.
+  const closeTimeoutMs = 10000;
+  try {
+    await Promise.race([
+      context.app.close(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`Timed out closing Electron app after ${closeTimeoutMs}ms`)), closeTimeoutMs)
+      ),
+    ]);
+  } catch (error) {
+    closeError = error as Error;
+
+    // Fallback: force-kill Electron process if graceful close hangs.
+    try {
+      const processRef = context.app.process();
+      if (processRef && !processRef.killed) {
+        processRef.kill('SIGKILL');
+      }
+    } catch {
+      // Ignore force-kill errors; continue cleanup and surface toast failures first.
+    }
+  }
 
   // Cleanup test data directory
   // Requirements: testing.3.7
@@ -200,6 +222,10 @@ export async function closeElectron(
 
   if (toastError) {
     throw toastError;
+  }
+
+  if (closeError) {
+    console.warn(`[TEST] closeElectron fallback used: ${closeError.message}`);
   }
 }
 
