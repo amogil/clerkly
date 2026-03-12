@@ -204,6 +204,17 @@ export interface LLMPipelineDiagnosticPayload extends BaseEvent {
 4. `App` подписывается на `EVENT_TYPES.LLM_PIPELINE_DIAGNOSTIC` и пишет запись в renderer console (Developer Log) через `Logger`.
 5. Toast-уведомления для этого события не показываются.
 
+#### Логирование chat `message.created` в Developer Log
+
+**Requirements:** realtime-events.4.11, realtime-events.4.11.1
+
+Для синхронизации канала чата и Developer Log `App` подписывается на `EVENT_TYPES.MESSAGE_CREATED` и пишет диагностические записи о сообщениях, которые попадают в чат.
+
+Правило логирования:
+1. Для любого `message.created` пишется техническая запись с `kind`, `id`, `agentId`.
+2. Для `message.kind = "error"` запись пишется через `logger.error(...)`.
+3. Для `message.kind = "error"` в лог включается текст `payload.data.error.message`.
+
 #### Streaming-события LLM чата
 
 **Requirements:** realtime-events.3.7, realtime-events.3.8, realtime-events.3.9
@@ -400,7 +411,7 @@ export class MainEventBus {
     this.publishEnvelope(event as AnyEvent, options);
   }
 
-  // Requirements: realtime-events.1.7, realtime-events.4.11
+  // Requirements: realtime-events.1.7, realtime-events.4.12
   publishEnvelope(event: AnyEvent, options: PublishOptions = {}): void {
     const { type, payload } = event;
 
@@ -1103,6 +1114,7 @@ eventBus.publish('user.login', { userId: 'user-123' }, { local: true });
 | Тест | Требование |
 |------|------------|
 | should log llm.pipeline.diagnostic events to renderer console | realtime-events.4.10 |
+| should log chat kind:error messages from message.created to renderer console | realtime-events.4.11, realtime-events.4.11.1 |
 
 #### React Hook
 

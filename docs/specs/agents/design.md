@@ -1538,6 +1538,8 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 - При активном reasoning без финального `data.text` в сообщении отображается reasoning-блок как единственный индикатор стриминга до появления текста ответа.
 - Визуальный маркер reasoning-сообщения рендерится в заголовке `ReasoningTrigger` (иконка приложения + текстовый индикатор + chevron).
   Этот маркер в рамках спеки считается `Message Avatar` для reasoning-сообщений.
+- Перед рендером reasoning-текста применяется нормализация markdown-склейки: если `**...**` начинается сразу после обычного текста без пробела/переноса (`soon!**Title**`), вставляется пробел (`soon! **Title**`).
+- Нормализация reasoning-склейки применяется только вне fenced code и inline code.
 
 **Trigger иконка (`ReasoningTrigger`):**
 - В app-owned компоненте `AgentReasoningTrigger` используется иконка приложения (`Logo`) вместо `BrainIcon`.
@@ -1975,7 +1977,7 @@ import { Logo } from '../logo';
 | `tests/unit/agents/computeAgentStatus.test.ts` | agents.9 |
 | `tests/unit/agents/ActivityIndicator.test.tsx` | agents.11 |
 | `tests/unit/components/ai-elements/prompt-input.test.tsx` | agents.4.2-4.7, agents.4.24 |
-| `tests/unit/components/agents/AgentMessage.test.tsx` | agents.4.10, agents.4.11.1, agents.7.4.5-7.4.7, llm-integration.2, llm-integration.7 |
+| `tests/unit/components/agents/AgentMessage.test.tsx` | agents.4.10, agents.4.11.1, agents.4.11.3, agents.7.4.5-7.4.7, llm-integration.2, llm-integration.7 |
 | `tests/unit/components/agents/AgentReasoningTrigger.test.tsx` | agents.4.11, agents.4.11.2, llm-integration.2, llm-integration.7.2 |
 | `tests/unit/renderer/IPCChatTransport.test.ts` | llm-integration.2, llm-integration.7 |
 | `tests/unit/hooks/useAgentChat.test.ts` | agents.4.24, llm-integration.8.7 |

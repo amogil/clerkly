@@ -16,7 +16,10 @@ import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from '../ai-elem
 import { Queue, QueueItem } from '../ai-elements/queue';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
 import { toUIMessage } from '../../lib/messageMapper';
-import { normalizeMathDelimiters } from '../../lib/mathDelimiterNormalization';
+import {
+  normalizeMathDelimiters,
+  normalizeReasoningMarkdownSpacing,
+} from '../../lib/mathDelimiterNormalization';
 import type { MessageSnapshot } from '../../../shared/events/types';
 import { AgentErrorDialog } from './AgentErrorDialog';
 import type { AgentDialogActionItem } from './AgentDialog';
@@ -85,7 +88,7 @@ export function AgentMessage({
     typeof llmData?.['text'] === 'string' ? (llmData['text'] as string) : undefined;
   const llmText = llmTextRaw ? normalizeMathDelimiters(llmTextRaw) : undefined;
   const llmReasoningText = llmReasoning?.text
-    ? normalizeMathDelimiters(llmReasoning.text)
+    ? normalizeMathDelimiters(normalizeReasoningMarkdownSpacing(llmReasoning.text))
     : undefined;
 
   if (message.kind === 'user') {
@@ -307,10 +310,7 @@ export function AgentMessage({
               </ToolHeader>
               <CollapsibleContent data-testid="message-code-exec-content">
                 <ToolContent>
-                  <ToolInput
-                    data-testid="message-code-exec-input"
-                    className="bg-transparent"
-                  >
+                  <ToolInput data-testid="message-code-exec-input" className="bg-transparent">
                     <MessageResponse className="message-response-transparent-code-blocks message-response-code-exec-input text-xs leading-relaxed break-words">
                       {buildJavaScriptFence(codeInput)}
                     </MessageResponse>

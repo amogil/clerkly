@@ -338,6 +338,30 @@ describe('AgentMessage — llm', () => {
     expect(screen.getByTestId('message-llm-action')).toBeInTheDocument();
   });
 
+  /* Preconditions: kind:llm reasoning text has glued bold opener after plain text
+     Action: render AgentMessage
+     Assertions: reasoning text has normalized space before bold fragment
+     Requirements: agents.4.11 */
+  it('should normalize glued bold opener spacing in reasoning text', () => {
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'llm',
+          payload: {
+            data: {
+              reasoning: { text: 'Soon!**Resolving next step**' },
+              text: 'Answer',
+            },
+          },
+        })}
+      />
+    );
+
+    expect(screen.getByTestId('message-llm-reasoning')).toHaveTextContent(
+      'Soon! **Resolving next step**'
+    );
+  });
+
   /* Preconditions: kind:llm with reasoning, active streaming for this message
      Action: render AgentMessage with isReasoningStreaming=true
      Assertions: Reasoning receives data-streaming=true

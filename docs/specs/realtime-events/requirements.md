@@ -194,7 +194,11 @@
 
 4.10. КОГДА renderer получает `llm.pipeline.diagnostic`, ТО сообщение ДОЛЖНО попадать в Developer Log renderer (console) без показа toast-уведомления пользователю
 
-4.11. IPC bridge ДОЛЖЕН передавать исходные `timestamp` и `source` без реконструкции в процессе доставки
+4.11. КОГДА renderer получает chat-событие `message.created`, соответствующее сообщению, отображаемому в чате, ТО событие ДОЛЖНО логироваться в Developer Log renderer (console).
+
+4.11.1. КОГДА `message.created.message.kind = "error"`, ТО запись в Developer Log renderer ДОЛЖНА выполняться через error-уровень и ДОЛЖНА включать текст `data.error.message`.
+
+4.12. IPC bridge ДОЛЖЕН передавать исходные `timestamp` и `source` без реконструкции в процессе доставки
 
 **Тестируемость:** Да - через функциональные тесты IPC
 
@@ -203,6 +207,7 @@
 - `tests/functional/agent-realtime-events.spec.ts` - "should add message on message.created event"
 - `tests/functional/agent-realtime-events.spec.ts` - "should update message on message.updated event"
 - `tests/unit/App.ipc-integration.test.tsx` - "should log llm.pipeline.diagnostic events to renderer console"
+- `tests/unit/App.ipc-integration.test.tsx` - "should log chat kind:error messages from message.created to renderer console"
 - `tests/functional/llm-chat.spec.ts` - "reasoning and text stream simultaneously"
 - `tests/functional/llm-chat.spec.ts` - "multiple tool calls in one turn and final response continues"
 

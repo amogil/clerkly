@@ -16,7 +16,7 @@ interface SettingsProps {
   onNavigate?: (screen: string) => void;
 }
 
-export function Settings({ onSignOut, onNavigate }: SettingsProps) {
+export function Settings({ onSignOut, onNavigate: _onNavigate }: SettingsProps) {
   const { showSuccess } = useError();
   const [llmProvider, setLlmProvider] = useState<LLMProvider>('openai');
   const [apiKey, setApiKey] = useState('');
@@ -359,7 +359,6 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
           </div>
 
           {/* Save Button - REMOVED */}
-
         </div>
       </div>
     </div>

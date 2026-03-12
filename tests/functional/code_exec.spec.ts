@@ -349,9 +349,9 @@ test.describe('code_exec tool_call rendering', () => {
       '[data-streamdown="code-block"][data-language="javascript"]'
     );
     await expect(javascriptCodeBlock).toHaveCount(1);
-    await expect(javascriptCodeBlock.locator('[data-streamdown="code-block-body"] pre code')).toHaveCount(
-      1
-    );
+    await expect(
+      javascriptCodeBlock.locator('[data-streamdown="code-block-body"] pre code')
+    ).toHaveCount(1);
 
     await expectNoToastError(window);
   });

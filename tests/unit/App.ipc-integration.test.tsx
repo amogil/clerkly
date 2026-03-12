@@ -396,6 +396,7 @@ describe('App IPC Integration with Error Notification System', () => {
       expect(eventHandlers.has(EVENT_TYPES.AUTH_SIGNED_OUT)).toBe(true);
       expect(eventHandlers.has(EVENT_TYPES.ERROR_CREATED)).toBe(true);
       expect(eventHandlers.has(EVENT_TYPES.LLM_PIPELINE_DIAGNOSTIC)).toBe(true);
+      expect(eventHandlers.has(EVENT_TYPES.MESSAGE_CREATED)).toBe(true);
     });
   });
 
@@ -431,6 +432,53 @@ describe('App IPC Integration with Error Notification System', () => {
     await waitFor(() => {
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining('[ERROR] [App] LLM pipeline diagnostic (MainPipeline):')
+      );
+    });
+
+    consoleErrorSpy.mockRestore();
+  });
+
+  /* Preconditions: App component mounted and MESSAGE_CREATED subscription is set
+     Action: Emit message.created with kind:error payload
+     Assertions: Chat error message is written to renderer Developer Log via App logger.error
+     Requirements: realtime-events.4.12 */
+  it('should log chat kind:error messages from message.created to renderer console', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(eventHandlers.has(EVENT_TYPES.MESSAGE_CREATED)).toBe(true);
+    });
+
+    act(() => {
+      emitEvent(EVENT_TYPES.MESSAGE_CREATED, {
+        message: {
+          id: 777,
+          agentId: 'agent-1',
+          kind: 'error',
+          timestamp: Date.now(),
+          payload: {
+            data: {
+              error: {
+                type: 'provider',
+                message: 'Model returned invalid tool call arguments too many times.',
+              },
+            },
+          },
+          replyToMessageId: 12,
+          hidden: false,
+          done: true,
+        },
+        timestamp: Date.now(),
+      });
+    });
+
+    await waitFor(() => {
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          '[ERROR] [App] Chat message created (kind:error, id:777, agentId:agent-1): Model returned invalid tool call arguments too many times.'
+        )
       );
     });
 
