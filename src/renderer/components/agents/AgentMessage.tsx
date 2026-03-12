@@ -307,16 +307,13 @@ export function AgentMessage({
               </ToolHeader>
               <CollapsibleContent data-testid="message-code-exec-content">
                 <ToolContent>
-                  <div>
-                    <div className="mb-1 text-xs font-medium text-muted-foreground">JavaScript</div>
-                    <div
-                      data-testid="message-code-exec-input"
-                      className="w-full min-w-0 max-w-full overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words [overflow-wrap:anywhere] rounded-md border border-border/60 bg-transparent p-2 text-xs text-foreground"
-                    >
-                      <MessageResponse className="message-response-transparent-code-blocks text-xs leading-relaxed break-words">
-                        {buildJavaScriptFence(codeInput)}
-                      </MessageResponse>
-                    </div>
+                  <div
+                    data-testid="message-code-exec-input"
+                    className="w-full min-w-0 max-w-full overflow-x-hidden overflow-y-auto bg-transparent text-xs text-foreground"
+                  >
+                    <MessageResponse className="message-response-transparent-code-blocks text-xs leading-relaxed break-words">
+                      {buildJavaScriptFence(codeInput)}
+                    </MessageResponse>
                   </div>
                   {stdout.length > 0 ? (
                     <div>

@@ -280,6 +280,9 @@ test.describe('code_exec tool_call rendering', () => {
     expect(blockClassName).toContain('bg-transparent');
     expect(statusClassName).toContain('bg-transparent');
     expect(inputClassName).toContain('bg-transparent');
+    expect(inputClassName).not.toContain('rounded-md');
+    expect(inputClassName).not.toContain('border-border/60');
+    expect(inputClassName).not.toContain('p-2');
     expect(stdoutClassName).toContain('bg-transparent');
     expect(stderrClassName).toContain('bg-transparent');
 

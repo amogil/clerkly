@@ -153,6 +153,7 @@ describe('AgentMessage — tool_call', () => {
     fireEvent.click(screen.getByTestId('message-code-exec-toggle'));
 
     expect(screen.getByTestId('message-code-exec-header')).toHaveClass('mb-2');
+    expect(screen.queryByText('JavaScript')).not.toBeInTheDocument();
     expect(screen.getByTestId('message-code-exec-input')).toHaveClass('bg-transparent');
     expect(screen.getByTestId('message-code-exec-stdout')).toHaveTextContent('ok');
     expect(screen.getByTestId('message-code-exec-stdout')).toHaveClass('bg-transparent');

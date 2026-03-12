@@ -1596,6 +1596,7 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 - Для security/policy отказов используется `status=error` с соответствующим `error.code` (например, `policy_denied`).
 - При наличии отображаются `stdout` и `stderr` из persisted payload.
 - Секция `JavaScript` рендерится через общий `"MessageResponse"` и fenced markdown блок `javascript`, чтобы использовать стандартный рендерер code block и его встроенную подсветку синтаксиса.
+- Для input-кода `code_exec` не рендерится отдельный верхний label `JavaScript` и не используется внешний wrapper-box; в UI остается только сам встроенный markdown code block.
 - Заголовок `tool_call(code_exec)` рендерится с `items-center`; отступ заголовка переключается по состоянию collapsible (`collapsed -> mb-0`, `expanded -> mb-2`), чтобы в свернутом виде контент оставался вертикально центрированным.
 - Для `tool_call(code_exec)` transparent-surface применяется ко всему блоку: корневой контейнер `Tool`, status-badge, секции `JavaScript`, `stdout`, `stderr`.
 - Рендер строится только по persisted snapshot (`message.created`/`message.updated`) без локальной реконструкции результата.
