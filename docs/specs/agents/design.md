@@ -1582,10 +1582,14 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 **Сообщения инструментов (`kind: 'tool_call'`):**
 - Для `toolName === 'code_exec'` используется AI Elements `Tool` family как отдельный технический блок вызова инструмента.
 - Для `toolName === 'final_answer'` используется отдельный компонент `"Final Answer"` на базе AI Elements `Queue`.
+- Визуальный порядок строится по persisted snapshot-последовательности: pre-tool `kind: llm` -> `kind: tool_call` (`running`) -> post-tool `kind: llm`; terminal-обновление `tool_call` применяется позже в том же блоке.
+- UI рендерит только persisted `kind: tool_call` snapshots из видимой истории сообщений и не материализует отдельные промежуточные блоки вне persisted-потока.
+- Сообщения с `hidden = true` полностью исключаются из renderer-проекции перед построением порядка, чтобы failed-attempt артефакты не попадали в видимый поток.
 - Компонент не имеет отдельного заголовка; рендерится только checklist `summary_points`.
 - Каждый checklist-пункт рендерится с иконкой `Check` в зелёном круге.
 - Компонент всегда отображается в раскрытом виде; сворачивание/разворачивание не поддерживается.
 - `Agents` не выполняет валидацию/repair `final_answer`; компонент рендерит только persisted payload.
+- Если `final_answer` присутствует в успешной попытке, `"Final Answer"` рендерится как последний видимый артефакт этой попытки.
 
 **Сообщения выполнения кода (`kind: 'tool_call'`, `toolName: 'code_exec'`):**
 - Используется отдельный блок выполнения кода, не являющийся обычным текстовым bubble.
@@ -1595,6 +1599,7 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 - Badge статуса всегда содержит иконку, привязанную к persisted-статусу: `running -> Loader2 (spin)`, `success -> CircleCheck`, `error -> CircleX`, `timeout -> Clock3`, `cancelled -> CircleMinus`.
 - Иконки статусов в badge рендерятся цветными (например: `success` — зелёный, `error` — красный, `timeout` — янтарный, `running/cancelled` — нейтральные).
 - Блок отображает persisted-статус выполнения (`running | success | error | timeout | cancelled`).
+- Смена статуса `running -> terminal` выполняется в том же UI-блоке (без создания отдельной terminal-карточки).
 - Для security/policy отказов используется `status=error` с соответствующим `error.code` (например, `policy_denied`).
 - При наличии отображаются `stdout` и `stderr` из persisted payload.
 - Секция `JavaScript` рендерится через общий `"MessageResponse"` и fenced markdown блок `javascript`, чтобы использовать стандартный рендерер code block и его встроенную подсветку синтаксиса.

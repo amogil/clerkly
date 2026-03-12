@@ -146,3 +146,115 @@
 
 - [x] Добавить unit-тесты для `scripts/inject-oauth-client-secret.js`: чтение `CLERKLY_OAUTH_CLIENT_SECRET` из `process.env`, fallback из `.env`, pass-through в non-strict и fail-fast в strict-режиме при отсутствии значения.
 - [x] Добавить тест-кейс на отсутствие placeholder в build output (скрипт не падает, но логирует warning) и зафиксировать это поведение в `docs/specs/google-oauth-auth/design.md`.
+
+---
+
+## Консолидированный План: Agents + LLM Integration (незавершённое)
+
+### Planned
+
+#### Phase 1: Event-sourced attempt-модель
+
+- [ ] Добавить `runId`/`attemptId`/`sequence` в pipeline и transport-контракты
+- [ ] Обновить runtime-сортировку по `(attemptId, sequence)`
+- [ ] Добавить unit-тесты на стабильный порядок при перемешанной доставке событий
+
+#### Phase 2: Ранний persist tool_call и сегментация LLM
+
+- [ ] Убрать буферизацию tool-call до финализации полного llm-turn
+- [ ] Добавить жёсткую валидацию cardinality: `tool_calls.length <= 1` для каждого ответа модели
+- [ ] Финализировать текущий непустой llm-сегмент при валидном `tool_call`
+- [ ] Создавать `kind: tool_call` в `running` сразу после validation
+- [ ] Обновлять тот же `tool_call` до terminal-статуса по завершении инструмента
+- [ ] Открывать новый llm-сегмент сразу после `tool_call(running)` без ожидания terminal tool-result
+- [ ] Гарантировать, что пустые llm-сегменты не сохраняются
+
+#### Phase 3: Retry/repair и hidden-attempt
+
+- [ ] Сохранить bounded retry/repair (`maxRetries = 2`) для невалидных аргументов
+- [ ] На failed attempt помечать сообщения attempt как `hidden: true`
+- [ ] Исключать hidden-сообщения из model-history и активного runtime-потока
+- [ ] Добавить unit/functional тесты на отсутствие persisted `tool_call` при invalid args
+
+#### Phase 3.1: Prompt contract for code_exec runtime
+
+- [ ] Обновить системный prompt (`PromptBuilder`/`CodeExecFeature`) с явным указанием, что `code_exec` исполняет JS в async-контексте.
+- [ ] Явно зафиксировать в prompt, что `async/await` поддерживаются для пользовательского кода.
+- [ ] Добавить unit-тест на наличие этой инструкции в собранном системном prompt.
+
+#### Phase 4: Final Answer ordering
+
+- [ ] Буферизовать отображение `final_answer` до завершения остальных tool-step успешного attempt
+- [ ] Проверять правило "final_answer only-alone in turn"
+- [ ] Добавить функциональный тест "final_answer отображается последним"
+
+#### Phase 5: Терминализация running и отказоустойчивость
+
+- [ ] На cancel/timeout/error переводить все активные `running` tool-call в terminal
+- [ ] Добавить unit-тесты на отсутствие "висячих" running после завершения attempt
+- [ ] Добавить функциональные тесты на аварийные сценарии mid-tool
+
+#### Phase 6: Финальная проверка
+
+- [ ] Синхронизировать `requirements.md`, `design.md`, `tasks.md`
+- [ ] Прогнать таргетные unit-тесты по pipeline/runtime/prompt
+- [ ] Прогнать `npm run validate`
+
+### Test Coverage Plan (Unit)
+
+- [ ] `creates llm segment on first meaningful chunk (reasoning/text)`
+- [ ] `does not create empty llm segment when only tool_call arrives`
+- [ ] `finalizes non-empty pre-tool llm segment on first valid tool_call`
+- [ ] `persists tool_call as running immediately after validation`
+- [ ] `updates same tool_call row to terminal status on tool_result`
+- [ ] `opens post-tool llm segment while tool_call is still running`
+- [ ] `preserves order pre-tool llm -> tool running -> post-tool llm, then terminal in-place update`
+- [ ] `keeps final_answer as last visible artifact in successful attempt`
+- [ ] `rejects model turn with final_answer + another tool_call (repair path)`
+- [ ] `rejects model response with tool_calls.length > 1 and triggers repair path`
+- [ ] `does not persist any tool_call on invalid arguments during retry/repair`
+- [ ] `marks all messages of failed attempt hidden on retry transition`
+- [ ] `passes only terminal tool_call entries to model history replay`
+- [ ] `excludes non-terminal running tool_call from model history replay`
+- [ ] `converts running tool_call to terminal on cancel`
+- [ ] `converts running tool_call to terminal on timeout`
+- [ ] `converts running tool_call to terminal on provider failure mid-tool`
+- [ ] `never leaves running tool_call after attempt completion`
+- [ ] `keeps raw reasoning/text unchanged in persistence (no write-time normalization)`
+- [ ] `serializes terminal tool_call as assistant(tool-call)+tool(tool-result) pair`
+- [ ] `rejects malformed replay pair (missing tool-result)`
+- [ ] `rejects mismatched toolCallId in replay pair`
+- [ ] `filters hidden messages from model history`
+- [ ] `filters kind:error from model history`
+- [ ] `enforces final_answer-only turn rule in validation/repair contract`
+- [ ] `ensures non-empty summary_points for final_answer`
+- [ ] `applies deterministic ordering by (attemptId, sequence)`
+- [ ] `does not lose chunks when timestamps are equal`
+- [ ] `handles out-of-order arrival without visual reordering violations`
+- [ ] `renders tool_call state transitions from persisted snapshots only`
+- [ ] `logs chat error message.created in renderer log`
+- [ ] `does not log info/debug messages into Developer Tools`
+
+### Test Coverage Plan (Functional)
+
+- [ ] `should render pre-tool reasoning/text before code_exec block`
+- [ ] `should show code_exec block in running state before completion`
+- [ ] `should update same code_exec block from running to terminal`
+- [ ] `should render post-tool assistant text while tool is still running`
+- [ ] `should keep final_answer block as last artifact of successful attempt`
+- [ ] `should not render empty llm message between tool steps`
+- [ ] `should retry invalid tool args without creating tool_call message`
+- [ ] `should reject model response containing more than one tool_call and run repair`
+- [ ] `should hide failed attempt messages after retry starts`
+- [ ] `should show kind:error after invalid args retry limit exhaustion`
+- [ ] `should not include hidden failed-attempt messages in next response context`
+- [ ] `should convert running tool_call to cancelled when user presses stop`
+- [ ] `should convert running tool_call to timeout on sandbox timeout`
+- [ ] `should convert running tool_call to error on provider/tool failure`
+- [ ] `should not leave running tool_call visible after run ends`
+- [ ] `should reject mixed final_answer and other tool_calls and recover via repair`
+- [ ] `should show model error when final_answer remains invalid after retries`
+- [ ] `should mark agent completed only when final_answer terminal is persisted`
+- [ ] `should show chat error messages in Developer Tools`
+- [ ] `should not show info/debug logs in Developer Tools`
+- [ ] `should preserve raw reasoning in storage while applying display-only normalization`

@@ -412,7 +412,8 @@ interface MessageSnapshot {
 
 ### Отладка
 
-- Все события ДОЛЖНЫ логироваться с уровнем debug через Logger
+- Внутренние события МОГУТ логироваться через `Logger` для отладки transport-слоя.
+- При выводе в renderer Developer Log ДОЛЖНЫ применяться правила фильтрации уровней из `realtime-events.4.11` (уровни `info`/`debug` не попадают в console).
 
 ## Зависимости
 

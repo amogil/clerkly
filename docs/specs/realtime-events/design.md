@@ -1092,7 +1092,7 @@ eventBus.publish('user.login', { userId: 'user-123' }, { local: true });
 | should ignore outdated events based on timestamp | realtime-events.5.5 |
 | should handle 100 events per second | realtime-events.6.2 |
 | should cleanup subscriptions on clear() | realtime-events.6.5 |
-| should log events in debug level | Нефункциональные |
+| should support internal debug logging for event bus diagnostics | Нефункциональные |
 
 #### Event Types
 
@@ -1172,7 +1172,7 @@ eventBus.publish('user.login', { userId: 'user-123' }, { local: true });
 - mitt: ~200 bytes, O(1) для emit
 - Timestamp-based deduplication для предотвращения обработки устаревших событий
 - Lazy initialization для singleton EventBus
-- Логирование только в development режиме с уровнем debug
+- Для transport-диагностики допускаются internal debug-логи EventBus; при выводе в renderer Developer Log применяется порог `warn` (уровни `info`/`debug` отфильтрованы).
 
 ## Граница С Продуктовыми Спеками
 

@@ -584,6 +584,16 @@
   - `data-testid="message-code-exec-stdout"` для секции stdout,
   - `data-testid="message-code-exec-stderr"` для секции stderr.
 
+7.4.8. КОГДА в одном run присутствуют и `kind: llm`, и `kind: tool_call`, UI ДОЛЖЕН отображать их по persisted-порядку шагов: pre-tool `kind: llm` -> `kind: tool_call` (`running`) -> post-tool `kind: llm`; terminal-обновление `tool_call` МОЖЕТ приходить позже и ДОЛЖНО применяться в том же блоке.
+
+7.4.8.1. КОГДА `tool_call(code_exec)` появляется в чате, он ДОЛЖЕН сначала отображаться в статусе `running`, а затем обновляться до terminal-статуса в том же блоке (без создания отдельного дублирующего блока terminal-состояния).
+
+7.4.8.2. КОГДА в успешной попытке присутствует `tool_call(final_answer)`, блок `"Final Answer"` ДОЛЖЕН отображаться последним пользовательским артефактом этой попытки.
+
+7.4.8.3. КОГДА persisted-сообщение помечено `hidden = true`, оно НЕ ДОЛЖНО отображаться в чате и НЕ ДОЛЖНО нарушать порядок видимых блоков `kind: llm`/`kind: tool_call`.
+
+7.4.8.4. UI ДОЛЖЕН рендерить `tool_call`-блоки только из видимых persisted-сообщений (`hidden = false`), и НЕ ДОЛЖЕН показывать частично обработанные/промежуточные `tool_call`-артефакты, отсутствующие в видимой persisted-истории.
+
 7.5. Сообщение `user` ДОЛЖНО содержать:
    ```json
    { "data": { "text": "string" } }
@@ -634,6 +644,10 @@
 - `tests/functional/llm-chat.spec.ts` - "should avoid duplicate line breaks between markdown blocks"
 - `tests/functional/llm-chat.spec.ts` - "should render tool_call(final_answer) as checklist block"
 - `tests/functional/llm-chat.spec.ts` - "should keep tool_call(final_answer) checklist always expanded"
+- `tests/functional/llm-chat.spec.ts` - "should keep visual order pre-tool llm -> tool_call(running) -> post-tool llm with in-place terminal update"
+- `tests/functional/llm-chat.spec.ts` - "should render tool_call in running state and start post-tool text without waiting terminal result"
+- `tests/functional/llm-chat.spec.ts` - "should reject model response containing more than one tool_call and run repair"
+- `tests/functional/llm-chat.spec.ts` - "should render final_answer after all non-final tool steps of successful attempt"
 - `tests/functional/code_exec.spec.ts` - "should render tool_call(code_exec) message block with Code header/icon/status and transparent streams"
 - `tests/functional/code_exec.spec.ts` - "should render JavaScript syntax highlighting in code_exec input section"
 
