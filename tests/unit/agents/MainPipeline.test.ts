@@ -1,7 +1,10 @@
 // Requirements: llm-integration.1, llm-integration.2, llm-integration.5
 
 import { MainPipeline } from '../../../src/main/agents/MainPipeline';
-import { FullHistoryStrategy, PromptBuilder as PromptBuilderClass } from '../../../src/main/agents/PromptBuilder';
+import {
+  FullHistoryStrategy,
+  PromptBuilder as PromptBuilderClass,
+} from '../../../src/main/agents/PromptBuilder';
 import { MainEventBus } from '../../../src/main/events/MainEventBus';
 import {
   MessageLlmReasoningUpdatedEvent,

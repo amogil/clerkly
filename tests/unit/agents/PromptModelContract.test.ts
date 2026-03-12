@@ -58,7 +58,11 @@ function assertLinkedToolReplay(messages: Array<Record<string, unknown>>): void 
 
     if (role === 'assistant') {
       for (const part of content) {
-        if (part && typeof part === 'object' && (part as Record<string, unknown>)['type'] === 'tool-call') {
+        if (
+          part &&
+          typeof part === 'object' &&
+          (part as Record<string, unknown>)['type'] === 'tool-call'
+        ) {
           const toolCallId = (part as Record<string, unknown>)['toolCallId'];
           if (typeof toolCallId === 'string') called.add(toolCallId);
         }
