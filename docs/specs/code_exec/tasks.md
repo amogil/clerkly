@@ -161,37 +161,37 @@
 
 #### Phase 2: Ранний persist tool_call и сегментация LLM
 
-- [ ] Убрать буферизацию tool-call до финализации полного llm-turn
-- [ ] Добавить жёсткую валидацию cardinality: `tool_calls.length <= 1` для каждого ответа модели
-- [ ] Финализировать текущий непустой llm-сегмент при валидном `tool_call`
-- [ ] Создавать `kind: tool_call` в `running` сразу после validation
-- [ ] Обновлять тот же `tool_call` до terminal-статуса по завершении инструмента
-- [ ] Открывать новый llm-сегмент сразу после `tool_call(running)` без ожидания terminal tool-result
-- [ ] Гарантировать, что пустые llm-сегменты не сохраняются
+- [x] Убрать буферизацию tool-call до финализации полного llm-turn
+- [x] Добавить жёсткую валидацию cardinality: `tool_calls.length <= 1` для каждого ответа модели
+- [x] Финализировать текущий непустой llm-сегмент при валидном `tool_call`
+- [x] Создавать `kind: tool_call` в `running` сразу после validation
+- [x] Обновлять тот же `tool_call` до terminal-статуса по завершении инструмента
+- [x] Открывать новый llm-сегмент сразу после `tool_call(running)` без ожидания terminal tool-result
+- [x] Гарантировать, что пустые llm-сегменты не сохраняются
 
 #### Phase 3: Retry/repair и hidden-attempt
 
-- [ ] Сохранить bounded retry/repair (`maxRetries = 2`) для невалидных аргументов
-- [ ] На failed attempt помечать сообщения attempt как `hidden: true`
-- [ ] Исключать hidden-сообщения из model-history и активного runtime-потока
-- [ ] Добавить unit/functional тесты на отсутствие persisted `tool_call` при invalid args
+- [x] Сохранить bounded retry/repair (`maxRetries = 2`) для невалидных аргументов
+- [x] На failed attempt помечать сообщения attempt как `hidden: true`
+- [x] Исключать hidden-сообщения из model-history и активного runtime-потока
+- [x] Добавить unit/functional тесты на отсутствие persisted `tool_call` при invalid args
 
 #### Phase 3.1: Prompt contract for code_exec runtime
 
-- [ ] Обновить системный prompt (`PromptBuilder`/`CodeExecFeature`) с явным указанием, что `code_exec` исполняет JS в async-контексте.
-- [ ] Явно зафиксировать в prompt, что `async/await` поддерживаются для пользовательского кода.
-- [ ] Добавить unit-тест на наличие этой инструкции в собранном системном prompt.
+- [x] Обновить системный prompt (`PromptBuilder`/`CodeExecFeature`) с явным указанием, что `code_exec` исполняет JS в async-контексте.
+- [x] Явно зафиксировать в prompt, что `async/await` поддерживаются для пользовательского кода.
+- [x] Добавить unit-тест на наличие этой инструкции в собранном системном prompt.
 
 #### Phase 4: Final Answer ordering
 
-- [ ] Буферизовать отображение `final_answer` до завершения остальных tool-step успешного attempt
-- [ ] Проверять правило "final_answer only-alone in turn"
+- [x] Буферизовать отображение `final_answer` до завершения остальных tool-step успешного attempt
+- [x] Проверять правило "final_answer only-alone in turn"
 - [ ] Добавить функциональный тест "final_answer отображается последним"
 
 #### Phase 5: Терминализация running и отказоустойчивость
 
-- [ ] На cancel/timeout/error переводить все активные `running` tool-call в terminal
-- [ ] Добавить unit-тесты на отсутствие "висячих" running после завершения attempt
+- [x] На cancel/timeout/error переводить все активные `running` tool-call в terminal
+- [x] Добавить unit-тесты на отсутствие "висячих" running после завершения attempt
 - [ ] Добавить функциональные тесты на аварийные сценарии mid-tool
 
 #### Phase 6: Финальная проверка

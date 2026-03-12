@@ -557,7 +557,7 @@ describe('MainPipeline.run()', () => {
             typeof msg.content === 'string' &&
             msg.content.includes('Tool call validation failed:')
         ) as { content?: string } | undefined;
-        expect(retryFeedback?.content).toContain('final_answer must be called alone');
+        expect(retryFeedback?.content).toContain('more than one tool_call');
       }
       onChunk({
         type: 'tool_call',
@@ -761,8 +761,8 @@ describe('MainPipeline.run()', () => {
     await pipeline.run('agent-1', 1);
 
     expect(llmProvider.chat).toHaveBeenCalledTimes(3);
-    expect(messageManager.hideAndMarkIncomplete).toHaveBeenCalledTimes(3);
-    expect(messageManager.hideAndMarkIncomplete).toHaveBeenNthCalledWith(3, 2, 'agent-1');
+    expect(messageManager.setHidden).toHaveBeenCalledTimes(2);
+    expect(messageManager.setHidden).toHaveBeenNthCalledWith(2, 2, 'agent-1');
     expect(messageManager.create).toHaveBeenCalledWith(
       'agent-1',
       'error',
@@ -803,7 +803,7 @@ describe('MainPipeline.run()', () => {
     );
   });
 
-  it('handles multiple tool calls from one turn via stream chunks', async () => {
+  it('rejects multiple tool calls in one response and finishes with kind:error', async () => {
     const { pipeline, llmProvider, toolExecutor, messageManager } = makeMocks();
 
     llmProvider.chat.mockImplementation(
@@ -833,29 +833,20 @@ describe('MainPipeline.run()', () => {
     await pipeline.run('agent-1', 1);
 
     expect(toolExecutor.executeBatch).not.toHaveBeenCalled();
-    const toolCallCreates = (messageManager.create as jest.Mock).mock.calls.filter(
-      (call: unknown[]) => call[1] === 'tool_call'
+    expect(llmProvider.chat).toHaveBeenCalledTimes(3);
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'error',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          error: expect.objectContaining({
+            message: expect.stringContaining('invalid tool call arguments'),
+          }),
+        }),
+      }),
+      1,
+      true
     );
-    expect(toolCallCreates).toHaveLength(2);
-
-    for (const call of toolCallCreates) {
-      expect(call[4]).toBe(false);
-      const payload = call[2] as { data?: Record<string, unknown> };
-      expect(payload.data?.output).toEqual(
-        expect.objectContaining({
-          status: 'running',
-        })
-      );
-    }
-    const terminalToolUpdates = (messageManager.update as jest.Mock).mock.calls.filter(
-      (call: unknown[]) =>
-        call[3] === true &&
-        typeof call[2] === 'object' &&
-        call[2] !== null &&
-        'data' in (call[2] as Record<string, unknown>) &&
-        (call[2] as { data?: { output?: { status?: string } } }).data?.output?.status === 'success'
-    );
-    expect(terminalToolUpdates).toHaveLength(2);
   });
 
   it('persists tool_call with error output when tool_result arrives with error status', async () => {
@@ -951,7 +942,7 @@ describe('MainPipeline.run()', () => {
     );
   });
 
-  it('does not persist buffered tool_call when provider fails before completion', async () => {
+  it('persists running tool_call and finalizes it on provider failure before completion', async () => {
     const { pipeline, messageManager, llmProvider } = makeMocks();
 
     llmProvider.chat.mockImplementation(
@@ -971,7 +962,7 @@ describe('MainPipeline.run()', () => {
     const toolCreates = (messageManager.create as jest.Mock).mock.calls.filter(
       (call: unknown[]) => call[1] === 'tool_call'
     );
-    expect(toolCreates).toHaveLength(0);
+    expect(toolCreates).toHaveLength(1);
     const errorCreates = (messageManager.create as jest.Mock).mock.calls.filter(
       (call: unknown[]) => call[1] === 'error'
     );
@@ -1125,7 +1116,7 @@ describe('MainPipeline.run()', () => {
 
     await pipeline.run('agent-1', 1, controller.signal);
 
-    expect(messageManager.hideAndMarkIncomplete).toHaveBeenCalledWith(2, 'agent-1');
+    expect(messageManager.hideAndMarkIncomplete).not.toHaveBeenCalled();
     const errorCreates = (messageManager.create as jest.Mock).mock.calls.filter(
       (call: unknown[]) => call[1] === 'error'
     );
@@ -1133,7 +1124,7 @@ describe('MainPipeline.run()', () => {
     const toolCreates = (messageManager.create as jest.Mock).mock.calls.filter(
       (call: unknown[]) => call[1] === 'tool_call'
     );
-    expect(toolCreates).toHaveLength(0);
+    expect(toolCreates).toHaveLength(1);
   });
 
   it('cancels before final llm completion without creating kind:error', async () => {
@@ -1537,7 +1528,7 @@ describe('MainPipeline.run()', () => {
     );
   });
 
-  it('keeps latest arguments for duplicate tool_call callId before flush', async () => {
+  it('treats duplicate tool_call chunks as invalid multi-tool response and retries', async () => {
     const { pipeline, llmProvider, messageManager } = makeMocks();
 
     llmProvider.chat.mockImplementation(
@@ -1560,17 +1551,19 @@ describe('MainPipeline.run()', () => {
 
     await pipeline.run('agent-1', 1);
 
+    expect(llmProvider.chat).toHaveBeenCalledTimes(3);
     expect(messageManager.create).toHaveBeenCalledWith(
       'agent-1',
-      'tool_call',
+      'error',
       expect.objectContaining({
         data: expect.objectContaining({
-          callId: 'call-dup',
-          arguments: { q: 'v2' },
+          error: expect.objectContaining({
+            message: expect.stringContaining('invalid tool call arguments'),
+          }),
         }),
       }),
       1,
-      false
+      true
     );
   });
 
@@ -1677,6 +1670,12 @@ describe('MainPipeline.run()', () => {
 
     llmProvider.chat.mockImplementation(
       async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-circular',
+          toolName: 'search_docs',
+          arguments: { q: 1 },
+        });
         onChunk({
           type: 'tool_result',
           callId: 'call-circular',

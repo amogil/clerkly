@@ -7,10 +7,12 @@ import {
   FullHistoryStrategy,
   AgentFeature,
   FinalAnswerFeature,
+  CodeExecFeature,
   normalizePromptWhitespace,
 } from '../../../src/main/agents/PromptBuilder';
 import type { ChatMessage, LLMTool } from '../../../src/main/llm/ILLMProvider';
 import type { Message } from '../../../src/main/db/schema';
+import { SandboxSessionManager } from '../../../src/main/code_exec/SandboxSessionManager';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -183,6 +185,17 @@ describe('PromptBuilder.build()', () => {
       expect(
         (finalAnswerTool?.parameters as Record<string, unknown>).properties
       ).not.toHaveProperty('text');
+    });
+
+    /* Preconditions: CodeExecFeature enabled
+       Action: build() is called
+       Assertions: system prompt explicitly states async context and top-level await support
+       Requirements: code_exec.1, llm-integration.4 */
+    it('should include async execution guidance for code_exec', () => {
+      const sandboxManager = {} as SandboxSessionManager;
+      const feature = new CodeExecFeature(sandboxManager);
+      const result = makeBuilder('Base.', [feature]).build();
+      expect(result.systemPrompt).toContain('top-level `await` is supported');
     });
   });
 

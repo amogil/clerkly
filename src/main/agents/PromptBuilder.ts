@@ -359,6 +359,7 @@ export class CodeExecFeature implements AgentFeature {
       `- Input schema: JSON object with required string field \`code\` and optional integer \`timeout_ms\` (${CODE_EXEC_LIMITS.timeoutMsMin}..${CODE_EXEC_LIMITS.timeoutMsPolicyCap}, default ${CODE_EXEC_LIMITS.timeoutMsDefault}).`,
       '- Output fields: `status`, `stdout`, `stderr`, `stdout_truncated`, `stderr_truncated`, optional `error`.',
       '- Status values: running | success | error | timeout | cancelled.',
+      '- Execution context: your code runs inside an async function, so top-level `await` is supported.',
       '- Error codes in normal chat-flow outputs: policy_denied | sandbox_runtime_error | limit_exceeded | internal_error.',
       '- `invalid_tool_arguments` is defensive/runtime-local only (direct runtime calls) and is not persisted as chat `tool_call(code_exec)` output.',
       `- Limits: code <= ${CODE_EXEC_LIMITS.maxCodeBytes} bytes (30 KiB), stdout <= ${CODE_EXEC_LIMITS.maxStdoutBytes} bytes (10 KiB), stderr <= ${CODE_EXEC_LIMITS.maxStderrBytes} bytes (10 KiB), CPU limit ${CODE_EXEC_LIMITS.sandboxCpuLimit} vCPU, RAM limit 2 GiB.`,
