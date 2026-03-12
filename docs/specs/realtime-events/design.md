@@ -208,10 +208,10 @@ export interface LLMPipelineDiagnosticPayload extends BaseEvent {
 
 **Requirements:** realtime-events.4.11, realtime-events.4.11.1
 
-Для синхронизации канала чата и Developer Log `App` подписывается на `EVENT_TYPES.MESSAGE_CREATED` и пишет диагностические записи о сообщениях, которые попадают в чат.
+Для синхронизации канала чата и Developer Log `App` подписывается на `EVENT_TYPES.MESSAGE_CREATED`.
 
 Правило логирования:
-1. Для любого `message.created` пишется техническая запись с `kind`, `id`, `agentId`.
+1. Renderer `Logger` использует порог уровня `warn`, поэтому записи `debug` и `info` не публикуются в DevTools.
 2. Для `message.kind = "error"` запись пишется через `logger.error(...)`.
 3. Для `message.kind = "error"` в лог включается текст `payload.data.error.message`.
 
@@ -1115,6 +1115,7 @@ eventBus.publish('user.login', { userId: 'user-123' }, { local: true });
 |------|------------|
 | should log llm.pipeline.diagnostic events to renderer console | realtime-events.4.10 |
 | should log chat kind:error messages from message.created to renderer console | realtime-events.4.11, realtime-events.4.11.1 |
+| should not log non-error message.created events to renderer console | realtime-events.4.11 |
 
 #### React Hook
 

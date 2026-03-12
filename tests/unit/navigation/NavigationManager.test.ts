@@ -86,40 +86,26 @@ describe('NavigationManager', () => {
   describe('redirectToLogin', () => {
     /* Preconditions: NavigationManager created
        Action: call redirectToLogin()
-       Assertions: router.navigate() called with '/login', message logged
+       Assertions: router.navigate() called with '/login'
        Requirements: navigation.1.1, navigation.1.4 */
     it('should navigate to login route', () => {
-      const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
-
       navigationManager.redirectToLogin();
 
       expect(mockRouter.navigate).toHaveBeenCalledWith('/login');
       expect(mockRouter.navigate).toHaveBeenCalledTimes(1);
-      expect(consoleInfoSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[NavigationManager] Redirecting to login')
-      );
-
-      consoleInfoSpy.mockRestore();
     });
   });
 
   describe('redirectToAgents', () => {
     /* Preconditions: NavigationManager created
        Action: call redirectToAgents()
-       Assertions: router.navigate() called with '/agents', message logged
+       Assertions: router.navigate() called with '/agents'
        Requirements: navigation.1.3 */
     it('should navigate to agents route', () => {
-      const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
-
       navigationManager.redirectToAgents();
 
       expect(mockRouter.navigate).toHaveBeenCalledWith('/agents');
       expect(mockRouter.navigate).toHaveBeenCalledTimes(1);
-      expect(consoleInfoSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[NavigationManager] Redirecting to agents')
-      );
-
-      consoleInfoSpy.mockRestore();
     });
   });
 
@@ -130,17 +116,11 @@ describe('NavigationManager', () => {
        Requirements: navigation.1.1 */
     it('should redirect to login when user is not authorized', async () => {
       mockGetStatus.mockResolvedValue({ authorized: false });
-      const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
 
       await navigationManager.initialize();
 
       expect(mockGetStatus).toHaveBeenCalledTimes(1);
       expect(mockRouter.navigate).toHaveBeenCalledWith('/login');
-      expect(consoleInfoSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[NavigationManager] Redirecting to login')
-      );
-
-      consoleInfoSpy.mockRestore();
     });
 
     /* Preconditions: user authorized, current route is '/login'
@@ -153,17 +133,11 @@ describe('NavigationManager', () => {
         get: () => '/login',
         configurable: true,
       });
-      const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
 
       await navigationManager.initialize();
 
       expect(mockGetStatus).toHaveBeenCalledTimes(1);
       expect(mockRouter.navigate).toHaveBeenCalledWith('/agents');
-      expect(consoleInfoSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[NavigationManager] Redirecting to agents')
-      );
-
-      consoleInfoSpy.mockRestore();
     });
 
     /* Preconditions: user authorized, current route is '/agents'
@@ -206,7 +180,6 @@ describe('NavigationManager', () => {
        Requirements: navigation.1.1 */
     it('should redirect to login when auth check fails', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-      const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
       mockGetStatus.mockRejectedValue(new Error('Auth check failed'));
 
       await navigationManager.initialize();
@@ -216,12 +189,8 @@ describe('NavigationManager', () => {
         expect.stringContaining('[NavigationManager] Failed to check auth status:')
       );
       expect(mockRouter.navigate).toHaveBeenCalledWith('/login');
-      expect(consoleInfoSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[NavigationManager] Redirecting to login')
-      );
 
       consoleErrorSpy.mockRestore();
-      consoleInfoSpy.mockRestore();
     });
   });
 });

@@ -160,6 +160,9 @@ describe('PromptBuilder.build()', () => {
       expect(result.systemPrompt).toContain(
         'Call the `final_answer` tool only when you are confident'
       );
+      expect(result.systemPrompt).toContain(
+        'explicitly ask the user what information or confirmation you need next'
+      );
       expect(result.systemPrompt).toContain('Call `final_answer` alone');
       expect(result.systemPrompt).toContain('list solved tasks');
       expect(result.tools.some((tool) => tool.name === 'final_answer')).toBe(true);

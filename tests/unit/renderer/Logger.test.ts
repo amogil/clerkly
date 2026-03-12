@@ -33,32 +33,28 @@ describe('Logger (Renderer)', () => {
   });
 
   describe('Static methods', () => {
-    /* Preconditions: Console.debug is mocked
+    /* Preconditions: Console methods are mocked and renderer log level threshold is warn
        Action: Call Logger.debug with context and message
-       Assertions: console.debug called with formatted message
+       Assertions: debug message is filtered out and no console method is called
        Requirements: clerkly.3.1, clerkly.3.4 */
-    it('should call console.debug for debug level', () => {
+    it('should filter out debug level logs', () => {
       Logger.debug('TestContext', 'Debug message');
 
-      expect(consoleDebugSpy).toHaveBeenCalledWith(
-        '[2024-01-01T12:00:00+00:00] [DEBUG] [TestContext] Debug message'
-      );
+      expect(consoleDebugSpy).not.toHaveBeenCalled();
       expect(consoleInfoSpy).not.toHaveBeenCalled();
       expect(consoleWarnSpy).not.toHaveBeenCalled();
       expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
 
-    /* Preconditions: Console.info is mocked
+    /* Preconditions: Console methods are mocked and renderer log level threshold is warn
        Action: Call Logger.info with context and message
-       Assertions: console.info called with formatted message
+       Assertions: info message is filtered out and no console method is called
        Requirements: clerkly.3.1, clerkly.3.4 */
-    it('should call console.info for info level', () => {
+    it('should filter out info level logs', () => {
       Logger.info('TestContext', 'Info message');
 
-      expect(consoleInfoSpy).toHaveBeenCalledWith(
-        '[2024-01-01T12:00:00+00:00] [INFO] [TestContext] Info message'
-      );
       expect(consoleDebugSpy).not.toHaveBeenCalled();
+      expect(consoleInfoSpy).not.toHaveBeenCalled();
       expect(consoleWarnSpy).not.toHaveBeenCalled();
       expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
@@ -97,12 +93,13 @@ describe('Logger (Renderer)', () => {
        Action: Call Logger.log with explicit level parameter
        Assertions: Correct console method called
        Requirements: clerkly.3.1, clerkly.3.4 */
-    it('should use info level by default when level not specified', () => {
+    it('should filter out default info level when level not specified', () => {
       Logger.log('TestContext', 'Default message');
 
-      expect(consoleInfoSpy).toHaveBeenCalledWith(
-        '[2024-01-01T12:00:00+00:00] [INFO] [TestContext] Default message'
-      );
+      expect(consoleDebugSpy).not.toHaveBeenCalled();
+      expect(consoleInfoSpy).not.toHaveBeenCalled();
+      expect(consoleWarnSpy).not.toHaveBeenCalled();
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
   });
 
@@ -113,28 +110,30 @@ describe('Logger (Renderer)', () => {
       logger = Logger.create('InstanceContext');
     });
 
-    /* Preconditions: Logger instance created with context
+    /* Preconditions: Logger instance created with context and renderer log level threshold is warn
        Action: Call instance debug() method
-       Assertions: console.debug called with context from instance
+       Assertions: debug message is filtered out and no console method is called
        Requirements: clerkly.3.5, clerkly.3.7 */
-    it('should call console.debug for instance debug() method', () => {
+    it('should filter out instance debug() method logs', () => {
       logger.debug('Instance debug message');
 
-      expect(consoleDebugSpy).toHaveBeenCalledWith(
-        '[2024-01-01T12:00:00+00:00] [DEBUG] [InstanceContext] Instance debug message'
-      );
+      expect(consoleDebugSpy).not.toHaveBeenCalled();
+      expect(consoleInfoSpy).not.toHaveBeenCalled();
+      expect(consoleWarnSpy).not.toHaveBeenCalled();
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
 
-    /* Preconditions: Logger instance created with context
+    /* Preconditions: Logger instance created with context and renderer log level threshold is warn
        Action: Call instance info() method
-       Assertions: console.info called with context from instance
+       Assertions: info message is filtered out and no console method is called
        Requirements: clerkly.3.5, clerkly.3.7 */
-    it('should call console.info for instance info() method', () => {
+    it('should filter out instance info() method logs', () => {
       logger.info('Instance info message');
 
-      expect(consoleInfoSpy).toHaveBeenCalledWith(
-        '[2024-01-01T12:00:00+00:00] [INFO] [InstanceContext] Instance info message'
-      );
+      expect(consoleDebugSpy).not.toHaveBeenCalled();
+      expect(consoleInfoSpy).not.toHaveBeenCalled();
+      expect(consoleWarnSpy).not.toHaveBeenCalled();
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
 
     /* Preconditions: Logger instance created with context
@@ -173,26 +172,27 @@ describe('Logger (Renderer)', () => {
       );
     });
 
-    /* Preconditions: Logger instance created with context
+    /* Preconditions: Logger instance created with context and renderer log level threshold is warn
        Action: Call instance log() without level parameter
-       Assertions: Defaults to info level
+       Assertions: default info message is filtered out
        Requirements: clerkly.3.5, clerkly.3.7 */
-    it('should default to info level in instance log() method', () => {
+    it('should filter out default info in instance log() method', () => {
       logger.log('Default level message');
 
-      expect(consoleInfoSpy).toHaveBeenCalledWith(
-        '[2024-01-01T12:00:00+00:00] [INFO] [InstanceContext] Default level message'
-      );
+      expect(consoleDebugSpy).not.toHaveBeenCalled();
+      expect(consoleInfoSpy).not.toHaveBeenCalled();
+      expect(consoleWarnSpy).not.toHaveBeenCalled();
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
   });
 
   describe('Timestamp formatting', () => {
-    /* Preconditions: DateTimeFormatter.formatLogTimestamp is mocked
-       Action: Call any Logger method
-       Assertions: DateTimeFormatter.formatLogTimestamp called with Date object
+    /* Preconditions: DateTimeFormatter.formatLogTimestamp is mocked and renderer log level threshold is warn
+       Action: Call Logger.warn()
+       Assertions: DateTimeFormatter.formatLogTimestamp called with Date object for emitted level
        Requirements: clerkly.3.2, clerkly.3.6 */
     it('should use DateTimeFormatter for timestamp', () => {
-      Logger.info('TestContext', 'Message');
+      Logger.warn('TestContext', 'Message');
 
       expect(DateTimeFormatter.formatLogTimestamp).toHaveBeenCalledWith(expect.any(Date));
     });

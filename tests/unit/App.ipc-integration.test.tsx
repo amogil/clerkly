@@ -166,9 +166,6 @@ describe('App IPC Integration with Error Notification System', () => {
      Assertions: Notification is displayed via ErrorNotificationManager
      Requirements: error-notifications.1.1 */
   it('should display notification when error.created event is received', async () => {
-    // Spy on console.info to verify notification logging (Logger uses console.info for info level)
-    const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
-
     const { container } = render(<App />);
 
     // Wait for listener to be set up
@@ -188,11 +185,6 @@ describe('App IPC Integration with Error Notification System', () => {
       });
     });
 
-    // Verify the event was logged with new Logger format: [timestamp] [INFO] [App] message
-    await waitFor(() => {
-      expect(consoleInfoSpy).toHaveBeenCalledWith(expect.stringContaining('[INFO] [App] Error:'));
-    });
-
     // Verify notification is displayed via NotificationUI component
     await waitFor(() => {
       const notificationContext = container.querySelector('.notification-context');
@@ -202,8 +194,6 @@ describe('App IPC Integration with Error Notification System', () => {
       expect(notificationMessage).toBeInTheDocument();
       expect(notificationMessage).toHaveTextContent(testMessage);
     });
-
-    consoleInfoSpy.mockRestore();
   });
 
   /* Preconditions: App component is mounted
@@ -336,8 +326,6 @@ describe('App IPC Integration with Error Notification System', () => {
      Assertions: Each event triggers notification display via ErrorNotificationManager
      Requirements: error-notifications.1.1 */
   it('should handle multiple error.created events', async () => {
-    const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
-
     const { container } = render(<App />);
 
     // Wait for listener to be set up
@@ -362,13 +350,6 @@ describe('App IPC Integration with Error Notification System', () => {
       });
     }
 
-    // Verify all events were logged with new Logger format
-    await waitFor(() => {
-      errors.forEach(() => {
-        expect(consoleInfoSpy).toHaveBeenCalledWith(expect.stringContaining('[INFO] [App] Error:'));
-      });
-    });
-
     // Verify notifications are displayed via NotificationUI component
     await waitFor(() => {
       const notificationContext = container.querySelector('.notification-context');
@@ -376,8 +357,6 @@ describe('App IPC Integration with Error Notification System', () => {
       expect(notificationContext).toBeInTheDocument();
       expect(notificationMessage).toBeInTheDocument();
     });
-
-    consoleInfoSpy.mockRestore();
   });
 
   /* Preconditions: App component is mounted
@@ -441,7 +420,7 @@ describe('App IPC Integration with Error Notification System', () => {
   /* Preconditions: App component mounted and MESSAGE_CREATED subscription is set
      Action: Emit message.created with kind:error payload
      Assertions: Chat error message is written to renderer Developer Log via App logger.error
-     Requirements: realtime-events.4.12 */
+     Requirements: realtime-events.4.11, realtime-events.4.11.1 */
   it('should log chat kind:error messages from message.created to renderer console', async () => {
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
 
@@ -482,6 +461,55 @@ describe('App IPC Integration with Error Notification System', () => {
       );
     });
 
+    consoleErrorSpy.mockRestore();
+  });
+
+  /* Preconditions: App component mounted and MESSAGE_CREATED subscription is set
+     Action: Emit message.created with non-error kind payload
+     Assertions: Renderer Developer Log does not receive message-created entry
+     Requirements: realtime-events.4.11 */
+  it('should not log non-error message.created events to renderer console', async () => {
+    const consoleDebugSpy = jest.spyOn(console, 'debug').mockImplementation();
+    const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(eventHandlers.has(EVENT_TYPES.MESSAGE_CREATED)).toBe(true);
+    });
+
+    act(() => {
+      emitEvent(EVENT_TYPES.MESSAGE_CREATED, {
+        message: {
+          id: 778,
+          agentId: 'agent-1',
+          kind: 'llm',
+          timestamp: Date.now(),
+          payload: {
+            data: {
+              text: 'hello',
+            },
+          },
+          replyToMessageId: 12,
+          hidden: false,
+          done: true,
+        },
+        timestamp: Date.now(),
+      });
+    });
+
+    await waitFor(() => {
+      expect(consoleDebugSpy).not.toHaveBeenCalled();
+      expect(consoleInfoSpy).not.toHaveBeenCalled();
+      expect(consoleWarnSpy).not.toHaveBeenCalled();
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
+    });
+
+    consoleDebugSpy.mockRestore();
+    consoleInfoSpy.mockRestore();
+    consoleWarnSpy.mockRestore();
     consoleErrorSpy.mockRestore();
   });
 

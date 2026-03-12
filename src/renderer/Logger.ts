@@ -8,6 +8,10 @@ import { DateTimeFormatter } from '../shared/utils/DateTimeFormatter';
  */
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
+const LOG_LEVEL_ORDER: ReadonlyArray<LogLevel> = ['debug', 'info', 'warn', 'error'];
+
+const RENDERER_DEVTOOLS_MIN_LEVEL: LogLevel = 'warn';
+
 /**
  * Centralized Logger class for consistent logging across the application (Renderer Process)
  * Uses fixed timestamp format with timezone for consistency
@@ -50,6 +54,10 @@ export class Logger {
    * @param level - Log level (optional, defaults to 'info')
    */
   static log(context: string, message: string, level: LogLevel = 'info'): void {
+    if (LOG_LEVEL_ORDER.indexOf(level) < LOG_LEVEL_ORDER.indexOf(RENDERER_DEVTOOLS_MIN_LEVEL)) {
+      return;
+    }
+
     // Requirements: clerkly.3.2, clerkly.3.3, clerkly.3.6 - Automatically format timestamp with timezone
     const timestamp = DateTimeFormatter.formatLogTimestamp(new Date());
 

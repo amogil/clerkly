@@ -306,6 +306,7 @@ export class FinalAnswerFeature implements AgentFeature {
       'Final Answer tool usage:',
       '- Use normal assistant text for ongoing dialog: clarifying questions, intermediate updates, or requests for user input.',
       '- Call the `final_answer` tool only when you are confident the requested work is completed.',
+      '- If the requested work is not complete and you are not calling `final_answer`, explicitly ask the user what information or confirmation you need next.',
       '- Call `final_answer` alone: do not combine it with any other tool call in the same turn.',
       '- Use `final_answer.summary_points` to list solved tasks (required: 1 to 10 points, each max 200 characters).',
     ].join('\n');
