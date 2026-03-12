@@ -288,11 +288,14 @@ test.describe('code_exec tool_call rendering', () => {
     expect(blockClassName).toContain('bg-transparent');
     expect(statusClassName).toContain('bg-transparent');
     expect(inputClassName).toContain('bg-transparent');
-    expect(inputClassName).not.toContain('rounded-md');
-    expect(inputClassName).not.toContain('border-border/60');
-    expect(inputClassName).not.toContain('p-2');
+    expect(inputClassName).toContain('rounded-md');
+    expect(inputClassName).toContain('border-border/60');
+    expect(inputClassName).toContain('p-2');
     expect(codeBlockBorderTop).toBe(0);
-    expect(codeBodyBorderTop).toBeGreaterThan(0);
+    expect(codeBodyBorderTop).toBe(0);
+    expect(stdoutClassName).toContain('rounded-md');
+    expect(stdoutClassName).toContain('border-border/60');
+    expect(stdoutClassName).toContain('p-2');
     expect(stdoutClassName).toContain('bg-transparent');
     expect(stderrClassName).toContain('bg-transparent');
 
