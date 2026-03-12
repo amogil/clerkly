@@ -358,11 +358,11 @@ test.describe('code_exec tool_call rendering', () => {
 
   /* Preconditions: authenticated app with one visible agent
      Action: create persisted kind:tool_call code_exec with long unbroken input/output lines
-     Assertions: code_exec block adapts to chat width and does not introduce horizontal overflow
+     Assertions: code_exec block stays within chat width and uses internal horizontal scroll for long lines
      Exception Rationale (testing.3.13): this validates renderer layout behavior for persisted historical
      code_exec payload and intentionally bypasses LLM transport.
-     Requirements: agents.4.10.1, agents.4.23, agents.7.4.6 */
-  test('should keep code_exec block within chat width without horizontal overflow', async () => {
+     Requirements: agents.4.10.1, agents.7.4.6, agents.7.4.9 */
+  test('should keep code_exec block within chat width with internal horizontal scroll', async () => {
     await launchWithMockLLM();
     const agentId = (await getAgentIdsFromApi(window))[0];
     expect(agentId).toBeTruthy();
@@ -399,14 +399,13 @@ test.describe('code_exec tool_call rendering', () => {
     );
 
     const codeExecBlock = window.locator('[data-testid="message-code-exec-block"]').last();
-    const input = window
-      .locator('[data-testid="message-code-exec-block"]')
-      .last()
-      .locator('pre')
-      .first();
+    await expect(codeExecBlock).toBeVisible({ timeout: 5000 });
+    await window.locator('[data-testid="message-code-exec-toggle"]').last().click();
+
+    const input = window.locator('[data-testid="message-code-exec-input"]').last();
     const stdout = window.locator('[data-testid="message-code-exec-stdout"]').last();
 
-    await expect(codeExecBlock).toBeVisible({ timeout: 5000 });
+    await expect(input).toBeVisible({ timeout: 5000 });
     await expect(stdout).toContainText(longToken.slice(0, 20));
 
     const messagesArea = window.locator('[data-testid="messages-area"]');
@@ -420,8 +419,8 @@ test.describe('code_exec tool_call rendering', () => {
     );
 
     expect(blockWidth).toBeLessThanOrEqual(messagesAreaWidth + 1);
-    expect(hasHorizontalScrollInInput).toBe(false);
-    expect(hasHorizontalScrollInStdout).toBe(false);
+    expect(hasHorizontalScrollInInput).toBe(true);
+    expect(hasHorizontalScrollInStdout).toBe(true);
 
     await expectNoToastError(window);
   });

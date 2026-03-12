@@ -594,6 +594,8 @@
 
 7.4.8.4. UI ДОЛЖЕН рендерить `tool_call`-блоки только из видимых persisted-сообщений (`hidden = false`), и НЕ ДОЛЖЕН показывать частично обработанные/промежуточные `tool_call`-артефакты, отсутствующие в видимой persisted-истории.
 
+7.4.9. В явно выделенных text/code секциях tool-блоков (`Input`, `Output`, `JavaScript`, `stdout`, `stderr`) длинные строки НЕ ДОЛЖНЫ переноситься по ширине секции и ДОЛЖНЫ отображаться через горизонтальный скролл внутри соответствующего блока.
+
 7.5. Сообщение `user` ДОЛЖНО содержать:
    ```json
    { "data": { "text": "string" } }
@@ -610,7 +612,7 @@
 
 7.7.2. КОГДА `llm`-ответ содержит markdown code block, контейнеры code block в ответе ДОЛЖНЫ использовать прозрачный фон (`transparent`).
 
-7.7.3. КОГДА `llm`-ответ содержит markdown fenced code block с языком `text`/`plaintext`, длинные строки в таком блоке ДОЛЖНЫ переноситься по ширине блока и НЕ ДОЛЖНЫ вызывать горизонтальное переполнение области чата.
+7.7.3. КОГДА `llm`-ответ содержит markdown fenced code block (любой язык, включая `text`/`plaintext`), длинные строки в таком блоке НЕ ДОЛЖНЫ переноситься по ширине блока и ДОЛЖНЫ отображаться с горизонтальным скроллом внутри code block.
 
 7.8. Все timestamps ДОЛЖНЫ включать timezone offset и храниться в часовом поясе пользователя
 
@@ -638,7 +640,7 @@
 - `tests/functional/llm-chat.spec.ts` - "should render markdown mermaid diagrams"
 - `tests/functional/llm-chat.spec.ts` - "should render markdown inline math"
 - `tests/functional/llm-chat.spec.ts` - "should render markdown block math"
-- `tests/functional/llm-chat.spec.ts` - "should wrap long lines in markdown fenced text code block without horizontal overflow"
+- `tests/functional/llm-chat.spec.ts` - "should keep markdown fenced text code block lines unwrapped with horizontal scroll"
 - `tests/functional/llm-chat.spec.ts` - "should render math when model returns LaTeX delimiters"
 - `tests/functional/llm-chat.spec.ts` - "should render math when model returns escaped dollar delimiters"
 - `tests/functional/llm-chat.spec.ts` - "should avoid duplicate line breaks between markdown blocks"
@@ -650,6 +652,7 @@
 - `tests/functional/llm-chat.spec.ts` - "should render final_answer after all non-final tool steps of successful attempt"
 - `tests/functional/code_exec.spec.ts` - "should render tool_call(code_exec) message block with Code header/icon/status and transparent streams"
 - `tests/functional/code_exec.spec.ts` - "should render JavaScript syntax highlighting in code_exec input section"
+- `tests/functional/code_exec.spec.ts` - "should keep code_exec block within chat width with internal horizontal scroll"
 
 ---
 

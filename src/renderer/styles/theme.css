@@ -196,14 +196,13 @@
   background-color: transparent !important;
 }
 
-/* agents.7.7.3: wrap long lines inside markdown fenced text blocks */
-.message-response-transparent-code-blocks [data-streamdown='code-block'][data-language='text'] [data-streamdown='code-block-body'] pre,
-.message-response-transparent-code-blocks [data-streamdown='code-block'][data-language='plaintext'] [data-streamdown='code-block-body'] pre,
-.message-response-transparent-code-blocks [data-streamdown='code-block-body'] pre code.language-text,
-.message-response-transparent-code-blocks [data-streamdown='code-block-body'] pre code.language-plaintext {
-  white-space: pre-wrap !important;
-  overflow-wrap: anywhere !important;
-  word-break: break-word !important;
+/* agents.7.7.3: keep code-block lines unwrapped and use horizontal scroll */
+.message-response-transparent-code-blocks [data-streamdown='code-block-body'] pre {
+  white-space: pre !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  overflow-wrap: normal !important;
+  word-break: normal !important;
 }
 
 /* agents.7.4.6.11: remove outer frame for code_exec input code block, keep inner code frame */

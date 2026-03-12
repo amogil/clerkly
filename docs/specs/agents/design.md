@@ -1602,6 +1602,7 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 - Смена статуса `running -> terminal` выполняется в том же UI-блоке (без создания отдельной terminal-карточки).
 - Для security/policy отказов используется `status=error` с соответствующим `error.code` (например, `policy_denied`).
 - При наличии отображаются `stdout` и `stderr` из persisted payload.
+- Для явно выделенных text/code секций tool-блоков (`Input`, `Output`, `JavaScript`, `stdout`, `stderr`) применяется no-wrap + horizontal scroll (`white-space: pre`, `overflow-x: auto`).
 - Секция `JavaScript` рендерится через общий `"MessageResponse"` и fenced markdown блок `javascript`, чтобы использовать стандартный рендерер code block и его встроенную подсветку синтаксиса.
 - Для input-кода `code_exec` не рендерится отдельный верхний label `JavaScript` и не используется внешний wrapper-box; в UI остается только сам встроенный markdown code block.
 - Для input-кода `code_exec` используется тот же контейнер `"ToolInput"`, что и стандартные секции инструмента; CSS scope `message-response-code-exec-input` снимает внутренние рамки `data-streamdown='code-block'`, чтобы не было вложенной (двойной) геометрии.
@@ -1658,7 +1659,7 @@ if (message.kind === 'tool_call' && toolName === 'final_answer') {
 - математика через KaTeX (inline и block)
 - сноски не поддерживаются
 - Для markdown code blocks в `llm`-ответах применяется semantic-класс `message-response-transparent-code-blocks`, который задаёт transparent-overrides для контейнеров `code-block`, `code-block-header`, `code-block-body`, `code-block-actions` и `pre` внутри `code-block-body`.
-- Для markdown fenced code blocks с языком `text`/`plaintext` в `llm`-ответах применяются wrap-overrides (`white-space: pre-wrap`, `overflow-wrap: anywhere`, `word-break: break-word`) чтобы длинные строки не создавали горизонтальный overflow чата.
+- Для markdown fenced code blocks (любой язык) в `llm`-ответах применяется режим без soft-wrap (`white-space: pre`) и внутренний горизонтальный скролл (`overflow-x: auto`).
 
 Перед рендером применяется нормализация мат-делимитеров:
 - `\(...\)` -> `$...$`
@@ -2006,7 +2007,7 @@ import { Logo } from '../logo';
 | `tests/functional/agent-status-indicators.spec.ts` | agents.6 | - |
 | `tests/functional/agent-status-all-places.spec.ts` | agents.6.1-6.5 | Проверка консистентного отображения каждого статуса (`new`, `in-progress`, `awaiting-response`, `error`, `completed`) в Header, Agent List tooltip и All Agents |
 | `tests/functional/message-format.spec.ts` | agents.7 | - |
-| `tests/functional/code_exec.spec.ts` | agents.7.4.5-7.4.7, agents.4.23, agents.9.2.1 | Отдельные сценарии для `tool_call(code_exec)`: header/icon/status, вертикальное выравнивание в collapsed, JS highlighting, transparent sections и width/overflow |
+| `tests/functional/code_exec.spec.ts` | agents.7.4.5-7.4.9, agents.4.23, agents.9.2.1 | Отдельные сценарии для `tool_call(code_exec)`: header/icon/status, вертикальное выравнивание в collapsed, JS highlighting, transparent sections и width/overflow |
 | `tests/functional/llm-chat.spec.ts` | agents.4.11, agents.4.11.2, agents.7.7, agents.4.24, llm-integration.2, llm-integration.7.2, llm-integration.8.7 | - |
 | `tests/functional/agent-status-calculation.spec.ts` | agents.9 | - |
 | `tests/functional/agent-data-isolation.spec.ts` | agents.10 | - |
