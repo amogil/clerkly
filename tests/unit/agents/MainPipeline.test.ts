@@ -1003,6 +1003,136 @@ describe('MainPipeline.run()', () => {
     );
   });
 
+  /* Preconditions: provider emits reasoning before valid tool_call and then post-tool text
+     Action: run pipeline for one attempt
+     Assertions: pre-tool llm segment is finalized before running tool_call is persisted
+     Requirements: llm-integration.11.1.2 */
+  it('finalizes pre-tool llm segment before creating running tool_call', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({ type: 'reasoning', delta: 'pre reasoning' });
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-pre-finalize',
+          toolName: 'code_exec',
+          arguments: { code: "console.log('ok')" },
+        });
+        onChunk({ type: 'text', delta: 'post text' });
+        onChunk({
+          type: 'tool_result',
+          callId: 'call-pre-finalize',
+          toolName: 'code_exec',
+          arguments: { code: "console.log('ok')" },
+          output: { status: 'success', stdout: 'ok\n', stderr: '' },
+          status: 'success',
+        });
+        return { text: 'post text' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const updateMock = messageManager.update as jest.Mock;
+    const createMock = messageManager.create as jest.Mock;
+
+    const finalizedPreToolUpdateIndex = updateMock.mock.calls.findIndex(
+      (call) =>
+        call[3] === true &&
+        typeof call[2]?.data?.reasoning?.text === 'string' &&
+        call[2].data.reasoning.text.includes('pre reasoning')
+    );
+    expect(finalizedPreToolUpdateIndex).toBeGreaterThanOrEqual(0);
+
+    const runningToolCreateIndex = createMock.mock.calls.findIndex(
+      (call) =>
+        call[1] === 'tool_call' &&
+        call[2]?.data?.callId === 'call-pre-finalize' &&
+        call[4] === false
+    );
+    expect(runningToolCreateIndex).toBeGreaterThanOrEqual(0);
+
+    const finalizedPreToolOrder =
+      updateMock.mock.invocationCallOrder[finalizedPreToolUpdateIndex] ?? -1;
+    const runningToolCreateOrder =
+      createMock.mock.invocationCallOrder[runningToolCreateIndex] ?? -1;
+
+    expect(finalizedPreToolOrder).toBeGreaterThan(0);
+    expect(runningToolCreateOrder).toBeGreaterThan(0);
+    expect(finalizedPreToolOrder).toBeLessThan(runningToolCreateOrder);
+  });
+
+  /* Preconditions: provider emits tool_call in the middle of reasoning stream
+     Action: run pipeline for one attempt
+     Assertions: running tool_call is persisted only after reasoning stream tail is appended
+     Requirements: llm-integration.11.1.2 */
+  it('buffers tool_call until reasoning stream tail is processed', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({ type: 'reasoning', delta: 'pre ' });
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-buffered-reasoning',
+          toolName: 'code_exec',
+          arguments: { code: "console.log('ok')" },
+        });
+        onChunk({ type: 'reasoning', delta: 'tail' });
+        onChunk({ type: 'text', delta: 'post text' });
+        onChunk({
+          type: 'tool_result',
+          callId: 'call-buffered-reasoning',
+          toolName: 'code_exec',
+          arguments: { code: "console.log('ok')" },
+          output: { status: 'success', stdout: 'ok\n', stderr: '' },
+          status: 'success',
+        });
+        return { text: 'post text' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const createMock = messageManager.create as jest.Mock;
+    const updateMock = messageManager.update as jest.Mock;
+
+    const tailReasoningCreateIndex = createMock.mock.calls.findIndex(
+      (call) =>
+        call[1] === 'llm' &&
+        call[4] === false &&
+        typeof call[2]?.data?.reasoning?.text === 'string' &&
+        call[2].data.reasoning.text.includes('tail')
+    );
+    const tailReasoningUpdateIndex = updateMock.mock.calls.findIndex(
+      (call) =>
+        call[3] === false &&
+        typeof call[2]?.data?.reasoning?.text === 'string' &&
+        call[2].data.reasoning.text.includes('tail')
+    );
+    expect(Math.max(tailReasoningCreateIndex, tailReasoningUpdateIndex)).toBeGreaterThanOrEqual(0);
+
+    const runningToolCreateIndex = createMock.mock.calls.findIndex(
+      (call) =>
+        call[1] === 'tool_call' &&
+        call[2]?.data?.callId === 'call-buffered-reasoning' &&
+        call[4] === false
+    );
+    expect(runningToolCreateIndex).toBeGreaterThanOrEqual(0);
+
+    const tailReasoningOrder =
+      tailReasoningCreateIndex >= 0
+        ? (createMock.mock.invocationCallOrder[tailReasoningCreateIndex] ?? -1)
+        : (updateMock.mock.invocationCallOrder[tailReasoningUpdateIndex] ?? -1);
+    const runningToolCreateOrder =
+      createMock.mock.invocationCallOrder[runningToolCreateIndex] ?? -1;
+
+    expect(tailReasoningOrder).toBeGreaterThan(0);
+    expect(runningToolCreateOrder).toBeGreaterThan(0);
+    expect(tailReasoningOrder).toBeLessThan(runningToolCreateOrder);
+  });
+
   it('creates finalized llm message from result.text when no text chunks were emitted', async () => {
     const { pipeline, messageManager, llmProvider } = makeMocks();
 

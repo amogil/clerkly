@@ -301,7 +301,7 @@ CREATE TABLE messages (
 2) На первом meaningful chunk создаёт `kind: llm` (`done: 0`).
 3) На каждом чанке обновляет payload `kind: llm`.
 4) При получении полного `tool_call` выполняет schema/contract validation до persist; если в одном ответе модели обнаружено более одного `tool_call`, ответ помечается невалидным и уходит в retry/repair без persist.
-5) Для валидного `tool_call` немедленно финализирует текущий непустой LLM-сегмент и создаёт persisted `kind: tool_call` в `running` (`done: 0`).
+5) Для валидного `tool_call` откладывает persist до завершения текущей reasoning-фазы, затем финализирует текущий непустой LLM-сегмент и создаёт persisted `kind: tool_call` в `running` (`done: 0`).
 6) Не дожидаясь terminal `tool_result`, открывает post-tool LLM-сегмент для последующих reasoning/text чанков текущего ответа модели.
 7) После terminal-результата (`success|error|timeout|cancelled`) обновляет тот же persisted `kind: tool_call` в `done: 1` in-place и передаёт replay-пару `assistant(tool-call)` + `tool(tool-result)` в следующий шаг `model` (с тем же ограничением `max 1 tool_call` для следующего ответа).
 8) Для невалидного `tool_call` не создаёт persisted запись, запускает retry/repair; при провале попытки помечает сообщения попытки `hidden: true`.
@@ -557,6 +557,7 @@ class MainPipeline {
     if chunk.type == 'tool_call':
       собирает полный tool call и валидирует schema/contract
       если tool call валиден:
+        ждёт завершения текущей reasoning-фазы
         финализирует текущий непустой LLM-сегмент
         создаёт persisted `kind: tool_call` (`done: false`, `status: running`)
         запускает выполнение инструмента (асинхронно, без блокировки post-tool text stream)
@@ -740,7 +741,7 @@ User отправляет сообщение
 - `tests/unit/agents/PromptModelContract.test.ts` — контрактная валидация `ModelMessage[]` (AI SDK schema), terminal-статусы `tool-result`, негативные кейсы `legacy result`, missing pair, mismatched `toolCallId`, malformed/non-terminal `tool_call`
 - `tests/unit/agents/MainPipeline.test.ts` — мок провайдера, полный цикл, ошибки, события
 - `tests/unit/agents/MainPipeline.test.ts` — integration guard: в `provider.chat` передаются schema-valid `ModelMessage[]` и связанная replay-пара `assistant(tool-call)` + `tool(tool-result)`
-- `tests/unit/agents/MainPipeline.test.ts` — порядок persist: валидный `kind:tool_call(status=running)` фиксируется до post-tool llm сегмента; terminal приходит позже и обновляет тот же блок in-place
+- `tests/unit/agents/MainPipeline.test.ts` — порядок persist: `kind:tool_call(status=running)` фиксируется только после завершения pre-tool reasoning-сегмента и до post-tool llm сегмента; terminal приходит позже и обновляет тот же блок in-place
 - `tests/unit/agents/MainPipeline.test.ts` — отклонение ответа модели с `tool_calls.length > 1` (retry/repair без persist `tool_call`)
 - `tests/unit/agents/AgentIPCHandlers.test.ts` — запуск pipeline при kind:user
 - `tests/unit/renderer/IPCChatTransport.test.ts` — обработка delta-stream (`reasoning/text`) и persisted `kind: tool_call` snapshot
@@ -762,7 +763,7 @@ User отправляет сообщение
 - `tests/functional/llm-chat.spec.ts` — "should hide error bubble when user sends next message"
 - `tests/functional/llm-chat.spec.ts` — "should send full conversation history to llm on second message"
 - `tests/functional/llm-chat.spec.ts` — "should exclude error messages from llm history"
-- `tests/functional/llm-chat.spec.ts` — "should render tool_call in running state and start post-tool text without waiting terminal result"
+- `tests/functional/llm-chat.spec.ts` — "should create tool_call only after reasoning phase and start post-tool text without waiting terminal result"
 - `tests/functional/llm-chat.spec.ts` — "should keep visual order pre-tool llm -> tool_call(running) -> post-tool llm with in-place terminal update"
 - `tests/functional/llm-chat.spec.ts` — "should retry tool call on invalid arguments, not persist tool_call, and show kind:error after retry limit"
 - `tests/functional/llm-chat.spec.ts` — "should continue to next model step after terminal code_exec tool result"

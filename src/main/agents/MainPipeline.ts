@@ -278,6 +278,13 @@ export class MainPipeline {
     for (;;) {
       const attemptMessageIds = new Set<number>();
       const runningToolCalls = new Map<string, RunningToolState>();
+      let pendingToolCall:
+        | {
+            callId: string;
+            toolName: string;
+            args: Record<string, unknown>;
+          }
+        | null = null;
       const attemptId = attempts + 1;
       let sequence = 0;
       const nextOrder = (): MessageOrderMeta => ({
@@ -294,6 +301,47 @@ export class MainPipeline {
       let meaningfulChunkSeen = false;
 
       try {
+        const flushPendingToolCall = (): void => {
+          if (!pendingToolCall) {
+            return;
+          }
+
+          finalLlmMessageId = this.finalizeLlmSegmentIfNonEmpty(
+            currentSegment,
+            agentId,
+            context.options.model
+          );
+          if (finalLlmMessageId !== null) {
+            setLastLlmMessageId(finalLlmMessageId);
+          }
+          currentSegment = { id: null, reasoning: '', text: '', order: null };
+
+          const payloadData: Record<string, unknown> = {
+            callId: pendingToolCall.callId,
+            toolName: pendingToolCall.toolName,
+            arguments: pendingToolCall.args,
+            order: nextOrder(),
+          };
+          const startedAt = new Date().toISOString();
+          const runningPayload = buildRunningToolPayload(payloadData, startedAt);
+          const runningMessage = this.messageManager.create(
+            agentId,
+            'tool_call',
+            runningPayload,
+            context.replyToMessageId,
+            false
+          );
+          attemptMessageIds.add(runningMessage.id);
+          runningToolCalls.set(pendingToolCall.callId, {
+            messageId: runningMessage.id,
+            callId: pendingToolCall.callId,
+            toolName: pendingToolCall.toolName,
+            args: pendingToolCall.args,
+            startedAt,
+          });
+          pendingToolCall = null;
+        };
+
         const chatMessagesForAttempt = this.buildRetryChatMessages(
           context.chatMessages,
           validationFeedback
@@ -337,6 +385,7 @@ export class MainPipeline {
                 return;
               }
               meaningfulChunkSeen = true;
+              flushPendingToolCall();
               currentSegment.text += chunk.delta;
               currentSegment.id = this.upsertLlmSegment(
                 currentSegment,
@@ -378,45 +427,20 @@ export class MainPipeline {
                 return;
               }
 
-              finalLlmMessageId = this.finalizeLlmSegmentIfNonEmpty(
-                currentSegment,
-                agentId,
-                context.options.model
-              );
-              if (finalLlmMessageId !== null) {
-                setLastLlmMessageId(finalLlmMessageId);
-              }
-              currentSegment = { id: null, reasoning: '', text: '', order: null };
-
-              const payloadData: Record<string, unknown> = {
-                callId: chunk.callId,
-                toolName: chunk.toolName,
-                arguments: chunk.arguments,
-                order: nextOrder(),
-              };
-              const startedAt = new Date().toISOString();
-              const runningPayload = buildRunningToolPayload(payloadData, startedAt);
-              const runningMessage = this.messageManager.create(
-                agentId,
-                'tool_call',
-                runningPayload,
-                context.replyToMessageId,
-                false
-              );
-              attemptMessageIds.add(runningMessage.id);
-              runningToolCalls.set(chunk.callId, {
-                messageId: runningMessage.id,
+              pendingToolCall = {
                 callId: chunk.callId,
                 toolName: chunk.toolName,
                 args: chunk.arguments,
-                startedAt,
-              });
+              };
               return;
             }
 
             if (chunk.type === 'tool_result') {
               meaningfulChunkSeen = true;
               toolCallsInCurrentStep = 0;
+              if (pendingToolCall && pendingToolCall.callId === chunk.callId) {
+                flushPendingToolCall();
+              }
               const running = runningToolCalls.get(chunk.callId);
               if (!running) {
                 return;
@@ -449,6 +473,8 @@ export class MainPipeline {
             }
           }
         );
+
+        flushPendingToolCall();
 
         if (
           currentSegment.id !== null &&

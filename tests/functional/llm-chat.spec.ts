@@ -1478,9 +1478,9 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
 
   /* Preconditions: scripted response emits reasoning + code_exec tool_call + post-tool text while tool still running
      Action: User sends a message
-     Assertions: code_exec becomes visible in running, post-tool text appears before terminal update
-     Requirements: llm-integration.11.1.3 */
-  test('should render tool_call in running state and start post-tool text without waiting terminal result', async () => {
+     Assertions: during reasoning phase tool_call is not visible; after reasoning phase tool_call becomes running and post-tool text appears before terminal update
+     Requirements: llm-integration.11.1.2, llm-integration.11.1.3 */
+  test('should create tool_call only after reasoning phase and start post-tool text without waiting terminal result', async () => {
     mockLLMServer.setStreamingMode(true, { chunkDelayMs: 40 });
     mockLLMServer.setOpenAIStreamScripts([
       {
@@ -1503,6 +1503,14 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
     await messageInput.fill('Check running and post-tool ordering');
     await messageInput.press('Enter');
+
+    const reasoningTrigger = context.window
+      .locator('[data-testid="message-llm-reasoning-trigger"]')
+      .last();
+    await expect(reasoningTrigger).toBeVisible({ timeout: 8000 });
+
+    const codeExecBlocks = context.window.locator('[data-testid="message-code-exec-block"]');
+    await expect(codeExecBlocks).toHaveCount(0);
 
     const codeExecStatus = context.window
       .locator('[data-testid="message-code-exec-status"]')

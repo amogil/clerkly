@@ -425,7 +425,7 @@
 
 11.1.1. КОГДА один ответ модели содержит более одного `tool_call`, ТО такой ответ ДОЛЖЕН считаться невалидным и ДОЛЖЕН обрабатываться через bounded retry/repair без создания persisted `kind: tool_call`.
 
-11.1.2. КОГДА `tool_call` валиден, ТО система ДОЛЖНА немедленно завершить текущий LLM-сегмент (если он непустой) и создать persisted `kind: tool_call` в статусе выполнения (`done = false`, `status = "running"`).
+11.1.2. КОГДА `tool_call` валиден, ТО система ДОЛЖНА отложить создание persisted `kind: tool_call` до завершения текущей reasoning-фазы ответа модели, затем завершить текущий непустой LLM-сегмент и только после этого создать persisted `kind: tool_call` в статусе выполнения (`done = false`, `status = "running"`).
 
 11.1.3. КОГДА `tool_call` валиден и создан в `running`, ТО post-tool LLM-сегмент ДОЛЖЕН начинать стримиться без ожидания terminal-результата `tool_call`.
 
@@ -478,7 +478,7 @@
 
 #### Функциональные Тесты
 
-- `tests/functional/llm-chat.spec.ts` — "should render tool_call in running state and start post-tool text without waiting terminal result"
+- `tests/functional/llm-chat.spec.ts` — "should create tool_call only after reasoning phase and start post-tool text without waiting terminal result"
 - `tests/functional/llm-chat.spec.ts` — "should keep visual order pre-tool llm -> tool_call(running) -> post-tool llm with in-place terminal update"
 - `tests/functional/llm-chat.spec.ts` — "should reject model response containing more than one tool_call and run repair"
 - `tests/functional/llm-chat.spec.ts` — "should retry tool call on invalid arguments, not persist tool_call, and show kind:error after retry limit"
