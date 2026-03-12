@@ -57,7 +57,7 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
         let reasoningId: string | null = null;
         let textPartId: string | null = null;
         const unsubscribers: (() => void)[] = [];
-        const protocolErrorText = 'Response stream error. Please try again.';
+        const protocolErrorText = 'Response stream error. Please try again later.';
 
         function finish() {
           if (finished) return;

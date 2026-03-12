@@ -265,7 +265,10 @@ export function AgentMessage({
                     data-testid="message-code-exec-icon"
                     className="h-4 w-4 shrink-0 text-muted-foreground"
                   />
-                  <div data-testid="message-code-exec-title" className="font-medium text-foreground">
+                  <div
+                    data-testid="message-code-exec-title"
+                    className="font-medium text-foreground"
+                  >
                     Code
                   </div>
                   <div

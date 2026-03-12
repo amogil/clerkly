@@ -38,7 +38,7 @@ type BufferedToolCall = {
 };
 
 const FINAL_ANSWER_RETRY_EXHAUSTED_MESSAGE =
-  'Model returned invalid tool call arguments too many times. Please try again.';
+  'Model returned invalid tool call arguments too many times. Please try again later.';
 const MAX_INVALID_TOOL_CALL_RETRIES = 2;
 
 class InvalidFinalAnswerContractError extends Error {
@@ -367,7 +367,7 @@ export class MainPipeline {
         this.validateToolCalls(bufferedToolCalls);
         if (invalidFinalAnswerSeen && !this.hasFinalAnswerToolCall(bufferedToolCalls)) {
           throw new InvalidFinalAnswerContractError(
-            'Model did not return final_answer after invalid completion retry. Please try again.'
+            'Model did not return final_answer after invalid completion retry. Please try again later.'
           );
         }
 

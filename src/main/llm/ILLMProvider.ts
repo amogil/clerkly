@@ -18,12 +18,21 @@ export type ChatMessage =
       content: string;
     }
   | {
+      role: 'assistant';
+      content: Array<{
+        type: 'tool-call';
+        toolCallId: string;
+        toolName: string;
+        input: Record<string, unknown>;
+      }>;
+    }
+  | {
       role: 'tool';
       content: Array<{
         type: 'tool-result';
         toolCallId: string;
         toolName: string;
-        result: unknown;
+        output: unknown;
       }>;
     };
 

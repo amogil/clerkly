@@ -40,8 +40,8 @@ const STANDARD_MESSAGES = {
   rateLimit: 'Rate limit exceeded. Please try again later.',
   provider: 'Provider service unavailable. Please try again later.',
   timeout: 'Model response timeout. The provider took too long to respond. Please try again later.',
-  tool: 'Tool execution failed. Please try again.',
-  protocol: 'Response stream error. Please try again.',
+  tool: 'Tool execution failed. Please try again later.',
+  protocol: 'Response stream error. Please try again later.',
 };
 
 // Requirements: llm-integration.3.7.6
@@ -114,6 +114,9 @@ export function normalizeLLMError(error: unknown): NormalizedLLMError {
     return { type: 'tool', message: STANDARD_MESSAGES.tool };
   }
   if (name === 'UIMessageStreamError') {
+    return { type: 'protocol', message: STANDARD_MESSAGES.protocol };
+  }
+  if (lower.includes('modelmessage[] schema') || lower.includes('invalid prompt')) {
     return { type: 'protocol', message: STANDARD_MESSAGES.protocol };
   }
 

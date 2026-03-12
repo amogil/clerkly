@@ -1730,7 +1730,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     const errorBubble = context.window.locator('[data-testid="message-error"]').last();
     await expect(errorBubble).toBeVisible({ timeout: 15000 });
     await expect(errorBubble).toContainText(
-      'Model returned invalid tool call arguments too many times. Please try again.'
+      'Model returned invalid tool call arguments too many times. Please try again later.'
     );
 
     const agentId = (await getAgentIdsFromApi(context.window))[0];
@@ -1869,7 +1869,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     const errorBubble = context.window.locator('[data-testid="message-error"]').last();
     await expect(errorBubble).toBeVisible({ timeout: 15000 });
     await expect(errorBubble).toContainText(
-      'Model returned invalid tool call arguments too many times. Please try again.'
+      'Model returned invalid tool call arguments too many times. Please try again later.'
     );
 
     const requestCount = mockLLMServer
@@ -1941,7 +1941,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     const errorBubble = context.window.locator('[data-testid="message-error"]').last();
     await expect(errorBubble).toBeVisible({ timeout: 15000 });
     await expect(errorBubble).toContainText(
-      'Model returned invalid tool call arguments too many times. Please try again.'
+      'Model returned invalid tool call arguments too many times. Please try again later.'
     );
     await expect(context.window.locator('[data-testid="message-final-answer-block"]')).toHaveCount(
       0

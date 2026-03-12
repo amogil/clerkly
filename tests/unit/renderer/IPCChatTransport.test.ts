@@ -723,7 +723,7 @@ describe('IPCChatTransport', () => {
         type: 'error';
         errorText: string;
       };
-      expect(errorChunk.errorText).toBe('Response stream error. Please try again.');
+      expect(errorChunk.errorText).toBe('Response stream error. Please try again later.');
     });
 
     it('should close stream when abortSignal fires after start', async () => {

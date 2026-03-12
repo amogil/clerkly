@@ -925,14 +925,25 @@ test.describe('code_exec tool loop execution', () => {
       timeout: 15000,
     });
     await sendUserMessage('Second turn after code_exec');
+    await expect(window.locator('.message-llm-action-response').last()).toContainText(
+      'second done',
+      {
+        timeout: 15000,
+      }
+    );
     await expect
       .poll(async () => {
         const agentId = (await getAgentIdsFromApi(window))[0];
         const messages = await getAllMessages(agentId);
-        return messages.some((entry) => {
+        const hasSecondUser = messages.some((entry) => {
           const payload = entry.payload as { data?: { text?: string } };
           return entry.kind === 'user' && payload?.data?.text === 'Second turn after code_exec';
         });
+        const hasProviderError = messages.some((entry) => {
+          const payload = entry.payload as { data?: { error?: { type?: string } } };
+          return entry.kind === 'error' && payload?.data?.error?.type === 'provider';
+        });
+        return hasSecondUser && !hasProviderError;
       })
       .toBe(true);
 

@@ -241,18 +241,33 @@ CREATE TABLE messages (
 3. Для каждого сообщения истории:
    - санитизируем `payload`: удаляем `data.model` и всю ветку `data.reasoning*`;
    - определяем `role`: `user` для `kind:user`, `assistant` для `kind:llm`;
-   - для `kind:tool_call` включаем только terminal-состояния (`success|error|timeout|cancelled`) и передаём как tool result-контекст независимо от `toolName`;
+   - для `kind:tool_call` включаем только terminal-состояния (`success|error|timeout|cancelled`) и сериализуем как replay-пару `assistant(tool-call)` + `tool(tool-result)` независимо от `toolName`;
    - формируем отдельный элемент входного массива `messages` с текстовым `content`:
      - для `kind:user` передаём текст пользовательского сообщения;
      - для `kind:llm` передаём только текст ответа;
-     - для `kind:tool_call` передаём AI SDK-совместимый `tool-result` блок: `toolCallId`, `toolName`, `result` (включая terminal `status` и `output`).
+     - для `kind:tool_call` передаём AI SDK-совместимую связанную пару:
+       - `assistant` с `tool-call` (`toolCallId`, `toolName`, `input`),
+       - `tool` с `tool-result` (`toolCallId`, `toolName`, `result`).
 4. Для всех поддерживаемых провайдеров формируем единый итоговый входной массив сообщений:
    - отдельный элемент `role: system` для системной инструкции;
    - отдельные элементы истории в хронологическом порядке (по одному элементу на каждое сообщение диалога).
 
-Пример terminal tool result в AI SDK-совместимом виде:
+Пример terminal replay-пары tool_call в AI SDK-совместимом виде:
 
 ```json
+{
+  "role": "assistant",
+  "content": [
+    {
+      "type": "tool-call",
+      "toolCallId": "call-123",
+      "toolName": "code_exec",
+      "input": {
+        "code": "console.log('ok')"
+      }
+    }
+  ]
+}
 {
   "role": "tool",
   "content": [
@@ -284,7 +299,7 @@ CREATE TABLE messages (
 5) На завершении turn сначала финализирует `kind: llm` (`done: 1`).
 6) После финализации `kind: llm` сохраняет buffered `kind: tool_call` только для вызовов, прошедших schema/contract validation.
 7) Отдельно сохраняет `usage_json` (если есть).
-8) Для каждого terminal `tool_call` результата (`success|error|timeout|cancelled`) pipeline немедленно формирует следующий вызов `model` в цикле `model -> tools -> model` с передачей этого результата в history как AI SDK `tool-result`.
+8) Для каждого terminal `tool_call` результата (`success|error|timeout|cancelled`) pipeline немедленно формирует следующий вызов `model` в цикле `model -> tools -> model` с передачей replay-пары `assistant(tool-call)` + `tool(tool-result)` в history.
 
 #### 2. Runtime transport: stream processing
 1) Runtime-consumer использует единый stream-state контракт диалога.
@@ -447,7 +462,7 @@ class PromptBuilder {
 - один элемент `role: system` с системной инструкцией;
 - затем отдельные элементы истории:
   - `role: user` / `role: assistant` для диалоговых сообщений;
-  - `role: tool` с `tool-result` для terminal `kind: tool_call`.
+  - для terminal `kind: tool_call` — связанную replay-пару `role: assistant` (`tool-call`) и `role: tool` (`tool-result`).
 
 **Базовая инструкция для system-role:**
 
@@ -491,6 +506,7 @@ try {
 | transport-level ошибка без `statusCode` | `network` |
 | `NoSuchToolError` / `InvalidToolInputError` / `ToolExecutionError` / `ToolCallRepairError` | `tool` |
 | `UIMessageStreamError` | `protocol` |
+| `Invalid prompt: ... ModelMessage[] schema` | `protocol` |
 
 ```typescript
 // Requirements: llm-integration.1
@@ -575,7 +591,7 @@ catch(error):
 
 **`MessageManager.listForModelHistory()`** фильтрует сообщения с `hidden` — они не попадают во входной массив `messages`.
 
-**`MessageManager.listForModelHistory()`** также фильтрует сообщения с `kind: error`; для `kind: tool_call` включаются только terminal-результаты (`success|error|timeout|cancelled`) независимо от `toolName` и сериализуются в AI SDK `tool-result` формат (`toolCallId`, `toolName`, `result`).
+**`MessageManager.listForModelHistory()`** также фильтрует сообщения с `kind: error`; для `kind: tool_call` включаются только terminal-результаты (`success|error|timeout|cancelled`) независимо от `toolName` и сериализуются в AI SDK replay-пару `assistant(tool-call)` + `tool(tool-result)` с общим `toolCallId`.
 
 Клиентский runtime фильтрует сообщения с `hidden: true`.
 

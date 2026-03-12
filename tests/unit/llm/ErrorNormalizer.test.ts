@@ -161,7 +161,7 @@ describe('ErrorNormalizer', () => {
       message: 'tool failed',
     });
     expect(normalized.type).toBe('tool');
-    expect(normalized.message).toBe('Tool execution failed. Please try again.');
+    expect(normalized.message).toBe('Tool execution failed. Please try again later.');
   });
 
   /* Preconditions: UIMessageStreamError from SDK
@@ -174,7 +174,20 @@ describe('ErrorNormalizer', () => {
       message: 'stream invalid',
     });
     expect(normalized.type).toBe('protocol');
-    expect(normalized.message).toBe('Response stream error. Please try again.');
+    expect(normalized.message).toBe('Response stream error. Please try again later.');
+  });
+
+  /* Preconditions: provider error text contains invalid ModelMessage schema prompt error
+     Action: normalizeLLMError
+     Assertions: mapped to protocol instead of provider
+     Requirements: llm-integration.3.10 */
+  it('maps invalid prompt ModelMessage schema errors to protocol', () => {
+    const normalized = normalizeLLMError({
+      name: 'Error',
+      message: 'Invalid prompt: The messages do not match the ModelMessage[] schema.',
+    });
+    expect(normalized.type).toBe('protocol');
+    expect(normalized.message).toBe('Response stream error. Please try again later.');
   });
 
   /* Preconditions: LLMRequestAbortedError

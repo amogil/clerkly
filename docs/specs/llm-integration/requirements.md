@@ -142,8 +142,8 @@
   - **Rate limit** (HTTP 429): `"Rate limit exceeded. Please try again later."` — см. требование 3.7
   - **Внутренняя ошибка провайдера** (HTTP 5xx): `"Provider service unavailable. Please try again later."`
   - **Таймаут ожидания ответа**: `"Model response timeout. The provider took too long to respond. Please try again later."`
-  - **Ошибка инструмента** (`tool`): `"Tool execution failed. Please try again."`
-  - **Ошибка stream protocol** (`protocol`): `"Response stream error. Please try again."`
+  - **Ошибка инструмента** (`tool`): `"Tool execution failed. Please try again later."`
+  - **Ошибка stream protocol** (`protocol`): `"Response stream error. Please try again later."`
 
 3.6. Таймаут ожидания ответа от LLM ДОЛЖЕН составлять 300 секунд (5 минут). ЕСЛИ за это время не получен финальный ответ модели, ТО запрос прерывается с ошибкой таймаута
 
@@ -189,6 +189,7 @@
   - transport-level ошибки без `statusCode` → `network`
   - ошибки tool execution (`NoSuchToolError`, `InvalidToolInputError`, `ToolExecutionError`, `ToolCallRepairError`) → `tool`
   - ошибки stream protocol (`UIMessageStreamError`) → `protocol`
+  - ошибки валидации replay prompt (например, `Invalid prompt: ... ModelMessage[] schema`) → `protocol`
 
 #### Функциональные Тесты
 
@@ -446,12 +447,11 @@
 
 11.3.1.2. Non-terminal `tool_call` (например, `status = "running"`) SHALL NOT включаться в model history.
 
-11.3.1.3. Формат включения terminal `tool_call` в model history ДОЛЖЕН соответствовать AI SDK tool-result контракту.
+11.3.1.3. Формат включения terminal `tool_call` в model history ДОЛЖЕН соответствовать AI SDK replay-контракту вызова инструмента: связанная пара `assistant(tool-call)` + `tool(tool-result)` с одинаковым `toolCallId`.
 
-11.3.1.3.1. Для каждого terminal `tool_call` в model history ДОЛЖЕН передаваться structured tool-result с обязательными полями:
-  - `toolCallId` (идентификатор вызова);
-  - `toolName` (имя инструмента);
-  - `result` (нормализованный terminal результат инструмента).
+11.3.1.3.1. Для каждого terminal `tool_call` в model history ДОЛЖНЫ передаваться:
+  - `assistant` сообщение с `tool-call` (`toolCallId`, `toolName`, `input` из persisted `arguments`);
+  - `tool` сообщение с `tool-result` (`toolCallId`, `toolName`, `result`).
 
 11.3.1.3.2. Поле `result` ДОЛЖНО содержать terminal-статус вызова (`success | error | timeout | cancelled`) и соответствующий output инструмента (включая ошибку, если она есть).
 

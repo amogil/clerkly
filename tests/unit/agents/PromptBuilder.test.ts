@@ -352,11 +352,11 @@ describe('PromptBuilder.buildMessages()', () => {
     expect(chatMessages[0].role).toBe('system');
   });
 
-  /* Preconditions: History contains kind:tool_call message
+  /* Preconditions: History contains non-terminal kind:tool_call message
      Action: Call buildMessages() with user + tool_call + llm
-     Assertions: tool_call is excluded from model history
+     Assertions: non-terminal tool_call is excluded from model history
      Requirements: llm-integration.10.1 */
-  it('should ignore tool_call messages in model history', () => {
+  it('should ignore non-terminal tool_call messages in model history', () => {
     const msgs = [
       makeMessage({
         id: 1,
@@ -383,9 +383,9 @@ describe('PromptBuilder.buildMessages()', () => {
 
   /* Preconditions: History contains terminal kind:tool_call message
      Action: Call buildMessages()
-     Assertions: terminal tool_call is serialized as tool-result history item
+     Assertions: terminal tool_call is serialized as assistant(tool-call) + tool(tool-result) history pair
      Requirements: llm-integration.11.3.1.1, llm-integration.11.3.1.3 */
-  it('should include terminal tool_call messages in tool-result format', () => {
+  it('should include terminal tool_call messages as replay pair', () => {
     const msgs = [
       makeMessage({
         id: 1,
@@ -412,15 +412,65 @@ describe('PromptBuilder.buildMessages()', () => {
     ];
 
     const chatMessages = makeBuilder().buildMessages(msgs);
-    expect(chatMessages).toHaveLength(4);
+    expect(chatMessages).toHaveLength(5);
     expect(chatMessages[2]).toMatchObject({
+      role: 'assistant',
+      content: [
+        {
+          type: 'tool-call',
+          toolCallId: 'call-1',
+          toolName: 'code_exec',
+          input: {},
+        },
+      ],
+    });
+    expect(chatMessages[3]).toMatchObject({
       role: 'tool',
       content: [
         {
           type: 'tool-result',
           toolCallId: 'call-1',
           toolName: 'code_exec',
-          result: expect.objectContaining({ status: 'success' }),
+          output: {
+            type: 'json',
+            value: expect.objectContaining({ status: 'success' }),
+          },
+        },
+      ],
+    });
+    expect(JSON.stringify(chatMessages[3])).not.toContain('"result"');
+  });
+
+  /* Preconditions: Terminal kind:tool_call has arguments payload
+     Action: Call buildMessages()
+     Assertions: replayed assistant tool-call includes original arguments as input
+     Requirements: llm-integration.11.3.1.1 */
+  it('should replay terminal tool_call arguments in assistant tool-call input', () => {
+    const msgs = [
+      makeMessage({
+        id: 1,
+        kind: 'tool_call',
+        done: true,
+        payloadJson: JSON.stringify({
+          data: {
+            callId: 'call-args',
+            toolName: 'code_exec',
+            arguments: { code: "console.log('x')", timeout_ms: 5000 },
+            output: { status: 'success', stdout: 'x' },
+          },
+        }),
+      }),
+    ];
+
+    const chatMessages = makeBuilder().buildMessages(msgs);
+    expect(chatMessages[1]).toMatchObject({
+      role: 'assistant',
+      content: [
+        {
+          type: 'tool-call',
+          toolCallId: 'call-args',
+          toolName: 'code_exec',
+          input: { code: "console.log('x')", timeout_ms: 5000 },
         },
       ],
     });

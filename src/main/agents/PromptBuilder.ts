@@ -130,9 +130,9 @@ export class PromptBuilder {
       }
       const payload = this.parsePayload(msg.payloadJson);
       if (msg.kind === 'tool_call') {
-        const toolResult = this.toolResultForReplay(payload);
-        if (toolResult) {
-          history.push(toolResult);
+        const toolReplay = this.toolReplayForHistory(payload);
+        if (toolReplay.length > 0) {
+          history.push(...toolReplay);
         }
       } else {
         const content = this.messageContentForReplay(msg.kind, payload);
@@ -177,11 +177,18 @@ export class PromptBuilder {
     return '';
   }
 
+  private isTerminalToolStatus(status: unknown): boolean {
+    return (
+      status === 'success' || status === 'error' || status === 'timeout' || status === 'cancelled'
+    );
+  }
+
   /**
-   * Serialize terminal tool_call into AI SDK-compatible tool-result history item.
+   * Serialize persisted terminal tool_call into AI SDK-compatible replay pair:
+   * assistant(tool-call) + tool(tool-result).
    * Requirements: llm-integration.11.3.1.1, llm-integration.11.3.1.3
    */
-  private toolResultForReplay(payload: Record<string, unknown>): ChatMessage | null {
+  private toolReplayForHistory(payload: Record<string, unknown>): ChatMessage[] {
     const data =
       payload['data'] && typeof payload['data'] === 'object'
         ? (payload['data'] as Record<string, unknown>)
@@ -190,7 +197,7 @@ export class PromptBuilder {
     const toolName = typeof data?.['toolName'] === 'string' ? data['toolName'] : undefined;
     const toolCallId = typeof data?.['callId'] === 'string' ? data['callId'] : undefined;
     if (!toolName || !toolCallId) {
-      return null;
+      return [];
     }
 
     const output = data?.['output'];
@@ -199,31 +206,46 @@ export class PromptBuilder {
         ? (output as Record<string, unknown>)['status']
         : undefined;
 
-    if (toolName !== 'final_answer') {
-      const isTerminal =
-        outputStatus === 'success' ||
-        outputStatus === 'error' ||
-        outputStatus === 'timeout' ||
-        outputStatus === 'cancelled';
-      if (!isTerminal) {
-        return null;
-      }
+    if (toolName !== 'final_answer' && !this.isTerminalToolStatus(outputStatus)) {
+      return [];
     }
 
-    return {
-      role: 'tool',
-      content: [
-        {
-          type: 'tool-result',
-          toolCallId,
-          toolName,
-          result: {
-            status: outputStatus ?? 'success',
-            output: output ?? null,
+    const args = data?.['arguments'];
+    const input =
+      args && typeof args === 'object' && !Array.isArray(args)
+        ? (args as Record<string, unknown>)
+        : {};
+
+    return [
+      {
+        role: 'assistant',
+        content: [
+          {
+            type: 'tool-call',
+            toolCallId,
+            toolName,
+            input,
           },
-        },
-      ],
-    };
+        ],
+      },
+      {
+        role: 'tool',
+        content: [
+          {
+            type: 'tool-result',
+            toolCallId,
+            toolName,
+            output: {
+              type: 'json',
+              value: {
+                status: this.isTerminalToolStatus(outputStatus) ? outputStatus : 'success',
+                output: output ?? null,
+              },
+            },
+          },
+        ],
+      },
+    ];
   }
 
   /**
