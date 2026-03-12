@@ -1704,6 +1704,53 @@ describe('MainPipeline.run()', () => {
     );
   });
 
+  it('allows one tool_call per step across multi-step provider stream', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-step-1',
+          toolName: 'search_docs',
+          arguments: { q: 'part-1' },
+        });
+        onChunk({
+          type: 'tool_result',
+          callId: 'call-step-1',
+          toolName: 'search_docs',
+          arguments: { q: 'part-1' },
+          output: { status: 'ok-1' },
+          status: 'success',
+        });
+        onChunk({ type: 'text', delta: 'after first tool ' });
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-step-2',
+          toolName: 'search_docs',
+          arguments: { q: 'part-2' },
+        });
+        onChunk({
+          type: 'tool_result',
+          callId: 'call-step-2',
+          toolName: 'search_docs',
+          arguments: { q: 'part-2' },
+          output: { status: 'ok-2' },
+          status: 'success',
+        });
+        return { text: 'done' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(llmProvider.chat).toHaveBeenCalledTimes(1);
+    const errorCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'error'
+    );
+    expect(errorCreates).toHaveLength(0);
+  });
+
   it('persists final_answer tool_result using finalized buffered row', async () => {
     const { pipeline, llmProvider, messageManager } = makeMocks();
 

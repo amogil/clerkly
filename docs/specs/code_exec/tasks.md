@@ -43,7 +43,7 @@
 - ✅ Добавлен сценарий `limit_exceeded` для memory-heavy `code_exec` с продолжением pipeline.
 - ✅ Обновлены `SandboxSessionManager` и unit-тесты для нормализации memory-limit ошибок в `error.code=limit_exceeded`.
 - ✅ Синхронизированы `code_exec` requirements/design с фактической реализацией lifecycle и resource-limit semantics.
-- ✅ Запущен `npm run validate` (успешно).
+- ✅ Последний запуск `npm run validate` успешен (актуализировано на текущем HEAD).
 - ✅ Закрыт reviewer comment по `invalid_tool_arguments`: зафиксировано, что `code_exec` не запускается, `tool_call(code_exec)` не создаётся и ошибка возвращается как model response validation error.
 - ✅ Унифицирован invalid-tool-args flow в `MainPipeline`: validation-feedback передаётся модели на retry, persisted `tool_call` не создаётся для невалидных аргументов, при исчерпании retry создаётся только `kind:error`.
 - ✅ Добавлены unit-тесты `MainPipeline` на отсутствие persist `tool_call` при invalid args и на retry-feedback в последующие provider-вызовы.

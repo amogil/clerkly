@@ -32,8 +32,11 @@ interface AgentMessageProps {
 }
 
 // Requirements: agents.7.4.6.8
-function buildJavaScriptFence(code: string): string {
-  return `\`\`\`javascript\n${code}\n\`\`\``;
+export function buildJavaScriptFence(code: string): string {
+  const longestBacktickRun = Math.max(0, ...(code.match(/`+/g) ?? []).map((match) => match.length));
+  const fenceLength = Math.max(3, longestBacktickRun + 1);
+  const fence = '`'.repeat(fenceLength);
+  return `${fence}javascript\n${code}\n${fence}`;
 }
 
 function getCodeExecStatusIcon(status: string) {

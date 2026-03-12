@@ -287,7 +287,8 @@ export class MainPipeline {
       });
       let currentSegment: LlmSegmentState = { id: null, reasoning: '', text: '', order: null };
       let finalLlmMessageId: number | null = null;
-      let toolCallsInResponse = 0;
+      let toolCallsInCurrentStep = 0;
+      let sawAnyToolCall = false;
       let finalAnswerCall: { callId: string; args: Record<string, unknown> } | null = null;
       let finalAnswerOrder: MessageOrderMeta | null = null;
       let meaningfulChunkSeen = false;
@@ -359,8 +360,9 @@ export class MainPipeline {
 
             if (chunk.type === 'tool_call') {
               meaningfulChunkSeen = true;
-              toolCallsInResponse += 1;
-              if (toolCallsInResponse > 1) {
+              sawAnyToolCall = true;
+              toolCallsInCurrentStep += 1;
+              if (toolCallsInCurrentStep > 1) {
                 throw new InvalidToolArgumentsError(
                   'Model returned more than one tool_call in a single response'
                 );
@@ -414,6 +416,7 @@ export class MainPipeline {
 
             if (chunk.type === 'tool_result') {
               meaningfulChunkSeen = true;
+              toolCallsInCurrentStep = 0;
               const running = runningToolCalls.get(chunk.callId);
               if (!running) {
                 return;
@@ -491,7 +494,7 @@ export class MainPipeline {
           };
         }
 
-        if (finalLlmMessageId === null && !finalAnswerCall && toolCallsInResponse === 0) {
+        if (finalLlmMessageId === null && !finalAnswerCall && !sawAnyToolCall) {
           throw new InvalidFinalAnswerContractError(
             'Model returned no assistant text and no completion tool call'
           );

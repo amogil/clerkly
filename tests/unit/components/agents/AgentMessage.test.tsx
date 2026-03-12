@@ -4,7 +4,10 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import { AgentMessage } from '../../../../src/renderer/components/agents/AgentMessage';
+import {
+  AgentMessage,
+  buildJavaScriptFence,
+} from '../../../../src/renderer/components/agents/AgentMessage';
 import type { MessageSnapshot } from '../../../../src/shared/events/types';
 
 const mockRetryLast = jest.fn().mockResolvedValue({ success: true });
@@ -26,6 +29,19 @@ const baseMessage = (overrides: Partial<MessageSnapshot> = {}): MessageSnapshot 
     replyToMessageId: null,
     ...overrides,
   }) as MessageSnapshot;
+
+describe('buildJavaScriptFence', () => {
+  /* Preconditions: code contains triple backticks
+     Action: build fenced markdown for code_exec input
+     Assertions: fence length is expanded beyond content backtick run
+     Requirements: agents.7.4.6.8 */
+  it('uses a fence longer than any backtick run in code', () => {
+    const fenced = buildJavaScriptFence("console.log('a');\n```in-code```");
+    expect(fenced.startsWith('````javascript\n')).toBe(true);
+    expect(fenced.endsWith('\n````')).toBe(true);
+    expect(fenced).toContain('```in-code```');
+  });
+});
 
 describe('AgentMessage — user', () => {
   /* Preconditions: kind:user message
