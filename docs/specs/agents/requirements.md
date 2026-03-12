@@ -543,11 +543,19 @@
 
 7.4.6.5. Секции `Input code`, `stdout` и `stderr` в блоке `tool_call(code_exec)` ДОЛЖНЫ использовать прозрачный фон (`transparent`).
 
+7.4.6.6. Статус-badge блока `tool_call(code_exec)` ДОЛЖЕН содержать иконку статуса, соответствующую persisted-статусу выполнения:
+  - `running` → `LoaderCircle` (с анимацией вращения),
+  - `success` → `CircleCheck`,
+  - `error` → `CircleX`,
+  - `timeout` → `Clock3`,
+  - `cancelled` → `Ban`.
+
 7.4.7. Для `tool_call(code_exec)` UI ДОЛЖЕН иметь отдельные тестовые идентификаторы:
   - `data-testid="message-code-exec-block"` для корневого блока,
   - `data-testid="message-code-exec-icon"` для иконки в заголовке,
   - `data-testid="message-code-exec-title"` для названия `Code`,
   - `data-testid="message-code-exec-status"` для статуса,
+  - `data-testid="message-code-exec-status-icon"` для иконки статуса,
   - `data-testid="message-code-exec-input"` для секции Input code,
   - `data-testid="message-code-exec-stdout"` для секции stdout,
   - `data-testid="message-code-exec-stderr"` для секции stderr.

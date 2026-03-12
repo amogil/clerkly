@@ -1,6 +1,6 @@
 import React from 'react';
 // Requirements: llm-integration.7, llm-integration.3.4.1, llm-integration.3.4.4, agents.4.22, agents.4.9, agents.4.10.1, agents.4.10.2, agents.7.4
-import { Check, Code2 } from 'lucide-react';
+import { Ban, Check, CircleCheck, CircleX, Clock3, Code2, LoaderCircle } from 'lucide-react';
 import { Message, MessageContent, MessageResponse } from '../ai-elements/message';
 import { Reasoning, ReasoningContent } from '../ai-elements/reasoning';
 import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from '../ai-elements/tool';
@@ -16,6 +16,23 @@ interface AgentMessageProps {
   message: MessageSnapshot;
   isReasoningStreaming?: boolean;
   onNavigate?: (screen: string) => void;
+}
+
+function getCodeExecStatusIcon(status: string) {
+  switch (status) {
+    case 'success':
+      return CircleCheck;
+    case 'running':
+      return LoaderCircle;
+    case 'error':
+      return CircleX;
+    case 'timeout':
+      return Clock3;
+    case 'cancelled':
+      return Ban;
+    default:
+      return LoaderCircle;
+  }
 }
 
 // Requirements: llm-integration.7, llm-integration.3.4.1, llm-integration.3.4.4, agents.4.22, agents.4.9, agents.4.10.1, agents.4.10.2
@@ -208,6 +225,7 @@ export function AgentMessage({
         toolData.arguments && typeof toolData.arguments.code === 'string'
           ? toolData.arguments.code
           : JSON.stringify(toolData.arguments ?? {}, null, 2);
+      const StatusIcon = getCodeExecStatusIcon(status);
 
       return (
         <Message from="assistant" className="w-full max-w-full">
@@ -224,6 +242,10 @@ export function AgentMessage({
                 data-testid="message-code-exec-status"
                 className="inline-flex items-center rounded-full border border-border/70 bg-background px-2 py-0.5 text-xs text-muted-foreground"
               >
+                <StatusIcon
+                  data-testid="message-code-exec-status-icon"
+                  className={`mr-1 h-3 w-3 shrink-0 ${status === 'running' ? 'animate-spin' : ''}`}
+                />
                 {status}
               </div>
             </ToolHeader>

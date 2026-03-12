@@ -202,6 +202,9 @@ test.describe('code_exec tool_call rendering', () => {
     await expect(window.locator('[data-testid="message-code-exec-status"]').last()).toHaveText(
       'success'
     );
+    await expect(
+      window.locator('[data-testid="message-code-exec-status-icon"]').last()
+    ).toBeVisible();
     await expect(window.locator('[data-testid="message-code-exec-input"]').last()).toContainText(
       "console.log('ok')"
     );

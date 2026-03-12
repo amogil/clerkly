@@ -1590,6 +1590,7 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 - Блок строится на AI Elements `Tool` (см. [https://elements.ai-sdk.dev/components/tool](https://elements.ai-sdk.dev/components/tool)).
 - Заголовок блока отображает иконку выполнения кода (`Code2`) и название `Code`.
 - Сразу после названия `Code` отображается badge со статусом выполнения.
+- Badge статуса всегда содержит иконку, привязанную к persisted-статусу: `running -> LoaderCircle (spin)`, `success -> CircleCheck`, `error -> CircleX`, `timeout -> Clock3`, `cancelled -> Ban`.
 - Блок отображает persisted-статус выполнения (`running | success | error | timeout | cancelled`).
 - Для security/policy отказов используется `status=error` с соответствующим `error.code` (например, `policy_denied`).
 - При наличии отображаются `stdout` и `stderr` из persisted payload.

@@ -139,6 +139,7 @@ describe('AgentMessage — tool_call', () => {
     expect(screen.getByTestId('message-code-exec-icon')).toBeInTheDocument();
     expect(screen.getByTestId('message-code-exec-title')).toHaveTextContent('Code');
     expect(screen.getByTestId('message-code-exec-status')).toHaveTextContent('success');
+    expect(screen.getByTestId('message-code-exec-status-icon')).toBeInTheDocument();
     expect(screen.getByTestId('message-code-exec-input')).toHaveClass('bg-transparent');
     expect(screen.getByTestId('message-code-exec-stdout')).toHaveTextContent('ok');
     expect(screen.getByTestId('message-code-exec-stdout')).toHaveClass('bg-transparent');
