@@ -544,7 +544,7 @@
 7.4.6.5. В блоке `tool_call(code_exec)` прозрачный фон (`transparent`) ДОЛЖЕН использоваться для:
   - корневого контейнера блока,
   - status-badge,
-  - секций `Input code`, `stdout` и `stderr`.
+  - секций `JavaScript`, `stdout` и `stderr`.
 
 7.4.6.6. Статус-badge компонента `Tool` (включая блок `tool_call(code_exec)`) ДОЛЖЕН содержать иконку статуса, соответствующую persisted-статусу выполнения:
   - `running` → `Loader2` (с анимацией вращения),
@@ -561,7 +561,7 @@
   - `data-testid="message-code-exec-title"` для названия `Code`,
   - `data-testid="message-code-exec-status"` для статуса,
   - `data-testid="message-code-exec-status-icon"` для иконки статуса,
-  - `data-testid="message-code-exec-input"` для секции Input code,
+  - `data-testid="message-code-exec-input"` для секции JavaScript,
   - `data-testid="message-code-exec-stdout"` для секции stdout,
   - `data-testid="message-code-exec-stderr"` для секции stderr.
 

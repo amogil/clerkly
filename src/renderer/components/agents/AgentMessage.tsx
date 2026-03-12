@@ -295,7 +295,7 @@ export function AgentMessage({
               <CollapsibleContent data-testid="message-code-exec-content">
                 <ToolContent>
                   <div>
-                    <div className="mb-1 text-xs font-medium text-muted-foreground">Input code</div>
+                    <div className="mb-1 text-xs font-medium text-muted-foreground">JavaScript</div>
                     <ToolInput data-testid="message-code-exec-input" className="bg-transparent">
                       {codeInput}
                     </ToolInput>

@@ -1595,7 +1595,7 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 - Блок отображает persisted-статус выполнения (`running | success | error | timeout | cancelled`).
 - Для security/policy отказов используется `status=error` с соответствующим `error.code` (например, `policy_denied`).
 - При наличии отображаются `stdout` и `stderr` из persisted payload.
-- Для `tool_call(code_exec)` transparent-surface применяется ко всему блоку: корневой контейнер `Tool`, status-badge, секции `Input code`, `stdout`, `stderr`.
+- Для `tool_call(code_exec)` transparent-surface применяется ко всему блоку: корневой контейнер `Tool`, status-badge, секции `JavaScript`, `stdout`, `stderr`.
 - Рендер строится только по persisted snapshot (`message.created`/`message.updated`) без локальной реконструкции результата.
 
 ```tsx
