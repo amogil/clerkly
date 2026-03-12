@@ -37,7 +37,10 @@ export function compareMessageSnapshots(a: MessageSnapshot, b: MessageSnapshot):
   const ao = readOrder(a);
   const bo = readOrder(b);
 
-  if (ao && bo && ao.runId === bo.runId && ao.attemptId === bo.attemptId) {
+  if (ao && bo && ao.runId === bo.runId) {
+    if (ao.attemptId !== bo.attemptId) {
+      return ao.attemptId - bo.attemptId;
+    }
     if (ao.sequence !== bo.sequence) {
       return ao.sequence - bo.sequence;
     }

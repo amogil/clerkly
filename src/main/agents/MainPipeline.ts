@@ -298,47 +298,48 @@ export class MainPipeline {
       let finalAnswerOrder: MessageOrderMeta | null = null;
       let meaningfulChunkSeen = false;
 
-      try {
-        const flushPendingToolCall = (): void => {
-          if (!pendingToolCall) {
-            return;
-          }
+      const flushPendingToolCall = (): void => {
+        if (!pendingToolCall) {
+          return;
+        }
 
-          finalLlmMessageId = this.finalizeLlmSegmentIfNonEmpty(
-            currentSegment,
-            agentId,
-            context.options.model
-          );
-          if (finalLlmMessageId !== null) {
-            setLastLlmMessageId(finalLlmMessageId);
-          }
-          currentSegment = { id: null, reasoning: '', text: '', order: null };
+        finalLlmMessageId = this.finalizeLlmSegmentIfNonEmpty(
+          currentSegment,
+          agentId,
+          context.options.model
+        );
+        if (finalLlmMessageId !== null) {
+          setLastLlmMessageId(finalLlmMessageId);
+        }
+        currentSegment = { id: null, reasoning: '', text: '', order: null };
 
-          const payloadData: Record<string, unknown> = {
-            callId: pendingToolCall.callId,
-            toolName: pendingToolCall.toolName,
-            arguments: pendingToolCall.args,
-            order: nextOrder(),
-          };
-          const startedAt = new Date().toISOString();
-          const runningPayload = buildRunningToolPayload(payloadData, startedAt);
-          const runningMessage = this.messageManager.create(
-            agentId,
-            'tool_call',
-            runningPayload,
-            context.replyToMessageId,
-            false
-          );
-          attemptMessageIds.add(runningMessage.id);
-          runningToolCalls.set(pendingToolCall.callId, {
-            messageId: runningMessage.id,
-            callId: pendingToolCall.callId,
-            toolName: pendingToolCall.toolName,
-            args: pendingToolCall.args,
-            startedAt,
-          });
-          pendingToolCall = null;
+        const payloadData: Record<string, unknown> = {
+          callId: pendingToolCall.callId,
+          toolName: pendingToolCall.toolName,
+          arguments: pendingToolCall.args,
+          order: nextOrder(),
         };
+        const startedAt = new Date().toISOString();
+        const runningPayload = buildRunningToolPayload(payloadData, startedAt);
+        const runningMessage = this.messageManager.create(
+          agentId,
+          'tool_call',
+          runningPayload,
+          context.replyToMessageId,
+          false
+        );
+        attemptMessageIds.add(runningMessage.id);
+        runningToolCalls.set(pendingToolCall.callId, {
+          messageId: runningMessage.id,
+          callId: pendingToolCall.callId,
+          toolName: pendingToolCall.toolName,
+          args: pendingToolCall.args,
+          startedAt,
+        });
+        pendingToolCall = null;
+      };
+
+      try {
 
         const chatMessagesForAttempt = this.buildRetryChatMessages(
           context.chatMessages,
@@ -540,6 +541,9 @@ export class MainPipeline {
         const isInvalidFinalAnswer =
           error instanceof InvalidFinalAnswerContractError ||
           error instanceof InvalidToolArgumentsError;
+        if (!isInvalidFinalAnswer) {
+          flushPendingToolCall();
+        }
         if (isInvalidFinalAnswer) {
           invalidFinalAnswerSeen = Boolean(finalAnswerCall);
           validationFeedback =

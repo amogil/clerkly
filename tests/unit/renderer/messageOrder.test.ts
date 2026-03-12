@@ -49,4 +49,17 @@ describe('messageOrder', () => {
     expect(compareMessageSnapshots(a, b)).toBeGreaterThan(0);
     expect(sortMessageSnapshots([a, b]).map((m) => m.id)).toEqual([1, 2]);
   });
+
+  /* Preconditions: same runId but different attempts arrive out of order by timestamp
+     Action: sort snapshots
+     Assertions: attemptId order is respected before timestamp fallback
+     Requirements: llm-integration.11.1.5, agents.7.4.8 */
+  it('sorts by attemptId for same run before fallback timestamp/id', () => {
+    const attempt2 = makeSnapshot(20, 1000, { runId: 'run-a', attemptId: 2, sequence: 1 });
+    const attempt1 = makeSnapshot(10, 2000, { runId: 'run-a', attemptId: 1, sequence: 99 });
+
+    const sorted = sortMessageSnapshots([attempt2, attempt1]);
+
+    expect(sorted.map((m) => m.id)).toEqual([10, 20]);
+  });
 });

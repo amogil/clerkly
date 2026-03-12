@@ -1173,7 +1173,7 @@ describe('MainPipeline.run()', () => {
     );
   });
 
-  it('does not persist tool_call on provider failure before reasoning phase completes', async () => {
+  it('persists pending tool_call and finalizes it on provider failure before completion', async () => {
     const { pipeline, messageManager, llmProvider } = makeMocks();
 
     llmProvider.chat.mockImplementation(
@@ -1193,7 +1193,7 @@ describe('MainPipeline.run()', () => {
     const toolCreates = (messageManager.create as jest.Mock).mock.calls.filter(
       (call: unknown[]) => call[1] === 'tool_call'
     );
-    expect(toolCreates).toHaveLength(0);
+    expect(toolCreates).toHaveLength(1);
     const errorCreates = (messageManager.create as jest.Mock).mock.calls.filter(
       (call: unknown[]) => call[1] === 'error'
     );
