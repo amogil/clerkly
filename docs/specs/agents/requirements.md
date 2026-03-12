@@ -522,6 +522,8 @@
 
 7.4.2.3. Контракт и лимиты аргументов `final_answer` задаются в спецификации `llm-integration`; `agents` использует только persisted payload для отображения.
 
+7.4.2.4. В каждом checklist-пункте блока `"Final Answer"` зелёная иконка `Check` ДОЛЖНА быть выровнена по вертикальному центру первой строки текста пункта (а НЕ по центру всего многострочного блока).
+
 7.4.4. Для `tool_call(final_answer)` UI ДОЛЖЕН иметь отдельные тестовые идентификаторы:
   - `data-testid="message-final-answer-block"` для корневого блока,
   - `data-testid="message-final-answer-summary"` для контейнера checklist,

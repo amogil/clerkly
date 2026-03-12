@@ -144,7 +144,7 @@ describe('AgentMessage — tool_call', () => {
   /* Preconditions: persisted kind:tool_call for final_answer with summary_points
      Action: render AgentMessage
      Assertions: renders Final Answer checklist items without title/header
-     Requirements: agents.7.4.1, agents.7.4.2, llm-integration.9.7 */
+     Requirements: agents.7.4.1, agents.7.4.2, agents.7.4.2.4, llm-integration.9.7 */
   it('should render final_answer as Final Answer block with summary list', () => {
     render(
       <AgentMessage
@@ -168,6 +168,10 @@ describe('AgentMessage — tool_call', () => {
     expect(screen.getByTestId('message-final-answer-summary')).toBeInTheDocument();
     expect(screen.getAllByTestId('message-final-answer-item')).toHaveLength(2);
     expect(screen.getByText('Point 1')).toBeInTheDocument();
+    expect(screen.getAllByTestId('message-final-answer-item')[0]).toHaveClass('items-start');
+    expect(screen.getAllByTestId('message-final-answer-item')[0].querySelector('span')).toHaveClass(
+      'mt-0.5'
+    );
     expect(screen.queryByTestId('message-final-answer-title')).not.toBeInTheDocument();
     expect(screen.queryByTestId('message-tool-call')).not.toBeInTheDocument();
     expect(screen.queryByTestId('message-completed-badge')).not.toBeInTheDocument();
