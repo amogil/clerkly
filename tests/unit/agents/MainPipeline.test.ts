@@ -295,6 +295,57 @@ describe('MainPipeline.run()', () => {
     );
   });
 
+  /* Preconditions: reasoning chunk has glued bold markdown; display normalization must not affect persistence
+     Action: run MainPipeline with reasoning and text chunks
+     Assertions: persisted payload and reasoning event keep raw model text
+     Requirements: agents.4.11.6, agents.4.11.7 */
+  it('persists raw reasoning text without display-time markdown spacing normalization', async () => {
+    const { pipeline, messageManager, llmProvider, mockPublish } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({ type: 'reasoning', delta: 'Soon!**Resolving next step**' });
+        onChunk({ type: 'text', delta: 'Answer' });
+        return { text: 'Answer' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'llm',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          reasoning: { text: 'Soon!**Resolving next step**', excluded_from_replay: true },
+        }),
+      }),
+      1,
+      false
+    );
+
+    expect(messageManager.update).toHaveBeenLastCalledWith(
+      2,
+      'agent-1',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          reasoning: { text: 'Soon!**Resolving next step**', excluded_from_replay: true },
+          text: 'Answer',
+        }),
+      }),
+      true
+    );
+
+    const reasoningEvent = mockPublish.mock.calls
+      .map((call: [unknown]) => call[0])
+      .find((event: unknown) => event instanceof MessageLlmReasoningUpdatedEvent) as
+      | MessageLlmReasoningUpdatedEvent
+      | undefined;
+    expect(reasoningEvent).toBeDefined();
+    expect(reasoningEvent?.delta).toBe('Soon!**Resolving next step**');
+    expect(reasoningEvent?.accumulatedText).toBe('Soon!**Resolving next step**');
+  });
+
   it('persists buffered tool_call after llm finalization in same turn', async () => {
     const { pipeline, llmProvider, toolExecutor, messageManager } = makeMocks();
 

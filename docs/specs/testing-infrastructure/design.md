@@ -722,7 +722,7 @@ afterEach(() => {
 
 ### Запуск в CI/CD
 
-**Requirements**: testing.4.2, testing.5.5
+**Requirements**: testing.4.2, testing.4.7, testing.5.5
 
 ```yaml
 # GitHub Actions example
@@ -731,7 +731,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: ci-env-validation
     steps:
-      - run: npm run validate
+      - run: npm run validate:verbose:deps
 
   functional:
     runs-on: macos-latest

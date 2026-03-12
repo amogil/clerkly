@@ -1,4 +1,4 @@
-// Requirements: agents.7.7, llm-integration.4.5
+// Requirements: agents.7.7, llm-integration.4.5, agents.4.11.3, agents.4.11.4, agents.4.11.5
 
 /**
  * Normalize common LaTeX delimiters to KaTeX markdown delimiters expected by Streamdown math plugin.
@@ -42,11 +42,12 @@ export function normalizeMathDelimiters(content: string): string {
     .join('');
 }
 
-// Requirements: agents.4.11
 /**
  * Normalize markdown spacing for reasoning text.
- * Inserts a single space before bold opener `**` when it is glued to previous plain text
- * (outside fenced and inline code), e.g. `soon!**Resolving**` -> `soon! **Resolving**`.
+ * For glued bold openers in reasoning (outside fenced/inline code):
+ * - inserts paragraph break before heading-like bold section after sentence punctuation
+ *   (`soon!**Resolving**` -> `soon!\n\n**Resolving**`);
+ * - otherwise falls back to a single space (`token**bold**` -> `token **bold**`).
  */
 export function normalizeReasoningMarkdownSpacing(content: string): string {
   if (!content || !content.includes('**')) {
@@ -57,7 +58,7 @@ export function normalizeReasoningMarkdownSpacing(content: string): string {
   const inlineCodePattern = /(`[^`\n]*`)/g;
 
   const normalizeNonCodeSegment = (segment: string): string =>
-    segment.replace(/([^\s])(\*\*)(?=\S)/g, '$1 $2');
+    segment.replace(/([.!?:…])(\*\*)(?=\S)/g, '$1\n\n$2').replace(/([^\s])(\*\*)(?=\S)/g, '$1 $2');
 
   return content
     .split(fencedCodePattern)

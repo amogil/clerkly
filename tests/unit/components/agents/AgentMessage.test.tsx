@@ -340,8 +340,8 @@ describe('AgentMessage — llm', () => {
 
   /* Preconditions: kind:llm reasoning text has glued bold opener after plain text
      Action: render AgentMessage
-     Assertions: reasoning text has normalized space before bold fragment
-     Requirements: agents.4.11 */
+     Assertions: reasoning text has paragraph break before heading-like bold fragment
+     Requirements: agents.4.11.3 */
   it('should normalize glued bold opener spacing in reasoning text', () => {
     render(
       <AgentMessage
@@ -360,6 +360,43 @@ describe('AgentMessage — llm', () => {
     expect(screen.getByTestId('message-llm-reasoning')).toHaveTextContent(
       'Soon! **Resolving next step**'
     );
+    const reasoningText = screen.getByTestId('message-llm-reasoning').textContent ?? '';
+    expect(reasoningText).toContain('Soon!\n\n**Resolving next step**');
+  });
+
+  /* Preconditions: reasoning text contains glued bold outside code and `**` inside fenced/inline code
+     Action: render AgentMessage
+     Assertions: only non-code reasoning text is normalized; code segments stay unchanged
+     Requirements: agents.4.11.3, agents.4.11.5 */
+  it('should normalize reasoning spacing only outside fenced and inline code', () => {
+    const reasoning = [
+      'Outside!**Bold**',
+      '',
+      '```js',
+      "const x='a**b';",
+      '```',
+      '',
+      '`x**y`',
+    ].join('\n');
+
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'llm',
+          payload: {
+            data: {
+              reasoning: { text: reasoning },
+              text: 'Answer',
+            },
+          },
+        })}
+      />
+    );
+
+    const node = screen.getByTestId('message-llm-reasoning');
+    expect(node).toHaveTextContent('Outside! **Bold**');
+    expect(node).toHaveTextContent("const x='a**b';");
+    expect(node).toHaveTextContent('x**y');
   });
 
   /* Preconditions: kind:llm with reasoning, active streaming for this message

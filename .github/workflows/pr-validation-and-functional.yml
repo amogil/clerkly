@@ -34,7 +34,7 @@ jobs:
         run: npm ci
 
       - name: Run validation
-        run: npm run validate:verbose
+        run: npm run validate:verbose:deps
 
   functional:
     if: github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository

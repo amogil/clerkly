@@ -155,6 +155,8 @@
 
 4.6. THE проверка устаревших зависимостей (`npm outdated`) SHALL быть отключена по умолчанию в `npm run validate` и SHALL запускаться только при явном флаге `--with-dependency-check` (или эквивалентной npm-команде с этим флагом).
 
+4.7. WHEN GitHub pull request workflow выполняет валидацию, THE job валидации SHALL запускать полный набор проверок с включённой проверкой устаревших зависимостей через `npm run validate:verbose:deps` (или эквивалент `npm run validate -- --with-dependency-check`), а НЕ дефолтный режим без dependency-check.
+
 ### 5. Запуск Функциональных Тестов
 
 **ID:** testing.5
