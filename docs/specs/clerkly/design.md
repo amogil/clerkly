@@ -122,7 +122,8 @@ graph TB
 Требование `clerkly.1.6` реализуется через стандартный pipeline `electron-builder` для macOS:
 
 - Source-of-truth: `assets/icon-source.svg` (статичная версия логотипа Clerkly с экрана логина)
-- Растеризация source в PNG: `assets/icon-source.png` (1024x1024, прозрачный фон) через `rsvg-convert`
+- Форма app-icon: macOS-style скруглённый прямоугольник (squircle-like), с прозрачными углами
+- Растеризация source в PNG: `assets/icon-source.png` (1024x1024, прозрачный фон) через Chromium renderer (Playwright), чтобы геометрия совпадала с UI-логотипом в Electron
 - Генерация iconset: `assets/icon.iconset` (размеры 16/32/64/128/256/512/1024)
 - Финальный артефакт: `assets/icon.icns`
 - Build binding: `electron-builder` поле `mac.icon = "assets/icon.icns"`

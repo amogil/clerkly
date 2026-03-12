@@ -11,13 +11,13 @@ if [[ ! -f "$SOURCE_VECTOR" ]]; then
   exit 1
 fi
 
-if ! command -v rsvg-convert >/dev/null 2>&1; then
-  echo "rsvg-convert is required to rasterize $SOURCE_VECTOR" >&2
+if ! command -v node >/dev/null 2>&1; then
+  echo "node is required to rasterize $SOURCE_VECTOR" >&2
   exit 1
 fi
 
-# Generate canonical PNG from SVG to preserve transparent background and exact geometry.
-rsvg-convert --width 1024 --height 1024 "$SOURCE_VECTOR" -o "$SOURCE_IMAGE"
+# Generate canonical PNG from SVG using Chromium renderer to match Electron/UI logo rendering.
+node scripts/render-icon-source.mjs "$SOURCE_VECTOR" "$SOURCE_IMAGE" 1024
 
 rm -rf "$ICONSET_DIR"
 mkdir -p "$ICONSET_DIR"
