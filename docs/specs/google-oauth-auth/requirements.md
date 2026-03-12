@@ -285,7 +285,6 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
    - "Automate Actions" с иконкой обновления
    - "Auto-Sync" с иконкой молнии
 5. "Login Screen" ДОЛЖЕН отображать текст "By continuing, you agree to Clerkly's Terms of Service and Privacy Policy"
-6. "Login Screen" ДОЛЖЕН использовать дизайн из прототипа `figma/src/app/components/login-screen.tsx`
 
 #### Функциональные Тесты
 
@@ -303,8 +302,7 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
 4. КОГДА ошибка "access_denied", ТО "Login Error Screen" ДОЛЖЕН показать заголовок "Access denied" и текст "You denied access to your Google account." с предложением "Clerkly needs access to your Google account to function properly."
 5. КОГДА ошибка "network_error", ТО "Login Error Screen" ДОЛЖЕН показать заголовок "Network error" и текст "Unable to connect to Google authentication servers." с предложением "Please check your internet connection and try again."
 6. КОГДА ошибка неизвестна, ТО "Login Error Screen" ДОЛЖЕН показать заголовок "Authentication failed" и переданное сообщение об ошибке с предложением "Please try signing in again or contact support if the problem persists."
-7. "Login Error Screen" ДОЛЖЕН использовать дизайн из прототипа `figma/src/app/components/login-error.tsx`
-8. КОГДА пользователь нажимает кнопку "Continue with Google" на "Login Error Screen", ТО приложение ДОЛЖНО повторить попытку авторизации (вызвать onRetry callback)
+7. КОГДА пользователь нажимает кнопку "Continue with Google" на "Login Error Screen", ТО приложение ДОЛЖНО повторить попытку авторизации (вызвать onRetry callback)
 
 #### Функциональные Тесты
 

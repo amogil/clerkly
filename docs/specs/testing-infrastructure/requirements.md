@@ -221,8 +221,6 @@
 
 7.4. THE Production Code SHALL поддерживаться и обновляться
 
-7.5. THE код в директории `figma/` SHALL считаться Reference Code
-
 7.6. THE Reference Code SHALL НЕ требовать покрытия тестами
 
 7.7. THE Reference Code SHALL НЕ анализироваться линтерами (может быть исключен из конфигурации)

@@ -767,34 +767,6 @@ module.exports = {
 };
 ```
 
-### Reference Code
-
-**Расположение**: `figma/**/*`
-
-**Характеристики**:
-- НЕ требует покрытия тестами (Requirements: testing.7.6)
-- НЕ анализируется линтерами (Requirements: testing.7.7)
-- НЕ требует изменений или поддержки (Requirements: testing.7.8)
-- Используется только как референс (Requirements: testing.7.9)
-- Исключен из расчета покрытия (Requirements: testing.7.10)
-
-**Конфигурация ESLint**:
-```javascript
-// Requirements: testing.7.7
-module.exports = {
-  ignorePatterns: ['figma/**/*'],
-};
-```
-
-**Конфигурация Jest**:
-```javascript
-// Requirements: testing.7.10
-module.exports = {
-  testPathIgnorePatterns: ['/node_modules/', '/figma/'],
-  coveragePathIgnorePatterns: ['/node_modules/', '/figma/'],
-};
-```
-
 ## Development Mode с Поддержкой Deep Links
 
 **Requirements**: testing.9
@@ -868,8 +840,7 @@ npm run dev:app
 5. ✅ Mock OAuth Server эмулирует Google OAuth endpoints (Requirements: testing.3.2.1)
 6. ✅ Покрытие кода > 80% (Requirements: testing.4.1)
 7. ✅ Все тесты проходят без ошибок
-8. ✅ Reference Code исключен из тестирования и анализа (Requirements: testing.7.6, testing.7.7, testing.7.10)
-9. ✅ Development mode с deep links работает за < 30 секунд (Requirements: testing.9.5)
+8. ✅ Development mode с deep links работает за < 30 секунд (Requirements: testing.9.5)
 
 ## Correctness Properties
 
@@ -917,13 +888,7 @@ npm run dev:app
 
 **Validates: Requirements testing.4.3**
 
-### Property 8: Reference Code Exclusion
-
-*For any* test coverage calculation, files in the `figma/` directory should be excluded from coverage metrics.
-
-**Validates: Requirements testing.7.10**
-
-### Property 9: Deep Link Registration
+### Property 8: Deep Link Registration
 
 *For any* unpacked .app bundle created with `npm run dev:app`, the bundle should correctly register custom protocol handlers for OAuth deep links.
 
@@ -1019,7 +984,6 @@ Unit Tests
 
 - Overall coverage: > 80%
 - Critical components: > 85%
-- Production code only (excludes `figma/`)
 
 ### Test Naming Convention
 

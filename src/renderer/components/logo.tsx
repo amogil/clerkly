@@ -1,4 +1,4 @@
-// Requirements: visual-design.1.1, visual-design.1.2
+// Requirements: google-oauth-auth.12.1, google-oauth-auth.13.1
 import React from 'react';
 
 interface LogoProps {
