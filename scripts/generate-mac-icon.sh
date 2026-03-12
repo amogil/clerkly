@@ -1,14 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SOURCE_VECTOR="assets/icon-source.svg"
 SOURCE_IMAGE="assets/icon-source.png"
 ICONSET_DIR="assets/icon.iconset"
 OUTPUT_ICNS="assets/icon.icns"
 
-if [[ ! -f "$SOURCE_IMAGE" ]]; then
-  echo "Source image not found: $SOURCE_IMAGE" >&2
+if [[ ! -f "$SOURCE_VECTOR" ]]; then
+  echo "Source vector not found: $SOURCE_VECTOR" >&2
   exit 1
 fi
+
+if ! command -v rsvg-convert >/dev/null 2>&1; then
+  echo "rsvg-convert is required to rasterize $SOURCE_VECTOR" >&2
+  exit 1
+fi
+
+# Generate canonical PNG from SVG to preserve transparent background and exact geometry.
+rsvg-convert --width 1024 --height 1024 "$SOURCE_VECTOR" -o "$SOURCE_IMAGE"
 
 rm -rf "$ICONSET_DIR"
 mkdir -p "$ICONSET_DIR"

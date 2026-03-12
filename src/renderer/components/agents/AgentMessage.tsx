@@ -1,10 +1,20 @@
 import React from 'react';
 // Requirements: llm-integration.7, llm-integration.3.4.1, llm-integration.3.4.4, agents.4.22, agents.4.9, agents.4.10.1, agents.4.10.2, agents.7.4
-import { Ban, Check, CircleCheck, CircleX, Clock3, Code2, LoaderCircle } from 'lucide-react';
+import {
+  Ban,
+  Check,
+  ChevronDownIcon,
+  CircleCheck,
+  CircleX,
+  Clock3,
+  Code2,
+  LoaderCircle,
+} from 'lucide-react';
 import { Message, MessageContent, MessageResponse } from '../ai-elements/message';
 import { Reasoning, ReasoningContent } from '../ai-elements/reasoning';
 import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from '../ai-elements/tool';
 import { Queue, QueueItem } from '../ai-elements/queue';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
 import { toUIMessage } from '../../lib/messageMapper';
 import { normalizeMathDelimiters } from '../../lib/mathDelimiterNormalization';
 import type { MessageSnapshot } from '../../../shared/events/types';
@@ -247,51 +257,66 @@ export function AgentMessage({
 
       return (
         <Message from="assistant" className="w-full max-w-full">
-          <Tool data-testid="message-code-exec-block" className="bg-transparent">
-            <ToolHeader className="justify-start">
-              <Code2
-                data-testid="message-code-exec-icon"
-                className="h-4 w-4 shrink-0 text-muted-foreground"
-              />
-              <div data-testid="message-code-exec-title" className="font-medium text-foreground">
-                Code
-              </div>
-              <div
-                data-testid="message-code-exec-status"
-                className="inline-flex items-center rounded-full border border-border/70 bg-transparent px-2 py-0.5 text-xs text-muted-foreground"
-              >
-                <StatusIcon
-                  data-testid="message-code-exec-status-icon"
-                  className={`mr-1 h-3 w-3 shrink-0 ${statusIconColorClass} ${status === 'running' ? 'animate-spin' : ''}`}
-                />
-                {status}
-              </div>
-            </ToolHeader>
-            <ToolContent>
-              <div>
-                <div className="mb-1 text-xs font-medium text-muted-foreground">Input code</div>
-                <ToolInput data-testid="message-code-exec-input" className="bg-transparent">
-                  {codeInput}
-                </ToolInput>
-              </div>
-              {stdout.length > 0 ? (
-                <div>
-                  <div className="mb-1 text-xs font-medium text-muted-foreground">stdout</div>
-                  <ToolOutput data-testid="message-code-exec-stdout" className="bg-transparent">
-                    {stdout}
-                  </ToolOutput>
+          <Collapsible defaultOpen={false} data-testid="message-code-exec-collapsible">
+            <Tool data-testid="message-code-exec-block" className="bg-transparent">
+              <ToolHeader className="justify-between">
+                <div className="flex min-w-0 items-center gap-2">
+                  <Code2
+                    data-testid="message-code-exec-icon"
+                    className="h-4 w-4 shrink-0 text-muted-foreground"
+                  />
+                  <div data-testid="message-code-exec-title" className="font-medium text-foreground">
+                    Code
+                  </div>
+                  <div
+                    data-testid="message-code-exec-status"
+                    className="inline-flex items-center rounded-full border border-border/70 bg-transparent px-2 py-0.5 text-xs text-muted-foreground"
+                  >
+                    <StatusIcon
+                      data-testid="message-code-exec-status-icon"
+                      className={`mr-1 h-3 w-3 shrink-0 ${statusIconColorClass} ${status === 'running' ? 'animate-spin' : ''}`}
+                    />
+                    {status}
+                  </div>
                 </div>
-              ) : null}
-              {stderr.length > 0 ? (
-                <div>
-                  <div className="mb-1 text-xs font-medium text-muted-foreground">stderr</div>
-                  <ToolOutput data-testid="message-code-exec-stderr" className="bg-transparent">
-                    {stderr}
-                  </ToolOutput>
-                </div>
-              ) : null}
-            </ToolContent>
-          </Tool>
+                <CollapsibleTrigger asChild>
+                  <button
+                    data-testid="message-code-exec-toggle"
+                    type="button"
+                    className="group inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
+                  >
+                    <ChevronDownIcon className="h-4 w-4 transition-transform group-data-[state=closed]:-rotate-90" />
+                  </button>
+                </CollapsibleTrigger>
+              </ToolHeader>
+              <CollapsibleContent data-testid="message-code-exec-content">
+                <ToolContent>
+                  <div>
+                    <div className="mb-1 text-xs font-medium text-muted-foreground">Input code</div>
+                    <ToolInput data-testid="message-code-exec-input" className="bg-transparent">
+                      {codeInput}
+                    </ToolInput>
+                  </div>
+                  {stdout.length > 0 ? (
+                    <div>
+                      <div className="mb-1 text-xs font-medium text-muted-foreground">stdout</div>
+                      <ToolOutput data-testid="message-code-exec-stdout" className="bg-transparent">
+                        {stdout}
+                      </ToolOutput>
+                    </div>
+                  ) : null}
+                  {stderr.length > 0 ? (
+                    <div>
+                      <div className="mb-1 text-xs font-medium text-muted-foreground">stderr</div>
+                      <ToolOutput data-testid="message-code-exec-stderr" className="bg-transparent">
+                        {stderr}
+                      </ToolOutput>
+                    </div>
+                  ) : null}
+                </ToolContent>
+              </CollapsibleContent>
+            </Tool>
+          </Collapsible>
         </Message>
       );
     }

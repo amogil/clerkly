@@ -108,8 +108,8 @@ describe('AgentMessage — tool_call', () => {
   });
 
   /* Preconditions: persisted kind:tool_call for code_exec with status/stdout/stderr
-     Action: render AgentMessage
-     Assertions: dedicated code_exec block renders Code header with icon/status and stream sections without gray input/output background
+     Action: render AgentMessage, verify default collapsed state, then expand by toggle
+     Assertions: dedicated code_exec block renders Code header with icon/status, starts collapsed, and shows transparent stream sections after expand
      Requirements: agents.7.4.5, agents.7.4.6, agents.7.4.7 */
   it('should render code_exec tool_call block with Code header, icon, status, and streams', () => {
     render(
@@ -143,6 +143,13 @@ describe('AgentMessage — tool_call', () => {
     expect(screen.getByTestId('message-code-exec-status')).toHaveClass('bg-transparent');
     expect(screen.getByTestId('message-code-exec-status-icon')).toBeInTheDocument();
     expect(screen.getByTestId('message-code-exec-status-icon')).toHaveClass('text-emerald-600');
+    expect(screen.getByTestId('message-code-exec-toggle')).toBeInTheDocument();
+    expect(screen.queryByTestId('message-code-exec-input')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('message-code-exec-stdout')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('message-code-exec-stderr')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('message-code-exec-toggle'));
+
     expect(screen.getByTestId('message-code-exec-input')).toHaveClass('bg-transparent');
     expect(screen.getByTestId('message-code-exec-stdout')).toHaveTextContent('ok');
     expect(screen.getByTestId('message-code-exec-stdout')).toHaveClass('bg-transparent');

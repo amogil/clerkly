@@ -157,8 +157,8 @@ test.afterEach(async () => {
 
 test.describe('code_exec tool_call rendering', () => {
   /* Preconditions: authenticated app with one visible agent
-     Action: create persisted kind:tool_call with toolName=code_exec and terminal output
-     Assertions: dedicated code_exec block renders Code header with icon/status and stream sections without gray input/output background
+     Action: create persisted kind:tool_call with toolName=code_exec and terminal output, then expand collapsed block by toggle
+     Assertions: dedicated code_exec block renders Code header/icon/status, starts collapsed by default, and shows transparent sections after expand
      Exception Rationale (testing.3.13): this test validates renderer behavior for an already persisted historical
      tool_call(code_exec) message and intentionally bypasses LLM transport; LLM+UI path coverage remains in
      code_exec tool-loop scenarios below.
@@ -205,6 +205,13 @@ test.describe('code_exec tool_call rendering', () => {
     await expect(
       window.locator('[data-testid="message-code-exec-status-icon"]').last()
     ).toBeVisible();
+    await expect(window.locator('[data-testid="message-code-exec-toggle"]').last()).toBeVisible();
+    await expect(window.locator('[data-testid="message-code-exec-input"]')).toHaveCount(0);
+    await expect(window.locator('[data-testid="message-code-exec-stdout"]')).toHaveCount(0);
+    await expect(window.locator('[data-testid="message-code-exec-stderr"]')).toHaveCount(0);
+
+    await window.locator('[data-testid="message-code-exec-toggle"]').last().click();
+
     await expect(window.locator('[data-testid="message-code-exec-input"]').last()).toContainText(
       "console.log('ok')"
     );
