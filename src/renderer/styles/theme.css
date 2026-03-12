@@ -205,3 +205,17 @@
   overflow-wrap: anywhere !important;
   word-break: break-word !important;
 }
+
+/* agents.7.4.6.11: remove outer frame for code_exec input code block, keep inner code frame */
+.message-response-code-exec-input [data-streamdown='code-block'],
+.message-response-code-exec-input [data-streamdown='code-block-header'],
+.message-response-code-exec-input [data-streamdown='code-block-body'] {
+  border: 0 !important;
+  box-shadow: none !important;
+  background-color: transparent !important;
+}
+
+.message-response-code-exec-input [data-streamdown='code-block-body'] pre {
+  border: 1px solid hsl(var(--border)) !important;
+  border-radius: 0.75rem !important;
+}

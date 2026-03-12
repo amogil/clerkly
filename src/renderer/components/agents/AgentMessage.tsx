@@ -311,7 +311,7 @@ export function AgentMessage({
                     data-testid="message-code-exec-input"
                     className="w-full min-w-0 max-w-full overflow-x-hidden overflow-y-auto bg-transparent text-xs text-foreground"
                   >
-                    <MessageResponse className="message-response-transparent-code-blocks text-xs leading-relaxed break-words">
+                    <MessageResponse className="message-response-transparent-code-blocks message-response-code-exec-input text-xs leading-relaxed break-words">
                       {buildJavaScriptFence(codeInput)}
                     </MessageResponse>
                   </div>

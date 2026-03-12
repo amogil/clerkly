@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Cpu, Eye, EyeOff, User, LogOut, AlertCircle } from 'lucide-react';
+import { Cpu, Eye, EyeOff, User, LogOut } from 'lucide-react';
 import { Logger } from '../Logger';
 import { useError } from '../contexts/error-context';
 import { useEventSubscription } from '../events/useEventSubscription';
@@ -360,32 +360,6 @@ export function Settings({ onSignOut, onNavigate }: SettingsProps) {
 
           {/* Save Button - REMOVED */}
 
-          {/* Error Handling System */}
-          <div className="bg-card rounded-xl border border-border shadow-sm">
-            <div className="p-6 border-b border-border">
-              <div className="flex items-center gap-3">
-                <AlertCircle className="w-5 h-5 text-primary" />
-                <h2 className="font-semibold text-foreground">Error Handling System</h2>
-              </div>
-            </div>
-            <div className="p-6">
-              <p className="text-sm text-muted-foreground mb-4">
-                View a demo of the complete error handling system, including toast notifications,
-                inline messages, error states, and error boundary behavior.
-              </p>
-              <button
-                onClick={() => {
-                  if (onNavigate) {
-                    onNavigate('error-demo');
-                  }
-                }}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
-              >
-                <AlertCircle className="w-4 h-4" />
-                Open Error Handling Demo
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </div>

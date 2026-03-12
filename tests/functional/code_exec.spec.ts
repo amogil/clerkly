@@ -261,6 +261,10 @@ test.describe('code_exec tool_call rendering', () => {
       .locator('[data-testid="message-code-exec-input"]')
       .last()
       .evaluate((el) => el.className);
+    const codeBlockBorderTop = await window
+      .locator('[data-testid="message-code-exec-input"] [data-streamdown="code-block"]')
+      .last()
+      .evaluate((el) => Number.parseFloat(getComputedStyle(el).borderTopWidth || '0'));
     const blockClassName = await window
       .locator('[data-testid="message-code-exec-block"]')
       .last()
@@ -283,6 +287,7 @@ test.describe('code_exec tool_call rendering', () => {
     expect(inputClassName).not.toContain('rounded-md');
     expect(inputClassName).not.toContain('border-border/60');
     expect(inputClassName).not.toContain('p-2');
+    expect(codeBlockBorderTop).toBe(0);
     expect(stdoutClassName).toContain('bg-transparent');
     expect(stderrClassName).toContain('bg-transparent');
 
