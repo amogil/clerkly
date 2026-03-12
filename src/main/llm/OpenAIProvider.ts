@@ -161,7 +161,7 @@ export class OpenAIProvider implements ILLMProvider {
         providerOptions: {
           openai: {
             ...(options.reasoningEffort ? { reasoningEffort: options.reasoningEffort } : {}),
-            reasoningSummary: 'detailed',
+            reasoningSummary: 'auto',
             strictJsonSchema: true,
             parallelToolCalls: true,
           },
