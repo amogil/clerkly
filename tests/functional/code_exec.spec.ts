@@ -158,11 +158,11 @@ test.afterEach(async () => {
 test.describe('code_exec tool_call rendering', () => {
   /* Preconditions: authenticated app with one visible agent
      Action: create persisted kind:tool_call with toolName=code_exec and terminal output, then expand collapsed block by toggle
-     Assertions: dedicated code_exec block renders Code header/icon/status, starts collapsed by default, and shows transparent sections after expand
+     Assertions: dedicated code_exec block renders Code header/icon/status, starts collapsed by default with vertically centered header content, and shows transparent sections after expand
      Exception Rationale (testing.3.13): this test validates renderer behavior for an already persisted historical
      tool_call(code_exec) message and intentionally bypasses LLM transport; LLM+UI path coverage remains in
      code_exec tool-loop scenarios below.
-     Requirements: agents.7.4.5, agents.7.4.6, agents.7.4.7 */
+     Requirements: agents.7.4.5, agents.7.4.6, agents.7.4.6.9, agents.7.4.7 */
   test('should render tool_call(code_exec) message block with Code header/icon/status and transparent streams', async () => {
     await launchWithMockLLM();
     const agentId = (await getAgentIdsFromApi(window))[0];
@@ -210,7 +210,43 @@ test.describe('code_exec tool_call rendering', () => {
     await expect(window.locator('[data-testid="message-code-exec-stdout"]')).toHaveCount(0);
     await expect(window.locator('[data-testid="message-code-exec-stderr"]')).toHaveCount(0);
 
+    const collapsedHeaderMetrics = await window
+      .locator('[data-testid="message-code-exec-header"]')
+      .last()
+      .evaluate((header) => {
+        const title = header.querySelector('[data-testid="message-code-exec-title"]');
+        const status = header.querySelector('[data-testid="message-code-exec-status"]');
+        if (!(title instanceof HTMLElement) || !(status instanceof HTMLElement)) {
+          return null;
+        }
+
+        const headerRect = header.getBoundingClientRect();
+        const titleRect = title.getBoundingClientRect();
+        const statusRect = status.getBoundingClientRect();
+
+        return {
+          headerClassName: header.className,
+          headerCenterY: headerRect.top + headerRect.height / 2,
+          titleCenterY: titleRect.top + titleRect.height / 2,
+          statusCenterY: statusRect.top + statusRect.height / 2,
+        };
+      });
+    expect(collapsedHeaderMetrics).not.toBeNull();
+    expect(collapsedHeaderMetrics!.headerClassName).toContain('mb-0');
+    expect(
+      Math.abs(collapsedHeaderMetrics!.headerCenterY - collapsedHeaderMetrics!.titleCenterY)
+    ).toBeLessThanOrEqual(2);
+    expect(
+      Math.abs(collapsedHeaderMetrics!.headerCenterY - collapsedHeaderMetrics!.statusCenterY)
+    ).toBeLessThanOrEqual(2);
+
     await window.locator('[data-testid="message-code-exec-toggle"]').last().click();
+
+    const expandedHeaderClassName = await window
+      .locator('[data-testid="message-code-exec-header"]')
+      .last()
+      .evaluate((el) => el.className);
+    expect(expandedHeaderClassName).toContain('mb-2');
 
     await expect(window.locator('[data-testid="message-code-exec-input"]').last()).toContainText(
       "console.log('ok')"
@@ -246,6 +282,60 @@ test.describe('code_exec tool_call rendering', () => {
     expect(inputClassName).toContain('bg-transparent');
     expect(stdoutClassName).toContain('bg-transparent');
     expect(stderrClassName).toContain('bg-transparent');
+
+    await expectNoToastError(window);
+  });
+
+  /* Preconditions: authenticated app with one visible agent
+     Action: create persisted kind:tool_call with toolName=code_exec and JavaScript input, then expand collapsed block
+     Assertions: JavaScript input renders as syntax-highlighted fenced javascript code block via shared message code component
+     Exception Rationale (testing.3.13): this test validates renderer behavior for persisted historical
+     tool_call(code_exec) payload and intentionally bypasses LLM transport.
+     Requirements: agents.7.4.6 */
+  test('should render JavaScript syntax highlighting in code_exec input section', async () => {
+    await launchWithMockLLM();
+    const agentId = (await getAgentIdsFromApi(window))[0];
+    expect(agentId).toBeTruthy();
+
+    await window.evaluate(async (id) => {
+      const api = (window as unknown as { api: any }).api;
+      const result = await api.messages.create(id, 'tool_call', {
+        data: {
+          callId: 'code-highlight-1',
+          toolName: 'code_exec',
+          arguments: {
+            code: 'const answer = 42;\nfunction run() { return answer; }\nconsole.log(run());',
+            timeout_ms: 10000,
+          },
+          output: {
+            status: 'success',
+            stdout: '42\\n',
+            stderr: '',
+            stdout_truncated: false,
+            stderr_truncated: false,
+          },
+        },
+      });
+      if (!result?.success) {
+        throw new Error(result?.error || 'Failed to create code_exec tool_call');
+      }
+    }, agentId as string);
+
+    const codeExecBlock = window.locator('[data-testid="message-code-exec-block"]').last();
+    await expect(codeExecBlock).toBeVisible({ timeout: 5000 });
+    await window.locator('[data-testid="message-code-exec-toggle"]').last().click();
+
+    const inputSection = window.locator('[data-testid="message-code-exec-input"]').last();
+    await expect(inputSection).toBeVisible();
+    await expect(inputSection).toContainText('const answer = 42;');
+
+    const javascriptCodeBlock = inputSection.locator(
+      '[data-streamdown="code-block"][data-language="javascript"]'
+    );
+    await expect(javascriptCodeBlock).toHaveCount(1);
+    await expect(javascriptCodeBlock.locator('[data-streamdown="code-block-body"] pre code')).toHaveCount(
+      1
+    );
 
     await expectNoToastError(window);
   });

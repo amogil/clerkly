@@ -28,6 +28,11 @@ interface AgentMessageProps {
   onNavigate?: (screen: string) => void;
 }
 
+// Requirements: agents.7.4.6.8
+function buildJavaScriptFence(code: string): string {
+  return `\`\`\`javascript\n${code}\n\`\`\``;
+}
+
 function getCodeExecStatusIcon(status: string) {
   switch (status) {
     case 'success':
@@ -69,6 +74,7 @@ export function AgentMessage({
   onNavigate,
 }: AgentMessageProps) {
   const [isDismissed, setIsDismissed] = React.useState(false);
+  const [isCodeExecExpanded, setIsCodeExecExpanded] = React.useState(false);
 
   const isLlmMessage = message.kind === 'llm';
   const llmData = isLlmMessage
@@ -257,9 +263,16 @@ export function AgentMessage({
 
       return (
         <Message from="assistant" className="w-full max-w-full">
-          <Collapsible defaultOpen={false} data-testid="message-code-exec-collapsible">
+          <Collapsible
+            open={isCodeExecExpanded}
+            onOpenChange={setIsCodeExecExpanded}
+            data-testid="message-code-exec-collapsible"
+          >
             <Tool data-testid="message-code-exec-block" className="bg-transparent">
-              <ToolHeader className="justify-between">
+              <ToolHeader
+                data-testid="message-code-exec-header"
+                className={`items-center justify-between ${isCodeExecExpanded ? 'mb-2' : 'mb-0'}`}
+              >
                 <div className="flex min-w-0 items-center gap-2">
                   <Code2
                     data-testid="message-code-exec-icon"
@@ -296,9 +309,14 @@ export function AgentMessage({
                 <ToolContent>
                   <div>
                     <div className="mb-1 text-xs font-medium text-muted-foreground">JavaScript</div>
-                    <ToolInput data-testid="message-code-exec-input" className="bg-transparent">
-                      {codeInput}
-                    </ToolInput>
+                    <div
+                      data-testid="message-code-exec-input"
+                      className="w-full min-w-0 max-w-full overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words [overflow-wrap:anywhere] rounded-md border border-border/60 bg-transparent p-2 text-xs text-foreground"
+                    >
+                      <MessageResponse className="message-response-transparent-code-blocks text-xs leading-relaxed break-words">
+                        {buildJavaScriptFence(codeInput)}
+                      </MessageResponse>
+                    </div>
                   </div>
                   {stdout.length > 0 ? (
                     <div>

@@ -555,8 +555,13 @@
 
 7.4.6.7. Иконки статусов в status-badge `tool_call(code_exec)` ДОЛЖНЫ использовать цветовую кодировку (colorized icons), а не монохромный цвет.
 
+7.4.6.8. Секция `JavaScript` в `tool_call(code_exec)` ДОЛЖНА рендерить входной код через общий компонент markdown code block (fenced `javascript`) с встроенной JavaScript syntax highlighting, а НЕ как plain text.
+
+7.4.6.9. КОГДА блок `tool_call(code_exec)` находится в свернутом состоянии, ТО контент заголовка (`Code`, status-badge и toggle) ДОЛЖЕН быть выровнен по вертикальному центру; при этом нижний отступ заголовка ДОЛЖЕН отсутствовать. КОГДА блок раскрыт, ТО нижний отступ заголовка ДОЛЖЕН быть восстановлен.
+
 7.4.7. Для `tool_call(code_exec)` UI ДОЛЖЕН иметь отдельные тестовые идентификаторы:
   - `data-testid="message-code-exec-block"` для корневого блока,
+  - `data-testid="message-code-exec-header"` для заголовка блока,
   - `data-testid="message-code-exec-icon"` для иконки в заголовке,
   - `data-testid="message-code-exec-title"` для названия `Code`,
   - `data-testid="message-code-exec-status"` для статуса,
@@ -616,6 +621,7 @@
 - `tests/functional/llm-chat.spec.ts` - "should render tool_call(final_answer) as checklist block"
 - `tests/functional/llm-chat.spec.ts` - "should keep tool_call(final_answer) checklist always expanded"
 - `tests/functional/code_exec.spec.ts` - "should render tool_call(code_exec) message block with Code header/icon/status and transparent streams"
+- `tests/functional/code_exec.spec.ts` - "should render JavaScript syntax highlighting in code_exec input section"
 
 ---
 
