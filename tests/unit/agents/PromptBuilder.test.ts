@@ -160,6 +160,7 @@ describe('PromptBuilder.build()', () => {
       expect(result.systemPrompt).toContain(
         'Call the `final_answer` tool only when you are confident'
       );
+      expect(result.systemPrompt).toContain('Call `final_answer` alone');
       expect(result.systemPrompt).toContain('list solved tasks');
       expect(result.tools.some((tool) => tool.name === 'final_answer')).toBe(true);
       const finalAnswerTool = result.tools.find((tool) => tool.name === 'final_answer');

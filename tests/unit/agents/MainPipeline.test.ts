@@ -493,6 +493,65 @@ describe('MainPipeline.run()', () => {
     );
   });
 
+  it('retries and fails when final_answer is combined with another tool call in same turn', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+    let attempt = 0;
+
+    llmProvider.chat.mockImplementation(async (msgs: ChatMessage[], _opts, onChunk) => {
+      attempt += 1;
+      if (attempt > 1) {
+        const retryFeedback = msgs.find(
+          (msg) =>
+            msg.role === 'system' &&
+            typeof msg.content === 'string' &&
+            msg.content.includes('Tool call validation failed:')
+        ) as { content?: string } | undefined;
+        expect(retryFeedback?.content).toContain('final_answer must be called alone');
+      }
+      onChunk({
+        type: 'tool_call',
+        callId: `call-final-${attempt}`,
+        toolName: 'final_answer',
+        arguments: { summary_points: ['done'] },
+      });
+      onChunk({
+        type: 'tool_call',
+        callId: `call-code-${attempt}`,
+        toolName: 'code_exec',
+        arguments: { code: 'console.log(1)' },
+      });
+      return { text: '' };
+    });
+
+    await pipeline.run('agent-1', 1);
+
+    expect(llmProvider.chat).toHaveBeenCalledTimes(3);
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'error',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          error: expect.objectContaining({
+            message: expect.stringContaining('invalid tool call arguments'),
+          }),
+        }),
+      }),
+      1,
+      true
+    );
+    expect(messageManager.create).not.toHaveBeenCalledWith(
+      'agent-1',
+      'tool_call',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          toolName: 'final_answer',
+        }),
+      }),
+      1,
+      expect.anything()
+    );
+  });
+
   it('does not persist tool_call for invalid code_exec arguments and emits kind:error after retries', async () => {
     const { pipeline, llmProvider, messageManager } = makeMocks();
 

@@ -431,9 +431,22 @@ export class MainPipeline {
 
   /**
    * Enforce strict runtime contract for final_answer.
-   * Requirements: llm-integration.9.5.2, llm-integration.9.5.3, llm-integration.9.5.5, llm-integration.12.2.1
+   * Requirements: llm-integration.9.5.1.1, llm-integration.9.5.2, llm-integration.9.5.3, llm-integration.9.5.5, llm-integration.12.2.1
    */
   private validateToolCalls(bufferedToolCalls: Map<string, BufferedToolCall>): void {
+    const toolCalls = [...bufferedToolCalls.values()];
+    const finalAnswerCalls = toolCalls.filter((call) => call.toolName === 'final_answer');
+    if (finalAnswerCalls.length > 1) {
+      throw new InvalidFinalAnswerContractError(
+        'final_answer must appear at most once per model turn'
+      );
+    }
+    if (finalAnswerCalls.length === 1 && toolCalls.length > 1) {
+      throw new InvalidFinalAnswerContractError(
+        'final_answer must be called alone without any other tool calls in the same turn'
+      );
+    }
+
     for (const call of bufferedToolCalls.values()) {
       if (call.toolName === 'code_exec') {
         const validated = validateCodeExecInput(call.args);
