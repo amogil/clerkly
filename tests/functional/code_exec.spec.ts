@@ -208,6 +208,70 @@ test.describe('code_exec tool_call rendering', () => {
     await expectNoToastError(window);
   });
 
+  /* Preconditions: authenticated app with one visible agent
+     Action: create persisted kind:tool_call code_exec with long unbroken input/output lines
+     Assertions: code_exec block adapts to chat width and does not introduce horizontal overflow
+     Exception Rationale (testing.3.13): this validates renderer layout behavior for persisted historical
+     code_exec payload and intentionally bypasses LLM transport.
+     Requirements: agents.4.10.1, agents.4.23, agents.7.4.6 */
+  test('should keep code_exec block within chat width without horizontal overflow', async () => {
+    await launchWithMockLLM();
+    const agentId = (await getAgentIdsFromApi(window))[0];
+    expect(agentId).toBeTruthy();
+
+    const longToken = 'abcdefghijklmnopqrstuvwxyz0123456789'.repeat(40);
+    const longCode = `const value="${longToken}";\\nconsole.log(value);`;
+    const longStdout = `${longToken}\\n${longToken}`;
+
+    await window.evaluate(
+      async ({ id, code, stdout }) => {
+        const api = (window as unknown as { api: any }).api;
+        const result = await api.messages.create(id, 'tool_call', {
+          data: {
+            callId: 'code-wrap-1',
+            toolName: 'code_exec',
+            arguments: {
+              code,
+              timeout_ms: 10000,
+            },
+            output: {
+              status: 'success',
+              stdout,
+              stderr: '',
+              stdout_truncated: false,
+              stderr_truncated: false,
+            },
+          },
+        });
+        if (!result?.success) {
+          throw new Error(result?.error || 'Failed to create code_exec tool_call');
+        }
+      },
+      { id: agentId as string, code: longCode, stdout: longStdout }
+    );
+
+    const codeExecBlock = window.locator('[data-testid="message-code-exec-block"]').last();
+    const input = window.locator('[data-testid="message-code-exec-block"]').last().locator('pre').first();
+    const stdout = window.locator('[data-testid="message-code-exec-stdout"]').last();
+
+    await expect(codeExecBlock).toBeVisible({ timeout: 5000 });
+    await expect(stdout).toContainText(longToken.slice(0, 20));
+
+    const messagesArea = window.locator('[data-testid="messages-area"]');
+    const blockWidth = await codeExecBlock.evaluate((el) => (el as HTMLElement).offsetWidth);
+    const messagesAreaWidth = await messagesArea.evaluate((el) => (el as HTMLElement).clientWidth);
+    const hasHorizontalScrollInInput = await input.evaluate((el) => el.scrollWidth > el.clientWidth + 1);
+    const hasHorizontalScrollInStdout = await stdout.evaluate(
+      (el) => el.scrollWidth > el.clientWidth + 1
+    );
+
+    expect(blockWidth).toBeLessThanOrEqual(messagesAreaWidth + 1);
+    expect(hasHorizontalScrollInInput).toBe(false);
+    expect(hasHorizontalScrollInStdout).toBe(false);
+
+    await expectNoToastError(window);
+  });
+
   /* Preconditions: authenticated app
      Action: create done code_exec tool_call as last message
      Assertions: agent status remains in-progress (not completed/error)
