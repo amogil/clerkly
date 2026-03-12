@@ -284,7 +284,8 @@ describe('MainPipeline.run()', () => {
     const textEvents = mockPublish.mock.calls
       .map((call: [unknown]) => call[0])
       .filter((e: unknown) => e instanceof MessageLlmTextUpdatedEvent);
-    expect(textEvents).toHaveLength(2);
+    expect(textEvents).toHaveLength(1);
+    expect((textEvents[0] as MessageLlmTextUpdatedEvent).delta).toBe('Hello back');
 
     expect(messageManager.setUsage).toHaveBeenCalledWith(
       2,
@@ -293,6 +294,116 @@ describe('MainPipeline.run()', () => {
         canonical: { input_tokens: 10, output_tokens: 5, total_tokens: 15 },
       })
     );
+  });
+
+  /* Preconditions: active stream receives multiple text chunks within one 100ms window
+     Action: run MainPipeline with fake timers and advance time step-by-step
+     Assertions: intermediate persisted updates are throttled to <=1 per 100ms and deltas are batched
+     Requirements: llm-integration.1.6.4, llm-integration.2.3.1, llm-integration.2.5.1, llm-integration.14.4 */
+  it('throttles intermediate llm updates and batches text deltas in 100ms window', async () => {
+    jest.useFakeTimers();
+    try {
+      const { pipeline, messageManager, llmProvider, mockPublish } = makeMocks();
+
+      llmProvider.chat.mockImplementation(
+        async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+          onChunk({ type: 'text', delta: 'A' });
+          await new Promise<void>((resolve) => setTimeout(resolve, 50));
+          onChunk({ type: 'text', delta: 'B' });
+          onChunk({ type: 'text', delta: 'C' });
+          await new Promise<void>((resolve) => setTimeout(resolve, 60));
+          return { text: 'ABC' };
+        }
+      );
+
+      const runPromise = pipeline.run('agent-1', 1);
+      await jest.advanceTimersByTimeAsync(49);
+
+      const inFlightUpdatesBeforeFlush = (messageManager.update as jest.Mock).mock.calls.filter(
+        (call: unknown[]) => call[3] === false
+      );
+      expect(inFlightUpdatesBeforeFlush).toHaveLength(0);
+
+      await jest.advanceTimersByTimeAsync(51);
+      await jest.runAllTimersAsync();
+      await runPromise;
+
+      const inFlightUpdates = (messageManager.update as jest.Mock).mock.calls.filter(
+        (call: unknown[]) => call[3] === false
+      );
+      expect(inFlightUpdates).toHaveLength(1);
+      expect((inFlightUpdates[0]?.[2] as { data?: { text?: string } }).data?.text).toBe('ABC');
+
+      const textEvents = mockPublish.mock.calls
+        .map((call: [unknown]) => call[0])
+        .filter((e: unknown) => e instanceof MessageLlmTextUpdatedEvent) as
+        | MessageLlmTextUpdatedEvent[]
+        | [];
+      expect(textEvents).toHaveLength(2);
+      expect(textEvents[0]?.delta).toBe('A');
+      expect(textEvents[1]?.delta).toBe('BC');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  /* Preconditions: text delta is buffered (<100ms since previous flush) and tool_call arrives
+     Action: run MainPipeline where tool_call boundary appears before timer-based flush
+     Assertions: pending llm buffer is force-flushed before persisted tool_call(running) creation
+     Requirements: llm-integration.1.6.4, llm-integration.2.3.1, llm-integration.11.1.2, llm-integration.11.1.5 */
+  it('force-flushes pending llm buffer before creating running tool_call', async () => {
+    jest.useFakeTimers();
+    try {
+      const { pipeline, llmProvider, messageManager } = makeMocks();
+
+      llmProvider.chat.mockImplementation(
+        async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+          onChunk({ type: 'text', delta: 'A' });
+          await new Promise<void>((resolve) => setTimeout(resolve, 10));
+          onChunk({ type: 'text', delta: 'B' });
+          onChunk({
+            type: 'tool_call',
+            callId: 'call-force-flush',
+            toolName: 'code_exec',
+            arguments: { code: "console.log('x')" },
+          });
+          onChunk({
+            type: 'tool_result',
+            callId: 'call-force-flush',
+            toolName: 'code_exec',
+            arguments: { code: "console.log('x')" },
+            output: { status: 'success', stdout: 'x\n', stderr: '' },
+            status: 'success',
+          });
+          return { text: 'AB' };
+        }
+      );
+
+      const runPromise = pipeline.run('agent-1', 1);
+      await jest.runAllTimersAsync();
+      await runPromise;
+
+      const updateMock = messageManager.update as jest.Mock;
+      const createMock = messageManager.create as jest.Mock;
+
+      const forcedFlushUpdateIndex = updateMock.mock.calls.findIndex(
+        (call: unknown[]) =>
+          call[3] === false &&
+          ((call[2] as { data?: { text?: string } })?.data?.text ?? '') === 'AB'
+      );
+      const runningToolCreateIndex = createMock.mock.calls.findIndex(
+        (call: unknown[]) => call[1] === 'tool_call' && call[4] === false
+      );
+
+      expect(forcedFlushUpdateIndex).toBeGreaterThanOrEqual(0);
+      expect(runningToolCreateIndex).toBeGreaterThanOrEqual(0);
+      expect(
+        updateMock.mock.invocationCallOrder[forcedFlushUpdateIndex] <
+          createMock.mock.invocationCallOrder[runningToolCreateIndex]
+      ).toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   /* Preconditions: reasoning chunk has glued bold markdown; display normalization must not affect persistence

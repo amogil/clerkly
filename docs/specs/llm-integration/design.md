@@ -299,7 +299,7 @@ CREATE TABLE messages (
 #### 1. Main process: получение ответа LLM
 1) `MainPipeline` получает streaming chunks от провайдера (`reasoning`, `text`).
 2) На первом meaningful chunk создаёт `kind: llm` (`done: 0`).
-3) На каждом чанке обновляет payload `kind: llm`.
+3) Во время активного стриминга буферизует изменения `reasoning/text` и обновляет payload `kind: llm` не чаще одного раза в 100ms.
 4) При получении полного `tool_call` выполняет schema/contract validation до persist; если в одном ответе модели обнаружено более одного `tool_call`, ответ помечается невалидным и уходит в retry/repair без persist.
 5) Для валидного `tool_call` откладывает persist до завершения текущей reasoning-фазы, затем финализирует текущий непустой LLM-сегмент и создаёт persisted `kind: tool_call` в `running` (`done: 0`).
 6) Не дожидаясь terminal `tool_result`, открывает post-tool LLM-сегмент для последующих reasoning/text чанков текущего ответа модели.
@@ -312,10 +312,19 @@ CREATE TABLE messages (
 1) Runtime-consumer использует единый stream-state контракт диалога.
 2) `IPCChatTransport` работает как protocol-adapter: транслирует realtime-события в `UIMessageChunk` sequence (`start -> start-step -> delta -> finish-step -> finish`).
 3) `message.llm.reasoning.updated` и `message.llm.text.updated` применяются как primary deltas.
-4) `message.updated` используется как snapshot persisted-состояния и финализации.
+4) `message.updated` используется как snapshot persisted-состояния и финализации; промежуточные snapshot-обновления отправляются batched (<=1/100ms), boundary-обновления отправляются немедленно после flush.
 5) `kind: tool_call` обрабатывается только через persisted snapshot (`message.created`/`message.updated`), включая промежуточный статус `running`.
 6) Визуальный порядок фиксируется каноническим `sequence` внутри `attemptId`, а не временем прихода события в renderer.
 7) Persisted payload включает `data.order = { runId, attemptId, sequence }`; renderer сортирует snapshots по этому ключу (с fallback на `timestamp,id` для legacy сообщений).
+
+#### 3. Batching streaming updates (100ms)
+1) `MainPipeline` ведёт общий буфер для `reasoning/text` deltas и накопленного persisted payload активного `kind: llm` сегмента.
+2) Промежуточный flush выполняется не чаще одного раза в 100ms.
+3) Один flush-цикл:
+   - делает один persisted upsert (`message.created` или `message.updated`) для текущего `kind: llm`;
+   - публикует batched `message.llm.reasoning.updated` и/или `message.llm.text.updated` (с объединёнными delta за окно).
+4) Принудительный flush выполняется до boundary-событий: `tool_call`, `tool_result`, финализация шага (`done`), `error`, `abort`.
+5) Гарантия порядка сохраняется: pre-tool `kind: llm` segment -> `kind: tool_call` (`running`) -> post-tool `kind: llm` segment.
 
 ### Крайние случаи
 
@@ -540,7 +549,7 @@ class MainPipeline {
 3. Создаёт экземпляр провайдера с актуальными настройками
 4. Собирает промпт через PromptBuilder
    - `const { messages, tools } = promptBuilder.build(history)`
-5. Инициализирует локальное состояние выполнения (`llmMessageId`, `accumulatedReasoning`, `accumulatedText`)
+5. Инициализирует локальное состояние выполнения (`llmMessageId`, `accumulatedReasoning`, `accumulatedText`, `pendingReasoningDelta`, `pendingTextDelta`, `lastFlushAt`)
 6. Вызывает `provider.chat(messages, { ...options, tools }, onChunk)` (провайдерная реализация использует `Vercel AI SDK`):
    onChunk(chunk):
      if llmMessageId == null:
@@ -548,12 +557,12 @@ class MainPipeline {
       эмитит `message.created`
     if chunk.type == 'reasoning':
       accumulatedReasoning += chunk.delta
-      обновляет `kind: llm` (`reasoning.text = accumulatedReasoning`, `done: false`)
-      эмитит `message.llm.reasoning.updated { delta, accumulatedText }`
+      pendingReasoningDelta += chunk.delta
+      запускает batched flush (не чаще 1 раза в 100ms)
     if chunk.type == 'text':
       accumulatedText += chunk.delta
-      обновляет `kind: llm` (`data.text = accumulatedText`, `done: false`)
-      эмитит `message.llm.text.updated { delta, accumulatedText }`
+      pendingTextDelta += chunk.delta
+      запускает batched flush (не чаще 1 раза в 100ms)
     if chunk.type == 'tool_call':
       собирает полный tool call и валидирует schema/contract
       если tool call валиден:
@@ -563,7 +572,12 @@ class MainPipeline {
         запускает выполнение инструмента (асинхронно, без блокировки post-tool text stream)
       если tool call невалиден:
         запускает retry/repair без создания persisted `kind: tool_call`
-    if llmMessageId уже существовал до этого чанка: эмитит `message.updated` (snapshot/consistency)
+    flush():
+      upsert `kind: llm` (`done: false`) через один persisted snapshot update
+      эмитит batched `message.llm.reasoning.updated { delta, accumulatedText }` и/или
+      batched `message.llm.text.updated { delta, accumulatedText }`
+    if boundary event (`tool_call`/`tool_result`/done/error/abort):
+      выполняет force-flush без ожидания 100ms
 7. Post-tool LLM-сегмент может продолжать стримиться, пока `tool_call` остаётся в `running`
 8. При завершении выполнения инструмента обновляет соответствующий persisted `kind: tool_call` до terminal-статуса (`success|error|timeout|cancelled`) и передаёт terminal-результат в следующий шаг `model`
 9. После успешного завершения `provider.chat(...)` финализирует текущий непустой LLM-сегмент (`done: true`) и сохраняет `usage_json` отдельным шагом
@@ -684,6 +698,7 @@ interface MessageLlmTextUpdatedPayload {
 - `message.llm.reasoning.updated` и `message.llm.text.updated` используются как primary source для delta-стриминга.
 - `message.updated` используется как snapshot source для persisted-состояния и финализации turn.
 - Во время активного стриминга runtime не должен повторно добавлять тот же контент из snapshot, уже применённый через delta-события.
+- Промежуточные delta/snapshot события для активного `kind: llm` сегмента публикуются batched не чаще одного раза в 100ms; boundary-события вызывают принудительный flush.
 
 События определены в `src/shared/events/types.ts` и `src/shared/events/constants.ts`, а доставка реализована в `MainEventBus`.
 
@@ -699,14 +714,19 @@ User отправляет сообщение
       → PromptBuilder.build(history) -> { messages, tools }
       → LLMProvider.chat(messages, { ...options, tools }, onChunk) // provider adapter over Vercel AI SDK
           → [reasoning chunk]
-              → MessageManager.create/update(kind: 'llm', done: false, reply_to_message_id: userMessageId)
-              → message.llm.reasoning.updated
-              → message.created (для первого чанка) / message.updated (для последующих чанков)
+              → enqueue в streaming buffer
+              → batched flush (<=1/100ms):
+                  MessageManager.create/update(kind: 'llm', done: false, reply_to_message_id: userMessageId)
+                  message.llm.reasoning.updated
+                  message.created (для первого flush) / message.updated (для последующих flush)
           → [text chunk]
-              → MessageManager.update(kind: 'llm', text, done: false)
-              → message.llm.text.updated
-              → message.updated
+              → enqueue в streaming buffer
+              → batched flush (<=1/100ms):
+                  MessageManager.update(kind: 'llm', text, done: false)
+                  message.llm.text.updated
+                  message.updated
           → [tool_call with full arguments, например `final_answer` или `code_exec`]
+              → force-flush streaming buffer
               → validate tool-call
               → finalize current non-empty llm segment
               → MessageManager.create(kind: 'tool_call', done: false, status: 'running')
@@ -722,6 +742,7 @@ User отправляет сообщение
               → persist usage_json
               → if final_answer exists in successful attempt: render as last visible artifact
       → [on error]
+          → force-flush streaming buffer (если есть pending изменения)
           → MessageManager.update(kind: 'llm', hidden: true, done: false) [если уже создан]
           → MessageManager.create(kind: 'error', done: true, reply_to_message_id: userMessageId)
           → message.updated / message.created
@@ -743,6 +764,7 @@ User отправляет сообщение
 - `tests/unit/agents/MainPipeline.test.ts` — integration guard: в `provider.chat` передаются schema-valid `ModelMessage[]` и связанная replay-пара `assistant(tool-call)` + `tool(tool-result)`
 - `tests/unit/agents/MainPipeline.test.ts` — порядок persist: `kind:tool_call(status=running)` фиксируется только после завершения pre-tool reasoning-сегмента и до post-tool llm сегмента; terminal приходит позже и обновляет тот же блок in-place
 - `tests/unit/agents/MainPipeline.test.ts` — отклонение ответа модели с `tool_calls.length > 1` (retry/repair без persist `tool_call`)
+- `tests/unit/agents/MainPipeline.test.ts` — 100ms batching streaming updates: промежуточные flush не чаще 1/100ms, force-flush на `tool_call/tool_result/done/error/abort`, без потери accumulated delta
 - `tests/unit/agents/AgentIPCHandlers.test.ts` — запуск pipeline при kind:user
 - `tests/unit/renderer/IPCChatTransport.test.ts` — обработка delta-stream (`reasoning/text`) и persisted `kind: tool_call` snapshot
 - `tests/unit/renderer/messageOrder.test.ts` — детерминированная сортировка snapshots по `data.order.{runId,attemptId,sequence}` с fallback на `timestamp,id`
@@ -787,6 +809,7 @@ User отправляет сообщение
 | llm-integration.1.6.1 | ✓ | ✓ |
 | llm-integration.1.6.2 | ✓ | ✓ |
 | llm-integration.1.6.3 | ✓ | ✓ |
+| llm-integration.1.6.4 | ✓ | ✓ |
 | llm-integration.1.7 | ✓ | ✓ |
 | llm-integration.1.8 | ✓ | ✓ |
 | llm-integration.2 | ✓ | ✓ |
@@ -796,8 +819,11 @@ User отправляет сообщение
 | llm-integration.2.1.3 | ✓ | ✓ |
 | llm-integration.2.2 | ✓ | ✓ |
 | llm-integration.2.3 | ✓ | ✓ |
+| llm-integration.2.3.1 | ✓ | ✓ |
 | llm-integration.2.4 | ✓ | ✓ |
+| llm-integration.2.4.1 | ✓ | ✓ |
 | llm-integration.2.5 | ✓ | ✓ |
+| llm-integration.2.5.1 | ✓ | ✓ |
 | llm-integration.2.6 | ✓ | ✓ |
 | llm-integration.2.6.1 | ✓ | ✓ |
 | llm-integration.2.7 | ✓ | ✓ |
@@ -932,6 +958,7 @@ User отправляет сообщение
 | llm-integration.14.1 | ✓ | ✓ |
 | llm-integration.14.2 | ✓ | ✓ |
 | llm-integration.14.3 | ✓ | ✓ |
+| llm-integration.14.4 | ✓ | ✓ |
 | llm-integration.15 | ✓ | - |
 | llm-integration.15.1 | ✓ | - |
 | llm-integration.15.2 | ✓ | - |

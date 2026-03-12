@@ -61,6 +61,7 @@ type StreamProcessingResult = {
 const FINAL_ANSWER_RETRY_EXHAUSTED_MESSAGE =
   'Model returned invalid tool call arguments too many times. Please try again later.';
 const MAX_INVALID_TOOL_CALL_RETRIES = 2;
+const STREAM_FLUSH_INTERVAL_MS = 100;
 
 class InvalidFinalAnswerContractError extends Error {
   constructor(message: string) {
@@ -104,7 +105,7 @@ export type LLMErrorType =
  * - Build prompt via PromptBuilder
  * - Call ILLMProvider.chat() with streaming
  * - Create/update kind:llm messages via MessageManager
- * - Emit message.llm.reasoning.updated + message.updated on each reasoning chunk
+ * - Emit batched message.llm.reasoning.updated/message.llm.text.updated + message.updated
  * - Handle errors: create kind:error message
  * - Handle AbortSignal cancellation
  *
@@ -291,6 +292,11 @@ export class MainPipeline {
         sequence: ++sequence,
       });
       let currentSegment: LlmSegmentState = { id: null, reasoning: '', text: '', order: null };
+      let pendingReasoningDelta = '';
+      let pendingTextDelta = '';
+      let pendingFirstType: 'reasoning' | 'text' | null = null;
+      let lastFlushAt = 0;
+      let flushTimer: ReturnType<typeof setTimeout> | null = null;
       let finalLlmMessageId: number | null = null;
       let toolCallsInCurrentStep = 0;
       let sawAnyToolCall = false;
@@ -298,7 +304,98 @@ export class MainPipeline {
       let finalAnswerOrder: MessageOrderMeta | null = null;
       let meaningfulChunkSeen = false;
 
+      const clearFlushTimer = (): void => {
+        if (flushTimer) {
+          clearTimeout(flushTimer);
+          flushTimer = null;
+        }
+      };
+
+      const flushBufferedLlmSegment = (): void => {
+        if (!pendingReasoningDelta && !pendingTextDelta) {
+          return;
+        }
+
+        currentSegment.id = this.upsertLlmSegment(
+          currentSegment,
+          agentId,
+          context.replyToMessageId,
+          context.options.model,
+          nextOrder,
+          setLastLlmMessageId,
+          attemptMessageIds
+        );
+
+        const emitReasoning = (): void => {
+          if (!pendingReasoningDelta) return;
+          MainEventBus.getInstance().publish(
+            new MessageLlmReasoningUpdatedEvent(
+              currentSegment.id as number,
+              agentId,
+              pendingReasoningDelta,
+              currentSegment.reasoning
+            )
+          );
+        };
+        const emitText = (): void => {
+          if (!pendingTextDelta) return;
+          MainEventBus.getInstance().publish(
+            new MessageLlmTextUpdatedEvent(
+              currentSegment.id as number,
+              agentId,
+              pendingTextDelta,
+              currentSegment.text
+            )
+          );
+        };
+
+        if (pendingFirstType === 'text') {
+          emitText();
+          emitReasoning();
+        } else {
+          emitReasoning();
+          emitText();
+        }
+
+        pendingReasoningDelta = '';
+        pendingTextDelta = '';
+        pendingFirstType = null;
+        lastFlushAt = Date.now();
+      };
+
+      const scheduleLlmFlush = (force: boolean = false): void => {
+        if (!pendingReasoningDelta && !pendingTextDelta) {
+          return;
+        }
+
+        if (force) {
+          clearFlushTimer();
+          flushBufferedLlmSegment();
+          return;
+        }
+
+        const now = Date.now();
+        const elapsedSinceLastFlush = now - lastFlushAt;
+        if (lastFlushAt === 0 || elapsedSinceLastFlush >= STREAM_FLUSH_INTERVAL_MS) {
+          clearFlushTimer();
+          flushBufferedLlmSegment();
+          return;
+        }
+
+        if (!flushTimer) {
+          const delayMs = STREAM_FLUSH_INTERVAL_MS - elapsedSinceLastFlush;
+          flushTimer = setTimeout(
+            () => {
+              flushTimer = null;
+              flushBufferedLlmSegment();
+            },
+            Math.max(1, delayMs)
+          );
+        }
+      };
+
       const flushPendingToolCall = (): void => {
+        scheduleLlmFlush(true);
         if (!pendingToolCall) {
           return;
         }
@@ -312,6 +409,11 @@ export class MainPipeline {
           setLastLlmMessageId(finalLlmMessageId);
         }
         currentSegment = { id: null, reasoning: '', text: '', order: null };
+        pendingReasoningDelta = '';
+        pendingTextDelta = '';
+        pendingFirstType = null;
+        lastFlushAt = 0;
+        clearFlushTimer();
 
         const payloadData: Record<string, unknown> = {
           callId: pendingToolCall.callId,
@@ -358,23 +460,11 @@ export class MainPipeline {
               }
               meaningfulChunkSeen = true;
               currentSegment.reasoning += chunk.delta;
-              currentSegment.id = this.upsertLlmSegment(
-                currentSegment,
-                agentId,
-                context.replyToMessageId,
-                context.options.model,
-                nextOrder,
-                setLastLlmMessageId,
-                attemptMessageIds
-              );
-              MainEventBus.getInstance().publish(
-                new MessageLlmReasoningUpdatedEvent(
-                  currentSegment.id,
-                  agentId,
-                  chunk.delta,
-                  currentSegment.reasoning
-                )
-              );
+              if (!pendingFirstType) {
+                pendingFirstType = 'reasoning';
+              }
+              pendingReasoningDelta += chunk.delta;
+              scheduleLlmFlush();
               return;
             }
 
@@ -383,30 +473,21 @@ export class MainPipeline {
                 return;
               }
               meaningfulChunkSeen = true;
-              flushPendingToolCall();
+              if (pendingToolCall) {
+                flushPendingToolCall();
+              }
               currentSegment.text += chunk.delta;
-              currentSegment.id = this.upsertLlmSegment(
-                currentSegment,
-                agentId,
-                context.replyToMessageId,
-                context.options.model,
-                nextOrder,
-                setLastLlmMessageId,
-                attemptMessageIds
-              );
-              MainEventBus.getInstance().publish(
-                new MessageLlmTextUpdatedEvent(
-                  currentSegment.id,
-                  agentId,
-                  chunk.delta,
-                  currentSegment.text
-                )
-              );
+              if (!pendingFirstType) {
+                pendingFirstType = 'text';
+              }
+              pendingTextDelta += chunk.delta;
+              scheduleLlmFlush();
               return;
             }
 
             if (chunk.type === 'tool_call') {
               meaningfulChunkSeen = true;
+              scheduleLlmFlush(true);
               sawAnyToolCall = true;
               toolCallsInCurrentStep += 1;
               if (toolCallsInCurrentStep > 1) {
@@ -435,6 +516,7 @@ export class MainPipeline {
 
             if (chunk.type === 'tool_result') {
               meaningfulChunkSeen = true;
+              scheduleLlmFlush(true);
               toolCallsInCurrentStep = 0;
               if (pendingToolCall && pendingToolCall.callId === chunk.callId) {
                 flushPendingToolCall();

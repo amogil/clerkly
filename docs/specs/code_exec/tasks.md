@@ -49,6 +49,8 @@
 - ✅ Добавлены unit-тесты `MainPipeline` на отсутствие persist `tool_call` при invalid args и на retry-feedback в последующие provider-вызовы.
 - ✅ Добавлены unit-тесты для `scripts/inject-oauth-client-secret.js` (env, `.env` fallback, non-strict pass-through, strict fail-fast, placeholder warning).
 - ✅ Синхронизированы `llm-integration/code_exec/google-oauth-auth` requirements/design и coverage-матрицы с новым контрактом.
+- ✅ В `MainPipeline` реализован 100ms batching для streaming `kind: llm` (persisted `message.updated` + delta-события) с force-flush на boundary-событиях (`tool_call/tool_result/done/error/abort`).
+- ✅ Добавлены плотные unit-тесты `MainPipeline` на throttling/buffering без потери данных и без нарушения порядка pre-tool/tool/post-tool.
 
 ### В Работе
 - 🔄 Ожидает отдельного запуска полного `npm run test:functional` по подтверждению пользователя.
@@ -160,6 +162,7 @@
 - ✅ Сохранён контракт retry/repair (`maxRetries=2`) без persist `tool_call` для невалидных аргументов.
 - ✅ Сохранён контракт hidden-attempt (скрытие сообщений неуспешной попытки).
 - ✅ Добавлены/актуализированы unit/functional тесты для `final_answer` порядка и mid-tool аварийных сценариев.
+- ✅ Добавлен контракт batched streaming updates (не чаще 1 раза в 100ms) с force-flush на boundary и синхронизацией `llm-integration requirements/design`.
 
 ### Осталось
 
