@@ -126,7 +126,7 @@ class WindowManager {
       y: windowState.y,
       width: windowState.width,
       height: windowState.height,
-      title: '', // Requirements: window-management.2.1
+      title: 'Clerkly', // Requirements: window-management.2.1
       show: false,
       resizable: true, // Requirements: window-management.1.3
       
@@ -211,7 +211,7 @@ class WindowManager {
 - Добавлена зависимость от `WindowStateManager`
 - Метод `createWindow()` теперь загружает сохраненное состояние
 - Добавлены методы для отслеживания и сохранения состояния окна
-- Пустой заголовок окна (`title: ''`)
+- Заголовок окна `Clerkly` (`title: 'Clerkly'`)
 - Применение состояния maximized после создания окна
 
 ### Обработка Внешних Ссылок (window-management.7)
@@ -432,9 +432,9 @@ interface WindowState {
 
 **Validates: Requirements window-management.1.3, window-management.1.4**
 
-### Property 3: Окно имеет пустой заголовок
+### Property 3: Окно имеет заголовок приложения
 
-*Для любого* созданного главного окна, заголовок окна должен быть пустой строкой (`title: ''`).
+*Для любого* созданного главного окна, заголовок окна должен быть строкой `Clerkly` (`title: 'Clerkly'`).
 
 **Validates: Requirements window-management.2.1**
 
@@ -628,7 +628,7 @@ console.error('Failed to create window:', errorMessage);
 describe('WindowManager', () => {
   /* Preconditions: WindowManager created with DatabaseManager mock
      Action: call createWindow()
-     Assertions: window created with empty title, default titleBarStyle, not fullscreen
+     Assertions: window created with title Clerkly, default titleBarStyle, not fullscreen
      Requirements: window-management.1, window-management.2, window-management.3 */
   it('should create window with correct initial configuration', () => {
     // Тест создания окна с корректной конфигурацией
@@ -722,7 +722,7 @@ describe('WindowStateManager', () => {
 describe('Window Management Functional Tests', () => {
   /* Preconditions: fresh application start, no saved state
      Action: launch application, verify window state
-     Assertions: window opens with size min(900, screenWidth) x min(800, screenHeight), not maximized, has empty title, uses native macOS controls
+     Assertions: window opens with size min(900, screenWidth) x min(800, screenHeight), not maximized, has Clerkly title, uses native macOS controls
      Requirements: window-management.1.1, window-management.1.2, window-management.2.1, window-management.3.1 */
   it('should open application with correct initial window state', async () => {
     // Запустить приложение
@@ -742,8 +742,8 @@ describe('Window Management Functional Tests', () => {
     // Проверить, что НЕ maximized
     expect(window.isMaximized()).toBe(false);
     
-    // Проверить пустой заголовок
-    expect(window.getTitle()).toBe('');
+    // Проверить заголовок приложения
+    expect(window.getTitle()).toBe('Clerkly');
     
     // Проверить, что не в fullscreen
     expect(window.isFullScreen()).toBe(false);

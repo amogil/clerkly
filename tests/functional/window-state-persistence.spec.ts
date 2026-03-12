@@ -316,9 +316,9 @@ test.describe('Window State Persistence', () => {
 
   /* Preconditions: Application not running
      Action: Launch application and check window title
-     Assertions: Window title is empty string
+     Assertions: Window title is Clerkly
      Requirements: window-management.2.1, window-management.2.2 */
-  test('should have empty window title', async () => {
+  test('should have Clerkly window title', async () => {
     // Launch the application
     context = await launchElectron();
     await context.window.waitForLoadState('domcontentloaded');
@@ -326,9 +326,9 @@ test.describe('Window State Persistence', () => {
     // Get window title
     const title = await context.window.title();
 
-    // Verify title is empty
+    // Verify title
     // Requirements: window-management.2.1
-    expect(title).toBe('');
+    expect(title).toBe('Clerkly');
 
     // Also verify through Electron API
     const electronTitle = await context.app.evaluate(({ BrowserWindow }) => {
@@ -336,13 +336,13 @@ test.describe('Window State Persistence', () => {
       return window ? window.getTitle() : null;
     });
 
-    // Requirements: window-management.2.2 - Should NOT display application name
-    expect(electronTitle).toBe('');
+    // Requirements: window-management.2.2 - Should display application name
+    expect(electronTitle).toBe('Clerkly');
 
     console.log(`Window title: "${title}"`);
 
     // Take screenshot
-    await context.window.screenshot({ path: 'playwright-report/window-empty-title.png' });
+    await context.window.screenshot({ path: 'playwright-report/window-clerkly-title.png' });
   });
 
   /* Preconditions: Application not running

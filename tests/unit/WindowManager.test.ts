@@ -119,7 +119,7 @@ describe('WindowManager', () => {
       expect(BrowserWindow).toHaveBeenCalledTimes(1);
       expect(BrowserWindow).toHaveBeenCalledWith(
         expect.objectContaining({
-          title: '', // Requirements: window-management.2.1
+          title: 'Clerkly', // Requirements: window-management.2.1
           show: false,
           resizable: true, // Requirements: window-management.1.3
           titleBarStyle: 'default', // Requirements: window-management.3.1

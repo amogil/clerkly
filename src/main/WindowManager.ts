@@ -30,7 +30,7 @@ interface WindowOptions {
 
   /**
    * Window title text
-   * @remarks Default is empty string for minimalist interface (window-management.2.1)
+   * @remarks Default is 'Clerkly' (window-management.2.1)
    */
   title?: string;
 
@@ -63,7 +63,7 @@ interface WindowOptions {
  * @remarks
  * Window Features:
  * - Native macOS window controls and title bar (window-management.3.1)
- * - Empty title for minimalist interface (window-management.2.1)
+ * - Application title 'Clerkly' (window-management.2.1)
  * - Maximized by default on first launch (window-management.1.1)
  * - Not fullscreen - preserves system elements (window-management.1.2)
  * - Resizable by user (window-management.1.3)
@@ -136,7 +136,7 @@ class WindowManager {
    * - Loads saved window state (position, size, maximized) from database
    * - Opens with compact size min(900, screenWidth) x min(800, screenHeight) by default (first launch or no saved state)
    * - Uses native macOS window controls and title bar style
-   * - Has empty title for minimalist interface
+   * - Has application title 'Clerkly'
    * - Adapts to screen size (no hardcoded dimensions)
    * - Automatically tracks and saves state changes
    * - Validates saved position is within available screens
@@ -148,7 +148,7 @@ class WindowManager {
    *
    * @remarks
    * Window Configuration:
-   * - title: '' - Empty title for clean interface (window-management.2.1)
+   * - title: 'Clerkly' - Application title (window-management.2.1)
    * - titleBarStyle: 'default' - Native macOS controls (window-management.3.1)
    * - Position and size from saved state or screen-based defaults (window-management.4.1, window-management.4.2, window-management.5.4, window-management.5.5)
    * - Compact size min(900, screenWidth) x min(800, screenHeight) on first launch (window-management.1.1, window-management.4.2)
@@ -189,7 +189,7 @@ class WindowManager {
         height: windowState.height,
         minWidth: 350, // Requirements: window-management.1.6
         minHeight: 650, // Requirements: window-management.1.6
-        title: '', // Requirements: window-management.2.1
+        title: 'Clerkly', // Requirements: window-management.2.1
         show: false,
         resizable: true, // Requirements: window-management.1.3
         titleBarStyle: 'default', // Requirements: window-management.3.1
