@@ -251,7 +251,11 @@ test.describe('code_exec tool_call rendering', () => {
     );
 
     const codeExecBlock = window.locator('[data-testid="message-code-exec-block"]').last();
-    const input = window.locator('[data-testid="message-code-exec-block"]').last().locator('pre').first();
+    const input = window
+      .locator('[data-testid="message-code-exec-block"]')
+      .last()
+      .locator('pre')
+      .first();
     const stdout = window.locator('[data-testid="message-code-exec-stdout"]').last();
 
     await expect(codeExecBlock).toBeVisible({ timeout: 5000 });
@@ -260,7 +264,9 @@ test.describe('code_exec tool_call rendering', () => {
     const messagesArea = window.locator('[data-testid="messages-area"]');
     const blockWidth = await codeExecBlock.evaluate((el) => (el as HTMLElement).offsetWidth);
     const messagesAreaWidth = await messagesArea.evaluate((el) => (el as HTMLElement).clientWidth);
-    const hasHorizontalScrollInInput = await input.evaluate((el) => el.scrollWidth > el.clientWidth + 1);
+    const hasHorizontalScrollInInput = await input.evaluate(
+      (el) => el.scrollWidth > el.clientWidth + 1
+    );
     const hasHorizontalScrollInStdout = await stdout.evaluate(
       (el) => el.scrollWidth > el.clientWidth + 1
     );

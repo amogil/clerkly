@@ -193,7 +193,10 @@ export async function closeElectron(
     await Promise.race([
       context.app.close(),
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error(`Timed out closing Electron app after ${closeTimeoutMs}ms`)), closeTimeoutMs)
+        setTimeout(
+          () => reject(new Error(`Timed out closing Electron app after ${closeTimeoutMs}ms`)),
+          closeTimeoutMs
+        )
       ),
     ]);
   } catch (error) {
