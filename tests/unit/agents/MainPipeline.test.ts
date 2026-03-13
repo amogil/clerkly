@@ -690,6 +690,7 @@ describe('MainPipeline.run()', () => {
     const meaninglessUser = makeMessage(1, 'user');
     meaninglessUser.payloadJson = JSON.stringify({ data: { text: '...' } });
     (messageManager.list as jest.Mock).mockReturnValue([meaninglessUser]);
+    (messageManager.listForModelHistory as jest.Mock).mockReturnValue([meaninglessUser]);
 
     llmProvider.chat.mockImplementation(
       async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
@@ -726,7 +727,9 @@ describe('MainPipeline.run()', () => {
     user3.payloadJson = JSON.stringify({ data: { text: 'follow up two' } });
     const user4 = makeMessage(13, 'user');
     user4.payloadJson = JSON.stringify({ data: { text: 'follow up three' } });
-    (messageManager.list as jest.Mock).mockReturnValue([user1, llmPast, user2, user3, user4]);
+    const snapshot = [user1, llmPast, user2, user3, user4];
+    (messageManager.list as jest.Mock).mockReturnValue(snapshot);
+    (messageManager.listForModelHistory as jest.Mock).mockReturnValue(snapshot);
     agentTitleUpdater.getCurrentTitle.mockReturnValue('Sprint backlog planning');
 
     llmProvider.chat.mockImplementation(
@@ -770,6 +773,7 @@ describe('MainPipeline.run()', () => {
     const invalidUser = makeMessage(1, 'user');
     invalidUser.payloadJson = '{ invalid';
     (messageManager.list as jest.Mock).mockReturnValue([invalidUser]);
+    (messageManager.listForModelHistory as jest.Mock).mockReturnValue([invalidUser]);
     agentTitleUpdater.getCurrentTitle.mockReturnValue('New Agent');
 
     llmProvider.chat.mockImplementation(
@@ -809,6 +813,7 @@ describe('MainPipeline.run()', () => {
     user4.payloadJson = JSON.stringify({ data: { text: 'follow up three' } });
     const snapshot = [user1, llmPast, user2, user3, user4];
     (messageManager.list as jest.Mock).mockReturnValue(snapshot);
+    (messageManager.listForModelHistory as jest.Mock).mockReturnValue(snapshot);
     agentTitleUpdater.getCurrentTitle.mockReturnValue('Sprint backlog planning');
 
     llmProvider.chat.mockImplementation(

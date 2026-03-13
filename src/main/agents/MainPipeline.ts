@@ -67,6 +67,7 @@ type MessageOrderMeta = {
 type StreamProcessingResult = {
   output: LLMChatResult;
   finalLlmMessageId: number | null;
+  finalLlmPayload: Record<string, unknown> | null;
   activeLlmMessageId: number | null;
   finalAnswerCall: { callId: string; args: Record<string, unknown> } | null;
   finalAnswerOrder: MessageOrderMeta | null;
@@ -237,6 +238,7 @@ export class MainPipeline {
   ): Promise<{
     provider: LLMProvider;
     apiKey: string;
+    historyMessages: Message[];
     baseChatMessages: ReturnType<PromptBuilder['buildMessages']>;
     options: ChatOptions;
     replyToMessageId: number;
@@ -272,7 +274,15 @@ export class MainPipeline {
     };
     const llmProvider = this.createProvider(provider, apiKey);
 
-    return { provider, apiKey, baseChatMessages, options, replyToMessageId, llmProvider };
+    return {
+      provider,
+      apiKey,
+      historyMessages: messages,
+      baseChatMessages,
+      options,
+      replyToMessageId,
+      llmProvider,
+    };
   }
 
   /**
@@ -281,6 +291,7 @@ export class MainPipeline {
    */
   private async executeWithRetries(
     context: {
+      historyMessages: Message[];
       baseChatMessages: ReturnType<PromptBuilder['buildMessages']>;
       options: ChatOptions;
       replyToMessageId: number;
@@ -326,11 +337,20 @@ export class MainPipeline {
         streamResult.finalAnswerOrder
       );
     }
+    const messagesForAutoTitle = this.extendHistorySnapshotWithFinalLlm(
+      context.historyMessages,
+      agentId,
+      context.replyToMessageId,
+      streamResult.finalLlmMessageId,
+      streamResult.finalLlmPayload
+    );
     this.applyAutoTitleCandidate(
       agentId,
       userMessageId,
       streamResult.titleCandidate,
-      streamResult.finalLlmMessageId
+      streamResult.finalLlmMessageId,
+      streamResult.finalLlmPayload,
+      messagesForAutoTitle
     );
     this.publishStepDiagnostics(agentId, userMessageId, streamResult.output);
     this.logger.info(`Pipeline completed for agent ${agentId}`);
@@ -833,6 +853,7 @@ export class MainPipeline {
       state.currentSegment.text = output.text;
     }
 
+    let finalLlmPayload: Record<string, unknown> | null = null;
     const finalizedSegmentId = this.finalizeLlmSegmentIfNonEmpty(
       state.currentSegment,
       agentId,
@@ -841,17 +862,35 @@ export class MainPipeline {
     if (finalizedSegmentId !== null) {
       state.finalLlmMessageId = finalizedSegmentId;
       setLastLlmMessageId(finalizedSegmentId);
+      finalLlmPayload = {
+        data: {
+          model: context.options.model,
+          reasoning: state.currentSegment.reasoning
+            ? { text: state.currentSegment.reasoning, excluded_from_replay: true }
+            : undefined,
+          text: state.currentSegment.text || undefined,
+          order: state.currentSegment.order ?? undefined,
+        },
+      };
     } else if (typeof output.text === 'string' && output.text.trim().length > 0) {
+      const fallbackOrder = this.nextOrder(cycleState.runId, attemptId, state);
       const msg = this.createCompletedLlmMessage(
         agentId,
         context.replyToMessageId,
         context.options.model,
         output.text,
-        this.nextOrder(cycleState.runId, attemptId, state)
+        fallbackOrder
       );
       state.attemptMessageIds.add(msg.id);
       state.finalLlmMessageId = msg.id;
       setLastLlmMessageId(msg.id);
+      finalLlmPayload = {
+        data: {
+          model: context.options.model,
+          text: output.text,
+          order: fallbackOrder,
+        },
+      };
     }
 
     if (state.finalAnswerCall) {
@@ -862,6 +901,7 @@ export class MainPipeline {
       return {
         output,
         finalLlmMessageId: state.finalLlmMessageId,
+        finalLlmPayload,
         activeLlmMessageId: state.currentSegment.id,
         finalAnswerCall: state.finalAnswerCall,
         finalAnswerOrder: state.finalAnswerOrder,
@@ -883,6 +923,7 @@ export class MainPipeline {
     return {
       output,
       finalLlmMessageId: state.finalLlmMessageId,
+      finalLlmPayload,
       activeLlmMessageId: state.currentSegment.id,
       finalAnswerCall: state.finalAnswerCall,
       finalAnswerOrder: state.finalAnswerOrder,
@@ -1027,14 +1068,15 @@ export class MainPipeline {
     agentId: string,
     userMessageId: number,
     candidate: string | null,
-    sourceLlmMessageId: number | null
+    sourceLlmMessageId: number | null,
+    sourceLlmPayload: Record<string, unknown> | null,
+    messagesSnapshot: Message[]
   ): void {
     if (!candidate || !this.agentTitleUpdater) {
       return;
     }
 
     try {
-      const allMessages = this.messageManager.list(agentId);
       const normalizedCandidate = normalizeAgentTitleCandidate(candidate);
       if (!normalizedCandidate) {
         this.logger.debug(`Auto-title skipped for agent ${agentId}: invalid candidate`);
@@ -1048,7 +1090,8 @@ export class MainPipeline {
 
       const shouldEnforceMeaningfulFirstRename = this.isDefaultAgentTitle(currentTitle);
       if (shouldEnforceMeaningfulFirstRename) {
-        const triggerMessage = allMessages.find((message) => message.id === userMessageId) ?? null;
+        const triggerMessage =
+          messagesSnapshot.find((message) => message.id === userMessageId) ?? null;
         if (!this.isMeaningfulUserMessage(triggerMessage)) {
           this.logger.debug(
             `Auto-title skipped for agent ${agentId}: first rename requires meaningful user message`
@@ -1057,10 +1100,10 @@ export class MainPipeline {
         }
       }
 
-      const userTurn = this.getUserTurnCount(allMessages);
+      const userTurn = this.getUserTurnCount(messagesSnapshot);
       const lastRenameUserTurn = this.getLastRenameUserTurnFromHistory(
         agentId,
-        allMessages,
+        messagesSnapshot,
         sourceLlmMessageId
       );
       const guardDecision = evaluateAgentTitleGuards({
@@ -1077,7 +1120,7 @@ export class MainPipeline {
       }
 
       this.agentTitleUpdater.rename(agentId, normalizedCandidate);
-      this.markAutoTitleApplied(agentId, sourceLlmMessageId, normalizedCandidate);
+      this.markAutoTitleApplied(agentId, sourceLlmMessageId, sourceLlmPayload, normalizedCandidate);
     } catch (error) {
       this.logger.warn(
         `Auto-title failed for agent ${agentId}: ${error instanceof Error ? error.message : String(error)}`
@@ -1175,25 +1218,19 @@ export class MainPipeline {
   private markAutoTitleApplied(
     agentId: string,
     sourceLlmMessageId: number | null,
+    sourceLlmPayload: Record<string, unknown> | null,
     appliedTitle: string
   ): void {
-    if (sourceLlmMessageId === null) {
+    if (sourceLlmMessageId === null || !sourceLlmPayload) {
       return;
     }
 
     try {
-      const sourceMessage =
-        this.messageManager.list(agentId).find((message) => message.id === sourceLlmMessageId) ??
-        null;
-      if (!sourceMessage) {
-        return;
-      }
-      const payload = JSON.parse(sourceMessage.payloadJson) as {
-        data?: Record<string, unknown>;
-      };
       const data =
-        payload.data && typeof payload.data === 'object' && !Array.isArray(payload.data)
-          ? payload.data
+        sourceLlmPayload.data &&
+        typeof sourceLlmPayload.data === 'object' &&
+        !Array.isArray(sourceLlmPayload.data)
+          ? (sourceLlmPayload.data as Record<string, unknown>)
           : {};
       data.auto_title_applied = true;
       data.auto_title_applied_title = appliedTitle;
@@ -1201,7 +1238,7 @@ export class MainPipeline {
         sourceLlmMessageId,
         agentId,
         {
-          ...payload,
+          ...sourceLlmPayload,
           data,
         },
         true
@@ -1232,6 +1269,34 @@ export class MainPipeline {
     } catch {
       return null;
     }
+  }
+
+  // Requirements: llm-integration.16.10
+  private extendHistorySnapshotWithFinalLlm(
+    baseHistory: Message[],
+    agentId: string,
+    replyToMessageId: number,
+    finalLlmMessageId: number | null,
+    finalLlmPayload: Record<string, unknown> | null
+  ): Message[] {
+    if (finalLlmMessageId === null || !finalLlmPayload) {
+      return baseHistory;
+    }
+
+    return [
+      ...baseHistory,
+      {
+        id: finalLlmMessageId,
+        agentId,
+        kind: 'llm',
+        timestamp: new Date().toISOString(),
+        payloadJson: JSON.stringify(finalLlmPayload),
+        usageJson: null,
+        replyToMessageId,
+        hidden: false,
+        done: true,
+      },
+    ];
   }
 
   /**

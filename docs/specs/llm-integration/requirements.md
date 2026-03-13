@@ -631,7 +631,9 @@
 16.10. Перед применением rename система ДОЛЖНА выполнять anti-flapping guards:
   - exact-match guard на нормализованных строках;
   - семантический guard по Jaccard similarity токенов (threshold `0.7`);
-  - cooldown guard: не чаще одного rename за 5 user-turns для одного агента.
+  - cooldown guard: не чаще одного rename за 5 user-turns для одного агента;
+  - cooldown replay ДОЛЖЕН учитывать только успешно применённые rename (не просто наличие comment в тексте ответа);
+  - initial-rename guard: ПОКА текущий заголовок агента равен `New Agent`, auto-rename ДОЛЖЕН выполняться только если triggering user-message является meaningful (не менее 3 буквенно-цифровых символов).
 
 16.11. Применение валидного candidate title ДОЛЖНО выполняться через существующий путь обновления агента (`AgentManager.update(...)`) с публикацией стандартного `agent.updated`.
 
