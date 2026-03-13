@@ -82,9 +82,11 @@ Clerkly - это Electron-приложение для Mac OS X, представ
 
 1.5. Clerkly ДОЛЖНО использовать Node.js версии 18 или выше
 
+1.6. Clerkly ДОЛЖНО включать кастомную иконку приложения для macOS (Finder, Dock, Launchpad), собранную из статичной версии логотипа Clerkly с экрана логина
+
 **Примечание:** Требования к пользовательскому интерфейсу и нативным элементам Mac OS X описаны в спецификации `docs/specs/ui/requirements.md`
 
-**Тестируемость:** Да - через модульные тесты компонентов "DatabaseManager", "UserSettingsManager", "Lifecycle Manager", проверку версий зависимостей в package.json, функциональные тесты запуска приложения
+**Тестируемость:** Да - через модульные тесты компонентов "DatabaseManager", "UserSettingsManager", "Lifecycle Manager", проверку версий зависимостей в package.json, проверку конфигурации `electron-builder` и наличия `assets/icon.icns`, функциональные тесты запуска приложения
 
 #### Функциональные Тесты
 

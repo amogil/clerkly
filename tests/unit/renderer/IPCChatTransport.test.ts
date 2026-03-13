@@ -521,6 +521,102 @@ describe('IPCChatTransport', () => {
       expect(types).toContain('finish');
     });
 
+    /* Preconditions: one user request produces pre-tool llm segment, tool_call, and post-tool llm segment
+       Action: emit events for llm#1(done) -> tool_call(created) -> llm#2(stream+done)
+       Assertions: transport keeps one stream and emits two steps without protocol error
+       Requirements: llm-integration.11.1.3, llm-integration.11.1.5 */
+    it('should support multiple llm segments in one stream when tool_call splits pre and post text', async () => {
+      const streamPromise = transport.sendMessages(makeSendOptions());
+      await Promise.resolve();
+
+      emitEvent(EVENT_TYPES.MESSAGE_CREATED, {
+        message: {
+          id: 1201,
+          agentId: 'agent-1',
+          kind: 'llm',
+          timestamp: Date.now(),
+          payload: { data: {} },
+          hidden: false,
+          done: false,
+        },
+        timestamp: Date.now(),
+      });
+      emitEvent(EVENT_TYPES.MESSAGE_LLM_TEXT_UPDATED, {
+        messageId: 1201,
+        agentId: 'agent-1',
+        delta: 'pre',
+        accumulatedText: 'pre',
+        timestamp: Date.now(),
+      });
+      emitEvent(EVENT_TYPES.MESSAGE_UPDATED, {
+        message: {
+          id: 1201,
+          agentId: 'agent-1',
+          kind: 'llm',
+          timestamp: Date.now(),
+          payload: { data: { text: 'pre' } },
+          hidden: false,
+          done: true,
+        },
+        timestamp: Date.now(),
+      });
+
+      emitEvent(EVENT_TYPES.MESSAGE_CREATED, {
+        message: {
+          id: 2201,
+          agentId: 'agent-1',
+          kind: 'tool_call',
+          timestamp: Date.now(),
+          payload: { data: { toolName: 'code_exec', output: { status: 'running' } } },
+          hidden: false,
+          done: false,
+        },
+        timestamp: Date.now(),
+      });
+
+      emitEvent(EVENT_TYPES.MESSAGE_CREATED, {
+        message: {
+          id: 1202,
+          agentId: 'agent-1',
+          kind: 'llm',
+          timestamp: Date.now(),
+          payload: { data: {} },
+          hidden: false,
+          done: false,
+        },
+        timestamp: Date.now(),
+      });
+      emitEvent(EVENT_TYPES.MESSAGE_LLM_TEXT_UPDATED, {
+        messageId: 1202,
+        agentId: 'agent-1',
+        delta: 'post',
+        accumulatedText: 'post',
+        timestamp: Date.now(),
+      });
+      emitEvent(EVENT_TYPES.MESSAGE_UPDATED, {
+        message: {
+          id: 1202,
+          agentId: 'agent-1',
+          kind: 'llm',
+          timestamp: Date.now(),
+          payload: { data: { text: 'post' } },
+          hidden: false,
+          done: true,
+        },
+        timestamp: Date.now(),
+      });
+
+      const stream = await streamPromise;
+      const chunks = await collectChunks(stream);
+      const types = chunks.map((chunk) => chunk.type);
+
+      expect(types.filter((type) => type === 'start')).toHaveLength(1);
+      expect(types.filter((type) => type === 'start-step').length).toBeGreaterThanOrEqual(2);
+      expect(types.filter((type) => type === 'finish-step').length).toBeGreaterThanOrEqual(2);
+      expect(types).not.toContain('error');
+      expect(types).toContain('finish');
+    });
+
     it('should not emit duplicate start chunks when MESSAGE_CREATED arrives after text stream start', async () => {
       const streamPromise = transport.sendMessages(makeSendOptions());
       await Promise.resolve();
@@ -689,7 +785,7 @@ describe('IPCChatTransport', () => {
       expect(textDelta?.delta).toBe('t');
     });
 
-    it('should fail controlled on MESSAGE_LLM_TEXT_UPDATED for a different llm message id', async () => {
+    it('should switch step when MESSAGE_LLM_TEXT_UPDATED arrives for a new llm message id', async () => {
       const streamPromise = transport.sendMessages(makeSendOptions());
       await Promise.resolve();
 
@@ -713,17 +809,26 @@ describe('IPCChatTransport', () => {
         accumulatedText: 'wrong-id',
         timestamp: Date.now(),
       });
+      emitEvent(EVENT_TYPES.MESSAGE_UPDATED, {
+        message: {
+          id: 901,
+          agentId: 'agent-1',
+          kind: 'llm',
+          timestamp: Date.now(),
+          payload: { data: { text: 'wrong-id' } },
+          hidden: false,
+          done: true,
+        },
+        timestamp: Date.now(),
+      });
 
       const stream = await streamPromise;
       const chunks = await collectChunks(stream);
       const types = chunks.map((chunk) => chunk.type);
-      expect(types).toContain('error');
+      expect(types).not.toContain('error');
+      expect(types.filter((type) => type === 'start-step').length).toBeGreaterThanOrEqual(2);
+      expect(types).toContain('text-delta');
       expect(types).toContain('finish');
-      const errorChunk = chunks.find((chunk) => chunk.type === 'error') as {
-        type: 'error';
-        errorText: string;
-      };
-      expect(errorChunk.errorText).toBe('Response stream error. Please try again.');
     });
 
     it('should close stream when abortSignal fires after start', async () => {

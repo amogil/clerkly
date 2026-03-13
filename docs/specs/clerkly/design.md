@@ -117,6 +117,31 @@ graph TB
 - **SQLite**: Легковесная встроенная база данных, не требует отдельного сервера, идеальна для локального хранения
 - **Jest + ts-jest**: Комплексное тестирование (unit) с полной поддержкой TypeScript
 
+### Иконка Приложения macOS
+
+Требование `clerkly.1.6` реализуется через стандартный pipeline `electron-builder` для macOS:
+
+- Source-of-truth: React компонент `src/renderer/components/logo.tsx` (статичный `Logo`, без текста и анимации)
+- Форма app-icon: macOS-style скруглённый прямоугольник (squircle-like), с прозрачными углами
+- Генерация промежуточного SVG: `assets/icon-source.svg` из React-компонента через `scripts/generate-icon-source-svg.cjs`
+- Растеризация source в PNG: `assets/icon-source.png` (1024x1024, прозрачный фон) через Chromium renderer (Playwright), чтобы геометрия совпадала с UI-логотипом в Electron
+- Генерация iconset: `assets/icon.iconset` (размеры 16/32/64/128/256/512/1024)
+- Финальный артефакт: `assets/icon.icns`
+- Build binding: `electron-builder` поле `mac.icon = "assets/icon.icns"`
+
+Принципы визуального баланса для app-icon:
+- Единая macOS shape (скруглённый прямоугольник) как базовый контейнер
+- Внутренний знак размещается с достаточным "breathing room" и не должен визуально переполнять контейнер
+- Иконка проектируется под читаемость в малых размерах из `iconset` (16px–512px@2x)
+
+Для воспроизводимой сборки иконки используется скрипт:
+
+```bash
+npm run generate:icon:mac
+```
+
+Скрипт создает/обновляет `assets/icon-source.svg`, `assets/icon-source.png`, `assets/icon.iconset` и `assets/icon.icns` на базе React-компонента `Logo`.
+
 ## Компоненты и интерфейсы
 
 ### Компоненты Main Process
@@ -2134,6 +2159,7 @@ test('UI should render within 100ms', () => {
 | clerkly.1.3 | ✓ | ✓ |
 | clerkly.1.4 | ✓ | ✓ |
 | clerkly.1.5 | ✓ | - |
+| clerkly.1.6 | - | - |
 | clerkly.2.1 | ✓ | - |
 | clerkly.2.2 | - | ✓ |
 | clerkly.2.3 | ✓ | - |
@@ -2174,7 +2200,8 @@ test('UI should render within 100ms', () => {
 - \- - Требование не покрыто данным типом тестов
 
 **Примечания:**
-- Все функциональные требования (clerkly.1.x, clerkly.2.x) покрыты соответствующими типами тестов
+- Требование `clerkly.1.6` (иконка macOS) проверяется артефактно/интеграционно при сборке (`assets/icon.icns` + `electron-builder` конфигурация), без отдельного unit/functional теста
+- Все остальные функциональные требования (clerkly.1.x, clerkly.2.x) покрыты соответствующими типами тестов
 - Все нефункциональные требования (clerkly.nfr.x.x) покрыты соответствующими типами тестов
 - Функциональные тесты проверяют интеграцию между компонентами
 - Модульные тесты покрывают конкретные примеры, граничные случаи и обработку ошибок
@@ -2214,6 +2241,11 @@ test('UI should render within 100ms', () => {
 - Реализовано: Весь проект написан на TypeScript
 - Компоненты: Все компоненты
 - Тестирование: ts-jest для запуска TypeScript тестов
+
+**Требование 1.6 (Иконка приложения macOS):**
+- Реализовано: Сборка `assets/icon.icns` из статичного логотипа Clerkly и подключение в `electron-builder` (`mac.icon`)
+- Компоненты: Build resources (`assets/icon-source.png`, `assets/icon.iconset`, `assets/icon.icns`), скрипт `scripts/generate-mac-icon.sh`
+- Тестирование: Проверка артефактов сборки и наличия иконки в `.app` bundle
 
 **Требование 2.1 (Модульные тесты):**
 - Реализовано: Jest тесты для всех компонентов
@@ -2398,3 +2430,12 @@ test('UI should render within 100ms', () => {
 - Компоненты: Все модульные тесты
 - Стратегия: Раздел "Стратегия модульного тестирования"
 ```
+
+
+---
+
+## Реактивная Архитектура UI
+
+Подробная кросс-фичевая архитектура реактивных UI-подписок вынесена в отдельную спецификацию:
+- `docs/specs/reactive-ui-architecture/requirements.md`
+- `docs/specs/reactive-ui-architecture/design.md`

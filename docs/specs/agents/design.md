@@ -502,7 +502,7 @@ contextBridge.exposeInMainWorld('api', {
 ## Алгоритм определения статуса
 
 ```typescript
-// Requirements: agents.9.1, agents.9.2, agents.9.4
+// Requirements: agents.9.1, agents.9.2, agents.9.4, llm-integration.9.4, llm-integration.9.4.1, llm-integration.9.4.2
 function computeAgentStatus(messages: Message[]): AgentStatus {
   // Фильтруем hidden сообщения — они не видны в UI и не влияют на статус
   const visibleMessages = messages.filter(m => m.hidden !== true);
@@ -519,10 +519,18 @@ function computeAgentStatus(messages: Message[]): AgentStatus {
   }
   if (lastMessage.kind === 'tool_call') {
     if (!lastMessage.done) return 'in-progress';
-    return lastMessage.payload?.data?.toolName === 'final_answer' ? 'completed' : 'awaiting-response';
+    if (lastMessage.payload?.data?.toolName === 'final_answer') {
+      return 'completed';
+    }
+    if (lastMessage.payload?.data?.toolName === 'code_exec') {
+      // Keep agent in-progress for all terminal code_exec outcomes.
+      return 'in-progress';
+    }
+    return 'awaiting-response';
   }
   return 'new';
 }
+```
 
 ## Auto-create First Agent
 
@@ -1537,6 +1545,8 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 - При активном reasoning без финального `data.text` в сообщении отображается reasoning-блок как единственный индикатор стриминга до появления текста ответа.
 - Визуальный маркер reasoning-сообщения рендерится в заголовке `ReasoningTrigger` (иконка приложения + текстовый индикатор + chevron).
   Этот маркер в рамках спеки считается `Message Avatar` для reasoning-сообщений.
+- Перед рендером reasoning-текста в `agents` применяется display-time нормализация markdown-склейки: если `**...**` начинается сразу после текста без пробела/переноса и перед ним стоит завершающая пунктуация предложения, в отображении вставляется `\n\n`; в остальных склеенных случаях вставляется пробел.
+- Эта нормализация выполняется только в renderer и не изменяет persisted `payload.data.reasoning.text` в БД.
 
 **Trigger иконка (`ReasoningTrigger`):**
 - В app-owned компоненте `AgentReasoningTrigger` используется иконка приложения (`Logo`) вместо `BrainIcon`.
@@ -1577,12 +1587,35 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 ```
 
 **Сообщения инструментов (`kind: 'tool_call'`):**
-- Для `toolName !== 'final_answer'` используется AI Elements `Tool` family как отдельный технический блок вызова инструмента.
+- Для `toolName === 'code_exec'` используется AI Elements `Tool` family как отдельный технический блок вызова инструмента.
 - Для `toolName === 'final_answer'` используется отдельный компонент `"Final Answer"` на базе AI Elements `Queue`.
+- Визуальный порядок строится по persisted snapshot-последовательности: pre-tool `kind: llm` -> `kind: tool_call` (`running`) -> post-tool `kind: llm`; terminal-обновление `tool_call` применяется позже в том же блоке.
+- UI рендерит только persisted `kind: tool_call` snapshots из видимой истории сообщений и не материализует отдельные промежуточные блоки вне persisted-потока.
+- Сообщения с `hidden = true` полностью исключаются из renderer-проекции перед построением порядка, чтобы failed-attempt артефакты не попадали в видимый поток.
 - Компонент не имеет отдельного заголовка; рендерится только checklist `summary_points`.
 - Каждый checklist-пункт рендерится с иконкой `Check` в зелёном круге.
 - Компонент всегда отображается в раскрытом виде; сворачивание/разворачивание не поддерживается.
 - `Agents` не выполняет валидацию/repair `final_answer`; компонент рендерит только persisted payload.
+- Если `final_answer` присутствует в успешной попытке, `"Final Answer"` рендерится как последний видимый артефакт этой попытки.
+
+**Сообщения выполнения кода (`kind: 'tool_call'`, `toolName: 'code_exec'`):**
+- Используется отдельный блок выполнения кода, не являющийся обычным текстовым bubble.
+- Блок строится на AI Elements `Tool` (см. [https://elements.ai-sdk.dev/components/tool](https://elements.ai-sdk.dev/components/tool)).
+- Заголовок блока отображает иконку выполнения кода (`Code2`) и название `Code`.
+- Сразу после названия `Code` отображается badge со статусом выполнения.
+- Badge статуса всегда содержит иконку, привязанную к persisted-статусу: `running -> Loader2 (spin)`, `success -> CircleCheck`, `error -> CircleX`, `timeout -> Clock3`, `cancelled -> CircleMinus`.
+- Иконки статусов в badge рендерятся цветными (например: `success` — зелёный, `error` — красный, `timeout` — янтарный, `running/cancelled` — нейтральные).
+- Блок отображает persisted-статус выполнения (`running | success | error | timeout | cancelled`).
+- Смена статуса `running -> terminal` выполняется в том же UI-блоке (без создания отдельной terminal-карточки).
+- Для security/policy отказов используется `status=error` с соответствующим `error.code` (например, `policy_denied`).
+- При наличии отображаются `stdout` и `stderr` из persisted payload.
+- Для явно выделенных text/code секций tool-блоков (`Input`, `Output`, `JavaScript`, `stdout`, `stderr`) применяется no-wrap + horizontal scroll (`white-space: pre`, `overflow-x: auto`).
+- Секция `JavaScript` рендерится через общий `"MessageResponse"` и fenced markdown блок `javascript`, чтобы использовать стандартный рендерер code block и его встроенную подсветку синтаксиса.
+- Для input-кода `code_exec` не рендерится отдельный верхний label `JavaScript` и не используется внешний wrapper-box; в UI остается только сам встроенный markdown code block.
+- Для input-кода `code_exec` используется тот же контейнер `"ToolInput"`, что и стандартные секции инструмента; CSS scope `message-response-code-exec-input` снимает внутренние рамки `data-streamdown='code-block'`, чтобы не было вложенной (двойной) геометрии.
+- Заголовок `tool_call(code_exec)` рендерится с `items-center`; отступ заголовка переключается по состоянию collapsible (`collapsed -> mb-0`, `expanded -> mb-2`), чтобы в свернутом виде контент оставался вертикально центрированным.
+- Для `tool_call(code_exec)` transparent-surface применяется ко всему блоку: корневой контейнер `Tool`, status-badge, секции `JavaScript`, `stdout`, `stderr`.
+- Рендер строится только по persisted snapshot (`message.created`/`message.updated`) без локальной реконструкции результата.
 
 ```tsx
 // Requirements: agents.7.4.1, agents.7.4.2
@@ -1632,6 +1665,8 @@ if (message.kind === 'tool_call' && toolName === 'final_answer') {
 - Mermaid диаграммы
 - математика через KaTeX (inline и block)
 - сноски не поддерживаются
+- Для markdown code blocks в `llm`-ответах применяется semantic-класс `message-response-transparent-code-blocks`, который задаёт transparent-overrides для контейнеров `code-block`, `code-block-header`, `code-block-body`, `code-block-actions` и `pre` внутри `code-block-body`.
+- Для markdown fenced code blocks (любой язык) в `llm`-ответах применяется режим без soft-wrap (`white-space: pre`) и внутренний горизонтальный скролл (`overflow-x: auto`).
 
 Перед рендером применяется нормализация мат-делимитеров:
 - `\(...\)` -> `$...$`
@@ -1641,7 +1676,7 @@ if (message.kind === 'tool_call' && toolName === 'final_answer') {
 - fenced code и inline code при нормализации не изменяются
 
 ```typescript
-// Requirements: agents.7.7, agents.7.7.1
+// Requirements: agents.7.7, agents.7.7.1, agents.7.7.2
 import { MessageResponse } from '../ai-elements/message';
 import { normalizeMathDelimiters } from '../../lib/mathDelimiterNormalization';
 
@@ -1757,6 +1792,9 @@ const STATUS_STYLES: Record<AgentStatus, StatusStyle> = {
 **Варианты:**
 - Страница логина: без анимации
 - Пустой стейт чата: с CSS-анимацией узлов
+
+**Статичное отображение (без анимации):**
+- Боковые узлы (левый верхний, левый нижний, правый верхний, правый нижний) рендерятся непрозрачными (`opacity=1`), чтобы линии связей не просвечивали через круги.
 
 **Детали CSS-анимации узлов (5 узлов нейронной сети):**
 - `pulse-subtle` (3.2s): верхний левый узел
@@ -1951,8 +1989,9 @@ import { Logo } from '../logo';
 | `tests/unit/agents/AgentIPCHandlers.test.ts` | agents.2, agents.4, agents.5.5 |
 | `tests/unit/agents/computeAgentStatus.test.ts` | agents.9 |
 | `tests/unit/agents/ActivityIndicator.test.tsx` | agents.11 |
+| `tests/unit/agents/MainPipeline.test.ts` | agents.4.11.6-4.11.7, llm-integration.1, llm-integration.2 |
 | `tests/unit/components/ai-elements/prompt-input.test.tsx` | agents.4.2-4.7, agents.4.24 |
-| `tests/unit/components/agents/AgentMessage.test.tsx` | agents.4.10, agents.4.11.1, llm-integration.2, llm-integration.7 |
+| `tests/unit/components/agents/AgentMessage.test.tsx` | agents.4.10, agents.4.11.1, agents.4.11.3-4.11.5, agents.7.4.5-7.4.7, llm-integration.2, llm-integration.7 |
 | `tests/unit/components/agents/AgentReasoningTrigger.test.tsx` | agents.4.11, agents.4.11.2, llm-integration.2, llm-integration.7.2 |
 | `tests/unit/renderer/IPCChatTransport.test.ts` | llm-integration.2, llm-integration.7 |
 | `tests/unit/hooks/useAgentChat.test.ts` | agents.4.24, llm-integration.8.7 |
@@ -1975,6 +2014,7 @@ import { Logo } from '../logo';
 | `tests/functional/agent-status-indicators.spec.ts` | agents.6 | - |
 | `tests/functional/agent-status-all-places.spec.ts` | agents.6.1-6.5 | Проверка консистентного отображения каждого статуса (`new`, `in-progress`, `awaiting-response`, `error`, `completed`) в Header, Agent List tooltip и All Agents |
 | `tests/functional/message-format.spec.ts` | agents.7 | - |
+| `tests/functional/code_exec.spec.ts` | agents.7.4.5-7.4.9, agents.4.23 | Отдельные сценарии для `tool_call(code_exec)`: header/icon/status, вертикальное выравнивание в collapsed, JS highlighting, transparent sections и width/overflow |
 | `tests/functional/llm-chat.spec.ts` | agents.4.11, agents.4.11.2, agents.7.7, agents.4.24, llm-integration.2, llm-integration.7.2, llm-integration.8.7 | - |
 | `tests/functional/agent-status-calculation.spec.ts` | agents.9 | - |
 | `tests/functional/agent-data-isolation.spec.ts` | agents.10 | - |
@@ -2157,9 +2197,9 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 
 ## AI Elements интеграция (Фаза 9)
 
-Для отображения `tool_call` используется смешанная стратегия:
-- AI Elements `Tool` family (см. [https://elements.ai-sdk.dev/components/tool](https://elements.ai-sdk.dev/components/tool)) для всех `tool_call`, кроме `final_answer`.
-- AI Elements `Queue` family для `tool_call(final_answer)`: финал отображается отдельным компонентом `Final Answer` (header + список `summary_points`).
+Для отображения `tool_call` в текущем scope используется фиксированная стратегия:
+- AI Elements `Tool` family (см. [https://elements.ai-sdk.dev/components/tool](https://elements.ai-sdk.dev/components/tool)) для `tool_call(code_exec)`.
+- AI Elements `Queue` family для `tool_call(final_answer)`: финал отображается отдельным checklist-компонентом `Final Answer` (без отдельного header, только `summary_points`).
 
 ### Архитектура
 
@@ -2253,7 +2293,7 @@ useChat.sendMessage()
 - `MESSAGE_CREATED` (kind: error) → `{ type: 'error', errorText }` + `{ type: 'finish' }`
 - `MESSAGE_UPDATED` с `hidden: true` → закрыть stream (прерывание)
 
-Терминологическое соответствие с `testing.13.1`:
+Терминологическое соответствие с `llm-integration.2.8`:
 - `start-step` в тестовом контракте соответствует chunk-типу `text-start` в transport.
 - `finish-step` в тестовом контракте соответствует chunk-типу `text-end` в transport.
 
@@ -2340,6 +2380,13 @@ interface UseAgentChatResult {
 - В фазе `waiting-for-chats` запускается таймер
 - Если `app:set-chats-ready` не получен вовремя, состояние переходит в `error`
 - Причина перехода публикуется в `reason` для диагностики флейков/регрессий
+
+## Реактивные Подписки
+
+Подробная верхнеуровневая архитектура реактивных UI-подписок, общие паттерны и миграционные шаги вынесены в кросс-фичевую спецификацию `reactive-ui-architecture`:
+- `docs/specs/reactive-ui-architecture/design.md`.
+
+В этой спецификации `agents` фиксируются только компонентные правила и контракты рендера, относящиеся к UI агентов.
 
 ## Установка и обновление AI Elements компонентов
 

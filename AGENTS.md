@@ -10,6 +10,8 @@ This document describes all rules, workflows, and work formats. These rules are 
 ```bash
 npm run validate          # full validation (TypeScript, ESLint, Prettier, unit tests)
 npm run validate:verbose  # same, with verbose output
+npm run validate:deps     # validate + optional dependency check (npm outdated)
+npm run validate:verbose:deps  # verbose validate + optional dependency check
 ```
 
 ### Tests
@@ -629,7 +631,20 @@ ErrorHandler automatically filters race condition errors (does not show them to 
 | design.md | Russian |
 | tasks.md (if used) | Russian |
 | Code comments | English |
+| GitHub (issues, PR descriptions, review comments/replies, commit messages) | English |
 | File and variable names | English |
+
+### Language in GitHub
+
+- All GitHub communication MUST be in English:
+  - issues
+  - pull request descriptions
+  - review comments and replies
+  - commit messages related to PRs
+
+### Language in code comments
+
+- All code comments MUST be in English.
 
 ### Component naming
 

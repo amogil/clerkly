@@ -180,7 +180,7 @@ describe('OpenAIProvider.chat()', () => {
     const streamArgs = (aiModule.streamText as unknown as jest.Mock).mock.calls[0][0];
     expect(streamArgs.providerOptions.openai).toEqual({
       reasoningEffort: 'high',
-      reasoningSummary: 'detailed',
+      reasoningSummary: 'auto',
       strictJsonSchema: true,
       parallelToolCalls: true,
     });

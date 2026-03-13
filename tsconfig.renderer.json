@@ -17,5 +17,5 @@
     }
   },
   "include": ["src/renderer/**/*", "src/types/**/*", "src/preload/index.ts"],
-  "exclude": ["node_modules", "dist", "tests", "figma"]
+  "exclude": ["node_modules", "dist", "tests"]
 }

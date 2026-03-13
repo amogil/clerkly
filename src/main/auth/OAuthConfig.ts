@@ -4,6 +4,7 @@ import { Logger } from '../Logger';
 
 // Requirements: clerkly.3.5, clerkly.3.7 - Create parameterized logger for OAuthConfig module
 const logger = Logger.create('OAuthConfig');
+const BUILD_TIME_OAUTH_CLIENT_SECRET_PLACEHOLDER = '__CLERKLY_' + 'OAUTH_CLIENT_SECRET__';
 
 // Requirements: clerkly.3.8 - Use centralized Logger instead of console.*
 /**
@@ -103,7 +104,7 @@ function getOAuthConfigConstants() {
     clientId: isTest
       ? 'test-client-id-12345'
       : '100365225505-a9mp4sll4948tafotr1va0fvnl5hrpoa.apps.googleusercontent.com',
-    clientSecret: isTest ? 'test-client-secret-67890' : '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',
+    clientSecret: isTest ? 'test-client-secret-67890' : '__CLERKLY_OAUTH_CLIENT_SECRET__',
     // iOS OAuth clients use URL scheme format
     redirectUri: isTest
       ? 'com.googleusercontent.apps.test-client-id-12345:/oauth2redirect'
@@ -128,7 +129,9 @@ export function getOAuthConfig(clientId?: string): OAuthConfig {
 
   // Allow overriding clientId and clientSecret via environment variables (for testing)
   const effectiveClientId = clientId || process.env.CLERKLY_OAUTH_CLIENT_ID || config.clientId;
-  const effectiveClientSecret = process.env.CLERKLY_OAUTH_CLIENT_SECRET || config.clientSecret;
+  const configClientSecret =
+    config.clientSecret === BUILD_TIME_OAUTH_CLIENT_SECRET_PLACEHOLDER ? '' : config.clientSecret;
+  const effectiveClientSecret = process.env.CLERKLY_OAUTH_CLIENT_SECRET || configClientSecret;
 
   // Extract the numeric part from Client ID (remove .apps.googleusercontent.com suffix if present)
   // iOS Client ID format: 100365225505-9039l9g72mja9onmlkoupkphbns6lrg2.apps.googleusercontent.com

@@ -1,12 +1,25 @@
 import React from 'react';
 // Requirements: llm-integration.7, llm-integration.3.4.1, llm-integration.3.4.4, agents.4.22, agents.4.9, agents.4.10.1, agents.4.10.2, agents.7.4
-import { Check } from 'lucide-react';
+import {
+  Check,
+  ChevronDownIcon,
+  CircleCheck,
+  CircleMinus,
+  CircleX,
+  Clock3,
+  Code2,
+  Loader2,
+} from 'lucide-react';
 import { Message, MessageContent, MessageResponse } from '../ai-elements/message';
 import { Reasoning, ReasoningContent } from '../ai-elements/reasoning';
 import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from '../ai-elements/tool';
-import { Queue, QueueItem, QueueItemContent } from '../ai-elements/queue';
+import { Queue, QueueItem } from '../ai-elements/queue';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
 import { toUIMessage } from '../../lib/messageMapper';
-import { normalizeMathDelimiters } from '../../lib/mathDelimiterNormalization';
+import {
+  normalizeMathDelimiters,
+  normalizeReasoningMarkdownSpacing,
+} from '../../lib/mathDelimiterNormalization';
 import type { MessageSnapshot } from '../../../shared/events/types';
 import { AgentErrorDialog } from './AgentErrorDialog';
 import type { AgentDialogActionItem } from './AgentDialog';
@@ -18,6 +31,48 @@ interface AgentMessageProps {
   onNavigate?: (screen: string) => void;
 }
 
+// Requirements: agents.7.4.6.8
+export function buildJavaScriptFence(code: string): string {
+  const longestBacktickRun = Math.max(0, ...(code.match(/`+/g) ?? []).map((match) => match.length));
+  const fenceLength = Math.max(3, longestBacktickRun + 1);
+  const fence = '`'.repeat(fenceLength);
+  return `${fence}javascript\n${code}\n${fence}`;
+}
+
+function getCodeExecStatusIcon(status: string) {
+  switch (status) {
+    case 'success':
+      return CircleCheck;
+    case 'running':
+      return Loader2;
+    case 'error':
+      return CircleX;
+    case 'timeout':
+      return Clock3;
+    case 'cancelled':
+      return CircleMinus;
+    default:
+      return Loader2;
+  }
+}
+
+function getCodeExecStatusIconColorClass(status: string) {
+  switch (status) {
+    case 'success':
+      return 'text-emerald-600';
+    case 'running':
+      return 'text-muted-foreground';
+    case 'error':
+      return 'text-red-600';
+    case 'timeout':
+      return 'text-amber-600';
+    case 'cancelled':
+      return 'text-zinc-500';
+    default:
+      return 'text-muted-foreground';
+  }
+}
+
 // Requirements: llm-integration.7, llm-integration.3.4.1, llm-integration.3.4.4, agents.4.22, agents.4.9, agents.4.10.1, agents.4.10.2
 export function AgentMessage({
   message,
@@ -25,6 +80,7 @@ export function AgentMessage({
   onNavigate,
 }: AgentMessageProps) {
   const [isDismissed, setIsDismissed] = React.useState(false);
+  const [isCodeExecExpanded, setIsCodeExecExpanded] = React.useState(false);
 
   const isLlmMessage = message.kind === 'llm';
   const llmData = isLlmMessage
@@ -35,7 +91,7 @@ export function AgentMessage({
     typeof llmData?.['text'] === 'string' ? (llmData['text'] as string) : undefined;
   const llmText = llmTextRaw ? normalizeMathDelimiters(llmTextRaw) : undefined;
   const llmReasoningText = llmReasoning?.text
-    ? normalizeMathDelimiters(llmReasoning.text)
+    ? normalizeMathDelimiters(normalizeReasoningMarkdownSpacing(llmReasoning.text))
     : undefined;
 
   if (message.kind === 'user') {
@@ -126,7 +182,7 @@ export function AgentMessage({
               data-testid="message-llm-action"
               className="w-full message-llm-action message-llm-action-response"
             >
-              <MessageResponse className="text-sm leading-relaxed break-words">
+              <MessageResponse className="message-response-transparent-code-blocks text-sm leading-relaxed break-words">
                 {llmText}
               </MessageResponse>
             </MessageContent>
@@ -141,6 +197,7 @@ export function AgentMessage({
       | {
           toolName?: unknown;
           arguments?: Record<string, unknown>;
+          output?: Record<string, unknown>;
         }
       | undefined;
 
@@ -164,7 +221,7 @@ export function AgentMessage({
                   data-testid="message-final-answer-item"
                   className="flex-row items-start gap-2"
                 >
-                  <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-green-600">
+                  <span className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-green-600">
                     <Check className="h-3 w-3 text-white" />
                   </span>
                   <div>{point}</div>
@@ -191,6 +248,98 @@ export function AgentMessage({
 
     if (!toolPart) {
       return null;
+    }
+
+    if (toolData?.toolName === 'code_exec') {
+      const output = (toolData.output ?? {}) as {
+        status?: unknown;
+        stdout?: unknown;
+        stderr?: unknown;
+      };
+      const status =
+        typeof output.status === 'string' ? output.status : message.done ? 'success' : 'running';
+      const stdout = typeof output.stdout === 'string' ? output.stdout : '';
+      const stderr = typeof output.stderr === 'string' ? output.stderr : '';
+      const codeInput =
+        toolData.arguments && typeof toolData.arguments.code === 'string'
+          ? toolData.arguments.code
+          : JSON.stringify(toolData.arguments ?? {}, null, 2);
+      const StatusIcon = getCodeExecStatusIcon(status);
+      const statusIconColorClass = getCodeExecStatusIconColorClass(status);
+
+      return (
+        <Message from="assistant" className="w-full max-w-full">
+          <Collapsible
+            open={isCodeExecExpanded}
+            onOpenChange={setIsCodeExecExpanded}
+            data-testid="message-code-exec-collapsible"
+          >
+            <Tool data-testid="message-code-exec-block" className="bg-transparent">
+              <ToolHeader
+                data-testid="message-code-exec-header"
+                className={`items-center justify-between ${isCodeExecExpanded ? 'mb-2' : 'mb-0'}`}
+              >
+                <div className="flex min-w-0 items-center gap-2">
+                  <Code2
+                    data-testid="message-code-exec-icon"
+                    className="h-4 w-4 shrink-0 text-muted-foreground"
+                  />
+                  <div
+                    data-testid="message-code-exec-title"
+                    className="font-medium text-foreground"
+                  >
+                    Code
+                  </div>
+                  <div
+                    data-testid="message-code-exec-status"
+                    className="inline-flex items-center rounded-full border border-border/70 bg-transparent px-2 py-0.5 text-xs text-muted-foreground"
+                  >
+                    <StatusIcon
+                      data-testid="message-code-exec-status-icon"
+                      className={`mr-1 h-3 w-3 shrink-0 ${statusIconColorClass} ${status === 'running' ? 'animate-spin' : ''}`}
+                    />
+                    {status}
+                  </div>
+                </div>
+                <CollapsibleTrigger asChild>
+                  <button
+                    data-testid="message-code-exec-toggle"
+                    type="button"
+                    className="group inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
+                  >
+                    <ChevronDownIcon className="h-4 w-4 transition-transform group-data-[state=closed]:-rotate-90" />
+                  </button>
+                </CollapsibleTrigger>
+              </ToolHeader>
+              <CollapsibleContent data-testid="message-code-exec-content">
+                <ToolContent>
+                  <ToolInput data-testid="message-code-exec-input" className="bg-transparent">
+                    <MessageResponse className="message-response-transparent-code-blocks message-response-code-exec-input text-xs leading-relaxed break-words">
+                      {buildJavaScriptFence(codeInput)}
+                    </MessageResponse>
+                  </ToolInput>
+                  {stdout.length > 0 ? (
+                    <div>
+                      <div className="mb-1 text-xs font-medium text-muted-foreground">stdout</div>
+                      <ToolOutput data-testid="message-code-exec-stdout" className="bg-transparent">
+                        {stdout}
+                      </ToolOutput>
+                    </div>
+                  ) : null}
+                  {stderr.length > 0 ? (
+                    <div>
+                      <div className="mb-1 text-xs font-medium text-muted-foreground">stderr</div>
+                      <ToolOutput data-testid="message-code-exec-stderr" className="bg-transparent">
+                        {stderr}
+                      </ToolOutput>
+                    </div>
+                  ) : null}
+                </ToolContent>
+              </CollapsibleContent>
+            </Tool>
+          </Collapsible>
+        </Message>
+      );
     }
 
     const toolName = toolPart.toolName;

@@ -186,3 +186,43 @@
     line-height: 1.5;
   }
 }
+
+/* agents.7.7.2: keep markdown code blocks transparent inside llm response */
+.message-response-transparent-code-blocks [data-streamdown='code-block'],
+.message-response-transparent-code-blocks [data-streamdown='code-block-header'],
+.message-response-transparent-code-blocks [data-streamdown='code-block-body'],
+.message-response-transparent-code-blocks [data-streamdown='code-block-actions'],
+.message-response-transparent-code-blocks [data-streamdown='code-block-body'] pre {
+  background-color: transparent !important;
+}
+
+/* agents.7.7.3: keep code-block lines unwrapped and use horizontal scroll */
+.message-response-transparent-code-blocks [data-streamdown='code-block-body'] pre {
+  white-space: pre !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  overflow-wrap: normal !important;
+  word-break: normal !important;
+}
+
+/* agents.7.4.9: keep explicit tool text/code sections unwrapped with horizontal scroll */
+[data-testid='message-code-exec-input'],
+[data-testid='message-code-exec-stdout'],
+[data-testid='message-code-exec-stderr'],
+[data-testid='message-tool-call-input'],
+[data-testid='message-tool-call-output'] {
+  white-space: pre !important;
+  overflow-x: auto !important;
+  overflow-wrap: normal !important;
+  word-break: normal !important;
+}
+
+/* agents.7.4.6.11: remove outer frame for code_exec input code block, keep inner code frame */
+.message-response-code-exec-input [data-streamdown='code-block'],
+.message-response-code-exec-input [data-streamdown='code-block-header'],
+.message-response-code-exec-input [data-streamdown='code-block-body'],
+.message-response-code-exec-input [data-streamdown='code-block-body'] pre {
+  border: 0 !important;
+  box-shadow: none !important;
+  background-color: transparent !important;
+}

@@ -2,7 +2,8 @@
 
 ## Введение
 
-Данный документ описывает требования к системе событий реального времени (Real-time Events System) для приложения Clerkly. Система обеспечивает синхронизацию данных между различными частями приложения и автоматическое обновление UI при изменениях.
+Данный документ описывает требования к системе событий реального времени (Real-time Events System) для приложения Clerkly. Система обеспечивает transport/публикацию/подписку и доставку snapshot-состояния между частями приложения.
+Документ не описывает UI-поведение, визуальные компоненты или правила рендера.
 
 ## Глоссарий
 
@@ -61,6 +62,8 @@
 
 1.6. Продюсер МОЖЕТ указать, нужно ли пересылать событие через IPC или только локально
 
+1.7. Event envelope (`type`, `payload`, `timestamp`, `source`) ДОЛЖЕН сохраняться без изменения при доставке между процессами и локальным подписчикам
+
 **Тестируемость:** Да - через модульные тесты EventBus, функциональные тесты IPC
 
 #### Функциональные Тесты
@@ -88,7 +91,7 @@
 
 2.5. При получении события консюмер ДОЛЖЕН получить callback с данными события
 
-2.6. Callback ДОЛЖЕН выполняться асинхронно
+2.6. Callback МОЖЕТ быть синхронным или асинхронным; Event Bus НЕ ДОЛЖЕН ожидать завершения async callback (fire-and-forget)
 
 2.7. ЕСЛИ callback выбрасывает исключение, ТО оно НЕ ДОЛЖНО влиять на других консюмеров
 
@@ -119,6 +122,8 @@
    - `{entity}.updated` - обновлены данные сущности
    - `{entity}.deleted` - сущность удалена
 
+3.1.1. Для сущностей с мягким удалением/архивацией система ДОЛЖНА поддерживать специализированные lifecycle-события (например, `agent.archived`) как допустимое расширение базовых паттернов.
+
 3.2. Событие `{entity}.created` ДОЛЖНО содержать полные данные новой сущности
 
 3.3. Событие `{entity}.updated` ДОЛЖНО содержать полные данные сущности после обновления.
@@ -148,7 +153,7 @@
 
 3.8. События `message.llm.reasoning.updated` и `message.llm.text.updated` ДОЛЖНЫ передавать инкрементальные delta-данные и идентификатор сообщения, к которому относится update
 
-3.9. Рендер tool-call в UI ДОЛЖЕН строиться по persisted snapshot-событиям `message.created`/`message.updated` для сообщений `kind: tool_call`; `tool_call(final_answer)` ДОЛЖЕН рендериться как ответ модели с `Completed` badge.
+3.9. Состояние сообщений `kind: tool_call` ДОЛЖНО доставляться подписчикам через persisted snapshot-события `message.created`/`message.updated`.
 
 **Примечание:** Целевой список типов событий определяется этой спецификацией; `src/shared/events/types.ts` ДОЛЖЕН быть синхронизирован с данным контрактом.
 
@@ -187,7 +192,13 @@
    - `details` (`agentId`, `userMessageId`, `signalAborted`, `errorName`, `errorType`)
    - `timestamp`
 
-4.10. КОГДА renderer получает `llm.pipeline.diagnostic`, ТО сообщение ДОЛЖНО попадать в Developer Log renderer (console) без показа toast-уведомления пользователю
+4.10. КОГДА renderer получает `llm.pipeline.diagnostic`, ТО сообщение ДОЛЖНО попадать в Developer Log renderer (console) на уровне `warn` или `error` без показа toast-уведомления пользователю.
+
+4.11. КОГДА renderer логирует записи в Developer Log, ТО записи уровней `info` и `debug` НЕ ДОЛЖНЫ попадать в console.
+
+4.11.1. КОГДА `message.created.message.kind = "error"`, ТО запись в Developer Log renderer ДОЛЖНА выполняться через error-уровень и ДОЛЖНА включать текст `data.error.message`.
+
+4.12. IPC bridge ДОЛЖЕН передавать исходные `timestamp` и `source` без реконструкции в процессе доставки
 
 **Тестируемость:** Да - через функциональные тесты IPC
 
@@ -196,30 +207,32 @@
 - `tests/functional/agent-realtime-events.spec.ts` - "should add message on message.created event"
 - `tests/functional/agent-realtime-events.spec.ts` - "should update message on message.updated event"
 - `tests/unit/App.ipc-integration.test.tsx` - "should log llm.pipeline.diagnostic events to renderer console"
+- `tests/unit/App.ipc-integration.test.tsx` - "should log chat kind:error messages from message.created to renderer console"
+- `tests/unit/App.ipc-integration.test.tsx` - "should not log non-error message.created events to renderer console"
 - `tests/functional/llm-chat.spec.ts` - "reasoning and text stream simultaneously"
 - `tests/functional/llm-chat.spec.ts` - "multiple tool calls in one turn and final response continues"
 
-### Требование 5: Обработка событий в UI
+### Требование 5: Обработка событий в подписчиках данных
 
 **ID:** realtime-events.5
 
-**User Story:** Как пользователь, я хочу видеть изменения данных в UI без необходимости обновлять страницу.
+**User Story:** Как разработчик, я хочу чтобы подписчики данных (state/hooks/store) применяли события консистентно, чтобы downstream-слои (включая UI) получали актуальное состояние без дополнительных запросов.
 
 **Зависимости:** Нет
 
 #### Критерии Приемки
 
-5.1. КОГДА приходит событие `{entity}.created`, ТО UI ДОЛЖЕН обновиться для отображения новой сущности
+5.1. КОГДА приходит событие `{entity}.created`, ТО подписчик ДОЛЖЕН добавить новую сущность в локальное состояние
 
-5.2. КОГДА приходит событие `{entity}.updated`, ТО данные сущности в UI ДОЛЖНЫ обновиться
+5.2. КОГДА приходит событие `{entity}.updated`, ТО подписчик ДОЛЖЕН обновить сущность в локальном состоянии
 
-5.3. КОГДА приходит событие `{entity}.deleted`, ТО сущность ДОЛЖНА быть удалена из UI
+5.3. КОГДА приходит событие `{entity}.deleted` (или lifecycle-эквивалент, например `agent.archived`), ТО подписчик ДОЛЖЕН удалить/деактивировать сущность в локальном состоянии
 
-5.4. Обновления UI ДОЛЖНЫ происходить плавно без мерцания
+5.4. Обработчик подписчика ДОЛЖЕН использовать snapshot payload напрямую и SHALL NOT требовать дополнительного запроса к БД/IPC для применения события
 
 5.5. События с более старым timestamp ДОЛЖНЫ игнорироваться, если уже обработано событие с более новым timestamp для той же сущности
 
-**Тестируемость:** Да - через функциональные тесты UI
+**Тестируемость:** Да - через модульные тесты подписчиков/хуков и функциональные сценарии с end-to-end доставкой событий
 
 #### Функциональные Тесты
 
@@ -227,7 +240,7 @@
 - `tests/functional/agent-realtime-events.spec.ts` - "should update agent on agent.updated event"
 - `tests/functional/agent-realtime-events.spec.ts` - "should remove agent on agent.archived event"
 
-### Требование 6: Производительность
+### Требование 6: Производительность и lifecycle подписок
 
 **ID:** realtime-events.6
 
@@ -243,7 +256,7 @@
 
 6.3. События одного типа для одной сущности МОГУТ объединяться (batching) в пределах одного tick event loop
 
-6.4. Старые неиспользуемые подписки ДОЛЖНЫ автоматически очищаться
+6.4. Неиспользуемые подписки ДОЛЖНЫ очищаться через явный lifecycle (`unsubscribe`, unmount cleanup, `destroy()`/`resetInstance()` в тестах)
 
 6.5. Кэш timestamp'ов (lastEventTimestamps) ДОЛЖЕН очищаться:
    - При получении события `{entity}.deleted` — удалять запись для этой сущности
@@ -305,7 +318,7 @@
 
 **ID:** realtime-events.9
 
-**User Story:** Как разработчик, я хочу чтобы события содержали полные снапшоты моделей, чтобы UI мог обновляться без дополнительных запросов к БД.
+**User Story:** Как разработчик, я хочу чтобы события содержали полные снапшоты моделей, чтобы downstream-подписчики могли обновлять состояние без дополнительных запросов к БД.
 
 **Зависимости:** Нет
 
@@ -340,7 +353,7 @@
    - `MessageCreatedEvent` → `{ message: MessageSnapshot, timestamp: number }`
    - `MessageUpdatedEvent` → `{ message: MessageSnapshot, timestamp: number }`
 
-9.8. UI ДОЛЖЕН использовать данные из снапшота напрямую без дополнительных запросов
+9.8. Downstream-подписчики ДОЛЖНЫ использовать данные из снапшота напрямую без дополнительных запросов
 
 **Примеры снапшотов:**
 
@@ -399,7 +412,8 @@ interface MessageSnapshot {
 
 ### Отладка
 
-- Все события ДОЛЖНЫ логироваться с уровнем debug через Logger
+- Внутренние события МОГУТ логироваться через `Logger` для отладки transport-слоя.
+- При выводе в renderer Developer Log ДОЛЖНЫ применяться правила фильтрации уровней из `realtime-events.4.11` (уровни `info`/`debug` не попадают в console).
 
 ## Зависимости
 

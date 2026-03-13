@@ -4,6 +4,12 @@
 
 import type { Message } from '../db/schema';
 import type { LLMTool, ChatMessage } from '../llm/ILLMProvider';
+import {
+  CODE_EXEC_LIMITS,
+  CODE_EXEC_TOOL_SCHEMA,
+  validateCodeExecInput,
+} from '../code_exec/contracts';
+import { SandboxSessionManager } from '../code_exec/SandboxSessionManager';
 
 /**
  * Normalize prompt text for stable model input:
@@ -119,18 +125,25 @@ export class PromptBuilder {
     const history: ChatMessage[] = [];
 
     for (const msg of selected) {
-      if (msg.hidden || (msg.kind !== 'user' && msg.kind !== 'llm')) {
+      if (msg.hidden || (msg.kind !== 'user' && msg.kind !== 'llm' && msg.kind !== 'tool_call')) {
         continue;
       }
       const payload = this.parsePayload(msg.payloadJson);
-      const content = this.messageContentForReplay(msg.kind, payload);
-      if (!content) {
-        continue;
+      if (msg.kind === 'tool_call') {
+        const toolReplay = this.toolReplayForHistory(payload);
+        if (toolReplay.length > 0) {
+          history.push(...toolReplay);
+        }
+      } else {
+        const content = this.messageContentForReplay(msg.kind, payload);
+        if (!content) {
+          continue;
+        }
+        history.push({
+          role: msg.kind === 'user' ? 'user' : 'assistant',
+          content,
+        });
       }
-      history.push({
-        role: msg.kind === 'user' ? 'user' : 'assistant',
-        content,
-      });
     }
 
     return history;
@@ -162,6 +175,77 @@ export class PromptBuilder {
     }
 
     return '';
+  }
+
+  private isTerminalToolStatus(status: unknown): boolean {
+    return (
+      status === 'success' || status === 'error' || status === 'timeout' || status === 'cancelled'
+    );
+  }
+
+  /**
+   * Serialize persisted terminal tool_call into AI SDK-compatible replay pair:
+   * assistant(tool-call) + tool(tool-result).
+   * Requirements: llm-integration.11.3.1.1, llm-integration.11.3.1.3
+   */
+  private toolReplayForHistory(payload: Record<string, unknown>): ChatMessage[] {
+    const data =
+      payload['data'] && typeof payload['data'] === 'object'
+        ? (payload['data'] as Record<string, unknown>)
+        : undefined;
+
+    const toolName = typeof data?.['toolName'] === 'string' ? data['toolName'] : undefined;
+    const toolCallId = typeof data?.['callId'] === 'string' ? data['callId'] : undefined;
+    if (!toolName || !toolCallId) {
+      return [];
+    }
+
+    const output = data?.['output'];
+    const outputStatus =
+      output && typeof output === 'object'
+        ? (output as Record<string, unknown>)['status']
+        : undefined;
+
+    if (toolName !== 'final_answer' && !this.isTerminalToolStatus(outputStatus)) {
+      return [];
+    }
+
+    const args = data?.['arguments'];
+    const input =
+      args && typeof args === 'object' && !Array.isArray(args)
+        ? (args as Record<string, unknown>)
+        : {};
+
+    return [
+      {
+        role: 'assistant',
+        content: [
+          {
+            type: 'tool-call',
+            toolCallId,
+            toolName,
+            input,
+          },
+        ],
+      },
+      {
+        role: 'tool',
+        content: [
+          {
+            type: 'tool-result',
+            toolCallId,
+            toolName,
+            output: {
+              type: 'json',
+              value: {
+                status: this.isTerminalToolStatus(outputStatus) ? outputStatus : 'success',
+                output: output ?? null,
+              },
+            },
+          },
+        ],
+      },
+    ];
   }
 
   /**
@@ -222,6 +306,8 @@ export class FinalAnswerFeature implements AgentFeature {
       'Final Answer tool usage:',
       '- Use normal assistant text for ongoing dialog: clarifying questions, intermediate updates, or requests for user input.',
       '- Call the `final_answer` tool only when you are confident the requested work is completed.',
+      '- If the requested work is not complete and you are not calling `final_answer`, explicitly ask the user what information or confirmation you need next.',
+      '- Call `final_answer` alone: do not combine it with any other tool call in the same turn.',
       '- Use `final_answer.summary_points` to list solved tasks (required: 1 to 10 points, each max 200 characters).',
     ].join('\n');
   }
@@ -252,6 +338,63 @@ export class FinalAnswerFeature implements AgentFeature {
         },
         // Keep execution deterministic and side-effect free.
         execute: async (args: Record<string, unknown>) => args,
+      },
+    ];
+  }
+}
+
+/**
+ * Built-in feature that defines sandboxed JavaScript execution tool.
+ * Requirements: code_exec.1, code_exec.3, code_exec.5
+ */
+export class CodeExecFeature implements AgentFeature {
+  name = 'code_exec';
+
+  constructor(private readonly sandboxSessionManager: SandboxSessionManager) {}
+
+  getSystemPromptSection(): string {
+    return [
+      'Code Exec tool usage:',
+      '- Tool name: `code_exec`.',
+      `- Input schema: JSON object with required string field \`code\` and optional integer \`timeout_ms\` (${CODE_EXEC_LIMITS.timeoutMsMin}..${CODE_EXEC_LIMITS.timeoutMsPolicyCap}, default ${CODE_EXEC_LIMITS.timeoutMsDefault}).`,
+      '- Output fields: `status`, `stdout`, `stderr`, `stdout_truncated`, `stderr_truncated`, optional `error`.',
+      '- Status values: running | success | error | timeout | cancelled.',
+      '- Execution context: your code runs inside an async function, so top-level `await` is supported.',
+      '- Error codes in normal chat-flow outputs: policy_denied | sandbox_runtime_error | limit_exceeded | internal_error.',
+      '- `invalid_tool_arguments` is defensive/runtime-local only (direct runtime calls) and is not persisted as chat `tool_call(code_exec)` output.',
+      `- Limits: code <= ${CODE_EXEC_LIMITS.maxCodeBytes} bytes (30 KiB), stdout <= ${CODE_EXEC_LIMITS.maxStdoutBytes} bytes (10 KiB), stderr <= ${CODE_EXEC_LIMITS.maxStderrBytes} bytes (10 KiB), CPU limit ${CODE_EXEC_LIMITS.sandboxCpuLimit} vCPU, RAM limit 2 GiB.`,
+      '- Allowed runtime API: console.log/info/warn/error and window.tools (sandbox allowlist only).',
+      '- Browser-level network APIs are denied: fetch, XMLHttpRequest, WebSocket, sendBeacon, window.open, location.assign, location.replace.',
+      '- Multithreading APIs are denied: Worker, SharedWorker, ServiceWorker, Worklet.',
+      '- Positive example: compute values, print diagnostics via console.*.',
+      '- Negative example: trying window.open/fetch/window.api must return policy_denied.',
+      '- When error.code is limit_exceeded, reduce code size/complexity or split work into multiple tool calls.',
+      '- When stderr warns about throttling/degraded mode, treat results as potentially slower/partial.',
+    ].join('\n');
+  }
+
+  getTools(): LLMTool[] {
+    return [
+      {
+        name: 'code_exec',
+        description:
+          'Execute JavaScript in isolated sandbox runtime with strict policy and resource limits.',
+        parameters: CODE_EXEC_TOOL_SCHEMA,
+        execute: async (args: Record<string, unknown>, signal?: AbortSignal) => {
+          const validated = validateCodeExecInput(args);
+          if (!validated.ok) {
+            throw new Error(validated.error?.message ?? 'Invalid code_exec arguments.');
+          }
+
+          const toolCallId = `code_exec_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+          const output = await this.sandboxSessionManager.execute(
+            'runtime',
+            toolCallId,
+            args,
+            signal
+          );
+          return output;
+        },
       },
     ];
   }

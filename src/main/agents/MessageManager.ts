@@ -79,14 +79,41 @@ export class MessageManager {
   }
 
   /**
-   * List messages for LLM history (excludes hidden and kind:error).
-   * Requirements: llm-integration.3.9, llm-integration.8.6
+   * List messages for LLM history (excludes hidden and kind:error, keeps terminal tool_call).
+   * Requirements: llm-integration.3.9, llm-integration.8.6, llm-integration.11.3.1
    */
   listForModelHistory(agentId: string): Message[] {
     const messages = this.dbManager.messages.listByAgent(agentId, true);
-    return messages.filter(
-      (msg) => !msg.hidden && msg.kind !== 'error' && msg.kind !== 'tool_call'
-    );
+    return messages.filter((msg) => {
+      if (msg.hidden || msg.kind === 'error') {
+        return false;
+      }
+      if (msg.kind !== 'tool_call') {
+        return true;
+      }
+      if (!msg.done) {
+        return false;
+      }
+      return this.isTerminalToolCall(msg);
+    });
+  }
+
+  private isTerminalToolCall(message: Message): boolean {
+    try {
+      const payload = JSON.parse(message.payloadJson) as {
+        data?: { toolName?: unknown; output?: { status?: unknown } };
+      };
+      const toolName = payload?.data?.toolName;
+      if (toolName === 'final_answer') {
+        return true;
+      }
+      const status = payload?.data?.output?.status;
+      return (
+        status === 'success' || status === 'error' || status === 'timeout' || status === 'cancelled'
+      );
+    } catch {
+      return false;
+    }
   }
 
   /**

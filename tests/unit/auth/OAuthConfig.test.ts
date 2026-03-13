@@ -9,11 +9,18 @@ describe('OAuthConfig', () => {
        Assertions: Returns default configuration
        Requirements: google-oauth-auth.10.1 */
     it('should return default configuration when no client ID provided', () => {
+      const originalClientSecret = process.env.CLERKLY_OAUTH_CLIENT_SECRET;
+      delete process.env.CLERKLY_OAUTH_CLIENT_SECRET;
+
       const config = getOAuthConfig();
 
       expect(config.clientId).toBe(OAUTH_CONFIG.clientId);
       expect(config.clientSecret).toBe(OAUTH_CONFIG.clientSecret);
       expect(config.scopes).toEqual(OAUTH_CONFIG.scopes);
+
+      if (originalClientSecret) {
+        process.env.CLERKLY_OAUTH_CLIENT_SECRET = originalClientSecret;
+      }
     });
 
     /* Preconditions: Client ID with .apps.googleusercontent.com suffix
@@ -92,7 +99,9 @@ describe('OAuthConfig', () => {
        Requirements: google-oauth-auth.10.1 */
     it('should use test configuration in test environment', () => {
       const originalEnv = process.env.NODE_ENV;
+      const originalClientSecret = process.env.CLERKLY_OAUTH_CLIENT_SECRET;
       process.env.NODE_ENV = 'test';
+      delete process.env.CLERKLY_OAUTH_CLIENT_SECRET;
 
       const config = getOAuthConfig();
 
@@ -103,6 +112,9 @@ describe('OAuthConfig', () => {
       );
 
       process.env.NODE_ENV = originalEnv;
+      if (originalClientSecret) {
+        process.env.CLERKLY_OAUTH_CLIENT_SECRET = originalClientSecret;
+      }
     });
 
     /* Preconditions: Custom client ID provided

@@ -1,5 +1,18 @@
 # Документ Требований: LLM Integration
 
+## Фокус Документа
+
+Этот документ фиксирует только требования к runtime-интеграции с LLM:
+- orchestration single-tool шага на один ответ модели (`max 1 tool_call per model response`) в `MainPipeline`;
+- streaming reasoning/text, обработку ошибок и retry-поведение;
+- persisted/runtime контракты сообщений (`kind`, `done`, `tool_call`, `usage_json`) и их согласованность в chat-flow;
+- канонический реестр tool names для LLM tool-loop (`final_answer`, `code_exec`).
+
+Документ НЕ определяет:
+- UI/рендеринг сообщений и визуальные состояния чата (см. `docs/specs/agents/*`);
+- общий transport/event-bus контракт вне LLM-специфичных требований (см. `docs/specs/realtime-events/*`);
+- sandbox/policy/API контракты исполнения `code_exec` (см. `docs/specs/code_exec/*`).
+
 ## Введение
 
 Данный документ описывает требования к интеграции LLM в приложение Clerkly. Функциональность обеспечивает полный цикл взаимодействия пользователя с AI-агентом: отправка сообщения → вызов LLM → стриминг reasoning и текста ответа → (опционально) вызовы инструментов → сохранение событий и сообщений в целевом runtime-контракте.
@@ -15,6 +28,7 @@
 - **Reasoning** — внутренние "размышления" модели (стримятся в реальном времени)
 - **Assistant text** — пользовательский текстовый ответ модели (стримится инкрементально)
 - **Tool call** — запрос модели на вызов инструмента и получение результата
+- **code_exec** — инструмент выполнения JavaScript-кода в sandbox; в истории хранится как `kind: tool_call` с `toolName = "code_exec"`
 - **kind** — тип сообщения: `user | llm | error | tool_call`
 - **done** — флаг завершённости сообщения в БД (`false` пока сообщение ещё формируется/стримится, `true` после полного получения)
 - **reply_to_message_id** — ссылка на сообщение, на которое даётся ответ (колонка `messages.reply_to_message_id`, null только у первого)
@@ -40,13 +54,15 @@
 
 1.5. `MainPipeline` ДОЛЖЕН создавать `kind: llm` сообщение при получении первого meaningful чанка (reasoning или text) либо при завершении генерации, если стриминг не пришёл
 
-1.6. `MainPipeline` ДОЛЖЕН обновлять `kind: llm` сообщение при каждом reasoning/text чанке и при завершении текущего ответа модели
+1.6. `MainPipeline` ДОЛЖЕН обновлять persisted `kind: llm` сообщение батчами в активном стриминге и при завершении текущего ответа модели
 
 1.6.1. `kind: llm` сообщение ДОЛЖНО создаваться/обновляться с `done = false`, пока текущий ответ модели не завершён
 
 1.6.2. После завершения текущего ответа модели `kind: llm` сообщение ДОЛЖНО иметь `done = true`
 
 1.6.3. `kind: llm` ДОЛЖЕН оставаться каноничным сообщением для streaming reasoning/text; отдельное завершение задачи фиксируется `kind: tool_call` с `toolName = "final_answer"` и `done = true`.
+
+1.6.4. КОГДА идёт активный стриминг `reasoning/text`, ТО промежуточные persisted-обновления `kind: llm` ДОЛЖНЫ выполняться не чаще одного раза в 100ms; при этом система ДОЛЖНА выполнять принудительный flush накопленного буфера до обработки boundary-событий (`tool_call`, `tool_result`, `done`, `error`, `abort`).
 
 1.7. `MainPipeline` ДОЛЖЕН проставлять `messages.reply_to_message_id` для каждого создаваемого сообщения:
   - Для первого сообщения в чате агента — `null`
@@ -68,7 +84,7 @@
 
 2.1.1. КОГДА reasoning чанк создаёт первое `kind: llm` сообщение (сообщение ещё не существовало), ТО дополнительно ДОЛЖНО эмититься `message.created` с полным snapshot нового сообщения
 
-2.1.2. КОГДА reasoning чанк обновляет уже существующее `kind: llm` сообщение, ТО дополнительно ДОЛЖНО эмититься `message.updated` с полным snapshot обновлённого сообщения
+2.1.2. КОГДА reasoning чанк обновляет уже существующее `kind: llm` сообщение, ТО дополнительно ДОЛЖНО эмититься batched `message.updated` с полным snapshot обновлённого сообщения
 
 2.1.3. Точный технический контракт realtime-события reasoning (имя события и payload) ДОЛЖЕН определяться в `design.md` и быть согласован с `realtime-events` спецификацией
 
@@ -76,9 +92,15 @@
 
 2.3. `message.updated` ДОЛЖЕН эмититься при любом обновлении сообщения (промежуточном и финальном)
 
+2.3.1. Для активного стриминга `kind: llm` промежуточные `message.updated` ДОЛЖНЫ эмититься не чаще одного раза в 100ms; финальные/граничные snapshot-обновления (`tool_call`, `tool_result`, `done`, `error`, `abort`) ДОЛЖНЫ эмититься немедленно после flush буфера.
+
 2.4. Событие `message.llm.reasoning.updated` ДОЛЖНО передавать инкрементальные delta-обновления reasoning.
 
+2.4.1. Во время активного стриминга система ДОЛЖНА передавать `message.llm.reasoning.updated` батчами не чаще одного раза в 100ms (с объединением накопленных delta), за исключением принудительного flush на boundary-событиях.
+
 2.5. Событие `message.llm.text.updated` ДОЛЖНО передавать инкрементальные delta-обновления текста ответа.
+
+2.5.1. Во время активного стриминга система ДОЛЖНА передавать `message.llm.text.updated` батчами не чаще одного раза в 100ms (с объединением накопленных delta), за исключением принудительного flush на boundary-событиях.
 
 2.6. Обработка `tool_call` в chat-flow ДОЛЖНА опираться на persisted сообщения `kind: tool_call` через `message.created`/`message.updated`.
 
@@ -128,8 +150,8 @@
   - **Rate limit** (HTTP 429): `"Rate limit exceeded. Please try again later."` — см. требование 3.7
   - **Внутренняя ошибка провайдера** (HTTP 5xx): `"Provider service unavailable. Please try again later."`
   - **Таймаут ожидания ответа**: `"Model response timeout. The provider took too long to respond. Please try again later."`
-  - **Ошибка инструмента** (`tool`): `"Tool execution failed. Please try again."`
-  - **Ошибка stream protocol** (`protocol`): `"Response stream error. Please try again."`
+  - **Ошибка инструмента** (`tool`): `"Tool execution failed. Please try again later."`
+  - **Ошибка stream protocol** (`protocol`): `"Response stream error. Please try again later."`
 
 3.6. Таймаут ожидания ответа от LLM ДОЛЖЕН составлять 300 секунд (5 минут). ЕСЛИ за это время не получен финальный ответ модели, ТО запрос прерывается с ошибкой таймаута
 
@@ -175,6 +197,11 @@
   - transport-level ошибки без `statusCode` → `network`
   - ошибки tool execution (`NoSuchToolError`, `InvalidToolInputError`, `ToolExecutionError`, `ToolCallRepairError`) → `tool`
   - ошибки stream protocol (`UIMessageStreamError`) → `protocol`
+  - ошибки валидации replay prompt (например, `Invalid prompt: ... ModelMessage[] schema`) → `protocol`
+
+#### Функциональные Тесты
+
+- `tests/functional/llm-chat.spec.ts` — "should show rate limit banner with countdown and auto-retry"
 
 ---
 
@@ -227,7 +254,7 @@
 
 5.4. Текст ответа ДОЛЖЕН стримиться через `onChunk` инкрементально (`text delta`), без ожидания только финального агрегированного блока
 
-5.5. Провайдер ДОЛЖЕН поддерживать tool-calling в рамках одного turn: в chat-flow передаются полностью собранные данные tool call для persisted сообщения `kind: tool_call`
+5.5. Провайдер ДОЛЖЕН поддерживать tool-calling в рамках одного turn с ограничением `max 1 tool_call` на один ответ модели: в chat-flow передаются полностью собранные данные валидного tool call для persisted сообщения `kind: tool_call`
 
 5.6. Ответ провайдера ДОЛЖЕН включать usage-envelope в формате:
   - `canonical`: `input_tokens`, `output_tokens`, `total_tokens`, `cached_tokens?`, `reasoning_tokens?`
@@ -346,6 +373,10 @@
 
 9.4. Статус агента в chat-flow ДОЛЖЕН вычисляться в одном месте по алгоритму `agents.9.2`; LLM pipeline ДОЛЖЕН сохранять `kind`/`done`/`hidden` семантику сообщений строго в соответствии с этим алгоритмом.
 
+9.4.1. КОГДА terminal `tool_call(code_exec)` имеет `output.status = "success"`, ТО до следующего шага tool-loop статус агента ДОЛЖЕН оставаться `in-progress`.
+
+9.4.2. КОГДА terminal `tool_call(code_exec)` имеет `output.status ∈ {"error","timeout","cancelled"}`, ТО статус агента ДОЛЖЕН оставаться `in-progress`.
+
 9.5. Основной пользовательский ответ модели ДОЛЖЕН оставаться в `kind: llm` (`data.text`).
 
 9.5.1. `tool_call` с `toolName = "final_answer"` ДОЛЖЕН содержать:
@@ -354,6 +385,8 @@
 9.5.1.1. Системная инструкция и описание инструмента `final_answer` ДОЛЖНЫ явно фиксировать:
   - обычный текстовый ответ модели (`kind: llm`, `data.text`) используется для диалога в процессе выполнения задачи (уточнения, запросы к пользователю, промежуточные сообщения), а не для фиксации завершения;
   - `final_answer` вызывается только когда модель уверена, что работа завершена;
+  - ЕСЛИ работа не завершена и `final_answer` не вызывается, модель ДОЛЖНА явно запросить у пользователя недостающую информацию или подтверждение следующего шага;
+  - `final_answer` вызывается только в одиночку в рамках одного model-turn; в том же turn НЕ ДОЛЖНЫ вызываться другие инструменты;
   - `summary_points` соблюдает лимиты `llm-integration.9.5.2-9.5.3` и перечисляет решённые задачи.
 
 9.5.2. `summary_points` ДОЛЖЕН содержать от 1 до 10 пунктов.
@@ -366,7 +399,14 @@
 
 9.6. В целевой модели невалидный `final_answer` НЕ ДОЛЖЕН фиксироваться как успешный `completed`; он ДОЛЖЕН либо быть исправлен через retry, либо завершиться `kind:error` при исчерпании retry-лимита.
 
-9.7. Контракт отображения `tool_call(final_answer)` определяется в спецификации `agents` (см. `agents.7.4.4`) и не дублируется в данном документе.
+9.7. Контракт отображения `kind: tool_call` (в текущем scope: `final_answer`, `code_exec`) определяется только в спецификации `agents` (`agents.7.4.*`) и не дублируется в данном документе.
+
+#### Функциональные Тесты
+
+- `tests/functional/agent-status-calculation.spec.ts` - "should keep in-progress status for done code_exec success tool_call"
+- `tests/functional/agent-status-calculation.spec.ts` - "should keep in-progress status from done code_exec error tool_call"
+- `tests/functional/agent-status-calculation.spec.ts` - "should keep in-progress status from done code_exec timeout tool_call"
+- `tests/functional/agent-status-calculation.spec.ts` - "should keep in-progress status from done code_exec cancelled tool_call"
 
 ---
 
@@ -382,45 +422,75 @@
 
 10.2. В историю ДОЛЖНЫ попадать только пользовательские данные сообщения, а служебные поля (`kind`, `reply_to_message_id`, `model`, `reasoning.text`, `reasoning.excluded_from_replay`) НЕ ДОЛЖНЫ передаваться в сериализованный payload.
 
-10.3. Сообщения, которые не должны участвовать в диалоге (`kind:error`, `kind:tool_call`, а также сообщения с флагом `hidden`), НЕ ДОЛЖНЫ попадать в историю.
+10.3. Сообщения `kind:error` и сообщения с флагом `hidden` НЕ ДОЛЖНЫ попадать в историю.
 
 10.4. Системная инструкция и история диалога ДОЛЖНЫ передаваться в модель раздельно, без объединения в один текстовый блок.
 
 #### Функциональные Тесты
 
-- `tests/functional/llm-chat.spec.ts` — "История передаётся как отдельные сообщения и исключает служебные поля"
+- `tests/functional/llm-chat.spec.ts` — "should send full conversation history to llm on second message"
 
 ---
 
-### 11. Tool Calling и многошаговый цикл model -> tools -> model
+### 11. Tool Calling с ограничением `max 1 tool_call` на ответ модели
 
 **ID:** llm-integration.11
 
-**User Story:** Как пользователь, я хочу чтобы агент мог вызывать инструменты в процессе ответа и продолжать генерацию с учётом результатов.
+**User Story:** Как пользователь, я хочу чтобы агент вызывал не более одного инструмента в одном ответе модели, чтобы поведение было предсказуемым и стабильным.
 
 #### Критерии Приемки
 
-11.1. КОГДА модель запрашивает вызов инструмента, ТО `MainPipeline` ДОЛЖЕН дождаться полной сборки аргументов и сохранить/обновить сообщение `kind: tool_call` в `messages`.
+11.1. КОГДА модель запрашивает вызов инструмента, ТО `MainPipeline` ДОЛЖЕН дождаться полной сборки аргументов и выполнить schema/contract validation до создания persisted `kind: tool_call`.
 
-11.1.1. КОГДА в одном turn присутствуют и стриминг основного ответа (`reasoning`/`text`), и `tool_call`, ТО обработка `tool_call` в chat-flow ДОЛЖНА выполняться только после финализации основного `kind: llm` сообщения (`done = true`).
+11.1.1. КОГДА один ответ модели содержит более одного `tool_call`, ТО такой ответ ДОЛЖЕН считаться невалидным и ДОЛЖЕН обрабатываться через bounded retry/repair без создания persisted `kind: tool_call`.
 
-11.1.2. ПОКА основной `kind: llm` ответ текущего turn не финализирован, persisted `kind: tool_call` сообщения этого turn НЕ ДОЛЖНЫ создаваться/обновляться в БД.
+11.1.2. КОГДА `tool_call` валиден, ТО система ДОЛЖНА отложить создание persisted `kind: tool_call` до завершения текущей reasoning-фазы ответа модели, затем завершить текущий непустой LLM-сегмент и только после этого создать persisted `kind: tool_call` в статусе выполнения (`done = false`, `status = "running"`).
 
-11.2. При обработке tool call система ДОЛЖНА создавать/обновлять persisted сообщение `kind: tool_call` с полями `callId`, `toolName`, полностью собранными `arguments` и результатом выполнения.
+11.1.3. КОГДА `tool_call` валиден и создан в `running`, ТО post-tool LLM-сегмент ДОЛЖЕН начинать стримиться без ожидания terminal-результата `tool_call`.
 
-11.2.1. Для `final_answer` инструмент ДОЛЖЕН вызываться в strict-режиме через `Vercel AI SDK`; соблюдение контракта аргументов (`llm-integration.9.5.*`) ДОЛЖНО обеспечиваться схемой инструмента и встроенным retry/repair механизмом SDK.
+11.1.3.1. ЕСЛИ после `tool_call` в текущем model-step отсутствует post-tool `text`/`reasoning`, ТО persisted `tool_call` со статусом `running` ВСЁ РАВНО ДОЛЖЕН стать видимым в UI до его terminal-обновления в `message.updated`.
 
-11.3. Выполнение инструмента ДОЛЖНО сопровождаться сохранением сообщения `kind: tool_call` в `messages`; отображение этих сообщений определяется спецификацией `agents`.
+11.1.4. КОГДА `tool_call` завершён terminal-результатом (`success | error | timeout | cancelled`), ТО система ДОЛЖНА обновить тот же persisted `kind: tool_call` до terminal-состояния (`done = true`) в том же блоке (без создания дублирующего terminal-блока).
 
-11.3.1. Сообщения `kind: tool_call` НЕ ДОЛЖНЫ входить в model history (`PromptBuilder`/`listForModelHistory`), но ДОЛЖНЫ сохраняться в истории сообщений.
+11.1.5. КОГДА в одном run присутствуют и стриминг LLM (`reasoning`/`text`), и `tool_call`, ТО видимый порядок сообщений ДОЛЖЕН быть: pre-tool LLM-сегмент -> `tool_call` (`running`) -> post-tool LLM-сегмент; terminal-обновление `tool_call` МОЖЕТ приходить позже и ДОЛЖНО применяться in-place.
 
-11.3.2. Runtime-поток tool-calling НЕ ДОЛЖЕН требовать отдельного realtime-сигнала; обработка ДОЛЖНА строиться по persisted `message.created`/`message.updated`.
+11.1.6. Пустые LLM-сегменты (без reasoning и без text) НЕ ДОЛЖНЫ сохраняться.
 
-11.4. Система ДОЛЖНА поддерживать несколько tool calls в одном turn, включая контролируемую параллельность.
+11.2. Для `final_answer` инструмент ДОЛЖЕН вызываться в strict-режиме через `Vercel AI SDK`; соблюдение контракта аргументов (`llm-integration.9.5.*`) ДОЛЖНО обеспечиваться схемой инструмента и встроенным retry/repair механизмом SDK.
 
-11.5. После получения результатов инструментов `MainPipeline` ДОЛЖЕН продолжать цикл `model -> tools -> model` до завершения turn или ошибки.
+11.2.1. КОГДА `final_answer` присутствует в model-turn, ТО к ответу ДОЛЖНО применяться общее ограничение cardinality из `llm-integration.11.1.1` (без отдельного локального правила).
 
-11.6. Промежуточные `tool_call` сообщения ДОЛЖНЫ участвовать в статусной семантике chat-flow: при последнем видимом сообщении (`kind: llm` или `kind: tool_call`) с `done = false` статус ДОЛЖЕН быть `in-progress`; правила отображения определяются спецификацией `agents`.
+11.2.2. `final_answer` ДОЛЖЕН отображаться последним пользовательским артефактом текущей успешной попытки независимо от порядка его прихода в provider stream.
+
+11.3. КОГДА аргументы любого `tool_call` не проходят schema/contract validation, система ДОЛЖНА вернуть модели диагностику невалидных аргументов и выполнить bounded retry/repair без создания persisted `kind: tool_call`.
+
+11.3.1. Retry/repair для невалидных аргументов tool call ДОЛЖЕН быть ограничен конечным числом попыток: `maxRetries = 2`.
+
+11.3.2. ЕСЛИ после исчерпания retry/repair аргументы остаются невалидными, turn ДОЛЖЕН завершаться обычной ошибкой модели (`kind: error` в чате), а НЕ terminal-ошибкой `tool_call`.
+
+11.3.3. Для невалидных аргументов любого `tool_call` запись `kind: tool_call` НЕ ДОЛЖНА создаваться или обновляться в `messages` на любом шаге retry/repair.
+
+11.3.4. КОГДА попытка помечается неуспешной из-за невалидного `tool_call`, ТО уже созданные в этой попытке `kind: llm`/`kind: tool_call` сообщения ДОЛЖНЫ помечаться `hidden: true` и исключаться из активного runtime-потока.
+
+11.4. Сообщения `kind: tool_call` ДОЛЖНЫ сохраняться в истории сообщений и ДОЛЖНЫ включаться в model history (`PromptBuilder`/`listForModelHistory`) только в terminal-состоянии.
+
+11.4.1. Non-terminal `tool_call` (например, `status = "running"`) НЕ ДОЛЖЕН включаться в model history.
+
+11.4.2. Формат включения terminal `tool_call` в model history ДОЛЖЕН соответствовать AI SDK replay-контракту вызова инструмента: связанная пара `assistant(tool-call)` + `tool(tool-result)` с одинаковым `toolCallId`.
+
+11.4.3. Для каждого terminal `tool_call` в model history ДОЛЖНЫ передаваться:
+  - `assistant` сообщение с `tool-call` (`toolCallId`, `toolName`, `input` из persisted `arguments`);
+  - `tool` сообщение с `tool-result` (`toolCallId`, `toolName`, `output`), где `output` сериализован в формате ToolResultOutput AI SDK (для JSON: `{ "type": "json", "value": ... }`).
+
+11.4.4. Поле `output.value` ДОЛЖНО содержать terminal-статус вызова (`success | error | timeout | cancelled`) и соответствующий output инструмента (включая ошибку, если она есть).
+
+11.5. После получения terminal-результата инструмента `MainPipeline` ДОЛЖЕН продолжать выполнение следующим шагом модели (`model -> tool -> model`) до завершения turn или ошибки, сохраняя ограничение `max 1 tool_call` на каждый следующий ответ модели.
+
+11.5.1. КОГДА `tool_call` завершён terminal-результатом с любым статусом (`success | error | timeout | cancelled`), ТО `MainPipeline` ДОЛЖЕН немедленно передать этот результат в следующий шаг модели.
+
+11.6. Runtime-поток tool-calling НЕ ДОЛЖЕН требовать отдельного realtime-сигнала; обработка ДОЛЖНА строиться по persisted `message.created`/`message.updated`.
+
+11.6.1. Система ДОЛЖНА гарантировать, что при завершении run/attempt не остаётся `tool_call` со статусом `running`: каждый такой вызов ДОЛЖЕН переходить в terminal-статус (`cancelled | error | timeout | success`) до завершения попытки.
 
 11.7. ЕСЛИ реальное выполнение инструмента недоступно, система ДОЛЖНА завершать `kind: tool_call` через заглушку результата:
   - сохранять диагностически понятный placeholder output,
@@ -429,8 +499,13 @@
 
 #### Функциональные Тесты
 
-- `tests/functional/llm-chat.spec.ts` — "full llm response streams before final_answer block appears"
-- `tests/functional/llm-chat.spec.ts` — "tool_call block is not persisted/visible before llm done for the same turn"
+- `tests/functional/llm-chat.spec.ts` — "should create tool_call only after reasoning phase and start post-tool text without waiting terminal result"
+- `tests/functional/llm-chat.spec.ts` — "should keep visual order pre-tool llm -> tool_call(running) -> post-tool llm with in-place terminal update"
+- `tests/functional/llm-chat.spec.ts` — "should show running code_exec before terminal when first model step has no post-tool text"
+- `tests/functional/llm-chat.spec.ts` — "should reject model response containing more than one tool_call and run repair"
+- `tests/functional/llm-chat.spec.ts` — "should retry tool call on invalid arguments, not persist tool_call, and show kind:error after retry limit"
+- `tests/functional/llm-chat.spec.ts` — "should continue to next model step after terminal code_exec tool result"
+- `tests/functional/llm-chat.spec.ts` — "should render final_answer tool_call as completed assistant response"
 
 ### 12. Надёжность chat-flow и обработка некорректных ответов
 
@@ -454,7 +529,8 @@
 
 #### Функциональные Тесты
 
-- `tests/functional/llm-chat.spec.ts` — "cancel during tool execution hides in-flight messages and creates no error"
+- `tests/functional/llm-chat.spec.ts` — "should cancel active request via stop button without creating error message"
+- `tests/functional/llm-chat.spec.ts` — "should show error when invalid final_answer exhausts retry limit"
 
 ---
 
@@ -480,7 +556,7 @@
 
 #### Функциональные Тесты
 
-- `tests/functional/llm-chat.spec.ts` — "LLM сообщение сохраняется с usage_json (canonical + raw) без расчёта стоимости"
+- `tests/functional/llm-chat.spec.ts` — "should show llm response after user message"
 
 ---
 
@@ -498,6 +574,26 @@
 
 14.3. После завершения turn (`done = true`) финальный snapshot из `message.updated` ДОЛЖЕН считаться каноническим persisted-состоянием сообщения.
 
+14.4. В активном стриминге delta/source-of-truth (`message.llm.reasoning.updated`, `message.llm.text.updated`) и snapshot (`message.updated`) ДОЛЖНЫ координироваться через общий буфер с частотой не чаще 100ms между промежуточными flush-циклами.
+
 #### Функциональные Тесты
 
-- `tests/functional/llm-chat.spec.ts` — "multiple tool calls in one turn and final response continues"
+- `tests/functional/llm-chat.spec.ts` — "should continue single-tool model -> tool -> model flow with persisted tool_call blocks"
+
+---
+
+### 15. Канонический реестр tool names
+
+**ID:** llm-integration.15
+
+**User Story:** Как разработчик, я хочу единый канонический список имён инструментов в одном месте, чтобы избежать расхождений между спеками и runtime.
+
+#### Критерии Приемки
+
+15.1. Канонический список `toolName` ДОЛЖЕН фиксироваться в `llm-integration` как source of truth для runtime/tool-loop контракта.
+
+15.2. В текущем scope список `toolName` ДОЛЖЕН состоять ровно из:
+  - `final_answer`
+  - `code_exec`
+
+15.3. Другие спецификации (`agents`, `code_exec`, `realtime-events`) SHALL ссылаться на канонический список из `llm-integration` и SHALL NOT переопределять его независимо.

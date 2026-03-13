@@ -232,6 +232,13 @@ test.describe('Agent Status Indicators', () => {
     await messageInput.fill('Message to second agent');
     await messageInput.press('Enter');
     await expect(activeChat(window).userMessages).toHaveCount(1, { timeout: 5000 });
+    await expect(
+      window
+        .locator('[data-testid="agent-chat-root"]:not(.pointer-events-none)')
+        .locator('[data-testid="prompt-input-send"]')
+    ).toBeVisible({
+      timeout: 15000,
+    });
 
     // Switch to first agent using stable ID
     await window.locator(`[data-testid="${firstAgentTestId}"]`).click();
@@ -241,6 +248,13 @@ test.describe('Agent Status Indicators', () => {
     await messageInput.fill('Message to first agent');
     await messageInput.press('Enter');
     await expect(activeChat(window).userMessages).toHaveCount(1, { timeout: 5000 });
+    await expect(
+      window
+        .locator('[data-testid="agent-chat-root"]:not(.pointer-events-none)')
+        .locator('[data-testid="prompt-input-send"]')
+    ).toBeVisible({
+      timeout: 15000,
+    });
 
     // First agent should now be at position 0
     // Animation should have been triggered

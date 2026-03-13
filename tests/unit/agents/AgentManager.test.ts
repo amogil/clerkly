@@ -231,6 +231,57 @@ describe('AgentManager', () => {
       expect(snapshot.status).toBe(AGENT_STATUS.AWAITING_RESPONSE);
     });
 
+    /* Preconditions: Agent with last message kind:tool_call(code_exec), done=true, output.status=success
+       Action: Call toEventAgent() with agent
+       Assertions: Returns AgentSnapshot with status 'in-progress'
+       Requirements: agents.9.2, llm-integration.9.4.1 */
+    it('should compute status as in-progress when last message is done code_exec success tool_call', () => {
+      const lastMessage = {
+        id: 1,
+        agentId: mockAgent.agentId,
+        kind: MESSAGE_KIND.TOOL_CALL,
+        timestamp: '2026-02-15T10:30:00.000Z',
+        payloadJson: JSON.stringify({
+          data: { callId: 'call-1', toolName: 'code_exec', output: { status: 'success' } },
+        }),
+        usageJson: null,
+        replyToMessageId: null,
+        hidden: false,
+        done: true,
+      };
+      mockDbManager.messages.getLastByAgent = jest.fn().mockReturnValue(lastMessage);
+
+      const snapshot = (agentManager as any).toEventAgent(mockAgent);
+      expect(snapshot.status).toBe(AGENT_STATUS.IN_PROGRESS);
+    });
+
+    /* Preconditions: Agent with last message kind:tool_call(code_exec), done=true, output.status is terminal failure
+       Action: Call toEventAgent() with agent
+       Assertions: Returns AgentSnapshot with status 'in-progress' for error/timeout/cancelled
+       Requirements: agents.9.2, llm-integration.9.4.2 */
+    it.each(['error', 'timeout', 'cancelled'] as const)(
+      'should compute status as in-progress when last message is done code_exec %s tool_call',
+      (terminalStatus) => {
+        const lastMessage = {
+          id: 1,
+          agentId: mockAgent.agentId,
+          kind: MESSAGE_KIND.TOOL_CALL,
+          timestamp: '2026-02-15T10:30:00.000Z',
+          payloadJson: JSON.stringify({
+            data: { callId: 'call-1', toolName: 'code_exec', output: { status: terminalStatus } },
+          }),
+          usageJson: null,
+          replyToMessageId: null,
+          hidden: false,
+          done: true,
+        };
+        mockDbManager.messages.getLastByAgent = jest.fn().mockReturnValue(lastMessage);
+
+        const snapshot = (agentManager as any).toEventAgent(mockAgent);
+        expect(snapshot.status).toBe(AGENT_STATUS.IN_PROGRESS);
+      }
+    );
+
     /* Preconditions: Agent with last message of kind 'tool_call' and done=true for final_answer exists
        Action: Call toEventAgent() with agent
        Assertions: Returns AgentSnapshot with status 'completed'

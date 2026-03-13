@@ -23,6 +23,7 @@ import type {
   AuthCancelledPayload,
   ErrorCreatedPayload,
   LLMPipelineDiagnosticPayload,
+  MessageCreatedPayload,
 } from '../shared/events/types';
 
 // Requirements: clerkly.3.5, clerkly.3.7
@@ -151,6 +152,33 @@ function AppContent() {
     logger.error(message);
   }, []);
 
+  // Requirements: realtime-events.4.12
+  const handleMessageCreated = useCallback((payload: MessageCreatedPayload) => {
+    const message = payload.message;
+    if (message.kind === 'error') {
+      const data =
+        message.payload && typeof message.payload === 'object'
+          ? (message.payload.data as Record<string, unknown> | undefined)
+          : undefined;
+      const errorInfo =
+        data && typeof data['error'] === 'object' && data['error'] !== null
+          ? (data['error'] as { message?: unknown })
+          : undefined;
+      const errorText =
+        typeof errorInfo?.message === 'string' && errorInfo.message.length > 0
+          ? errorInfo.message
+          : 'Unknown error';
+      logger.error(
+        `Chat message created (kind:error, id:${message.id}, agentId:${message.agentId}): ${errorText}`
+      );
+      return;
+    }
+
+    logger.info(
+      `Chat message created (kind:${message.kind}, id:${message.id}, agentId:${message.agentId})`
+    );
+  }, []);
+
   useEventSubscription(EVENT_TYPES.AUTH_CALLBACK_RECEIVED, handleAuthCallbackReceived);
   useEventSubscription(EVENT_TYPES.AUTH_COMPLETED, handleAuthCompleted);
   useEventSubscription(EVENT_TYPES.AUTH_FAILED, handleAuthFailed);
@@ -158,6 +186,7 @@ function AppContent() {
   useEventSubscription(EVENT_TYPES.AUTH_SIGNED_OUT, handleAuthSignedOut);
   useEventSubscription(EVENT_TYPES.ERROR_CREATED, handleErrorCreated);
   useEventSubscription(EVENT_TYPES.LLM_PIPELINE_DIAGNOSTIC, handleLLMPipelineDiagnostic);
+  useEventSubscription(EVENT_TYPES.MESSAGE_CREATED, handleMessageCreated);
 
   // Requirements: error-notifications.2.7, error-notifications.2.8 - Global unhandled rejection handler
   useEffect(() => {

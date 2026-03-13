@@ -3,6 +3,8 @@
 ## Введение
 
 Данный документ описывает требования к инфраструктуре тестирования приложения Clerkly, включая типы тестов, стратегию мокирования и процесс валидации.
+Документ описывает только тестовую инфраструктуру (процессы, инструменты, правила написания и запуска тестов) и SHALL NOT задавать продуктовые UI-контракты или runtime-логику приложения.
+Продуктовые требования определяются профильными спецификациями фич в `docs/specs/*`; `testing-infrastructure` использует их только как внешние источники проверяемых контрактов.
 
 ## Глоссарий
 
@@ -89,6 +91,7 @@
 - `test:clear-tokens` - очистка всех токенов из БД
 - `test:get-token-status` - получение статуса токенов
 - `test:clear-data` - очистка всех данных из БД
+- `test:handle-deep-link` - симуляция обработки OAuth callback/deep link в тестовой среде
 
 3.1.3. THE test IPC handlers SHALL быть доступны ТОЛЬКО в тестовом режиме
 
@@ -148,6 +151,12 @@
 
 4.4. WHEN валидация проваливается, THE скрипт SHALL возвращать ненулевой код выхода
 
+4.5. THE команда `npm run validate` SHALL выполняться без обязательных runtime-secrets (`CLERKLY_OAUTH_CLIENT_SECRET`, `CLERKLY_OPENAI_API_KEY`)
+
+4.6. THE проверка устаревших зависимостей (`npm outdated`) SHALL быть отключена по умолчанию в `npm run validate` и SHALL запускаться только при явном флаге `--with-dependency-check` (или эквивалентной npm-команде с этим флагом).
+
+4.7. WHEN GitHub pull request workflow выполняет валидацию, THE job валидации SHALL запускать полный набор проверок с включённой проверкой устаревших зависимостей через `npm run validate:verbose:deps` (или эквивалент `npm run validate -- --with-dependency-check`), а НЕ дефолтный режим без dependency-check.
+
 ### 5. Запуск Функциональных Тестов
 
 **ID:** testing.5
@@ -167,6 +176,16 @@
 5.4. WHEN функциональные тесты запускаются, THE пользователь SHALL быть предупрежден о том, что будут показаны окна на экране
 
 5.5. WHEN pull request workflow CI выполняется, THE функциональные тесты SHALL запускаться на macOS runner и SHALL завершаться успешно
+
+5.6. WHERE функциональные тесты используют локальные mock HTTP-сервисы (например, Mock OAuth Server), запуск SHALL выполняться в окружении с разрешением на bind localhost-сокетов.
+
+5.7. IF окружение выполнения запрещает bind localhost-сокетов (например, sandbox-ограничения), THE функциональные тесты SHALL запускаться вне такого sandbox.
+
+5.8. IF запуск функциональных тестов выполняется в окружении без localhost bind permissions, THE инфраструктура SHALL считать ошибку `listen EPERM: operation not permitted 127.0.0.1` инфраструктурной ошибкой окружения, а НЕ продуктовой регрессией приложения.
+
+5.9. THE функциональные тесты SHALL НЕ требовать `CLERKLY_OAUTH_CLIENT_SECRET`; OAuth-сценарии SHALL использовать mock OAuth server (`CLERKLY_GOOGLE_API_URL`) и тестовые конфигурации.
+
+5.10. WHERE в функциональном наборе есть real-provider LLM сценарии, такие сценарии SHALL требовать только `CLERKLY_OPENAI_API_KEY` и НЕ SHALL требовать Google OAuth secret.
 
 ### 6. Требования к Окружению для Функциональных Тестов
 
@@ -205,8 +224,6 @@
 7.3. THE Production Code SHALL анализироваться линтерами и статическими анализаторами
 
 7.4. THE Production Code SHALL поддерживаться и обновляться
-
-7.5. THE код в директории `figma/` SHALL считаться Reference Code
 
 7.6. THE Reference Code SHALL НЕ требовать покрытия тестами
 
@@ -287,6 +304,8 @@
 - Тесты производительности
 - Нагрузочное тестирование
 - Тестирование безопасности
+- Продуктовые UI-контракты
+- Runtime-логика приложения
 
 
 ### 10. Helper Функции для Функциональных Тестов
@@ -405,34 +424,20 @@ await expect(element).toContainText('Success');
 
 12.3. THE проверка toast-ошибок SHALL быть реализована как переиспользуемый helper в модуле тестовых утилит.
 
-### 13. Контракты тестирования AI SDK chat-flow
+### 13. Инфраструктурный Контроль Полноты Тест-Матриц
 
 **ID:** testing.13
 
-**User Story:** Как разработчик, я хочу проверять AI SDK chat-flow контракт на уровне unit/functional тестов, чтобы стриминг, ошибки и tool-loop оставались стабильными.
+**User Story:** Как разработчик, я хочу инфраструктурные правила полноты тест-матриц, чтобы профильные спеки не теряли обязательные unit/functional сценарии при изменениях.
 
-**Зависимости:** testing.1, testing.3
+**Зависимости:** testing.8
 
 #### Критерии Приемки
 
-13.1. THE модульные тесты SHALL покрывать stream protocol sequence (`start -> start-step -> delta -> finish-step -> finish`) для renderer transport.
-13.1.1. `start-step` SHALL соответствовать transport chunk `text-start`, а `finish-step` SHALL соответствовать transport chunk `text-end`.
+13.1. THE process обновления спецификаций SHALL требовать, чтобы каждая профильная фича с пользовательскими сценариями содержала явные списки unit/functional тестов в `requirements.md` и/или `design.md`.
 
-13.2. THE модульные тесты SHALL покрывать отсутствие дублирования между delta-событиями (`message.llm.reasoning.updated`, `message.llm.text.updated`) и snapshot `message.updated`.
+13.2. THE testing infrastructure SHALL считать некорректным состояние, когда профильная спека содержит новые критерии приемки, но не содержит ссылок на покрывающие тесты.
 
-13.3. THE модульные тесты SHALL проверять рендер persisted `kind:tool_call`: `final_answer` как отдельный checklist-блок `"Final Answer"` (без отдельного заголовка, только `summary_points`), остальные `tool_call` как отдельный tool-call блок.
-13.3.1. Для `final_answer` тесты SHALL проверять, что checklist-блок всегда отображается раскрытым и не содержит контроля сворачивания.
-13.3.2. Тесты SHALL проверять соблюдение контракта `final_answer` согласно `llm-integration.9.5.*` (`summary_points` обязателен и содержит минимум 1 пункт).
-13.3.3. Тесты SHALL проверять retry-path для невалидного `final_answer` и создание `kind:error` при исчерпании retry-лимита.
+13.3. THE testing infrastructure SHALL использовать профильные спеки как source of truth для feature-specific сценариев и SHALL NOT дублировать их продуктовую логику в `testing-infrastructure`.
 
-13.4. THE модульные тесты SHALL покрывать ErrorNormalizer для классов ошибок AI SDK и доменного маппинга (`auth`, `rate_limit`, `provider`, `network`, `timeout`, `tool`, `protocol`).
-
-13.5. THE модульные тесты SHALL покрывать multi-tool сценарии в одном запросе и продолжение цикла `model -> tools -> model`.
-
-13.6. THE функциональные тесты SHALL проверять одновременный стриминг reasoning и текста в одном `kind:llm` сообщении.
-
-13.7. THE функциональные тесты SHALL проверять `rate_limit` countdown без создания `kind:error` записи в истории.
-
-13.8. THE функциональные тесты SHALL проверять, что cancel во время tool execution НЕ создаёт `kind:error`.
-
-13.9. THE модульные и функциональные тесты SHALL покрывать нормализацию математических делимитеров `\(...\)`, `\[...\]`, `\$...\$` и `\$\$...\$\$` в KaTeX-совместимый формат, включая проверку, что fenced/inline code при нормализации не изменяются.
+13.4. Инфраструктурный контроль полноты ДОЛЖЕН опираться на профильные спецификации соответствующих подсистем/фич и SHALL NOT фиксировать закрытый список конкретных фич внутри `testing-infrastructure`.

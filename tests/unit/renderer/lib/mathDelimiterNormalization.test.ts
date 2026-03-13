@@ -1,6 +1,9 @@
 // Requirements: agents.7.7, llm-integration.4.5
 
-import { normalizeMathDelimiters } from '../../../../src/renderer/lib/mathDelimiterNormalization';
+import {
+  normalizeMathDelimiters,
+  normalizeReasoningMarkdownSpacing,
+} from '../../../../src/renderer/lib/mathDelimiterNormalization';
 
 describe('normalizeMathDelimiters', () => {
   /* Preconditions: inline and block LaTeX delimiters are present in plain text
@@ -69,5 +72,44 @@ describe('normalizeMathDelimiters', () => {
     expect(output).toContain('Text $a+b$');
     expect(output).toContain('```md\n\\$code\\$\n```');
     expect(output).toContain('`\\$inline code\\$`');
+  });
+});
+
+describe('normalizeReasoningMarkdownSpacing', () => {
+  /* Preconditions: reasoning text has glued bold opener after plain text
+     Action: normalize reasoning markdown spacing
+     Assertions: paragraph break inserted before heading-like bold opener after punctuation
+     Requirements: agents.4.11.3 */
+  it('should insert paragraph break before glued bold opener after sentence punctuation', () => {
+    const input = 'I will clarify soon!**Resolving next step**';
+    const output = normalizeReasoningMarkdownSpacing(input);
+
+    expect(output).toBe('I will clarify soon!\n\n**Resolving next step**');
+  });
+
+  /* Preconditions: reasoning text has glued bold opener not preceded by sentence punctuation
+     Action: normalize reasoning markdown spacing
+     Assertions: single space inserted before bold opener
+     Requirements: agents.4.11.4 */
+  it('should insert space before glued bold opener when punctuation rule does not apply', () => {
+    const input = 'Token**bold section**';
+    const output = normalizeReasoningMarkdownSpacing(input);
+
+    expect(output).toBe('Token **bold section**');
+  });
+
+  /* Preconditions: reasoning text includes fenced and inline code with glued ** sequence
+     Action: normalize reasoning markdown spacing
+     Assertions: code segments remain unchanged
+     Requirements: agents.4.11.5 */
+  it('should not rewrite fenced and inline code segments', () => {
+    const input = ['Outside!**Bold**', '', '```js', "const x='a'+'**b';", '```', '', '`x**y`'].join(
+      '\n'
+    );
+    const output = normalizeReasoningMarkdownSpacing(input);
+
+    expect(output).toContain('Outside!\n\n**Bold**');
+    expect(output).toContain("```js\nconst x='a'+'**b';\n```");
+    expect(output).toContain('`x**y`');
   });
 });

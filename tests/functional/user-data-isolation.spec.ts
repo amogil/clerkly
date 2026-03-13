@@ -23,6 +23,8 @@ test.beforeEach(async () => {
   // Launch Electron app with mock OAuth server
   context = await launchElectron(undefined, {
     CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
+    CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
+    CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
     CLERKLY_OPENAI_API_KEY: '',
     CLERKLY_ANTHROPIC_API_KEY: '',
     CLERKLY_GOOGLE_API_KEY: '',
@@ -75,6 +77,8 @@ test('should isolate data between different users', async () => {
   // Relaunch app
   context = await launchElectron(testDataPath, {
     CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
+    CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
+    CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
     CLERKLY_OPENAI_API_KEY: '',
     CLERKLY_ANTHROPIC_API_KEY: '',
     CLERKLY_GOOGLE_API_KEY: '',
@@ -115,6 +119,8 @@ test('should isolate data between different users', async () => {
   // Relaunch app
   context = await launchElectron(testDataPath, {
     CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
+    CLERKLY_OAUTH_CLIENT_ID: 'test-client-id-12345',
+    CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
     CLERKLY_OPENAI_API_KEY: '',
     CLERKLY_ANTHROPIC_API_KEY: '',
     CLERKLY_GOOGLE_API_KEY: '',
@@ -361,6 +367,9 @@ test('should handle "No user logged in" error gracefully', async () => {
 
   await completeOAuthFlow(context.app, context.window, TEST_CLIENT_ID);
   await context.window.waitForSelector('[data-testid="agents"]', { timeout: 10000 });
+  await expect(context.window.locator('[data-testid="app-loading-screen"]')).toBeHidden({
+    timeout: 10000,
+  });
 
   // 3) Sign out
   await context.window.click('text=Settings');

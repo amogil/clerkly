@@ -1,32 +1,32 @@
-# Clerkly - AI Agent для менеджеров
+# Clerkly - AI Agent
 
-Electron-приложение для Mac OS X с локальным хранением данных и комплексным тестовым покрытием.
+An Electron app for Mac OS X with local data storage and comprehensive test coverage.
 
-## Требования к системе
+## System Requirements
 
-- **Node.js**: 18.0.0 или выше
-- **Mac OS X**: 10.13 (High Sierra) или выше
-- **Свободное место**: минимум 500 MB
+- **Node.js**: 18.0.0 or higher
+- **Mac OS X**: 10.13 (High Sierra) or higher
+- **Free disk space**: at least 500 MB
 
-## Быстрый старт
+## Quick Start
 
 ```bash
-# Установка зависимостей
+# Install dependencies
 npm install
 
-# Запуск приложения (production build с полной функциональностью)
+# Run the app (production build with full functionality)
 npm start
 
-# Валидация проекта
+# Validate the project
 npm run validate
 ```
 
-## Настройка Google OAuth
+## Google OAuth Setup
 
-1. Создайте проект в [Google Cloud Console](https://console.cloud.google.com/)
-2. Настройте OAuth consent screen (External, scopes: openid, email, profile)
-3. Создайте OAuth 2.0 Client ID (тип: Desktop app)
-4. Обновите `src/main/auth/OAuthConfig.ts`:
+1. Create a project in [Google Cloud Console](https://console.cloud.google.com/)
+2. Configure the OAuth consent screen (External, scopes: openid, email, profile)
+3. Create an OAuth 2.0 Client ID (type: Desktop app)
+4. Update `src/main/auth/OAuthConfig.ts`:
    ```typescript
    export const OAUTH_CONFIG = {
      clientId: 'your-client-id.apps.googleusercontent.com',
@@ -36,54 +36,54 @@ npm run validate
    };
    ```
 
-## Основные команды
+## Main Commands
 
-### Разработка
+### Development
 ```bash
-npm start                # Запуск приложения (production build с DMG, 60-90 сек)
-npm run dev              # Быстрая разработка БЕЗ deep links (10-15 сек)
-npm run dev:app          # Разработка С deep links для OAuth (20-30 сек)
-npm run build            # Сборка проекта
-npm run typecheck        # Проверка типов
+npm start                # Run the app (production build with DMG, 60-90 sec)
+npm run dev              # Fast development WITHOUT deep links (10-15 sec)
+npm run dev:app          # Development WITH OAuth deep links (20-30 sec)
+npm run build            # Build the project
+npm run typecheck        # Type checking
 ```
 
-**Выбор режима разработки:**
-- `npm run dev` - для обычной разработки UI/логики (быстро)
-- `npm run dev:app` - для тестирования OAuth flow с Google (средне)
-- `npm start` - для финального тестирования перед релизом (медленно)
+**Choosing a development mode:**
+- `npm run dev` - for regular UI/logic development (fast)
+- `npm run dev:app` - for testing Google OAuth flow (medium)
+- `npm start` - for final pre-release testing (slow)
 
-### Тестирование
+### Testing
 ```bash
-npm test                 # Модульные тесты
-npm run test:unit        # Модульные тесты
-npm run test:functional  # Функциональные тесты (Playwright, показывает окна)
-npm run test:coverage    # Отчет о покрытии
+npm test                 # Unit tests
+npm run test:unit        # Unit tests
+npm run test:functional  # Functional tests (Playwright, opens windows)
+npm run test:coverage    # Coverage report
 ```
 
-### Качество кода
+### Code Quality
 ```bash
-npm run validate         # Полная валидация (рекомендуется перед коммитом)
-npm run lint             # ESLint проверка
-npm run lint:fix         # ESLint с автофиксом
-npm run format           # Prettier форматирование
+npm run validate         # Full validation (recommended before commit)
+npm run lint             # ESLint check
+npm run lint:fix         # ESLint with auto-fix
+npm run format           # Prettier formatting
 ```
 
-### Упаковка
+### Packaging
 ```bash
-npm run package          # Создание дистрибутива (DMG + ZIP)
+npm run package          # Create distribution build (DMG + ZIP)
 ```
 
-## Типы тестов
+## Test Types
 
-1. **Модульные тесты** (`tests/unit/`)
-   - Изолированное тестирование с моками
-   - Скорость: < 100ms на тест
+1. **Unit tests** (`tests/unit/`)
+   - Isolated testing with mocks
+   - Speed: < 100ms per test
 
-2. **Функциональные тесты** (`tests/functional/`)
-   - End-to-end с реальным Electron через Playwright
-   - ⚠️ Показывают окна на экране
+2. **Functional tests** (`tests/functional/`)
+   - End-to-end with real Electron via Playwright
+   - ⚠️ Open windows on screen
 
-## Структура проекта
+## Project Structure
 
 ```
 clerkly/
@@ -91,84 +91,83 @@ clerkly/
 │   ├── main/           # Main process (Electron)
 │   ├── renderer/       # Renderer process (React UI)
 │   ├── preload/        # Preload script (IPC bridge)
-│   └── types/          # TypeScript типы
+│   └── types/          # TypeScript types
 ├── tests/
-│   ├── unit/           # Модульные тесты
-│   └── functional/     # Функциональные тесты (Playwright)
-├── migrations/         # Миграции SQLite
-├── docs/specs/        # Спецификации проекта
-└── dist/               # Скомпилированные файлы
+│   ├── unit/           # Unit tests
+│   └── functional/     # Functional tests (Playwright)
+├── migrations/         # SQLite migrations
+├── docs/specs/         # Project specifications
+└── dist/               # Compiled files
 ```
 
-## Технологический стек
+## Tech Stack
 
-- **Electron** 28+ - Desktop приложение
-- **TypeScript** 5+ - Язык программирования
-- **React** 18+ - UI библиотека
-- **Tailwind CSS** 4+ - CSS фреймворк
-- **SQLite** (better-sqlite3) - Локальное хранение
-- **Vite** 6+ - Сборщик
-- **Jest** + **Playwright** - Тестирование
+- **Electron** 28+ - Desktop application
+- **TypeScript** 5+ - Programming language
+- **React** 18+ - UI library
+- **Tailwind CSS** 4+ - CSS framework
+- **SQLite** (better-sqlite3) - Local storage
+- **Vite** 6+ - Bundler
+- **Jest** + **Playwright** - Testing
 
-## Workflow разработки
+## Development Workflow
 
-**Перед коммитом:**
+**Before commit:**
 ```bash
 npm run validate
 ```
 
-**Перед релизом:**
+**Before release:**
 ```bash
 npm run validate
 npm run test:functional
 npm run package
 ```
 
-## Документация
+## Documentation
 
-Полная документация в `docs/specs/`:
+Full documentation is in `docs/specs/`:
 
-**Основные спецификации:**
-- `clerkly/` - Общие требования и архитектура приложения
-- `testing-infrastructure/` - Стратегия тестирования
-- `visual-design/` - Визуальный дизайн и UI/UX
+**Core specifications:**
+- `clerkly/` - General requirements and app architecture
+- `testing-infrastructure/` - Testing strategy
 
-**Авторизация:**
-- `google-oauth-auth/` - OAuth авторизация через Google
+**Authentication:**
+- `google-oauth-auth/` - Google OAuth authentication
 
-**UI компоненты:**
-- `window-management/` - Управление окнами приложения
-- `navigation/` - Навигация и роутинг
-- `account-profile/` - Профиль пользователя
-- `error-notifications/` - Обработка и отображение ошибок
-- `token-management-ui/` - UI управления токенами
-- `settings/` - Настройки приложения
-- `user-data-isolation/` - Изоляция данных пользователей
+**UI components:**
+- `window-management/` - App window management
+- `navigation/` - Navigation and routing
+- `account-profile/` - User profile
+- `error-notifications/` - Error handling and display
+- `token-management-ui/` - Token management UI
+- `settings/` - Application settings
+- `user-data-isolation/` - User data isolation
 
-## Устранение неполадок
+## Troubleshooting
 
-**Ошибка компиляции better-sqlite3:**
+**better-sqlite3 compilation error:**
 ```bash
 npm rebuild better-sqlite3
 ```
 
-**Приложение не запускается:**
+**App does not start:**
 ```bash
 npm run build
-node --version  # Проверьте версию >= 18.0.0
+node --version  # Check version >= 18.0.0
 ```
 
-**Тесты не проходят:**
+**Tests are failing:**
 ```bash
 npm test -- --clearCache
 npm test -- --verbose
 ```
 
-## Лицензия
+## License
 
 MIT
 
 ---
 
-**Версия**: 1.0.0  
-**Платформа**: Mac OS X 10.13+
+**Version**: 1.0.0  
+**Platform**: Mac OS X 10.13+

@@ -1,6 +1,10 @@
 // Requirements: llm-integration.1, llm-integration.2, llm-integration.5
 
 import { MainPipeline } from '../../../src/main/agents/MainPipeline';
+import {
+  FullHistoryStrategy,
+  PromptBuilder as PromptBuilderClass,
+} from '../../../src/main/agents/PromptBuilder';
 import { MainEventBus } from '../../../src/main/events/MainEventBus';
 import {
   MessageLlmReasoningUpdatedEvent,
@@ -118,6 +122,61 @@ function makeMocks() {
   };
 }
 
+async function assertAiSdkModelMessages(messages: ChatMessage[]): Promise<void> {
+  if (typeof (globalThis as { TransformStream?: unknown }).TransformStream === 'undefined') {
+    const webStreams = await import('stream/web');
+    (globalThis as { TransformStream?: unknown }).TransformStream = webStreams.TransformStream;
+  }
+  const { modelMessageSchema } = await import('ai');
+  const parsed = (modelMessageSchema as { array: () => { safeParse: (v: unknown) => unknown } })
+    .array()
+    .safeParse(messages) as { success: boolean; error?: { issues?: Array<{ message: string }> } };
+  expect(parsed.success).toBe(true);
+}
+
+function assertToolReplayLinked(messages: ChatMessage[]): void {
+  const called = new Set<string>();
+  const completed = new Set<string>();
+
+  for (const message of messages as unknown as Array<Record<string, unknown>>) {
+    const role = message['role'];
+    const content = Array.isArray(message['content']) ? message['content'] : [];
+
+    if (role === 'assistant') {
+      for (const part of content) {
+        if (
+          part &&
+          typeof part === 'object' &&
+          (part as Record<string, unknown>)['type'] === 'tool-call'
+        ) {
+          const toolCallId = (part as Record<string, unknown>)['toolCallId'];
+          if (typeof toolCallId === 'string') called.add(toolCallId);
+        }
+      }
+    }
+
+    if (role === 'tool') {
+      for (const part of content) {
+        if (
+          part &&
+          typeof part === 'object' &&
+          (part as Record<string, unknown>)['type'] === 'tool-result'
+        ) {
+          const toolCallId = (part as Record<string, unknown>)['toolCallId'];
+          if (typeof toolCallId === 'string') {
+            expect(called.has(toolCallId)).toBe(true);
+            completed.add(toolCallId);
+          }
+        }
+      }
+    }
+  }
+
+  for (const toolCallId of called) {
+    expect(completed.has(toolCallId)).toBe(true);
+  }
+}
+
 describe('MainPipeline.run()', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -134,6 +193,40 @@ describe('MainPipeline.run()', () => {
     expect(createProvider('anthropic', 'k')).toBeDefined();
     expect(createProvider('google', 'k')).toBeDefined();
     expect(() => createProvider('unknown', 'k')).toThrow('Unknown provider: unknown');
+  });
+
+  it('sends AI SDK-valid linked replay history to provider.chat when terminal tool_call exists', async () => {
+    const { pipeline, llmProvider, messageManager, promptBuilder } = makeMocks();
+    const realPromptBuilder = new PromptBuilderClass('sys', [], new FullHistoryStrategy());
+
+    const userMsg = makeMessage(1, 'user');
+    userMsg.payloadJson = JSON.stringify({ data: { text: 'run code' } });
+    const terminalToolCall = makeMessage(2, 'tool_call');
+    terminalToolCall.payloadJson = JSON.stringify({
+      data: {
+        callId: 'call-main-pipeline',
+        toolName: 'code_exec',
+        arguments: { code: 'console.log(1)' },
+        output: { status: 'success', stdout: '1' },
+      },
+    });
+    messageManager.listForModelHistory = jest.fn().mockReturnValue([userMsg, terminalToolCall]);
+    promptBuilder.buildMessages = jest
+      .fn()
+      .mockImplementation((history: Message[]) => realPromptBuilder.buildMessages(history));
+
+    llmProvider.chat.mockImplementation(
+      async (messages: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        await assertAiSdkModelMessages(messages);
+        assertToolReplayLinked(messages);
+        onChunk({ type: 'text', delta: 'ok' });
+        return { text: 'ok' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(llmProvider.chat).toHaveBeenCalledTimes(1);
   });
 
   it('streams reasoning/text and finalizes llm message with data.text', async () => {
@@ -191,7 +284,8 @@ describe('MainPipeline.run()', () => {
     const textEvents = mockPublish.mock.calls
       .map((call: [unknown]) => call[0])
       .filter((e: unknown) => e instanceof MessageLlmTextUpdatedEvent);
-    expect(textEvents).toHaveLength(2);
+    expect(textEvents).toHaveLength(1);
+    expect((textEvents[0] as MessageLlmTextUpdatedEvent).delta).toBe('Hello back');
 
     expect(messageManager.setUsage).toHaveBeenCalledWith(
       2,
@@ -200,6 +294,167 @@ describe('MainPipeline.run()', () => {
         canonical: { input_tokens: 10, output_tokens: 5, total_tokens: 15 },
       })
     );
+  });
+
+  /* Preconditions: active stream receives multiple text chunks within one 100ms window
+     Action: run MainPipeline with fake timers and advance time step-by-step
+     Assertions: intermediate persisted updates are throttled to <=1 per 100ms and deltas are batched
+     Requirements: llm-integration.1.6.4, llm-integration.2.3.1, llm-integration.2.5.1, llm-integration.14.4 */
+  it('throttles intermediate llm updates and batches text deltas in 100ms window', async () => {
+    jest.useFakeTimers();
+    try {
+      const { pipeline, messageManager, llmProvider, mockPublish } = makeMocks();
+
+      llmProvider.chat.mockImplementation(
+        async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+          onChunk({ type: 'text', delta: 'A' });
+          await new Promise<void>((resolve) => setTimeout(resolve, 50));
+          onChunk({ type: 'text', delta: 'B' });
+          onChunk({ type: 'text', delta: 'C' });
+          await new Promise<void>((resolve) => setTimeout(resolve, 60));
+          return { text: 'ABC' };
+        }
+      );
+
+      const runPromise = pipeline.run('agent-1', 1);
+      await jest.advanceTimersByTimeAsync(49);
+
+      const inFlightUpdatesBeforeFlush = (messageManager.update as jest.Mock).mock.calls.filter(
+        (call: unknown[]) => call[3] === false
+      );
+      expect(inFlightUpdatesBeforeFlush).toHaveLength(0);
+
+      await jest.advanceTimersByTimeAsync(51);
+      await jest.runAllTimersAsync();
+      await runPromise;
+
+      const inFlightUpdates = (messageManager.update as jest.Mock).mock.calls.filter(
+        (call: unknown[]) => call[3] === false
+      );
+      expect(inFlightUpdates).toHaveLength(1);
+      expect((inFlightUpdates[0]?.[2] as { data?: { text?: string } }).data?.text).toBe('ABC');
+
+      const textEvents = mockPublish.mock.calls
+        .map((call: [unknown]) => call[0])
+        .filter((e: unknown) => e instanceof MessageLlmTextUpdatedEvent) as
+        | MessageLlmTextUpdatedEvent[]
+        | [];
+      expect(textEvents).toHaveLength(2);
+      expect(textEvents[0]?.delta).toBe('A');
+      expect(textEvents[1]?.delta).toBe('BC');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  /* Preconditions: text delta is buffered (<100ms since previous flush) and tool_call arrives
+     Action: run MainPipeline where tool_call boundary appears before timer-based flush
+     Assertions: pending llm buffer is force-flushed before persisted tool_call(running) creation
+     Requirements: llm-integration.1.6.4, llm-integration.2.3.1, llm-integration.11.1.2, llm-integration.11.1.5 */
+  it('force-flushes pending llm buffer before creating running tool_call', async () => {
+    jest.useFakeTimers();
+    try {
+      const { pipeline, llmProvider, messageManager } = makeMocks();
+
+      llmProvider.chat.mockImplementation(
+        async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+          onChunk({ type: 'text', delta: 'A' });
+          await new Promise<void>((resolve) => setTimeout(resolve, 10));
+          onChunk({ type: 'text', delta: 'B' });
+          onChunk({
+            type: 'tool_call',
+            callId: 'call-force-flush',
+            toolName: 'code_exec',
+            arguments: { code: "console.log('x')" },
+          });
+          onChunk({
+            type: 'tool_result',
+            callId: 'call-force-flush',
+            toolName: 'code_exec',
+            arguments: { code: "console.log('x')" },
+            output: { status: 'success', stdout: 'x\n', stderr: '' },
+            status: 'success',
+          });
+          return { text: 'AB' };
+        }
+      );
+
+      const runPromise = pipeline.run('agent-1', 1);
+      await jest.runAllTimersAsync();
+      await runPromise;
+
+      const updateMock = messageManager.update as jest.Mock;
+      const createMock = messageManager.create as jest.Mock;
+
+      const forcedFlushUpdateIndex = updateMock.mock.calls.findIndex(
+        (call: unknown[]) =>
+          call[3] === false &&
+          ((call[2] as { data?: { text?: string } })?.data?.text ?? '') === 'AB'
+      );
+      const runningToolCreateIndex = createMock.mock.calls.findIndex(
+        (call: unknown[]) => call[1] === 'tool_call' && call[4] === false
+      );
+
+      expect(forcedFlushUpdateIndex).toBeGreaterThanOrEqual(0);
+      expect(runningToolCreateIndex).toBeGreaterThanOrEqual(0);
+      expect(
+        updateMock.mock.invocationCallOrder[forcedFlushUpdateIndex] <
+          createMock.mock.invocationCallOrder[runningToolCreateIndex]
+      ).toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  /* Preconditions: reasoning chunk has glued bold markdown; display normalization must not affect persistence
+     Action: run MainPipeline with reasoning and text chunks
+     Assertions: persisted payload and reasoning event keep raw model text
+     Requirements: agents.4.11.6, agents.4.11.7 */
+  it('persists raw reasoning text without display-time markdown spacing normalization', async () => {
+    const { pipeline, messageManager, llmProvider, mockPublish } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({ type: 'reasoning', delta: 'Soon!**Resolving next step**' });
+        onChunk({ type: 'text', delta: 'Answer' });
+        return { text: 'Answer' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'llm',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          reasoning: { text: 'Soon!**Resolving next step**', excluded_from_replay: true },
+        }),
+      }),
+      1,
+      false
+    );
+
+    expect(messageManager.update).toHaveBeenLastCalledWith(
+      2,
+      'agent-1',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          reasoning: { text: 'Soon!**Resolving next step**', excluded_from_replay: true },
+          text: 'Answer',
+        }),
+      }),
+      true
+    );
+
+    const reasoningEvent = mockPublish.mock.calls
+      .map((call: [unknown]) => call[0])
+      .find((event: unknown) => event instanceof MessageLlmReasoningUpdatedEvent) as
+      | MessageLlmReasoningUpdatedEvent
+      | undefined;
+    expect(reasoningEvent).toBeDefined();
+    expect(reasoningEvent?.delta).toBe('Soon!**Resolving next step**');
+    expect(reasoningEvent?.accumulatedText).toBe('Soon!**Resolving next step**');
   });
 
   it('persists buffered tool_call after llm finalization in same turn', async () => {
@@ -239,10 +494,22 @@ describe('MainPipeline.run()', () => {
           callId: 'call-1',
           toolName: 'search_docs',
           arguments: { query: 'streaming' },
-          output: expect.objectContaining({ status: 'success' }),
+          output: expect.objectContaining({ status: 'running' }),
         }),
       }),
       1,
+      false
+    );
+    expect(messageManager.update).toHaveBeenCalledWith(
+      100,
+      'agent-1',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          callId: 'call-1',
+          toolName: 'search_docs',
+          output: expect.objectContaining({ status: 'success' }),
+        }),
+      }),
       true
     );
 
@@ -368,7 +635,225 @@ describe('MainPipeline.run()', () => {
         data: expect.objectContaining({
           error: expect.objectContaining({
             type: 'provider',
-            message: expect.stringContaining('invalid completion format'),
+            message: expect.stringContaining('invalid tool call arguments'),
+          }),
+        }),
+      }),
+      1,
+      true
+    );
+    expect(messageManager.create).not.toHaveBeenCalledWith(
+      'agent-1',
+      'tool_call',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          toolName: 'final_answer',
+        }),
+      }),
+      1,
+      expect.anything()
+    );
+  });
+
+  /* Preconditions: first attempt returns invalid final_answer, second attempt returns valid final_answer
+     Action: run pipeline with retry/repair
+     Assertions: persisted final_answer is created once with attemptId=2 in order metadata
+     Requirements: llm-integration.11.3.1, llm-integration.11.1.5 */
+  it('increments attemptId in order metadata after retry before persisting final_answer', async () => {
+    const { pipeline, messageManager, llmProvider } = makeMocks();
+
+    llmProvider.chat
+      .mockImplementationOnce(
+        async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+          onChunk({
+            type: 'tool_call',
+            callId: 'final-invalid',
+            toolName: 'final_answer',
+            arguments: {},
+          });
+          return { text: '' };
+        }
+      )
+      .mockImplementationOnce(
+        async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+          onChunk({
+            type: 'tool_call',
+            callId: 'final-valid',
+            toolName: 'final_answer',
+            arguments: { summary_points: ['ok after retry'] },
+          });
+          return { text: '' };
+        }
+      );
+
+    await pipeline.run('agent-1', 1);
+
+    const finalCalls = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) =>
+        call[1] === 'tool_call' &&
+        Boolean((call[2] as { data?: { toolName?: string } }).data?.toolName === 'final_answer')
+    );
+    expect(finalCalls).toHaveLength(1);
+    expect((finalCalls[0]?.[2] as { data?: { order?: unknown } }).data?.order).toEqual(
+      expect.objectContaining({
+        runId: expect.any(String),
+        attemptId: 2,
+        sequence: expect.any(Number),
+      })
+    );
+  });
+
+  it('retries and fails when final_answer is combined with another tool call in same turn', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+    let attempt = 0;
+
+    llmProvider.chat.mockImplementation(async (msgs: ChatMessage[], _opts, onChunk) => {
+      attempt += 1;
+      if (attempt > 1) {
+        const retryFeedback = msgs.find(
+          (msg) =>
+            msg.role === 'system' &&
+            typeof msg.content === 'string' &&
+            msg.content.includes('Tool call validation failed:')
+        ) as { content?: string } | undefined;
+        expect(retryFeedback?.content).toContain('more than one tool_call');
+      }
+      onChunk({
+        type: 'tool_call',
+        callId: `call-final-${attempt}`,
+        toolName: 'final_answer',
+        arguments: { summary_points: ['done'] },
+      });
+      onChunk({
+        type: 'tool_call',
+        callId: `call-code-${attempt}`,
+        toolName: 'code_exec',
+        arguments: { code: 'console.log(1)' },
+      });
+      return { text: '' };
+    });
+
+    await pipeline.run('agent-1', 1);
+
+    expect(llmProvider.chat).toHaveBeenCalledTimes(3);
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'error',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          error: expect.objectContaining({
+            message: expect.stringContaining('invalid tool call arguments'),
+          }),
+        }),
+      }),
+      1,
+      true
+    );
+    expect(messageManager.create).not.toHaveBeenCalledWith(
+      'agent-1',
+      'tool_call',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          toolName: 'final_answer',
+        }),
+      }),
+      1,
+      expect.anything()
+    );
+  });
+
+  it('does not persist tool_call for invalid code_exec arguments and emits kind:error after retries', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-code-invalid',
+          toolName: 'code_exec',
+          arguments: {},
+        });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(llmProvider.chat).toHaveBeenCalledTimes(3);
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'error',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          error: expect.objectContaining({
+            message: expect.stringContaining('invalid tool call arguments'),
+          }),
+        }),
+      }),
+      1,
+      true
+    );
+    expect(messageManager.create).not.toHaveBeenCalledWith(
+      'agent-1',
+      'tool_call',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          toolName: 'code_exec',
+        }),
+      }),
+      1,
+      expect.anything()
+    );
+    expect(messageManager.update).not.toHaveBeenCalledWith(
+      expect.any(Number),
+      'agent-1',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          toolName: 'code_exec',
+        }),
+      }),
+      expect.any(Boolean)
+    );
+  });
+
+  it('passes validation feedback to provider on retry after invalid tool arguments', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+    let attempt = 0;
+
+    llmProvider.chat.mockImplementation(async (msgs: ChatMessage[], _opts, onChunk) => {
+      attempt += 1;
+      if (attempt < 3) {
+        const hasRetryFeedback = msgs.some(
+          (msg) =>
+            msg.role === 'system' &&
+            typeof msg.content === 'string' &&
+            msg.content.includes('Tool call validation failed:')
+        );
+        if (attempt === 1) {
+          expect(hasRetryFeedback).toBe(false);
+        } else {
+          expect(hasRetryFeedback).toBe(true);
+        }
+      }
+      onChunk({
+        type: 'tool_call',
+        callId: `retry-invalid-${attempt}`,
+        toolName: 'code_exec',
+        arguments: {},
+      });
+      return { text: '' };
+    });
+
+    await pipeline.run('agent-1', 1);
+
+    expect(llmProvider.chat).toHaveBeenCalledTimes(3);
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'error',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          error: expect.objectContaining({
+            message: expect.stringContaining('invalid tool call arguments'),
           }),
         }),
       }),
@@ -434,16 +919,16 @@ describe('MainPipeline.run()', () => {
 
     await pipeline.run('agent-1', 1);
 
-    expect(llmProvider.chat).toHaveBeenCalledTimes(2);
-    expect(messageManager.hideAndMarkIncomplete).toHaveBeenCalledTimes(2);
-    expect(messageManager.hideAndMarkIncomplete).toHaveBeenNthCalledWith(2, 2, 'agent-1');
+    expect(llmProvider.chat).toHaveBeenCalledTimes(3);
+    expect(messageManager.setHidden).toHaveBeenCalledTimes(2);
+    expect(messageManager.setHidden).toHaveBeenNthCalledWith(2, 2, 'agent-1');
     expect(messageManager.create).toHaveBeenCalledWith(
       'agent-1',
       'error',
       expect.objectContaining({
         data: expect.objectContaining({
           error: expect.objectContaining({
-            message: expect.stringContaining('invalid completion format'),
+            message: expect.stringContaining('invalid tool call arguments'),
           }),
         }),
       }),
@@ -477,7 +962,7 @@ describe('MainPipeline.run()', () => {
     );
   });
 
-  it('handles multiple tool calls from one turn via stream chunks', async () => {
+  it('rejects multiple tool calls in one response and finishes with kind:error', async () => {
     const { pipeline, llmProvider, toolExecutor, messageManager } = makeMocks();
 
     llmProvider.chat.mockImplementation(
@@ -507,62 +992,334 @@ describe('MainPipeline.run()', () => {
     await pipeline.run('agent-1', 1);
 
     expect(toolExecutor.executeBatch).not.toHaveBeenCalled();
-    const toolCallCreates = (messageManager.create as jest.Mock).mock.calls.filter(
-      (call: unknown[]) => call[1] === 'tool_call'
-    );
-    expect(toolCallCreates).toHaveLength(2);
-
-    for (const call of toolCallCreates) {
-      expect(call[4]).toBe(true);
-      const payload = call[2] as { data?: Record<string, unknown> };
-      expect(payload.data?.output).toEqual(
-        expect.objectContaining({
-          status: 'success',
-        })
-      );
-    }
-  });
-
-  it('persists tool_call with error output when tool_result arrives with error status', async () => {
-    const { pipeline, llmProvider, messageManager } = makeMocks();
-
-    llmProvider.chat.mockImplementation(
-      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
-        onChunk({
-          type: 'tool_call',
-          callId: 'call-stub',
-          toolName: 'unknown_tool',
-          arguments: { foo: 'bar' },
-        });
-        onChunk({
-          type: 'tool_result',
-          callId: 'call-stub',
-          toolName: 'unknown_tool',
-          arguments: { foo: 'bar' },
-          output: { message: 'Tool "unknown_tool" is not available.' },
-          status: 'error',
-        });
-        return { text: 'final after stub' };
-      }
-    );
-
-    await pipeline.run('agent-1', 1);
-
+    expect(llmProvider.chat).toHaveBeenCalledTimes(3);
     expect(messageManager.create).toHaveBeenCalledWith(
       'agent-1',
-      'tool_call',
+      'error',
       expect.objectContaining({
         data: expect.objectContaining({
-          callId: 'call-stub',
-          toolName: 'unknown_tool',
-          output: expect.objectContaining({
-            status: 'error',
+          error: expect.objectContaining({
+            message: expect.stringContaining('invalid tool call arguments'),
           }),
         }),
       }),
       1,
       true
     );
+  });
+
+  it.each(['error', 'timeout', 'cancelled'] as const)(
+    'persists terminal tool_call and continues flow when tool_result arrives with %s status',
+    async (terminalStatus) => {
+      const { pipeline, llmProvider, messageManager } = makeMocks();
+
+      llmProvider.chat.mockImplementation(
+        async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+          onChunk({
+            type: 'tool_call',
+            callId: 'call-stub',
+            toolName: 'unknown_tool',
+            arguments: { foo: 'bar' },
+          });
+          onChunk({
+            type: 'tool_result',
+            callId: 'call-stub',
+            toolName: 'unknown_tool',
+            arguments: { foo: 'bar' },
+            output: { message: 'Tool "unknown_tool" is not available.' },
+            status: terminalStatus,
+          });
+          return { text: 'final after stub' };
+        }
+      );
+
+      await pipeline.run('agent-1', 1);
+
+      expect(messageManager.create).toHaveBeenCalledWith(
+        'agent-1',
+        'tool_call',
+        expect.objectContaining({
+          data: expect.objectContaining({
+            callId: 'call-stub',
+            toolName: 'unknown_tool',
+            output: expect.objectContaining({
+              status: 'running',
+            }),
+          }),
+        }),
+        1,
+        false
+      );
+      expect(messageManager.update).toHaveBeenCalledWith(
+        100,
+        'agent-1',
+        expect.objectContaining({
+          data: expect.objectContaining({
+            callId: 'call-stub',
+            output: expect.objectContaining({ status: terminalStatus }),
+          }),
+        }),
+        true
+      );
+      expect(messageManager.create).not.toHaveBeenCalledWith(
+        'agent-1',
+        'error',
+        expect.anything(),
+        expect.anything(),
+        true
+      );
+      expect(messageManager.create).toHaveBeenCalledWith(
+        'agent-1',
+        'llm',
+        expect.objectContaining({
+          data: expect.objectContaining({
+            text: 'final after stub',
+          }),
+        }),
+        1,
+        true
+      );
+    }
+  );
+
+  /* Preconditions: provider emits pre-tool reasoning, one valid tool_call, then post-tool text
+     Action: run pipeline for one attempt
+     Assertions: created llm/tool_call/llm messages carry deterministic order metadata with monotonic sequence
+     Requirements: llm-integration.11.1.5 */
+  it('adds run-attempt sequence order metadata to persisted pre-tool, tool_call, and post-tool messages', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({ type: 'reasoning', delta: 'pre ' });
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-ordered',
+          toolName: 'code_exec',
+          arguments: { code: "console.log('ok')" },
+        });
+        onChunk({ type: 'text', delta: 'post text' });
+        onChunk({
+          type: 'tool_result',
+          callId: 'call-ordered',
+          toolName: 'code_exec',
+          arguments: { code: "console.log('ok')" },
+          output: { status: 'success', stdout: 'ok\n', stderr: '' },
+          status: 'success',
+        });
+        return { text: 'post text' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const creates = (messageManager.create as jest.Mock).mock.calls;
+    const llmCreates = creates.filter((call) => call[1] === 'llm');
+    const toolCreates = creates.filter((call) => call[1] === 'tool_call');
+
+    expect(llmCreates).toHaveLength(2);
+    expect(toolCreates).toHaveLength(1);
+
+    const preOrder = (llmCreates[0]?.[2] as { data?: { order?: any } })?.data?.order;
+    const toolOrder = (toolCreates[0]?.[2] as { data?: { order?: any } })?.data?.order;
+    const postOrder = (llmCreates[1]?.[2] as { data?: { order?: any } })?.data?.order;
+
+    expect(preOrder).toEqual(
+      expect.objectContaining({ runId: expect.any(String), attemptId: 1, sequence: 1 })
+    );
+    expect(toolOrder).toEqual(
+      expect.objectContaining({ runId: preOrder.runId, attemptId: 1, sequence: 2 })
+    );
+    expect(postOrder).toEqual(
+      expect.objectContaining({ runId: preOrder.runId, attemptId: 1, sequence: 3 })
+    );
+  });
+
+  /* Preconditions: provider emits reasoning before valid tool_call and then post-tool text
+     Action: run pipeline for one attempt
+     Assertions: pre-tool llm segment is finalized before running tool_call is persisted
+     Requirements: llm-integration.11.1.2 */
+  it('finalizes pre-tool llm segment before creating running tool_call', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({ type: 'reasoning', delta: 'pre reasoning' });
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-pre-finalize',
+          toolName: 'code_exec',
+          arguments: { code: "console.log('ok')" },
+        });
+        onChunk({ type: 'text', delta: 'post text' });
+        onChunk({
+          type: 'tool_result',
+          callId: 'call-pre-finalize',
+          toolName: 'code_exec',
+          arguments: { code: "console.log('ok')" },
+          output: { status: 'success', stdout: 'ok\n', stderr: '' },
+          status: 'success',
+        });
+        return { text: 'post text' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const updateMock = messageManager.update as jest.Mock;
+    const createMock = messageManager.create as jest.Mock;
+
+    const finalizedPreToolUpdateIndex = updateMock.mock.calls.findIndex(
+      (call) =>
+        call[3] === true &&
+        typeof call[2]?.data?.reasoning?.text === 'string' &&
+        call[2].data.reasoning.text.includes('pre reasoning')
+    );
+    expect(finalizedPreToolUpdateIndex).toBeGreaterThanOrEqual(0);
+
+    const runningToolCreateIndex = createMock.mock.calls.findIndex(
+      (call) =>
+        call[1] === 'tool_call' &&
+        call[2]?.data?.callId === 'call-pre-finalize' &&
+        call[4] === false
+    );
+    expect(runningToolCreateIndex).toBeGreaterThanOrEqual(0);
+
+    const finalizedPreToolOrder =
+      updateMock.mock.invocationCallOrder[finalizedPreToolUpdateIndex] ?? -1;
+    const runningToolCreateOrder =
+      createMock.mock.invocationCallOrder[runningToolCreateIndex] ?? -1;
+
+    expect(finalizedPreToolOrder).toBeGreaterThan(0);
+    expect(runningToolCreateOrder).toBeGreaterThan(0);
+    expect(finalizedPreToolOrder).toBeLessThan(runningToolCreateOrder);
+  });
+
+  /* Preconditions: provider emits tool_call in the middle of reasoning stream
+     Action: run pipeline for one attempt
+     Assertions: running tool_call is persisted only after reasoning stream tail is appended
+     Requirements: llm-integration.11.1.2 */
+  it('buffers tool_call until reasoning stream tail is processed', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({ type: 'reasoning', delta: 'pre ' });
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-buffered-reasoning',
+          toolName: 'code_exec',
+          arguments: { code: "console.log('ok')" },
+        });
+        onChunk({ type: 'reasoning', delta: 'tail' });
+        onChunk({ type: 'text', delta: 'post text' });
+        onChunk({
+          type: 'tool_result',
+          callId: 'call-buffered-reasoning',
+          toolName: 'code_exec',
+          arguments: { code: "console.log('ok')" },
+          output: { status: 'success', stdout: 'ok\n', stderr: '' },
+          status: 'success',
+        });
+        return { text: 'post text' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const createMock = messageManager.create as jest.Mock;
+    const updateMock = messageManager.update as jest.Mock;
+
+    const tailReasoningCreateIndex = createMock.mock.calls.findIndex(
+      (call) =>
+        call[1] === 'llm' &&
+        call[4] === false &&
+        typeof call[2]?.data?.reasoning?.text === 'string' &&
+        call[2].data.reasoning.text.includes('tail')
+    );
+    const tailReasoningUpdateIndex = updateMock.mock.calls.findIndex(
+      (call) =>
+        call[3] === false &&
+        typeof call[2]?.data?.reasoning?.text === 'string' &&
+        call[2].data.reasoning.text.includes('tail')
+    );
+    expect(Math.max(tailReasoningCreateIndex, tailReasoningUpdateIndex)).toBeGreaterThanOrEqual(0);
+
+    const runningToolCreateIndex = createMock.mock.calls.findIndex(
+      (call) =>
+        call[1] === 'tool_call' &&
+        call[2]?.data?.callId === 'call-buffered-reasoning' &&
+        call[4] === false
+    );
+    expect(runningToolCreateIndex).toBeGreaterThanOrEqual(0);
+
+    const tailReasoningOrder =
+      tailReasoningCreateIndex >= 0
+        ? (createMock.mock.invocationCallOrder[tailReasoningCreateIndex] ?? -1)
+        : (updateMock.mock.invocationCallOrder[tailReasoningUpdateIndex] ?? -1);
+    const runningToolCreateOrder =
+      createMock.mock.invocationCallOrder[runningToolCreateIndex] ?? -1;
+
+    expect(tailReasoningOrder).toBeGreaterThan(0);
+    expect(runningToolCreateOrder).toBeGreaterThan(0);
+    expect(tailReasoningOrder).toBeLessThan(runningToolCreateOrder);
+  });
+
+  /* Preconditions: provider emits tool_call, then delays tool_result, and does not emit post-tool text
+     Action: run pipeline for one attempt
+     Assertions: running tool_call is persisted before terminal update even without post-tool llm segment
+     Requirements: llm-integration.11.1.2, llm-integration.11.1.3.1, code_exec.4.6 */
+  it('persists running tool_call before terminal update when model step has no post-tool text', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-no-post-text',
+          toolName: 'code_exec',
+          arguments: { code: "console.log('ok')" },
+        });
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        onChunk({
+          type: 'tool_result',
+          callId: 'call-no-post-text',
+          toolName: 'code_exec',
+          arguments: { code: "console.log('ok')" },
+          output: { status: 'success', stdout: 'ok\n', stderr: '' },
+          status: 'success',
+        });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const createMock = messageManager.create as jest.Mock;
+    const updateMock = messageManager.update as jest.Mock;
+
+    const runningCreateIndex = createMock.mock.calls.findIndex(
+      (call) =>
+        call[1] === 'tool_call' &&
+        call[2]?.data?.callId === 'call-no-post-text' &&
+        call[2]?.data?.output?.status === 'running' &&
+        call[4] === false
+    );
+    expect(runningCreateIndex).toBeGreaterThanOrEqual(0);
+
+    const terminalUpdateIndex = updateMock.mock.calls.findIndex(
+      (call) =>
+        call[2]?.data?.callId === 'call-no-post-text' &&
+        call[2]?.data?.output?.status === 'success' &&
+        call[3] === true
+    );
+    expect(terminalUpdateIndex).toBeGreaterThanOrEqual(0);
+
+    const runningCreateOrder = createMock.mock.invocationCallOrder[runningCreateIndex] ?? -1;
+    const terminalUpdateOrder = updateMock.mock.invocationCallOrder[terminalUpdateIndex] ?? -1;
+    expect(runningCreateOrder).toBeGreaterThan(0);
+    expect(terminalUpdateOrder).toBeGreaterThan(0);
+    expect(runningCreateOrder).toBeLessThan(terminalUpdateOrder);
   });
 
   it('creates finalized llm message from result.text when no text chunks were emitted', async () => {
@@ -605,7 +1362,7 @@ describe('MainPipeline.run()', () => {
     );
   });
 
-  it('does not persist buffered tool_call when provider fails before completion', async () => {
+  it('persists pending tool_call and finalizes it on provider failure before completion', async () => {
     const { pipeline, messageManager, llmProvider } = makeMocks();
 
     llmProvider.chat.mockImplementation(
@@ -625,7 +1382,7 @@ describe('MainPipeline.run()', () => {
     const toolCreates = (messageManager.create as jest.Mock).mock.calls.filter(
       (call: unknown[]) => call[1] === 'tool_call'
     );
-    expect(toolCreates).toHaveLength(0);
+    expect(toolCreates).toHaveLength(1);
     const errorCreates = (messageManager.create as jest.Mock).mock.calls.filter(
       (call: unknown[]) => call[1] === 'error'
     );
@@ -779,7 +1536,7 @@ describe('MainPipeline.run()', () => {
 
     await pipeline.run('agent-1', 1, controller.signal);
 
-    expect(messageManager.hideAndMarkIncomplete).toHaveBeenCalledWith(2, 'agent-1');
+    expect(messageManager.hideAndMarkIncomplete).not.toHaveBeenCalled();
     const errorCreates = (messageManager.create as jest.Mock).mock.calls.filter(
       (call: unknown[]) => call[1] === 'error'
     );
@@ -787,7 +1544,7 @@ describe('MainPipeline.run()', () => {
     const toolCreates = (messageManager.create as jest.Mock).mock.calls.filter(
       (call: unknown[]) => call[1] === 'tool_call'
     );
-    expect(toolCreates).toHaveLength(0);
+    expect(toolCreates).toHaveLength(1);
   });
 
   it('cancels before final llm completion without creating kind:error', async () => {
@@ -918,6 +1675,42 @@ describe('MainPipeline.run()', () => {
     const optionsArg = (llmProvider.chat as jest.Mock).mock.calls[0][1] as ChatOptions;
     expect(optionsArg.tools).toEqual([]);
     expect(toolExecutor.executeBatch).not.toHaveBeenCalled();
+  });
+
+  /* Preconditions: provider returns single valid final_answer tool_call
+     Action: run pipeline
+     Assertions: persisted final_answer includes order metadata
+     Requirements: llm-integration.11.1.5 */
+  it('persists final_answer with order metadata', async () => {
+    const { pipeline, messageManager, llmProvider } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'final-ordered',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['done'] },
+        });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const finalCall = (messageManager.create as jest.Mock).mock.calls.find(
+      (call: unknown[]) =>
+        call[1] === 'tool_call' &&
+        Boolean((call[2] as { data?: { toolName?: string } }).data?.toolName === 'final_answer')
+    );
+    expect(finalCall).toBeDefined();
+    expect((finalCall?.[2] as { data?: { order?: unknown } }).data?.order).toEqual(
+      expect.objectContaining({
+        runId: expect.any(String),
+        attemptId: 1,
+        sequence: expect.any(Number),
+      })
+    );
   });
 
   it('publishes diagnostic event on pipeline failures', async () => {
@@ -1191,7 +1984,7 @@ describe('MainPipeline.run()', () => {
     );
   });
 
-  it('keeps latest arguments for duplicate tool_call callId before flush', async () => {
+  it('treats duplicate tool_call chunks as invalid multi-tool response and retries', async () => {
     const { pipeline, llmProvider, messageManager } = makeMocks();
 
     llmProvider.chat.mockImplementation(
@@ -1214,18 +2007,67 @@ describe('MainPipeline.run()', () => {
 
     await pipeline.run('agent-1', 1);
 
+    expect(llmProvider.chat).toHaveBeenCalledTimes(3);
     expect(messageManager.create).toHaveBeenCalledWith(
       'agent-1',
-      'tool_call',
+      'error',
       expect.objectContaining({
         data: expect.objectContaining({
-          callId: 'call-dup',
-          arguments: { q: 'v2' },
+          error: expect.objectContaining({
+            message: expect.stringContaining('invalid tool call arguments'),
+          }),
         }),
       }),
       1,
       true
     );
+  });
+
+  it('allows one tool_call per step across multi-step provider stream', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-step-1',
+          toolName: 'search_docs',
+          arguments: { q: 'part-1' },
+        });
+        onChunk({
+          type: 'tool_result',
+          callId: 'call-step-1',
+          toolName: 'search_docs',
+          arguments: { q: 'part-1' },
+          output: { status: 'ok-1' },
+          status: 'success',
+        });
+        onChunk({ type: 'text', delta: 'after first tool ' });
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-step-2',
+          toolName: 'search_docs',
+          arguments: { q: 'part-2' },
+        });
+        onChunk({
+          type: 'tool_result',
+          callId: 'call-step-2',
+          toolName: 'search_docs',
+          arguments: { q: 'part-2' },
+          output: { status: 'ok-2' },
+          status: 'success',
+        });
+        return { text: 'done' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(llmProvider.chat).toHaveBeenCalledTimes(1);
+    const errorCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'error'
+    );
+    expect(errorCreates).toHaveLength(0);
   });
 
   it('persists final_answer tool_result using finalized buffered row', async () => {
@@ -1315,7 +2157,7 @@ describe('MainPipeline.run()', () => {
         data: expect.objectContaining({
           error: expect.objectContaining({
             type: 'provider',
-            message: expect.stringContaining('invalid completion format'),
+            message: expect.stringContaining('invalid tool call arguments'),
           }),
         }),
       }),
@@ -1331,6 +2173,12 @@ describe('MainPipeline.run()', () => {
 
     llmProvider.chat.mockImplementation(
       async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-circular',
+          toolName: 'search_docs',
+          arguments: { q: 1 },
+        });
         onChunk({
           type: 'tool_result',
           callId: 'call-circular',
@@ -1352,12 +2200,25 @@ describe('MainPipeline.run()', () => {
         data: expect.objectContaining({
           callId: 'call-circular',
           output: expect.objectContaining({
+            status: 'running',
+          }),
+        }),
+      }),
+      1,
+      false
+    );
+    expect(messageManager.update).toHaveBeenCalledWith(
+      100,
+      'agent-1',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          callId: 'call-circular',
+          output: expect.objectContaining({
             status: 'error',
             content: '[object Object]',
           }),
         }),
       }),
-      1,
       true
     );
   });

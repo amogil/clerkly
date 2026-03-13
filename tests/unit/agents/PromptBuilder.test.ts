@@ -7,10 +7,12 @@ import {
   FullHistoryStrategy,
   AgentFeature,
   FinalAnswerFeature,
+  CodeExecFeature,
   normalizePromptWhitespace,
 } from '../../../src/main/agents/PromptBuilder';
-import type { LLMTool } from '../../../src/main/llm/ILLMProvider';
+import type { ChatMessage, LLMTool } from '../../../src/main/llm/ILLMProvider';
 import type { Message } from '../../../src/main/db/schema';
+import { SandboxSessionManager } from '../../../src/main/code_exec/SandboxSessionManager';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -33,6 +35,14 @@ function makeBuilder(
   features: AgentFeature[] = []
 ): PromptBuilder {
   return new PromptBuilder(systemPrompt, features, new FullHistoryStrategy());
+}
+
+function expectTextMessage(
+  message: ChatMessage | undefined,
+  role: 'user' | 'assistant' | 'system'
+): asserts message is Extract<ChatMessage, { role: 'user' | 'assistant' | 'system' }> {
+  expect(message).toBeDefined();
+  expect(message?.role).toBe(role);
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -152,6 +162,10 @@ describe('PromptBuilder.build()', () => {
       expect(result.systemPrompt).toContain(
         'Call the `final_answer` tool only when you are confident'
       );
+      expect(result.systemPrompt).toContain(
+        'explicitly ask the user what information or confirmation you need next'
+      );
+      expect(result.systemPrompt).toContain('Call `final_answer` alone');
       expect(result.systemPrompt).toContain('list solved tasks');
       expect(result.tools.some((tool) => tool.name === 'final_answer')).toBe(true);
       const finalAnswerTool = result.tools.find((tool) => tool.name === 'final_answer');
@@ -171,6 +185,17 @@ describe('PromptBuilder.build()', () => {
       expect(
         (finalAnswerTool?.parameters as Record<string, unknown>).properties
       ).not.toHaveProperty('text');
+    });
+
+    /* Preconditions: CodeExecFeature enabled
+       Action: build() is called
+       Assertions: system prompt explicitly states async context and top-level await support
+       Requirements: code_exec.1, llm-integration.4 */
+    it('should include async execution guidance for code_exec', () => {
+      const sandboxManager = {} as SandboxSessionManager;
+      const feature = new CodeExecFeature(sandboxManager);
+      const result = makeBuilder('Base.', [feature]).build();
+      expect(result.systemPrompt).toContain('top-level `await` is supported');
     });
   });
 
@@ -202,10 +227,12 @@ describe('PromptBuilder.build()', () => {
       const chatMessages = makeBuilder().buildMessages(msgs);
 
       expect(chatMessages).toHaveLength(3);
-      expect(chatMessages[1]).toMatchObject({ role: 'user' });
-      expect(chatMessages[2]).toMatchObject({ role: 'assistant' });
-      expect(chatMessages[1].content).toContain('Hello');
-      expect(chatMessages[2].content).toContain('Hi there!');
+      const userMsg = chatMessages[1];
+      const assistantMsg = chatMessages[2];
+      expectTextMessage(userMsg, 'user');
+      expectTextMessage(assistantMsg, 'assistant');
+      expect(userMsg.content).toContain('Hello');
+      expect(assistantMsg.content).toContain('Hi there!');
     });
 
     /* Preconditions: LLM message with model and reasoning* fields
@@ -232,14 +259,14 @@ describe('PromptBuilder.build()', () => {
 
       const chatMessages = makeBuilder().buildMessages(msgs);
       const assistant = chatMessages.find((m) => m.role === 'assistant');
-      expect(assistant).toBeDefined();
-      expect(assistant!.content).not.toContain('model');
-      expect(assistant!.content).not.toContain('My internal thoughts');
-      expect(assistant!.content).not.toContain('reasoning');
-      expect(assistant!.content).not.toContain('reasoning_summary');
-      expect(assistant!.content).not.toContain('reasoning_tokens');
-      expect(assistant!.content).not.toContain('excluded_from_replay');
-      expect(assistant!.content).toContain('Answer');
+      expectTextMessage(assistant, 'assistant');
+      expect(assistant.content).not.toContain('model');
+      expect(assistant.content).not.toContain('My internal thoughts');
+      expect(assistant.content).not.toContain('reasoning');
+      expect(assistant.content).not.toContain('reasoning_summary');
+      expect(assistant.content).not.toContain('reasoning_tokens');
+      expect(assistant.content).not.toContain('excluded_from_replay');
+      expect(assistant.content).toContain('Answer');
     });
   });
 });
@@ -320,13 +347,16 @@ describe('PromptBuilder.buildMessages()', () => {
 
     const chatMessages = makeBuilder().buildMessages(msgs);
 
-    expect(chatMessages[0].role).toBe('system');
-    expect(chatMessages[0].content).toContain('helpful AI assistant');
+    const systemMsg = chatMessages[0];
+    const userMsg = chatMessages[1];
+    const assistantMsg = chatMessages[2];
+    expectTextMessage(systemMsg, 'system');
+    expect(systemMsg.content).toContain('helpful AI assistant');
     expect(chatMessages).toHaveLength(3);
-    expect(chatMessages[1].role).toBe('user');
-    expect(chatMessages[1].content).toContain('Hello');
-    expect(chatMessages[2].role).toBe('assistant');
-    expect(chatMessages[2].content).toContain('Hi!');
+    expectTextMessage(userMsg, 'user');
+    expect(userMsg.content).toContain('Hello');
+    expectTextMessage(assistantMsg, 'assistant');
+    expect(assistantMsg.content).toContain('Hi!');
   });
 
   /* Preconditions: No messages
@@ -339,11 +369,11 @@ describe('PromptBuilder.buildMessages()', () => {
     expect(chatMessages[0].role).toBe('system');
   });
 
-  /* Preconditions: History contains kind:tool_call message
+  /* Preconditions: History contains non-terminal kind:tool_call message
      Action: Call buildMessages() with user + tool_call + llm
-     Assertions: tool_call is excluded from model history
+     Assertions: non-terminal tool_call is excluded from model history
      Requirements: llm-integration.10.1 */
-  it('should ignore tool_call messages in model history', () => {
+  it('should ignore non-terminal tool_call messages in model history', () => {
     const msgs = [
       makeMessage({
         id: 1,
@@ -366,6 +396,142 @@ describe('PromptBuilder.buildMessages()', () => {
     expect(chatMessages).toHaveLength(3);
     expect(chatMessages[1].role).toBe('user');
     expect(chatMessages[2].role).toBe('assistant');
+  });
+
+  /* Preconditions: History contains terminal kind:tool_call message
+     Action: Call buildMessages()
+     Assertions: terminal tool_call is serialized as assistant(tool-call) + tool(tool-result) history pair
+     Requirements: llm-integration.11.3.1.1, llm-integration.11.3.1.3 */
+  it('should include terminal tool_call messages as replay pair', () => {
+    const msgs = [
+      makeMessage({
+        id: 1,
+        kind: 'user',
+        payloadJson: JSON.stringify({ data: { text: 'Question' } }),
+      }),
+      makeMessage({
+        id: 2,
+        kind: 'tool_call',
+        done: true,
+        payloadJson: JSON.stringify({
+          data: {
+            callId: 'call-1',
+            toolName: 'code_exec',
+            output: { status: 'success', stdout: 'ok' },
+          },
+        }),
+      }),
+      makeMessage({
+        id: 3,
+        kind: 'llm',
+        payloadJson: JSON.stringify({ data: { text: 'Answer' } }),
+      }),
+    ];
+
+    const chatMessages = makeBuilder().buildMessages(msgs);
+    expect(chatMessages).toHaveLength(5);
+    expect(chatMessages[2]).toMatchObject({
+      role: 'assistant',
+      content: [
+        {
+          type: 'tool-call',
+          toolCallId: 'call-1',
+          toolName: 'code_exec',
+          input: {},
+        },
+      ],
+    });
+    expect(chatMessages[3]).toMatchObject({
+      role: 'tool',
+      content: [
+        {
+          type: 'tool-result',
+          toolCallId: 'call-1',
+          toolName: 'code_exec',
+          output: {
+            type: 'json',
+            value: expect.objectContaining({ status: 'success' }),
+          },
+        },
+      ],
+    });
+    expect(JSON.stringify(chatMessages[3])).not.toContain('"result"');
+  });
+
+  /* Preconditions: Terminal kind:tool_call has timeout status
+     Action: Call buildMessages()
+     Assertions: tool-result output uses AI SDK ToolResultOutput envelope and preserves terminal status
+     Requirements: llm-integration.11.3.1.3, llm-integration.11.3.1.3.2 */
+  it('should encode terminal tool_result output as ToolResultOutput json envelope', () => {
+    const msgs = [
+      makeMessage({
+        id: 1,
+        kind: 'tool_call',
+        done: true,
+        payloadJson: JSON.stringify({
+          data: {
+            callId: 'call-timeout',
+            toolName: 'code_exec',
+            arguments: { code: 'while(true){}' },
+            output: { status: 'timeout', stdout: '', stderr: 'timed out' },
+          },
+        }),
+      }),
+    ];
+
+    const chatMessages = makeBuilder().buildMessages(msgs);
+    expect(chatMessages[2]).toMatchObject({
+      role: 'tool',
+      content: [
+        {
+          type: 'tool-result',
+          toolCallId: 'call-timeout',
+          toolName: 'code_exec',
+          output: {
+            type: 'json',
+            value: {
+              status: 'timeout',
+              output: { status: 'timeout', stdout: '', stderr: 'timed out' },
+            },
+          },
+        },
+      ],
+    });
+  });
+
+  /* Preconditions: Terminal kind:tool_call has arguments payload
+     Action: Call buildMessages()
+     Assertions: replayed assistant tool-call includes original arguments as input
+     Requirements: llm-integration.11.3.1.1 */
+  it('should replay terminal tool_call arguments in assistant tool-call input', () => {
+    const msgs = [
+      makeMessage({
+        id: 1,
+        kind: 'tool_call',
+        done: true,
+        payloadJson: JSON.stringify({
+          data: {
+            callId: 'call-args',
+            toolName: 'code_exec',
+            arguments: { code: "console.log('x')", timeout_ms: 5000 },
+            output: { status: 'success', stdout: 'x' },
+          },
+        }),
+      }),
+    ];
+
+    const chatMessages = makeBuilder().buildMessages(msgs);
+    expect(chatMessages[1]).toMatchObject({
+      role: 'assistant',
+      content: [
+        {
+          type: 'tool-call',
+          toolCallId: 'call-args',
+          toolName: 'code_exec',
+          input: { code: "console.log('x')", timeout_ms: 5000 },
+        },
+      ],
+    });
   });
 });
 

@@ -4,7 +4,10 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import { AgentMessage } from '../../../../src/renderer/components/agents/AgentMessage';
+import {
+  AgentMessage,
+  buildJavaScriptFence,
+} from '../../../../src/renderer/components/agents/AgentMessage';
 import type { MessageSnapshot } from '../../../../src/shared/events/types';
 
 const mockRetryLast = jest.fn().mockResolvedValue({ success: true });
@@ -26,6 +29,19 @@ const baseMessage = (overrides: Partial<MessageSnapshot> = {}): MessageSnapshot 
     replyToMessageId: null,
     ...overrides,
   }) as MessageSnapshot;
+
+describe('buildJavaScriptFence', () => {
+  /* Preconditions: code contains triple backticks
+     Action: build fenced markdown for code_exec input
+     Assertions: fence length is expanded beyond content backtick run
+     Requirements: agents.7.4.6.8 */
+  it('uses a fence longer than any backtick run in code', () => {
+    const fenced = buildJavaScriptFence("console.log('a');\n```in-code```");
+    expect(fenced.startsWith('````javascript\n')).toBe(true);
+    expect(fenced.endsWith('\n````')).toBe(true);
+    expect(fenced).toContain('```in-code```');
+  });
+});
 
 describe('AgentMessage — user', () => {
   /* Preconditions: kind:user message
@@ -107,10 +123,64 @@ describe('AgentMessage — tool_call', () => {
     expect(output).toHaveTextContent('"content": "result"');
   });
 
+  /* Preconditions: persisted kind:tool_call for code_exec with status/stdout/stderr
+     Action: render AgentMessage, verify default collapsed state, then expand by toggle
+     Assertions: dedicated code_exec block renders Code header with icon/status, starts collapsed with centered header spacing, and shows transparent stream sections after expand
+     Requirements: agents.7.4.5, agents.7.4.6, agents.7.4.6.9, agents.7.4.7 */
+  it('should render code_exec tool_call block with Code header, icon, status, and streams', () => {
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'tool_call',
+          done: true,
+          payload: {
+            data: {
+              callId: 'call-code',
+              toolName: 'code_exec',
+              arguments: { code: "console.log('ok')" },
+              output: {
+                status: 'success',
+                stdout: 'ok\\n',
+                stderr: 'warn\\n',
+                stdout_truncated: false,
+                stderr_truncated: false,
+              },
+            },
+          },
+        })}
+      />
+    );
+
+    expect(screen.getByTestId('message-code-exec-block')).toBeInTheDocument();
+    expect(screen.getByTestId('message-code-exec-block')).toHaveClass('bg-transparent');
+    expect(screen.getByTestId('message-code-exec-icon')).toBeInTheDocument();
+    expect(screen.getByTestId('message-code-exec-title')).toHaveTextContent('Code');
+    expect(screen.getByTestId('message-code-exec-status')).toHaveTextContent('success');
+    expect(screen.getByTestId('message-code-exec-status')).toHaveClass('bg-transparent');
+    expect(screen.getByTestId('message-code-exec-status-icon')).toBeInTheDocument();
+    expect(screen.getByTestId('message-code-exec-status-icon')).toHaveClass('text-emerald-600');
+    expect(screen.getByTestId('message-code-exec-header')).toHaveClass('mb-0');
+    expect(screen.getByTestId('message-code-exec-header')).toHaveClass('items-center');
+    expect(screen.getByTestId('message-code-exec-toggle')).toBeInTheDocument();
+    expect(screen.queryByTestId('message-code-exec-input')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('message-code-exec-stdout')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('message-code-exec-stderr')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('message-code-exec-toggle'));
+
+    expect(screen.getByTestId('message-code-exec-header')).toHaveClass('mb-2');
+    expect(screen.queryByText('JavaScript')).not.toBeInTheDocument();
+    expect(screen.getByTestId('message-code-exec-input')).toHaveClass('bg-transparent');
+    expect(screen.getByTestId('message-code-exec-stdout')).toHaveTextContent('ok');
+    expect(screen.getByTestId('message-code-exec-stdout')).toHaveClass('bg-transparent');
+    expect(screen.getByTestId('message-code-exec-stderr')).toHaveTextContent('warn');
+    expect(screen.getByTestId('message-code-exec-stderr')).toHaveClass('bg-transparent');
+  });
+
   /* Preconditions: persisted kind:tool_call for final_answer with summary_points
      Action: render AgentMessage
      Assertions: renders Final Answer checklist items without title/header
-     Requirements: agents.7.4.1, agents.7.4.2, llm-integration.9.7 */
+     Requirements: agents.7.4.1, agents.7.4.2, agents.7.4.2.4, llm-integration.9.7 */
   it('should render final_answer as Final Answer block with summary list', () => {
     render(
       <AgentMessage
@@ -134,6 +204,10 @@ describe('AgentMessage — tool_call', () => {
     expect(screen.getByTestId('message-final-answer-summary')).toBeInTheDocument();
     expect(screen.getAllByTestId('message-final-answer-item')).toHaveLength(2);
     expect(screen.getByText('Point 1')).toBeInTheDocument();
+    expect(screen.getAllByTestId('message-final-answer-item')[0]).toHaveClass('items-start');
+    expect(screen.getAllByTestId('message-final-answer-item')[0].querySelector('span')).toHaveClass(
+      'mt-0.5'
+    );
     expect(screen.queryByTestId('message-final-answer-title')).not.toBeInTheDocument();
     expect(screen.queryByTestId('message-tool-call')).not.toBeInTheDocument();
     expect(screen.queryByTestId('message-completed-badge')).not.toBeInTheDocument();
@@ -278,6 +352,67 @@ describe('AgentMessage — llm', () => {
     expect(screen.getByTestId('message-llm-reasoning')).toBeInTheDocument();
     expect(screen.getByTestId('reasoning-root')).toHaveAttribute('data-streaming', 'false');
     expect(screen.getByTestId('message-llm-action')).toBeInTheDocument();
+  });
+
+  /* Preconditions: kind:llm reasoning text has glued bold opener after plain text
+     Action: render AgentMessage
+     Assertions: reasoning text has paragraph break before heading-like bold fragment
+     Requirements: agents.4.11.3 */
+  it('should normalize glued bold opener spacing in reasoning text', () => {
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'llm',
+          payload: {
+            data: {
+              reasoning: { text: 'Soon!**Resolving next step**' },
+              text: 'Answer',
+            },
+          },
+        })}
+      />
+    );
+
+    expect(screen.getByTestId('message-llm-reasoning')).toHaveTextContent(
+      'Soon! **Resolving next step**'
+    );
+    const reasoningText = screen.getByTestId('message-llm-reasoning').textContent ?? '';
+    expect(reasoningText).toContain('Soon!\n\n**Resolving next step**');
+  });
+
+  /* Preconditions: reasoning text contains glued bold outside code and `**` inside fenced/inline code
+     Action: render AgentMessage
+     Assertions: only non-code reasoning text is normalized; code segments stay unchanged
+     Requirements: agents.4.11.3, agents.4.11.5 */
+  it('should normalize reasoning spacing only outside fenced and inline code', () => {
+    const reasoning = [
+      'Outside!**Bold**',
+      '',
+      '```js',
+      "const x='a**b';",
+      '```',
+      '',
+      '`x**y`',
+    ].join('\n');
+
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'llm',
+          payload: {
+            data: {
+              reasoning: { text: reasoning },
+              text: 'Answer',
+            },
+          },
+        })}
+      />
+    );
+
+    const node = screen.getByTestId('message-llm-reasoning');
+    expect(node).toHaveTextContent('Outside! **Bold**');
+    expect(node).toHaveTextContent("const x='a**b';");
+    expect(node).toHaveTextContent('x**y');
   });
 
   /* Preconditions: kind:llm with reasoning, active streaming for this message

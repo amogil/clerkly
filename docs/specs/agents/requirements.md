@@ -221,6 +221,16 @@
 
 4.11.2. КОГДА reasoning-фаза завершена и reasoning-блок автоматически свёрнут, иконка в заголовке reasoning-блока ДОЛЖНА оставаться статичной (`animated=false`)
 
+4.11.3. КОГДА в reasoning-тексте markdown-фрагмент с `**...**` следует сразу после текста без пробела/переноса и перед `**` стоит завершающая пунктуация предложения (`.`, `!`, `?`, `:`, `…`), слой отображения ДОЛЖЕН вставлять перед `**` разрыв абзаца (`\n\n`) для заголовочного отображения нового пункта.
+
+4.11.4. КОГДА правило `4.11.3` не применимо, но `**...**` всё ещё склеен с предыдущим reasoning-текстом, слой отображения ДОЛЖЕН вставлять перед `**` один пробел.
+
+4.11.5. Нормализация markdown-склейки для reasoning ДОЛЖНА применяться только вне fenced code и inline code.
+
+4.11.6. Нормализация markdown-склейки для reasoning SHALL NOT изменять persisted payload сообщения (`payload.data.reasoning.text`) и SHALL применяться только при рендере reasoning.
+
+4.11.7. Потоковые данные reasoning (`delta` и накопленный текст до сохранения) SHALL сохранять исходный текст модели без display-time нормализации; нормализация SHALL применяться только к отображаемому renderer-представлению reasoning.
+
 4.12. Сообщения агента ДОЛЖНЫ поддерживать React-компоненты (для rich content)
 
 4.13. ДОЛЖЕН выполняться автоскролл к последнему сообщению при появлении новых сообщений
@@ -506,13 +516,13 @@
    - `llm` - ответ агента (слева), включая streaming reasoning/text и финальное состояние `done = true`
    - `tool_call` - вызов инструмента и его результат/статус
 
-7.4. `tool_call` с `toolName != "final_answer"` НЕ ДОЛЖЕН отображаться как обычный текстовый bubble (`user`/`llm`); для него ДОЛЖЕН использоваться специализированный tool-call блок.
+7.4. В текущем scope UI ДОЛЖЕН поддерживать только два типа `tool_call`: `tool_call(final_answer)` и `tool_call(code_exec)`, с раздельными правилами отображения по пунктам `7.4.1`-`7.4.7`.
 
 7.4.1. `tool_call` с `toolName = "final_answer"` ДОЛЖЕН отображаться как отдельный компонент `"Final Answer"` (на базе AI Elements `Queue`), а не как обычный текстовый bubble `kind: llm`.
 
-7.4.1.2. Реализация `"Final Answer"` ДОЛЖНА использовать AI Elements `Queue` как базовый компонент.
-
 7.4.1.1. Компонент `"Final Answer"` ДОЛЖЕН отображаться как checklist без отдельного заголовка.
+
+7.4.1.2. Реализация `"Final Answer"` ДОЛЖНА использовать AI Elements `Queue` как базовый компонент.
 
 7.4.2. Внутри компонента `"Final Answer"` для `tool_call(final_answer)` ДОЛЖНЫ отображаться пункты `summary_points`; каждый пункт ДОЛЖЕН отображаться с иконкой `Check` в зелёном круге.
 
@@ -522,10 +532,69 @@
 
 7.4.2.3. Контракт и лимиты аргументов `final_answer` задаются в спецификации `llm-integration`; `agents` использует только persisted payload для отображения.
 
+7.4.2.4. В каждом checklist-пункте блока `"Final Answer"` зелёная иконка `Check` ДОЛЖНА быть выровнена по вертикальному центру первой строки текста пункта (а НЕ по центру всего многострочного блока).
+
 7.4.4. Для `tool_call(final_answer)` UI ДОЛЖЕН иметь отдельные тестовые идентификаторы:
   - `data-testid="message-final-answer-block"` для корневого блока,
   - `data-testid="message-final-answer-summary"` для контейнера checklist,
   - `data-testid="message-final-answer-item"` для checklist-пункта.
+
+7.4.5. `tool_call` с `toolName = "code_exec"` НЕ ДОЛЖЕН отображаться как обычный текстовый bubble (`user`/`llm`); для него ДОЛЖЕН использоваться специализированный блок выполнения кода.
+
+7.4.6. Блок `tool_call(code_exec)` ДОЛЖЕН отображать статус выполнения и детали результата (включая `stdout`/`stderr` при наличии) на основе persisted payload.
+
+7.4.6.1. Для визуализации `tool_call(code_exec)` ДОЛЖЕН использоваться компонент AI Elements `Tool` (см. [https://elements.ai-sdk.dev/components/tool](https://elements.ai-sdk.dev/components/tool)).
+
+7.4.6.2. Заголовок блока `tool_call(code_exec)` ДОЛЖЕН содержать иконку `Code2` (из набора `lucide-react`).
+
+7.4.6.3. Заголовок блока `tool_call(code_exec)` ДОЛЖЕН отображать название инструмента как `Code` (с заглавной буквы).
+
+7.4.6.4. Статус выполнения `tool_call(code_exec)` ДОЛЖЕН отображаться сразу после названия `Code` в заголовке.
+
+7.4.6.5. В блоке `tool_call(code_exec)` прозрачный фон (`transparent`) ДОЛЖЕН использоваться для:
+  - корневого контейнера блока,
+  - status-badge,
+  - секций `JavaScript`, `stdout` и `stderr`.
+
+7.4.6.6. Статус-badge компонента `Tool` (включая блок `tool_call(code_exec)`) ДОЛЖЕН содержать иконку статуса, соответствующую persisted-статусу выполнения:
+  - `running` → `Loader2` (с анимацией вращения),
+  - `success` → `CircleCheck`,
+  - `error` → `CircleX`,
+  - `timeout` → `Clock3`,
+  - `cancelled` → `CircleMinus`.
+
+7.4.6.7. Иконки статусов в status-badge `tool_call(code_exec)` ДОЛЖНЫ использовать цветовую кодировку (colorized icons), а не монохромный цвет.
+
+7.4.6.8. Секция `JavaScript` в `tool_call(code_exec)` ДОЛЖНА рендерить входной код через общий компонент markdown code block (fenced `javascript`) с встроенной JavaScript syntax highlighting, а НЕ как plain text.
+
+7.4.6.9. КОГДА блок `tool_call(code_exec)` находится в свернутом состоянии, ТО контент заголовка (`Code`, status-badge и toggle) ДОЛЖЕН быть выровнен по вертикальному центру; при этом нижний отступ заголовка ДОЛЖЕН отсутствовать. КОГДА блок раскрыт, ТО нижний отступ заголовка ДОЛЖЕН быть восстановлен.
+
+7.4.6.10. Для входного кода `tool_call(code_exec)` ДОЛЖЕН отображаться только встроенный markdown code block (с его собственным language-header); дополнительный верхний label `JavaScript` и отдельный внешний контейнер-рамка вокруг этого блока НЕ ДОЛЖНЫ рендериться.
+
+7.4.6.11. Для входного кода `tool_call(code_exec)` ДОЛЖЕН использоваться тот же контейнерный frame, что и у `stdout`/`stderr`; дополнительная внутренняя рамка встроенного markdown code block НЕ ДОЛЖНА рендериться.
+
+7.4.7. Для `tool_call(code_exec)` UI ДОЛЖЕН иметь отдельные тестовые идентификаторы:
+  - `data-testid="message-code-exec-block"` для корневого блока,
+  - `data-testid="message-code-exec-header"` для заголовка блока,
+  - `data-testid="message-code-exec-icon"` для иконки в заголовке,
+  - `data-testid="message-code-exec-title"` для названия `Code`,
+  - `data-testid="message-code-exec-status"` для статуса,
+  - `data-testid="message-code-exec-status-icon"` для иконки статуса,
+  - `data-testid="message-code-exec-input"` для секции JavaScript,
+  - `data-testid="message-code-exec-stdout"` для секции stdout,
+  - `data-testid="message-code-exec-stderr"` для секции stderr.
+
+7.4.8. КОГДА в одном run присутствуют и `kind: llm`, и `kind: tool_call`, UI ДОЛЖЕН отображать их по persisted-порядку шагов: pre-tool `kind: llm` (включая reasoning-фазу) -> `kind: tool_call` (`running`) -> post-tool `kind: llm`; terminal-обновление `tool_call` МОЖЕТ приходить позже и ДОЛЖНО применяться в том же блоке.
+
+7.4.8.1. КОГДА `tool_call(code_exec)` появляется в чате, он ДОЛЖЕН сначала отображаться в статусе `running`, а затем обновляться до terminal-статуса в том же блоке (без создания отдельного дублирующего блока terminal-состояния).
+
+7.4.8.2. КОГДА в успешной попытке присутствует `tool_call(final_answer)`, блок `"Final Answer"` ДОЛЖЕН отображаться последним пользовательским артефактом этой попытки.
+
+7.4.8.3. КОГДА persisted-сообщение помечено `hidden = true`, оно НЕ ДОЛЖНО отображаться в чате и НЕ ДОЛЖНО нарушать порядок видимых блоков `kind: llm`/`kind: tool_call`.
+
+7.4.8.4. UI ДОЛЖЕН рендерить `tool_call`-блоки только из видимых persisted-сообщений (`hidden = false`), и НЕ ДОЛЖЕН показывать частично обработанные/промежуточные `tool_call`-артефакты, отсутствующие в видимой persisted-истории.
+
+7.4.9. В явно выделенных text/code секциях tool-блоков (`Input`, `Output`, `JavaScript`, `stdout`, `stderr`) длинные строки НЕ ДОЛЖНЫ переноситься по ширине секции и ДОЛЖНЫ отображаться через горизонтальный скролл внутри соответствующего блока.
 
 7.5. Сообщение `user` ДОЛЖНО содержать:
    ```json
@@ -540,6 +609,10 @@
 7.7. КОГДА `format = "markdown"`, ТО текст ДОЛЖЕН рендериться с поддержкой Markdown
 
 7.7.1. КОГДА в тексте встречаются математические делимитеры `\(...\)`, `\[...\]` или экранированные dollar-делимитеры `\$...\$` / `\$\$...\$\$`, ТО UI ДОЛЖЕН нормализовать их в KaTeX-совместимый формат (`$...$`/`$$...$$`) до рендера.
+
+7.7.2. КОГДА `llm`-ответ содержит markdown code block, контейнеры code block в ответе ДОЛЖНЫ использовать прозрачный фон (`transparent`).
+
+7.7.3. КОГДА `llm`-ответ содержит markdown fenced code block (любой язык, включая `text`/`plaintext`), длинные строки в таком блоке НЕ ДОЛЖНЫ переноситься по ширине блока и ДОЛЖНЫ отображаться с горизонтальным скроллом внутри code block.
 
 7.8. Все timestamps ДОЛЖНЫ включать timezone offset и храниться в часовом поясе пользователя
 
@@ -567,9 +640,20 @@
 - `tests/functional/llm-chat.spec.ts` - "should render markdown mermaid diagrams"
 - `tests/functional/llm-chat.spec.ts` - "should render markdown inline math"
 - `tests/functional/llm-chat.spec.ts` - "should render markdown block math"
+- `tests/functional/llm-chat.spec.ts` - "should keep markdown fenced text code block lines unwrapped with horizontal scroll"
 - `tests/functional/llm-chat.spec.ts` - "should render math when model returns LaTeX delimiters"
 - `tests/functional/llm-chat.spec.ts` - "should render math when model returns escaped dollar delimiters"
 - `tests/functional/llm-chat.spec.ts` - "should avoid duplicate line breaks between markdown blocks"
+- `tests/functional/llm-chat.spec.ts` - "should render tool_call(final_answer) as checklist block"
+- `tests/functional/llm-chat.spec.ts` - "should keep tool_call(final_answer) checklist always expanded"
+- `tests/functional/llm-chat.spec.ts` - "should keep visual order pre-tool llm -> tool_call(running) -> post-tool llm with in-place terminal update"
+- `tests/functional/llm-chat.spec.ts` - "should create tool_call only after reasoning phase and start post-tool text without waiting terminal result"
+- `tests/functional/llm-chat.spec.ts` - "should show running code_exec before terminal when first model step has no post-tool text"
+- `tests/functional/llm-chat.spec.ts` - "should reject model response containing more than one tool_call and run repair"
+- `tests/functional/llm-chat.spec.ts` - "should render final_answer after all non-final tool steps of successful attempt"
+- `tests/functional/code_exec.spec.ts` - "should render tool_call(code_exec) message block with Code header/icon/status and transparent streams"
+- `tests/functional/code_exec.spec.ts` - "should render JavaScript syntax highlighting in code_exec input section"
+- `tests/functional/code_exec.spec.ts` - "should keep code_exec block within chat width with internal horizontal scroll"
 
 ---
 
@@ -621,8 +705,10 @@
      - `kind = 'llm'` и `done = true` → `awaiting-response`
      - `kind = 'tool_call'` и `done = false` → `in-progress`
      - `kind = 'tool_call'` и `toolName = 'final_answer'` и `done = true` → `completed`
-     - `kind = 'tool_call'` и `toolName != 'final_answer'` и `done = true` → `awaiting-response`
+     - `kind = 'tool_call'` и `toolName = 'code_exec'` и `done = true` → определяется по правилам `llm-integration.9.4.1-9.4.2`
      - `kind = 'error'` → `error`
+
+9.2.1. Детальная статусная семантика terminal `tool_call(code_exec)` ДОЛЖНА определяться в `llm-integration.9.4.1-9.4.2` и НЕ ДОЛЖНА дублироваться в данной спецификации.
 
 9.3. Статус ДОЛЖЕН пересчитываться при получении любого нового сообщения в чате агента
 
@@ -632,6 +718,10 @@
 
 - `tests/functional/agent-status-calculation.spec.ts` - "should calculate agent status from messages"
 - `tests/functional/agent-status-calculation.spec.ts` - "should update status on new message"
+- `tests/functional/agent-status-calculation.spec.ts` - "should keep in-progress status for done code_exec success tool_call"
+- `tests/functional/agent-status-calculation.spec.ts` - "should keep in-progress status from done code_exec error tool_call"
+- `tests/functional/agent-status-calculation.spec.ts` - "should keep in-progress status from done code_exec timeout tool_call"
+- `tests/functional/agent-status-calculation.spec.ts` - "should keep in-progress status from done code_exec cancelled tool_call"
 
 ---
 

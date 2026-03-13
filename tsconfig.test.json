@@ -8,5 +8,5 @@
     "allowSyntheticDefaultImports": true
   },
   "include": ["tests/**/*", "src/**/*"],
-  "exclude": ["node_modules", "dist", "figma"]
+  "exclude": ["node_modules", "dist"]
 }

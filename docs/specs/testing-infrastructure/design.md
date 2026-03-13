@@ -2,7 +2,8 @@
 
 ## Обзор
 
-Данный документ описывает дизайн инфраструктуры тестирования для приложения Clerkly, включая архитектуру тестов, стратегию мокирования, процесс валидации, требования к окружению для запуска различных типов тестов, а также специализированные инструменты для функционального тестирования (Test IPC Handlers, Mock OAuth Server) и режим разработки с поддержкой deep links.
+Данный документ описывает дизайн инфраструктуры тестирования для приложения Clerkly, включая архитектуру тестов, стратегию мокирования, процесс валидации, требования к окружению для запуска различных типов тестов, а также специализированные инструменты для функционального тестирования (Test IPC Handlers, Mock OAuth Server).
+Документ фиксирует только тестовую инфраструктуру и SHALL NOT задавать продуктовые UI-контракты или runtime-логику; такие контракты определяются в профильных спецификациях фич в `docs/specs/*`.
 
 ## Архитектура Тестирования
 
@@ -57,6 +58,11 @@ jest.mock('better-sqlite3');
 - Проверяют end-to-end пользовательские сценарии (Requirements: testing.3.10)
 - Используют LLM и UI (Requirements: testing.3.12)
 - **КРИТИЧЕСКИ ВАЖНО**: Каждый тест ДОЛЖЕН использовать уникальную временную директорию для полной изоляции данных (Requirements: testing.3.11)
+
+**Требования к разрешениям окружения запуска**:
+- Функциональные тесты, поднимающие локальные mock HTTP-сервисы (Mock OAuth Server), требуют разрешения на bind localhost-сокетов (Requirements: testing.5.6).
+- В окружениях с sandbox-ограничениями запуск должен выполняться вне sandbox (Requirements: testing.5.7).
+- Ошибка `listen EPERM: operation not permitted 127.0.0.1` классифицируется как инфраструктурное ограничение окружения запуска, а не как регрессия продуктового кода (Requirements: testing.5.8).
 
 **Исключения**:
 IF функциональный тест НЕ использует LLM или UI, он допускается ТОЛЬКО при наличии явного согласия пользователя и MUST содержать комментарий с причиной исключения (Requirements: testing.3.13)
@@ -537,7 +543,7 @@ interface MockTokenResponse {
 
 ### Команда `npm run validate`
 
-**Requirements**: testing.4.1, testing.4.2, testing.4.3, testing.4.4
+**Requirements**: testing.4.1, testing.4.2, testing.4.3, testing.4.4, testing.4.5, testing.4.6
 
 Выполняет следующие проверки в указанном порядке:
 
@@ -550,9 +556,16 @@ interface MockTokenResponse {
 **Скрипт валидации** (`scripts/validate.sh`):
 ```bash
 #!/bin/bash
-# Requirements: testing.4.1, testing.4.3, testing.4.4
+# Requirements: testing.4.1, testing.4.3, testing.4.4, testing.4.6
 
 set -e  # Exit on first error
+
+WITH_DEPENDENCY_CHECK=false
+for arg in "$@"; do
+  case "$arg" in
+    --with-dependency-check|--deps|-d) WITH_DEPENDENCY_CHECK=true ;;
+  esac
+done
 
 echo "🔍 Running validation..."
 
@@ -576,6 +589,11 @@ npm run test:unit
 echo "📊 Coverage check..."
 npm run test:coverage
 
+# Optional dependency check
+if [ "$WITH_DEPENDENCY_CHECK" = true ]; then
+  npm outdated || true
+fi
+
 echo "✅ Validation complete!"
 ```
 
@@ -583,10 +601,12 @@ echo "✅ Validation complete!"
 
 **НЕ включает**:
 - ❌ Функциональные тесты (Requirements: testing.4.2)
+- ❌ Обязательные runtime secrets (`CLERKLY_OAUTH_CLIENT_SECRET`, `CLERKLY_OPENAI_API_KEY`) (Requirements: testing.4.5)
+- ❌ Проверку `npm outdated` по умолчанию (Requirements: testing.4.6; включается флагом `--with-dependency-check`)
 
 ### Отдельные Команды для Функциональных Тестов
 
-**Requirements**: testing.5.1, testing.5.2, testing.5.3, testing.5.4
+**Requirements**: testing.5.1, testing.5.2, testing.5.3, testing.5.4, testing.5.9, testing.5.10
 
 ```bash
 # Функциональные тесты (с реальным Electron, показывают окна)
@@ -605,23 +625,26 @@ npm run test:functional:single -- navigation.spec.ts
 npm test
 ```
 
-**Предупреждение пользователю**: 
+**Предупреждение пользователю**:
 
 **Requirements**: testing.5.4
 
 Перед запуском функциональных тестов пользователь должен быть предупрежден о том, что будут показаны окна на экране. Это реализовано через:
 
-1. **Сообщение в консоли** при запуске команды
-2. **Документацию в README.md**
-3. **Комментарии в package.json**
+1. **Операционный workflow** (агент/разработчик предупреждает перед запуском)
+2. **Документацию в AGENTS.md и testing-infrastructure**
 
 ```json
 {
   "scripts": {
-    "test:functional": "echo '⚠️  Functional tests will show windows on screen' && npm run rebuild:electron && npm run build && playwright test"
+    "test:functional": "npm run rebuild:electron && npm run build && playwright test"
   }
 }
 ```
+
+**Скоуп секретов для functional** (Requirements: testing.5.9, testing.5.10):
+- OAuth сценарии работают через Mock OAuth Server и не требуют `CLERKLY_OAUTH_CLIENT_SECRET`.
+- Real LLM сценарии используют только `CLERKLY_OPENAI_API_KEY`.
 
 ## Стратегия Тестирования
 
@@ -640,7 +663,7 @@ npm test
 ### Покрытие Требований
 Покрытие требований фиксируется в таблицах покрытия соответствующих спецификаций. Для инфраструктуры тестирования применяются следующие правила:
 - `testing.1.*` покрывается модульными тестами
-- `testing.3.*`, `testing.5.*`, `testing.6.*`, `testing.8.*` покрывается функциональными тестами
+- `testing.3.*`, `testing.5.*`, `testing.6.*`, `testing.8.*`, `testing.9.*`, `testing.10.*`, `testing.11.*`, `testing.12.*` покрывается функциональными тестами
 - `testing.4.*` проверяется скриптом валидации
 
 ## Требования к Окружению
@@ -699,15 +722,27 @@ afterEach(() => {
 
 ### Запуск в CI/CD
 
-**Requirements**: testing.4.2, testing.5.5
+**Requirements**: testing.4.2, testing.4.7, testing.5.5
 
 ```yaml
 # GitHub Actions example
-- name: Run validation (without functional tests)
-  run: npm run validate
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    environment: ci-env-validation
+    steps:
+      - run: npm run validate:verbose:deps
 
-- name: Run functional tests on macOS for pull requests
-  run: npm run test:functional
+  functional:
+    runs-on: macos-latest
+    environment: ci-env-functional
+    steps:
+      - run: test -n "$CLERKLY_OPENAI_API_KEY"
+        env:
+          CLERKLY_OPENAI_API_KEY: ${{ secrets.CLERKLY_OPENAI_API_KEY }}
+      - run: npm run test:functional
+        env:
+          CLERKLY_OPENAI_API_KEY: ${{ secrets.CLERKLY_OPENAI_API_KEY }}
 ```
 
 ## Разделение Production Code и Reference Code
@@ -745,34 +780,6 @@ module.exports = {
 };
 ```
 
-### Reference Code
-
-**Расположение**: `figma/**/*`
-
-**Характеристики**:
-- НЕ требует покрытия тестами (Requirements: testing.7.6)
-- НЕ анализируется линтерами (Requirements: testing.7.7)
-- НЕ требует изменений или поддержки (Requirements: testing.7.8)
-- Используется только как референс (Requirements: testing.7.9)
-- Исключен из расчета покрытия (Requirements: testing.7.10)
-
-**Конфигурация ESLint**:
-```javascript
-// Requirements: testing.7.7
-module.exports = {
-  ignorePatterns: ['figma/**/*'],
-};
-```
-
-**Конфигурация Jest**:
-```javascript
-// Requirements: testing.7.10
-module.exports = {
-  testPathIgnorePatterns: ['/node_modules/', '/figma/'],
-  coveragePathIgnorePatterns: ['/node_modules/', '/figma/'],
-};
-```
-
 ## Development Mode с Поддержкой Deep Links
 
 **Requirements**: testing.9
@@ -794,8 +801,8 @@ module.exports = {
 ```json
 {
   "scripts": {
-    "dev": "npm run build && electron .",
-    "dev:app": "npm run build && electron-builder --mac --dir && open release/mac-arm64/Clerkly.app"
+    "dev": "npm run build:strict && electron .",
+    "dev:app": "npm run build:strict && electron-builder --mac --dir && open release/mac-arm64/Clerkly.app"
   }
 }
 ```
@@ -846,8 +853,7 @@ npm run dev:app
 5. ✅ Mock OAuth Server эмулирует Google OAuth endpoints (Requirements: testing.3.2.1)
 6. ✅ Покрытие кода > 80% (Requirements: testing.4.1)
 7. ✅ Все тесты проходят без ошибок
-8. ✅ Reference Code исключен из тестирования и анализа (Requirements: testing.7.6, testing.7.7, testing.7.10)
-9. ✅ Development mode с deep links работает за < 30 секунд (Requirements: testing.9.5)
+8. ✅ Development mode с deep links работает за < 30 секунд (Requirements: testing.9.5)
 
 ## Correctness Properties
 
@@ -895,13 +901,7 @@ npm run dev:app
 
 **Validates: Requirements testing.4.3**
 
-### Property 8: Reference Code Exclusion
-
-*For any* test coverage calculation, files in the `figma/` directory should be excluded from coverage metrics.
-
-**Validates: Requirements testing.7.10**
-
-### Property 9: Deep Link Registration
+### Property 8: Deep Link Registration
 
 *For any* unpacked .app bundle created with `npm run dev:app`, the bundle should correctly register custom protocol handlers for OAuth deep links.
 
@@ -997,7 +997,6 @@ Unit Tests
 
 - Overall coverage: > 80%
 - Critical components: > 85%
-- Production code only (excludes `figma/`)
 
 ### Test Naming Convention
 
@@ -1017,7 +1016,6 @@ test('should [expected behavior]', () => {
   // Test implementation
 });
 ```
-
 
 ## Helper Функции для Функциональных Тестов
 
@@ -1137,13 +1135,13 @@ await expect(messages.first()).toContainText('Test message');
 // ❌ НЕПРАВИЛЬНО
 await createButton.click();
 await window.waitForTimeout(1000);
-const agents = window.locator('[data-testid="agent-icon"]');
-expect(await agents.count()).toBe(2);
+const items = window.locator('[data-testid="list-item"]');
+expect(await items.count()).toBe(2);
 
 // ✅ ПРАВИЛЬНО
 await createButton.click();
-const agents = window.locator('[data-testid="agent-icon"]');
-await expect(agents).toHaveCount(2, { timeout: 2000 });
+const items = window.locator('[data-testid="list-item"]');
+await expect(items).toHaveCount(2, { timeout: 2000 });
 ```
 
 #### 4. Ожидание Изменения Состояния
@@ -1242,71 +1240,33 @@ export async function expectNoToastError(window: Page): Promise<void> {
 
 ### Когда вызывать
 
-- После `completeOAuthFlow` + ожидания `[data-testid="agents"]`
+- После завершения ключевого сценария + ожидания основного контейнера экрана
 - После любого действия, которое может вызвать фоновую ошибку
 
 ### Покрытие требований
 
 | Требование | Описание | Реализация |
 |------------|----------|------------|
-| testing.12.1 | Проверка после ключевых действий | Вызов в `launchWithMockLLM` и аналогичных helpers |
+| testing.12.1 | Проверка после ключевых действий | Вызов `expectNoToastError` в общих functional helpers после ключевых операций |
 | testing.12.2 | Фейл с текстом ошибки | `throw new Error(\`Toast error detected: ${text}\`)` |
 | testing.12.3 | Переиспользуемый helper | `expectNoToastError` в `helpers/electron.ts` |
 
-## AI SDK Chat-Flow Контракты
+## Инфраструктурный Контроль Полноты Тест-Матриц
 
 **Requirements**: testing.13
 
-### Unit: Stream Protocol
+Инфраструктура тестирования не определяет feature-specific логику, но задаёт процессный контроль полноты матриц:
+- при добавлении новых acceptance criteria в профильной спеке должны обновляться ссылки на unit/functional тесты;
+- отсутствие ссылок на тесты для новых критериев считается нарушением review-gate;
+- `testing-infrastructure` хранит только правила процесса и связности, а не сами продуктовые сценарии.
 
-- `tests/unit/renderer/IPCChatTransport.test.ts` проверяет порядок `UIMessageChunk`:
-  - `start -> start-step -> reasoning/text deltas -> finish-step -> finish`
-- Отдельные кейсы проверяют отсутствие дублирования между delta-событиями и `message.updated`.
-
-### Unit: Tool Loop и Status
-
-- `tests/unit/agents/MainPipeline.test.ts` покрывает:
-  - несколько `tool_call` в одном запросе;
-  - продолжение `model -> tools -> model`;
-  - cancel во время выполнения tools без `kind:error`.
-- `tests/unit/components/agents-status-colors.test.tsx` покрывает статусные переходы для `llm/tool_call` с `done=true/false`.
-
-### Unit: Error Normalization
-
-- `tests/unit/llm/ErrorNormalizer.test.ts` покрывает mapping AI SDK ошибок:
-  - `APICallError` (401/403/429/5xx),
-  - timeout/abort,
-  - transport-level network,
-  - `NoSuchToolError`, `InvalidToolInputError`, `ToolExecutionError`, `ToolCallRepairError`,
-  - `UIMessageStreamError`.
-
-### Functional: End-to-End Контракты
-
-- `tests/functional/llm-chat.spec.ts` проверяет:
-  - параллельный стриминг reasoning + текста;
-  - отображение persisted `tool_call` по `message.created`/`message.updated` (`final_answer` как отдельный блок `"Final Answer"`, остальные как tool-call блок);
-  - корректный rate-limit countdown без persisted `kind:error`;
-  - отсутствие `kind:error` при cancel во время tool execution.
-
-### Технические детали проверки `final_answer` (для тестов)
-
-- Для проверки завершённого ответа через `final_answer` использовать:
-  - `data-testid="message-final-answer-block"` — корневой блок;
-  - `data-testid="message-final-answer-summary"` — контейнер checklist `summary_points`;
-  - `data-testid="message-final-answer-item"` — checklist-пункты.
-- Блок `final_answer` проверяется как всегда раскрытый checklist без toggle-контрола.
-- Для проверки обычных tool-calls (не `final_answer`) использовать селекторы tool-call блока, а не assistant bubble.
-- Для сценариев невалидного `final_answer` (`summary_points` пустой/отсутствует, `summary_points` > 10, пункт > 200) проверять retry pipeline и итоговый `kind:error` при исчерпании лимита.
+Источники feature-specific тест-матриц определяются профильными спецификациями соответствующих подсистем/фич; `testing-infrastructure` не фиксирует закрытый список таких спецификаций.
 
 ### Покрытие требований
 
-| Требование | Модульные тесты | Функциональные тесты |
-|---|---|---|
-| testing.13.1 | ✓ | - |
-| testing.13.2 | ✓ | - |
-| testing.13.3 | ✓ | ✓ |
-| testing.13.4 | ✓ | - |
-| testing.13.5 | ✓ | ✓ |
-| testing.13.6 | - | ✓ |
-| testing.13.7 | ✓ | ✓ |
-| testing.13.8 | ✓ | ✓ |
+| Требование | Описание | Реализация |
+|------------|----------|------------|
+| testing.13.1 | Явные списки unit/functional в профильных спеках | Review checklist + обновление секций "Функциональные Тесты" и test strategy таблиц |
+| testing.13.2 | Запрет "новые критерии без тест-ссылок" | Spec review gate для PR |
+| testing.13.3 | Без дублирования продуктовой логики в testing-infrastructure | Разделение ответственности между `testing-infrastructure` и профильными спеками |
+| testing.13.4 | Источник матриц — профильные спеки без закрытого списка фич | Ссылки задаются в соответствующих профильных спецификациях |

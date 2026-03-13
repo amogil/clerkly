@@ -8,7 +8,10 @@ export type ToolProps = HTMLAttributes<HTMLDivElement>;
 
 export const Tool = ({ className, ...props }: ToolProps) => (
   <div
-    className={cn('w-full rounded-xl border border-border/70 bg-muted/20 p-3 text-sm', className)}
+    className={cn(
+      'w-full min-w-0 max-w-full rounded-xl border border-border/70 bg-muted/20 p-3 text-sm',
+      className
+    )}
     {...props}
   />
 );
@@ -22,7 +25,7 @@ export const ToolHeader = ({ className, ...props }: ToolHeaderProps) => (
 export type ToolContentProps = HTMLAttributes<HTMLDivElement>;
 
 export const ToolContent = ({ className, ...props }: ToolContentProps) => (
-  <div className={cn('grid gap-2', className)} {...props} />
+  <div className={cn('grid min-w-0 gap-2', className)} {...props} />
 );
 
 export type ToolInputProps = ComponentProps<'pre'>;
@@ -30,7 +33,7 @@ export type ToolInputProps = ComponentProps<'pre'>;
 export const ToolInput = ({ className, ...props }: ToolInputProps) => (
   <pre
     className={cn(
-      'overflow-auto rounded-md border border-border/60 bg-background/70 p-2 text-xs text-foreground',
+      'w-full min-w-0 max-w-full overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words [overflow-wrap:anywhere] rounded-md border border-border/60 bg-background/70 p-2 text-xs text-foreground',
       className
     )}
     {...props}
@@ -42,7 +45,7 @@ export type ToolOutputProps = ComponentProps<'pre'>;
 export const ToolOutput = ({ className, ...props }: ToolOutputProps) => (
   <pre
     className={cn(
-      'overflow-auto rounded-md border border-border/60 bg-background/70 p-2 text-xs text-foreground',
+      'w-full min-w-0 max-w-full overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words [overflow-wrap:anywhere] rounded-md border border-border/60 bg-background/70 p-2 text-xs text-foreground',
       className
     )}
     {...props}

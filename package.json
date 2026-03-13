@@ -15,11 +15,13 @@
   "scripts": {
     "rebuild:electron": "electron-rebuild -f -w better-sqlite3",
     "rebuild:node": "npm rebuild better-sqlite3",
-    "start": "npm run rebuild:electron && npm run build && npm run package:mac && (pkill -f '/Clerkly.app/Contents/MacOS/Clerkly' || true) && sleep 1 && open release/mac-arm64/Clerkly.app --args --user-data-dir \"$PWD/release\"",
-    "dev": "npm run build && electron .",
-    "dev:app": "npm run build && npx electron-builder --mac --dir && open release/mac-arm64/Clerkly.app",
+    "start": "npm run rebuild:electron && npm run build:strict && npm run package:mac && (pkill -f '/Clerkly.app/Contents/MacOS/Clerkly' || true) && sleep 1 && open release/mac-arm64/Clerkly.app --args --user-data-dir \"$PWD/release\"",
+    "dev": "npm run build:strict && electron .",
+    "dev:app": "npm run build:strict && npx electron-builder --mac --dir && open release/mac-arm64/Clerkly.app",
     "build": "npm run build:main && npm run build:renderer && npm run build:preload",
-    "build:main": "tsc -p tsconfig.main.json",
+    "build:strict": "npm run build:main:strict && npm run build:renderer && npm run build:preload",
+    "build:main": "tsc -p tsconfig.main.json && node scripts/inject-oauth-client-secret.js",
+    "build:main:strict": "tsc -p tsconfig.main.json && node scripts/inject-oauth-client-secret.js --strict",
     "build:renderer": "vite build",
     "build:preload": "tsc -p tsconfig.preload.json",
     "typecheck": "tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.preload.json --noEmit && tsc -p tsconfig.renderer.json --noEmit",
@@ -39,8 +41,11 @@
     "ai-elements:sync": "bash -lc 'set -euo pipefail; VER=\"${npm_package_config_ai_elements_version}\"; REF=\"ai-elements@${VER}\"; BASE=\"https://raw.githubusercontent.com/vercel/ai-elements/${REF}\"; mkdir -p src/renderer/components/ai-elements src/renderer/components/ui; for f in confirmation conversation message prompt-input reasoning shimmer tool queue; do curl -fsSL \"$BASE/packages/elements/src/$f.tsx\" -o \"src/renderer/components/ai-elements/$f.tsx\"; done; for f in button button-group collapsible separator tooltip scroll-area; do curl -fsSL \"$BASE/packages/shadcn-ui/components/ui/$f.tsx\" -o \"src/renderer/components/ui/$f.tsx\"; done; echo \"Synced AI Elements from tag: $REF\"'",
     "validate": "bash scripts/validate.sh",
     "validate:verbose": "bash scripts/validate.sh --verbose",
+    "validate:deps": "bash scripts/validate.sh --with-dependency-check",
+    "validate:verbose:deps": "bash scripts/validate.sh --verbose --with-dependency-check",
     "package": "electron-builder",
-    "package:mac": "electron-builder --mac"
+    "package:mac": "electron-builder --mac",
+    "generate:icon:mac": "bash scripts/generate-mac-icon.sh"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.58",

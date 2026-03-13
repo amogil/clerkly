@@ -227,13 +227,17 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
 
 #### Критерии Приемки
 
-1. "OAuth Client" ДОЛЖЕН хранить client_id и client_secret как константы в конфигурационном файле кода
-2. "OAuth Client" ДОЛЖЕН использовать redirect_uri в формате "com.googleusercontent.apps.CLIENT_ID:/oauth2redirect" (reverse client ID format), где CLIENT_ID - это числовая часть Client ID без суффикса ".apps.googleusercontent.com"
-3. "OAuth Client" ДОЛЖЕН запрашивать следующие scopes: "openid", "email", "profile"
-4. "OAuth Client" ДОЛЖЕН использовать authorization endpoint: "https://accounts.google.com/o/oauth2/v2/auth"
-5. "OAuth Client" ДОЛЖЕН использовать token endpoint: "https://oauth2.googleapis.com/token"
-6. "OAuth Client" ДОЛЖЕН использовать revoke endpoint: "https://oauth2.googleapis.com/revoke"
-7. "OAuth Client" ДОЛЖЕН включать параметры access_type=offline и prompt=consent для получения refresh token
+1. "OAuth Client" ДОЛЖЕН хранить client_id как константу в конфигурационном файле кода И ДОЛЖЕН загружать client_secret из `CLERKLY_OAUTH_CLIENT_SECRET` (на этапе сборки приложения)
+2. КОГДА `CLERKLY_OAUTH_CLIENT_SECRET` отсутствует в `process.env`, build-time инжектор ДОЛЖЕН попытаться загрузить значение из файла `.env` в корне проекта
+3. ЕСЛИ `CLERKLY_OAUTH_CLIENT_SECRET` отсутствует и в `process.env`, и в `.env`, ТО build-time инжектор ДОЛЖЕН:
+   - в strict-режиме сборки (`npm run build:strict`, `npm run start`, `npm run dev`, `npm run dev:app`) завершать сборку с ошибкой (ненулевой код выхода);
+   - в non-strict-режиме сборки (`npm run build`, `npm run validate`, `npm run test:functional*`) продолжать сборку без инъекции значения.
+4. "OAuth Client" ДОЛЖЕН использовать redirect_uri в формате "com.googleusercontent.apps.CLIENT_ID:/oauth2redirect" (reverse client ID format), где CLIENT_ID - это числовая часть Client ID без суффикса ".apps.googleusercontent.com"
+5. "OAuth Client" ДОЛЖЕН запрашивать следующие scopes: "openid", "email", "profile"
+6. "OAuth Client" ДОЛЖЕН использовать authorization endpoint: "https://accounts.google.com/o/oauth2/v2/auth"
+7. "OAuth Client" ДОЛЖЕН использовать token endpoint: "https://oauth2.googleapis.com/token"
+8. "OAuth Client" ДОЛЖЕН использовать revoke endpoint: "https://oauth2.googleapis.com/revoke"
+9. "OAuth Client" ДОЛЖЕН включать параметры access_type=offline и prompt=consent для получения refresh token
 
 **Примечание:** При формировании redirect_uri из Client ID, необходимо удалить суффикс ".apps.googleusercontent.com" если он присутствует, чтобы избежать дублирования в итоговом URL. Например:
 - Client ID: `100365225505-xxx.apps.googleusercontent.com`
@@ -281,7 +285,6 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
    - "Automate Actions" с иконкой обновления
    - "Auto-Sync" с иконкой молнии
 5. "Login Screen" ДОЛЖЕН отображать текст "By continuing, you agree to Clerkly's Terms of Service and Privacy Policy"
-6. "Login Screen" ДОЛЖЕН использовать дизайн из прототипа `figma/src/app/components/login-screen.tsx`
 
 #### Функциональные Тесты
 
@@ -299,8 +302,7 @@ Token Expiring → OAuthClientManager.refreshAccessToken() → Update Tokens in 
 4. КОГДА ошибка "access_denied", ТО "Login Error Screen" ДОЛЖЕН показать заголовок "Access denied" и текст "You denied access to your Google account." с предложением "Clerkly needs access to your Google account to function properly."
 5. КОГДА ошибка "network_error", ТО "Login Error Screen" ДОЛЖЕН показать заголовок "Network error" и текст "Unable to connect to Google authentication servers." с предложением "Please check your internet connection and try again."
 6. КОГДА ошибка неизвестна, ТО "Login Error Screen" ДОЛЖЕН показать заголовок "Authentication failed" и переданное сообщение об ошибке с предложением "Please try signing in again or contact support if the problem persists."
-7. "Login Error Screen" ДОЛЖЕН использовать дизайн из прототипа `figma/src/app/components/login-error.tsx`
-8. КОГДА пользователь нажимает кнопку "Continue with Google" на "Login Error Screen", ТО приложение ДОЛЖНО повторить попытку авторизации (вызвать onRetry callback)
+7. КОГДА пользователь нажимает кнопку "Continue with Google" на "Login Error Screen", ТО приложение ДОЛЖНО повторить попытку авторизации (вызвать onRetry callback)
 
 #### Функциональные Тесты
 

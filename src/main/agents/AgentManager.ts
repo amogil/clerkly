@@ -42,7 +42,7 @@ export class AgentManager {
 
   /**
    * Compute agent status from the latest visible message.
-   * Requirements: agents.9.2, agents.9.4
+   * Requirements: agents.9.2, agents.9.4, llm-integration.9.4, llm-integration.9.4.1, llm-integration.9.4.2
    */
   private computeAgentStatus(lastMessage: Message | null): AgentStatus {
     if (!lastMessage) {
@@ -65,9 +65,16 @@ export class AgentManager {
       if (!lastMessage.done) {
         return AGENT_STATUS.IN_PROGRESS;
       }
-      return this.extractToolName(lastMessage) === 'final_answer'
-        ? AGENT_STATUS.COMPLETED
-        : AGENT_STATUS.AWAITING_RESPONSE;
+      const toolName = this.extractToolName(lastMessage);
+      if (toolName === 'final_answer') {
+        return AGENT_STATUS.COMPLETED;
+      }
+      if (toolName === 'code_exec') {
+        // Keep agent in-progress across all terminal code_exec outcomes;
+        // next model step consumes terminal tool result from history.
+        return AGENT_STATUS.IN_PROGRESS;
+      }
+      return AGENT_STATUS.AWAITING_RESPONSE;
     }
 
     return AGENT_STATUS.NEW;

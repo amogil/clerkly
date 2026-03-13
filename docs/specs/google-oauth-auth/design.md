@@ -634,6 +634,7 @@ export function LoginScreen({ onLogin, isLoading, isDisabled }: LoginScreenProps
 
 // Содержимое компонента:
 // - Бренд-блок Clerkly: Logo component (size="lg", showText=true) в одном горизонтальном ряду с текстом "Clerkly" (text-4xl font-semibold)
+//   * В статичном логотипе боковые узлы непрозрачные (opacity=1), линии не просвечивают через круги
 // - Карта с заголовком "Welcome" (text-2xl font-semibold)
 // - Описание "Your autonomous AI agent that listens, organizes, and acts"
 // - Кнопка "Continue with Google" с иконкой Google
@@ -741,11 +742,21 @@ interface PKCEStorage {
 // src/main/auth/OAuthConfig.ts
 export const OAUTH_CONFIG = {
   clientId: 'YOUR_GOOGLE_CLIENT_ID_HERE', // Replace with your actual Google OAuth Client ID
-  clientSecret: 'YOUR_GOOGLE_CLIENT_SECRET_HERE', // Replace with your actual Google OAuth Client Secret
+  clientSecret: '__CLERKLY_OAUTH_CLIENT_SECRET__',
   redirectUri: 'com.googleusercontent.apps.YOUR_CLIENT_ID:/oauth2redirect', // Reverse client ID format
   scopes: ['openid', 'email', 'profile'],
 } as const;
 ```
+
+`client_secret` должен поступать из `CLERKLY_OAUTH_CLIENT_SECRET` на этапе сборки: build-скрипт заменяет placeholder `__CLERKLY_OAUTH_CLIENT_SECRET__` в собранном `OAuthConfig.js`. Хардкод секрета в исходниках не допускается.
+
+Правила build-time инжекции секрета:
+- сначала используется `process.env.CLERKLY_OAUTH_CLIENT_SECRET`;
+- если переменная не задана, скрипт пытается прочитать значение из `.env` в корне проекта;
+- если значение отсутствует в обоих источниках:
+  - strict-режим (`npm run build:strict`, `npm run start`, `npm run dev`, `npm run dev:app`) завершает сборку с ошибкой (ненулевой код выхода);
+  - non-strict-режим (`npm run build`, `npm run validate`, `npm run test:functional*`) завершает шаг без инъекции секрета.
+- если placeholder `__CLERKLY_OAUTH_CLIENT_SECRET__` отсутствует в build output, скрипт завершает работу с warning (без аварийного завершения сборки).
 
 **Важно:** При формировании `redirect_uri` из Client ID, функция `getOAuthConfig()` автоматически удаляет суффикс `.apps.googleusercontent.com` если он присутствует в Client ID, чтобы избежать дублирования в итоговом URL:
 
@@ -944,7 +955,7 @@ const effectiveRedirectUri = `com.googleusercontent.apps.${clientIdWithoutSuffix
 
 **Требование 10: Конфигурация OAuth**
 
-10.1-10.6 Конфигурационные параметры
+10.1-10.9 Конфигурационные параметры
   Мысли: Это управление конфигурацией. Это детали реализации.
   Тестируемость: нет
 
@@ -1403,6 +1414,7 @@ logger.error(`${operation} failed: ${error.message}`, {
 - Проверка отображения Login Screen при отсутствии токенов
 - Проверка обработки конкретных кодов ошибок (popup_closed_by_user, access_denied, network_error)
 - Проверка вызова правильных IPC методов
+- Проверка build-time инжекции OAuth секрета (`scripts/inject-oauth-client-secret.js`): `process.env`, fallback `.env`, non-strict pass-through, strict fail-fast, placeholder-missing warning
 
 ### Функциональные Тесты
 
@@ -1475,6 +1487,9 @@ logger.error(`${operation} failed: ${error.message}`, {
 | google-oauth-auth.10.4 | ✓ | - |
 | google-oauth-auth.10.5 | ✓ | - |
 | google-oauth-auth.10.6 | ✓ | - |
+| google-oauth-auth.10.7 | ✓ | - |
+| google-oauth-auth.10.8 | ✓ | - |
+| google-oauth-auth.10.9 | ✓ | - |
 | google-oauth-auth.11.1 | ✓ | ✓ |
 | google-oauth-auth.11.2 | ✓ | ✓ |
 | google-oauth-auth.11.3 | ✓ | ✓ |

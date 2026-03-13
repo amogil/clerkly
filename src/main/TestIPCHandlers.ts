@@ -451,7 +451,7 @@ export function registerTestIPCHandlers(
         }
 
         // status === 'completed'
-        // Requirements: agents.9.6
+        // Requirements: agents.9.2, llm-integration.9.2
         // Completed status is derived from a done tool_call(final_answer), not from legacy message kind.
         messageManager.create(
           agentId,

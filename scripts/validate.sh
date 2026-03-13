@@ -6,6 +6,8 @@
 # Usage:
 #   ./scripts/validate.sh           # Run with minimal output (only failures)
 #   ./scripts/validate.sh --verbose # Run with detailed output (all tests)
+#   ./scripts/validate.sh --with-dependency-check # Include npm outdated check
+#   ./scripts/validate.sh --verbose --with-dependency-check # Combine flags
 
 set -e  # Exit on any error
 
@@ -22,9 +24,20 @@ unset NPM_CONFIG_DEVDIR
 
 # Parse command line arguments
 VERBOSE=false
-if [[ "$1" == "--verbose" || "$1" == "-v" ]]; then
-    VERBOSE=true
-fi
+WITH_DEPENDENCY_CHECK=false
+
+for arg in "$@"; do
+    case "$arg" in
+        --verbose|-v)
+            VERBOSE=true
+            ;;
+        --with-dependency-check|--deps|-d)
+            WITH_DEPENDENCY_CHECK=true
+            ;;
+        *)
+            ;;
+    esac
+done
 
 # Function to print step header
 print_step() {
@@ -218,14 +231,19 @@ else
     print_warning "Note: This is informational only and won't fail the validation"
 fi
 
-# 9. Dependency Check (informational)
-print_step "9. Dependency Check (Informational)"
-echo "Checking for outdated dependencies..."
-if npm outdated 2>/dev/null; then
-    print_success "All dependencies are up to date"
+# 9. Dependency Check (informational, optional)
+if [ "$WITH_DEPENDENCY_CHECK" = true ]; then
+    print_step "9. Dependency Check (Informational)"
+    echo "Checking for outdated dependencies..."
+    if npm outdated 2>/dev/null; then
+        print_success "All dependencies are up to date"
+    else
+        print_warning "Some dependencies are outdated. Run 'npm outdated' for details."
+        print_warning "Note: This is informational only and won't fail the validation"
+    fi
 else
-    print_warning "Some dependencies are outdated. Run 'npm outdated' for details."
-    print_warning "Note: This is informational only and won't fail the validation"
+    print_step "9. Dependency Check (Informational)"
+    print_warning "Dependency check skipped by default. Use --with-dependency-check to enable it."
 fi
 
 # Final success message
@@ -242,7 +260,11 @@ echo "✅ Unit tests (all passing)"
 echo "✅ Test coverage (meets thresholds, unit only)"
 echo "✅ Project structure (all required files present)"
 echo "✅ Security audit (informational)"
-echo "✅ Dependency check (informational)"
+if [ "$WITH_DEPENDENCY_CHECK" = true ]; then
+    echo "✅ Dependency check (informational, enabled)"
+else
+    echo "⏭️  Dependency check (informational, skipped by default)"
+fi
 echo ""
 echo -e "${YELLOW}Note: Functional tests are excluded from validation${NC}"
 echo -e "${YELLOW}They use real Electron and show windows on screen.${NC}"
