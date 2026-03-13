@@ -1629,7 +1629,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expect(context.window.locator('[data-testid="message-code-exec-block"]')).toHaveCount(1);
   });
 
-  /* Preconditions: first response contains two tool calls (invalid), second response repairs to plain text
+  /* Preconditions: first response contains two code_exec tool calls in one model response (invalid), second response repairs to plain text
      Action: User sends message
      Assertions: pipeline runs repair and chat ends with repaired response without persisted tool_call from invalid attempt
      Requirements: llm-integration.11.1.1, llm-integration.11.3 */
@@ -1640,13 +1640,13 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
         toolCalls: [
           {
             callId: 'multi-1',
-            toolName: 'final_answer',
-            arguments: { summary_points: ['a'] },
+            toolName: 'code_exec',
+            arguments: { code: "console.log('A')", timeout_ms: 10000 },
           },
           {
             callId: 'multi-2',
             toolName: 'code_exec',
-            arguments: { code: "console.log('x')", timeout_ms: 10000 },
+            arguments: { code: "console.log('B')", timeout_ms: 10000 },
           },
         ],
       },
@@ -1663,9 +1663,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     const actionContent = context.window.locator('.message-llm-action-response').last();
     await expect(actionContent).toContainText('repair completed', { timeout: 15000 });
     await expect(context.window.locator('[data-testid="message-code-exec-block"]')).toHaveCount(0);
-    await expect(context.window.locator('[data-testid="message-final-answer-block"]')).toHaveCount(
-      0
-    );
+    await expect(context.window.locator('[data-testid="message-final-answer-block"]')).toHaveCount(0);
 
     const requestCount = mockLLMServer
       .getRequestLogs()
@@ -2118,10 +2116,10 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
       {
         toolCalls: [
           {
-            callId: 'final-valid',
+            callId: 'final-invalid-2',
             toolName: 'final_answer',
             arguments: {
-              summary_points: ['Validated format', 'Finished successfully'],
+              summary_points: Array.from({ length: 12 }, (_, i) => `Retry step ${i + 1}`),
             },
           },
         ],
@@ -2464,11 +2462,14 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await renderMarkdownMessage(`\`\`\`text\n${longNumbersLine}\n\`\`\``);
 
     const actionContent = context.window.locator('.message-llm-action-response').last();
-    const textCodeBlock = actionContent.locator('pre code.language-text').first();
+    const textCodeBlock = actionContent
+      .locator('[data-streamdown="code-block"][data-language="text"] pre code')
+      .first();
     await expect(textCodeBlock).toBeVisible();
 
-    const preHasHorizontalOverflow = await textCodeBlock.locator('..').evaluate((element) => {
-      const pre = element as HTMLElement;
+    const preHasHorizontalOverflow = await textCodeBlock.evaluate((element) => {
+      const pre = element.closest('pre') as HTMLElement | null;
+      if (!pre) return false;
       return pre.scrollWidth > pre.clientWidth + 1;
     });
     expect(preHasHorizontalOverflow).toBe(true);

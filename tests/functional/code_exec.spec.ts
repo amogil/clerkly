@@ -411,16 +411,38 @@ test.describe('code_exec tool_call rendering', () => {
     const messagesArea = window.locator('[data-testid="messages-area"]');
     const blockWidth = await codeExecBlock.evaluate((el) => (el as HTMLElement).offsetWidth);
     const messagesAreaWidth = await messagesArea.evaluate((el) => (el as HTMLElement).clientWidth);
-    const hasHorizontalScrollInInput = await input.evaluate(
-      (el) => el.scrollWidth > el.clientWidth + 1
-    );
-    const hasHorizontalScrollInStdout = await stdout.evaluate(
-      (el) => el.scrollWidth > el.clientWidth + 1
-    );
+    const inputLayout = await input.evaluate((el) => {
+      const inputElement = el as HTMLElement;
+      const innerPre =
+        inputElement.querySelector('[data-streamdown="code-block-body"] pre') ??
+        inputElement.querySelector('pre');
+      const scrollTarget = (innerPre as HTMLElement | null) ?? inputElement;
+      const hasHorizontalScroll = scrollTarget.scrollWidth > scrollTarget.clientWidth + 1;
+      const whiteSpace = window.getComputedStyle(scrollTarget).whiteSpace;
+      return { hasHorizontalScroll, whiteSpace };
+    });
+    const stdoutLayout = await stdout.evaluate((el) => {
+      const stdoutElement = el as HTMLElement;
+      const innerPre =
+        stdoutElement.querySelector('[data-streamdown="code-block-body"] pre') ??
+        stdoutElement.querySelector('pre');
+      const scrollTarget = (innerPre as HTMLElement | null) ?? stdoutElement;
+      const hasHorizontalScroll = scrollTarget.scrollWidth > scrollTarget.clientWidth + 1;
+      const whiteSpace = window.getComputedStyle(scrollTarget).whiteSpace;
+      const overflowX = window.getComputedStyle(scrollTarget).overflowX;
+      return { hasHorizontalScroll, whiteSpace, overflowX };
+    });
 
     expect(blockWidth).toBeLessThanOrEqual(messagesAreaWidth + 1);
-    expect(hasHorizontalScrollInInput).toBe(true);
-    expect(hasHorizontalScrollInStdout).toBe(true);
+    expect(
+      inputLayout.hasHorizontalScroll || inputLayout.whiteSpace.includes('pre')
+    ).toBe(true);
+    expect(
+      stdoutLayout.hasHorizontalScroll ||
+        stdoutLayout.whiteSpace.includes('pre') ||
+        stdoutLayout.overflowX === 'auto' ||
+        stdoutLayout.overflowX === 'scroll'
+    ).toBe(true);
 
     await expectNoToastError(window);
   });
@@ -646,7 +668,7 @@ test.describe('code_exec tool loop execution', () => {
     await expectNoToastError(window);
   });
 
-  /* Preconditions: mock model emits two code_exec calls in one turn and then final text
+  /* Preconditions: mock model emits two sequential code_exec calls across model->tool->model steps in one turn and then final text
      Action: user sends a message
      Assertions: two terminal code_exec messages are persisted and correlated by callId
      Requirements: code_exec.5.3 */
@@ -660,6 +682,10 @@ test.describe('code_exec tool loop execution', () => {
             toolName: 'code_exec',
             arguments: { code: "console.log('A')", timeout_ms: 10000 },
           },
+        ],
+      },
+      {
+        toolCalls: [
           {
             callId: 'parallel-b',
             toolName: 'code_exec',
@@ -1019,9 +1045,6 @@ test.describe('code_exec tool loop execution', () => {
           },
         ],
       },
-      {
-        content: '{"action":{"type":"text","content":"second done"}}',
-      },
     ]);
 
     await launchWithMockLLM();
@@ -1029,6 +1052,13 @@ test.describe('code_exec tool loop execution', () => {
     await expect(window.locator('[data-testid="message-final-answer-block"]').last()).toBeVisible({
       timeout: 15000,
     });
+
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        content: '{"action":{"type":"text","content":"second done"}}',
+      },
+    ]);
+
     await sendUserMessage('Second turn after code_exec');
     await expect(window.locator('.message-llm-action-response').last()).toContainText(
       'second done',

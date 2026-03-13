@@ -108,32 +108,29 @@ test('should dismiss notification on click', async () => {
    Requirements: error-notifications.1.4
    Property: 23 */
 test('should log errors to console', async () => {
-  // Collect console messages
-  const consoleMessages: string[] = [];
-  context.window.on('console', (msg) => {
-    consoleMessages.push(msg.text());
-  });
+  // Collect main process logs (AuthIPCHandlers logger writes in Electron main process).
+  const processLogs: string[] = [];
+  const electronProcess = context.app.process();
+  const collectLogs = (chunk: Buffer | string) => {
+    processLogs.push(chunk.toString());
+  };
+  electronProcess?.stdout?.on('data', collectLogs);
+  electronProcess?.stderr?.on('data', collectLogs);
 
-  // Trigger an error via IPC
-  await context.window.evaluate(async () => {
-    await (window as any).electron.ipcRenderer.invoke('test:trigger-error-notification', {
-      message: 'Test error logging',
-      context: 'Test Context',
+  try {
+    // Trigger an error via IPC
+    await context.window.evaluate(async () => {
+      await (window as any).electron.ipcRenderer.invoke('test:trigger-error-notification', {
+        message: 'Test error logging',
+        context: 'Test Context',
+      });
     });
-  });
 
-  // Wait a bit for console log
-  await context.window.waitForTimeout(1000);
-
-  // Check that error was logged
-  // Logger automatically adds [App] context and formats the message
-  const hasErrorLog = consoleMessages.some(
-    (msg) =>
-      msg.includes('[App]') &&
-      msg.includes('Error:') &&
-      msg.includes('Test error logging') &&
-      msg.includes('Test Context')
-  );
-
-  expect(hasErrorLog).toBe(true);
+    await expect
+      .poll(() => processLogs.join('\n'), { timeout: 5000 })
+      .toContain('[AuthIPCHandlers] [Test Context] Error: Test error logging');
+  } finally {
+    electronProcess?.stdout?.off('data', collectLogs);
+    electronProcess?.stderr?.off('data', collectLogs);
+  }
 });
