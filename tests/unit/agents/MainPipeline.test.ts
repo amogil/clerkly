@@ -1016,11 +1016,11 @@ describe('MainPipeline.run()', () => {
       llmProvider.chat.mockImplementation(
         async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
           onChunk({
-          type: 'tool_call',
-          callId: 'call-stub',
-          toolName: 'unknown_tool',
-          arguments: { foo: 'bar' },
-        });
+            type: 'tool_call',
+            callId: 'call-stub',
+            toolName: 'unknown_tool',
+            arguments: { foo: 'bar' },
+          });
           onChunk({
             type: 'tool_result',
             callId: 'call-stub',
@@ -1035,21 +1035,21 @@ describe('MainPipeline.run()', () => {
 
       await pipeline.run('agent-1', 1);
 
-    expect(messageManager.create).toHaveBeenCalledWith(
-      'agent-1',
-      'tool_call',
-      expect.objectContaining({
-        data: expect.objectContaining({
-          callId: 'call-stub',
-          toolName: 'unknown_tool',
-          output: expect.objectContaining({
-            status: 'running',
+      expect(messageManager.create).toHaveBeenCalledWith(
+        'agent-1',
+        'tool_call',
+        expect.objectContaining({
+          data: expect.objectContaining({
+            callId: 'call-stub',
+            toolName: 'unknown_tool',
+            output: expect.objectContaining({
+              status: 'running',
+            }),
           }),
         }),
-      }),
-      1,
-      false
-    );
+        1,
+        false
+      );
       expect(messageManager.update).toHaveBeenCalledWith(
         100,
         'agent-1',
