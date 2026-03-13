@@ -2018,7 +2018,7 @@ import { Logo } from '../logo';
 | `tests/functional/agent-status-all-places.spec.ts` | agents.6.1-6.5 | Проверка консистентного отображения каждого статуса (`new`, `in-progress`, `awaiting-response`, `error`, `completed`) в Header, Agent List tooltip и All Agents |
 | `tests/functional/message-format.spec.ts` | agents.7 | - |
 | `tests/functional/code_exec.spec.ts` | agents.7.4.5-7.4.9, agents.4.23 | Отдельные сценарии для `tool_call(code_exec)`: header/icon/status, вертикальное выравнивание в collapsed, JS highlighting, transparent sections и width/overflow |
-| `tests/functional/llm-chat.spec.ts` | agents.4.11, agents.4.11.2, agents.7.7, agents.4.24, agents.14.1-14.5, llm-integration.2, llm-integration.7.2, llm-integration.8.7, llm-integration.16 | - |
+| `tests/functional/llm-chat.spec.ts` | agents.4.11, agents.4.11.2, agents.7.7, agents.4.24, agents.14.1-14.6, llm-integration.2, llm-integration.7.2, llm-integration.8.7, llm-integration.16 | Включает сценарий deferred rename после non-meaningful triggering turn при наличии meaningful user-message в истории |
 | `tests/functional/agent-status-calculation.spec.ts` | agents.9 | - |
 | `tests/functional/agent-data-isolation.spec.ts` | agents.10 | - |
 | `tests/functional/agent-activity-indicator.spec.ts` | agents.11 | - |
@@ -2155,7 +2155,7 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 | agents.13.13, agents.13.14, agents.13.15 | ✓ | ✓ |
 | agents.13.17 (state-changed событие) | ✓ | - |
 | agents.13.18 (startup source of truth = polling) | ✓ | ✓ |
-| agents.14.1, agents.14.2, agents.14.3, agents.14.4, agents.14.5 (auto-title UI updates and stability) | - | ✓ |
+| agents.14.1, agents.14.2, agents.14.3, agents.14.4, agents.14.5, agents.14.6 (auto-title UI updates, stability, deferred rename after non-meaningful turn) | - | ✓ |
 | user-data-isolation.6 | ✓ | ✓ |
 
 ## Зависимости
