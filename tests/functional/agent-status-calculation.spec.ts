@@ -273,6 +273,51 @@ test.describe('Agent Status Calculation', () => {
     await expect(headerStatus).toHaveText('In progress');
   });
 
+  /* Preconditions: Agent exists and receives terminal done tool_call(code_exec)
+     Action: Append next model step message with awaiting-response status fixture
+     Assertions: Status transitions from in-progress to awaiting-response after next step
+     Requirements: agents.9.2, agents.9.3, llm-integration.9.4.1 */
+  test('should transition from done code_exec to awaiting-response on next model step', async () => {
+    const firstAgentDataTestId = await window
+      .locator('[data-testid^="agent-icon-"]')
+      .first()
+      .getAttribute('data-testid');
+    const agentId = firstAgentDataTestId?.replace('agent-icon-', '');
+    expect(agentId).toBeTruthy();
+
+    await window.evaluate(async (id) => {
+      const api = (window as unknown as { api: any }).api;
+      const codeExecResult = await api.messages.create(id, 'tool_call', {
+        data: {
+          callId: 'code-success-transition-1',
+          toolName: 'code_exec',
+          arguments: { code: 'console.log(1)' },
+          output: { status: 'success', stdout: '1\n', stderr: '' },
+        },
+      });
+      if (!codeExecResult?.success) {
+        throw new Error(codeExecResult?.error || 'Failed to create terminal code_exec tool_call');
+      }
+
+      const nextStepResult = await api.test.setAgentStatus(id, 'awaiting-response');
+      if (!nextStepResult?.success) {
+        throw new Error(nextStepResult?.error || 'Failed to create next model-step message');
+      }
+    }, agentId as string);
+
+    const agentAvatar = window
+      .locator('[data-testid^="agent-icon-"]')
+      .first()
+      .locator('[data-testid="agent-avatar-icon"]');
+    await expect
+      .poll(async () => await agentAvatar.getAttribute('class'), { timeout: 5000 })
+      .toContain('bg-amber-500');
+
+    const headerStatus = window.locator('[data-testid="agent-status-text"]').first();
+    await expect(headerStatus).toBeVisible();
+    await expect(headerStatus).toHaveText('Awaiting response');
+  });
+
   /* Preconditions: Agent exists and receives persisted done tool_call(code_exec) with terminal error statuses
      Action: Create terminal code_exec tool_call message for each status
      Assertions: Status remains in-progress in header and avatar color

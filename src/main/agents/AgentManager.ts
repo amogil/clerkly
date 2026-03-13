@@ -96,33 +96,6 @@ export class AgentManager {
   }
 
   /**
-   * Extract terminal code_exec status from persisted payload.
-   * Requirements: llm-integration.9.4.1, llm-integration.9.4.2
-   */
-  private extractCodeExecTerminalStatus(
-    message: Message
-  ): 'running' | 'success' | 'error' | 'timeout' | 'cancelled' | null {
-    try {
-      const payload = JSON.parse(message.payloadJson) as {
-        data?: { output?: { status?: unknown } };
-      };
-      const status = payload?.data?.output?.status;
-      if (
-        status === 'running' ||
-        status === 'success' ||
-        status === 'error' ||
-        status === 'timeout' ||
-        status === 'cancelled'
-      ) {
-        return status;
-      }
-      return null;
-    } catch {
-      return null;
-    }
-  }
-
-  /**
    * Resolve latest visible message with fast path for normal streaming updates.
    * Requirements: agents.9.2, realtime-events.6.1
    */
