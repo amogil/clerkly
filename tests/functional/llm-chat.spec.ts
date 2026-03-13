@@ -2681,4 +2681,124 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expect(actionContent.locator('a[href^="#fn"]')).toHaveCount(0);
     await expect(actionContent.locator('.footnotes')).toHaveCount(0);
   });
+
+  /* Preconditions: Mock stream returns markdown with auto-title HTML comment in same model turn
+     Action: User sends a message and waits for stream completion
+     Assertions: Agent name updates in header, tooltip, and All Agents, while markdown text remains unmodified
+     Requirements: llm-integration.16.1, llm-integration.16.7, agents.14.1, agents.14.2 */
+  test('should extract agent title from markdown comment in the same model turn', async () => {
+    const expectedTitle = 'Sprint Review Summary';
+    mockLLMServer.setStreamingMode(true, {
+      content: `Result body <!-- clerkly:title: ${expectedTitle} -->`,
+      chunkDelayMs: 0,
+    });
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await messageInput.fill('Summarize sprint');
+    await messageInput.press('Enter');
+
+    const actionContent = context.window.locator('.message-llm-action-response').last();
+    await expect(actionContent).toBeVisible({ timeout: 10000 });
+    await expect(actionContent).toContainText(`<!-- clerkly:title: ${expectedTitle} -->`);
+
+    const headerTitle = context.window.locator('[data-testid="agent-header-title"]');
+    await expect(headerTitle).toHaveText(expectedTitle, { timeout: 10000 });
+
+    const firstAgentId = (await getAgentIdsFromApi(context.window))[0];
+    expect(firstAgentId).toBeTruthy();
+
+    const headerIcon = context.window.locator(`[data-testid="agent-icon-${firstAgentId}"]`);
+    await expect(headerIcon).toBeVisible({ timeout: 5000 });
+    await headerIcon.hover();
+    await expect(headerIcon.locator('div.absolute.top-full')).toContainText(expectedTitle, {
+      timeout: 5000,
+    });
+
+    const allAgentsButton = context.window.locator('[data-testid="all-agents-button"]');
+    if ((await allAgentsButton.count()) === 0) {
+      for (let index = 0; index < 12; index += 1) {
+        await context.window.evaluate(async (i) => {
+          await (window as any).api.agents.create(`Overflow Agent ${i}`);
+        }, index);
+      }
+    }
+    await expect(allAgentsButton).toBeVisible({ timeout: 10000 });
+    await allAgentsButton.click();
+
+    const agentCard = context.window.locator(`[data-testid="agent-card-${firstAgentId}"]`);
+    await expect(agentCard).toBeVisible({ timeout: 5000 });
+    await expect(agentCard).toContainText(expectedTitle);
+    await expectNoToastError(context.window);
+  });
+
+  /* Preconditions: Mock stream returns unterminated auto-title comment with payload > 200 chars
+     Action: User sends a message and waits for stream completion
+     Assertions: Agent name is not changed and chat flow remains successful
+     Requirements: llm-integration.16.4, llm-integration.16.5, agents.14.3 */
+  test('should ignore unterminated title comment when payload exceeds 200 chars', async () => {
+    const overflowPayload = 'x'.repeat(220);
+    mockLLMServer.setStreamingMode(true, {
+      content: `Answer <!-- clerkly:title:${overflowPayload}`,
+      chunkDelayMs: 0,
+    });
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    const headerTitle = context.window.locator('[data-testid="agent-header-title"]');
+    await expect(headerTitle).toHaveText('New Agent');
+
+    await messageInput.fill('Trigger invalid title metadata');
+    await messageInput.press('Enter');
+
+    await expect(context.window.locator('.message-llm-action-response').last()).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(headerTitle).toHaveText('New Agent');
+    await expectNoToastError(context.window);
+  });
+
+  /* Preconditions: First response renames agent, cooldown is cleared by 5 filler turns, next response suggests semantically similar title
+     Action: User sends sequential messages through deterministic scripted stream
+     Assertions: Similar title suggestion is ignored and current title remains stable
+     Requirements: llm-integration.16.10, agents.14.4 */
+  test('should skip rename for semantically similar title candidate (anti-flap)', async () => {
+    const initialTitle = 'Sprint planning backlog';
+    const similarTitle = 'Backlog sprint planning';
+
+    mockLLMServer.setStreamingMode(true, { chunkDelayMs: 0 });
+    mockLLMServer.setOpenAIStreamScripts([
+      { content: `First answer <!-- clerkly:title: ${initialTitle} -->` },
+      { content: 'Filler answer 1' },
+      { content: 'Filler answer 2' },
+      { content: 'Filler answer 3' },
+      { content: 'Filler answer 4' },
+      { content: 'Filler answer 5' },
+      { content: `Similar answer <!-- clerkly:title: ${similarTitle} -->` },
+    ]);
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    const headerTitle = context.window.locator('[data-testid="agent-header-title"]');
+
+    await messageInput.fill('Message 1');
+    await messageInput.press('Enter');
+    await expect(headerTitle).toHaveText(initialTitle, { timeout: 10000 });
+
+    for (let index = 2; index <= 6; index += 1) {
+      await messageInput.fill(`Message ${index}`);
+      await messageInput.press('Enter');
+      await expect(context.window.locator('.message-llm-action-response').last()).toBeVisible({
+        timeout: 10000,
+      });
+    }
+
+    await messageInput.fill('Message 7');
+    await messageInput.press('Enter');
+    await expect(context.window.locator('.message-llm-action-response').last()).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(headerTitle).toHaveText(initialTitle);
+    await expectNoToastError(context.window);
+  });
 });

@@ -4,7 +4,7 @@
 
 Цель: реализовать автоматическое именование агента через LLM в рамках обычного ответа модели (без отдельного LLM-запроса) с потоковым парсингом markdown-комментария и anti-flapping guard.
 
-**Текущий статус:** Фаза 1 — В работе
+**Текущий статус:** Фаза 3 — В работе
 
 ---
 
@@ -42,9 +42,23 @@
 - ✅ Проверены текущие точки расширения в коде: `AgentIPCHandlers`, `AgentManager`, `MessageManager`, `MainPipeline`, `ILLMProvider`.
 - ✅ Согласован целевой протокол в ответе LLM: `<!-- clerkly:title: ... -->`.
 - ✅ Согласованы лимиты: max payload comment = 200, max agent title = 200.
+- ✅ Реализован runtime-модуль `AgentTitleRuntime` (parser `search/capture`, normalizer, Jaccard/cooldown guards).
+- ✅ Интегрирован auto-title в `MainPipeline` без отдельного LLM-вызова и без модификации output-stream.
+- ✅ Подключено переименование через существующий путь `AgentManager.update(...)` в `src/main/index.ts`.
+- ✅ Добавлены модульные тесты:
+  - ✅ `tests/unit/agents/AgentTitleCommentParser.test.ts`
+  - ✅ `tests/unit/agents/AgentTitleNormalization.test.ts`
+  - ✅ `tests/unit/agents/AgentTitleAntiFlap.test.ts`
+  - ✅ расширение `tests/unit/agents/MainPipeline.test.ts` для rename-flow.
+- ✅ Добавлены функциональные сценарии в `tests/functional/llm-chat.spec.ts`:
+  - ✅ извлечение title из markdown-comment в том же turn;
+  - ✅ игнорирование незакрытого comment при payload > 200;
+  - ✅ anti-flap для семантически близкого названия.
+- ✅ Прогнаны релевантные unit-тесты по новым модулям.
+- ✅ Прогнан `npm run validate` (успешно).
 
 ### В работе
-- 🔄 Обновление требований и дизайн-спеков (`agents` + `llm-integration`) под согласованный алгоритм auto-title.
+- 🔄 Подготовка к запуску функциональных тестов после отдельного подтверждения пользователя.
 
 ### Запланировано
 
@@ -71,98 +85,98 @@
 
 #### Фаза 2: Алгоритм (runtime)
 
-- [ ] Зафиксировать и реализовать целевой алгоритм (в `llm-integration` спеках и runtime-коде):
-  - [ ] `MainPipeline` запускается по обычному `messages:create(kind:user)` (без отдельного title-run).
-  - [ ] В ассистент-stream ищется первое вхождение `<!-- clerkly:title:`.
-  - [ ] После обнаружения parser входит в `capture` и читает payload до:
-    - [ ] закрывающего `-->`, ИЛИ
-    - [ ] `TITLE_COMMENT_PAYLOAD_MAX_LENGTH = 200`.
-  - [ ] Если `-->` найден до лимита:
-    - [ ] извлечь candidate title,
-    - [ ] не изменять output-stream для пользователя,
-    - [ ] продолжить обычный stream.
-  - [ ] Если достигнут лимит 200 без `-->`:
-    - [ ] считать мета-блок невалидным,
-    - [ ] не выполнять rename,
-    - [ ] продолжить обычный stream.
-  - [ ] Применять только первое валидное title-вхождение за turn.
-  - [ ] Ошибки парсинга/валидации/rename не прерывают turn и не создают блокирующий UI-error.
+- [x] Зафиксировать и реализовать целевой алгоритм (в `llm-integration` спеках и runtime-коде):
+  - [x] `MainPipeline` запускается по обычному `messages:create(kind:user)` (без отдельного title-run).
+  - [x] В ассистент-stream ищется первое вхождение `<!-- clerkly:title:`.
+  - [x] После обнаружения parser входит в `capture` и читает payload до:
+    - [x] закрывающего `-->`, ИЛИ
+    - [x] `TITLE_COMMENT_PAYLOAD_MAX_LENGTH = 200`.
+  - [x] Если `-->` найден до лимита:
+    - [x] извлечь candidate title,
+    - [x] не изменять output-stream для пользователя,
+    - [x] продолжить обычный stream.
+  - [x] Если достигнут лимит 200 без `-->`:
+    - [x] считать мета-блок невалидным,
+    - [x] не выполнять rename,
+    - [x] продолжить обычный stream.
+  - [x] Применять только первое валидное title-вхождение за turn.
+  - [x] Ошибки парсинга/валидации/rename не прерывают turn и не создают блокирующий UI-error.
 
 #### Фаза 3: Реализация (по модулям)
 
-- [ ] Добавить утилиту парсинга title-комментария (новый модуль):
-  - [ ] state machine `search`/`capture`;
-  - [ ] инкрементальная обработка stream-chunks;
-  - [ ] возвращает `titleCandidate` + parser-state без модификации текста.
-- [ ] Добавить утилиту нормализации/валидации title:
-  - [ ] trim/single-line/collapse spaces/remove edge punctuation;
-  - [ ] `AGENT_TITLE_MAX_LENGTH = 200`;
-  - [ ] reject empty/invalid.
-- [ ] Интегрировать parser в `MainPipeline`:
-  - [ ] читать text-delta события и кормить parser;
-  - [ ] фиксировать первое валидное вхождение за turn;
-  - [ ] вызывать rename-кандидат только после guard-проверок.
-- [ ] Добавить сервис anti-flap решения:
-  - [ ] нормализация текущего и нового имени;
-  - [ ] exact-equality guard;
-  - [ ] Jaccard similarity по токенам, threshold `0.7`;
-  - [ ] cooldown: не чаще 1 rename на агента за 5 user-turns.
-- [ ] Использовать существующий путь обновления:
-  - [ ] `AgentManager.update(agentId, { name })`;
-  - [ ] существующее событие `agent.updated`.
-- [ ] Гарантировать user-data isolation:
-  - [ ] rename применяется только к агенту текущего пользователя;
-  - [ ] никакие cross-user данные не читаются и не сравниваются.
+- [x] Добавить утилиту парсинга title-комментария (новый модуль):
+  - [x] state machine `search`/`capture`;
+  - [x] инкрементальная обработка stream-chunks;
+  - [x] возвращает `titleCandidate` + parser-state без модификации текста.
+- [x] Добавить утилиту нормализации/валидации title:
+  - [x] trim/single-line/collapse spaces/remove edge punctuation;
+  - [x] `AGENT_TITLE_MAX_LENGTH = 200`;
+  - [x] reject empty/invalid.
+- [x] Интегрировать parser в `MainPipeline`:
+  - [x] читать text-delta события и кормить parser;
+  - [x] фиксировать первое валидное вхождение за turn;
+  - [x] вызывать rename-кандидат только после guard-проверок.
+- [x] Добавить сервис anti-flap решения:
+  - [x] нормализация текущего и нового имени;
+  - [x] exact-equality guard;
+  - [x] Jaccard similarity по токенам, threshold `0.7`;
+  - [x] cooldown: не чаще 1 rename на агента за 5 user-turns.
+- [x] Использовать существующий путь обновления:
+  - [x] `AgentManager.update(agentId, { name })`;
+  - [x] существующее событие `agent.updated`.
+- [x] Гарантировать user-data isolation:
+  - [x] rename применяется только к агенту текущего пользователя;
+  - [x] никакие cross-user данные не читаются и не сравниваются.
 
 #### Фаза 4: Тесты
 
-- [ ] Добавить/обновить unit-тесты (расширенное покрытие):
-  - [ ] parser state-machine:
-    - [ ] префикс целиком в одном chunk;
-    - [ ] префикс разбит по нескольким chunk;
-    - [ ] закрытие `-->` в том же chunk;
-    - [ ] закрытие `-->` в следующем chunk;
-    - [ ] достижение лимита 200 без `-->`;
-    - [ ] несколько комментариев в одном ответе (берётся первый валидный);
-    - [ ] noise перед/после комментария;
-    - [ ] неполный комментарий до конца стрима.
-  - [ ] title normalization/validation:
-    - [ ] trim + collapse spaces;
-    - [ ] удаление краевой пунктуации;
-    - [ ] преобразование в single-line;
-    - [ ] пустой результат после normalizer;
-    - [ ] длина ровно 200;
-    - [ ] длина > 200.
-  - [ ] anti-flap decision logic:
-    - [ ] exact-equal после нормализации;
-    - [ ] similarity выше порога (skip);
-    - [ ] similarity ниже порога (allow);
-    - [ ] cooldown по числу turn (5).
-  - [ ] integration-level unit для `MainPipeline`:
-    - [ ] rename срабатывает при валидном комментарии;
-    - [ ] output-stream и persisted llm-текст не искажаются;
-    - [ ] при invalid comment rename не вызывается;
-    - [ ] при ошибке rename chat-flow продолжается.
+- [x] Добавить/обновить unit-тесты (расширенное покрытие):
+  - [x] parser state-machine:
+    - [x] префикс целиком в одном chunk;
+    - [x] префикс разбит по нескольким chunk;
+    - [x] закрытие `-->` в том же chunk;
+    - [x] закрытие `-->` в следующем chunk;
+    - [x] достижение лимита 200 без `-->`;
+    - [x] несколько комментариев в одном ответе (берётся первый валидный);
+    - [x] noise перед/после комментария;
+    - [x] неполный комментарий до конца стрима.
+  - [x] title normalization/validation:
+    - [x] trim + collapse spaces;
+    - [x] удаление краевой пунктуации;
+    - [x] преобразование в single-line;
+    - [x] пустой результат после normalizer;
+    - [x] длина ровно 200;
+    - [x] длина > 200.
+  - [x] anti-flap decision logic:
+    - [x] exact-equal после нормализации;
+    - [x] similarity выше порога (skip);
+    - [x] similarity ниже порога (allow);
+    - [x] cooldown по числу turn (5).
+  - [x] integration-level unit для `MainPipeline`:
+    - [x] rename срабатывает при валидном комментарии;
+    - [x] output-stream и persisted llm-текст не искажаются;
+    - [x] при invalid comment rename не вызывается;
+    - [x] при ошибке rename chat-flow продолжается.
   - [ ] unit для `AgentManager` / `AgentIPCHandlers`:
     - [ ] rename только для текущего user-agent;
     - [ ] `agent.updated` публикуется штатно.
-- [ ] Добавить/обновить functional-тесты (необходимый минимум):
-  - [ ] первое осмысленное сообщение переименовывает `New Agent` в UI (header + list + all-agents);
+- [x] Добавить/обновить functional-тесты (необходимый минимум):
+  - [x] первое осмысленное сообщение переименовывает `New Agent` в UI (header + list + all-agents);
   - [ ] whitespace/неосмысленное первое сообщение не переименовывает;
-  - [ ] комментарий с незакрытым `-->` и payload > 200 не приводит к rename;
-  - [ ] anti-flap: близкое по смыслу имя не триггерит повторный rename;
+  - [x] комментарий с незакрытым `-->` и payload > 200 не приводит к rename;
+  - [x] anti-flap: близкое по смыслу имя не триггерит повторный rename;
   - [ ] anti-flap: при заметно новом intent rename происходит после cooldown.
-- [ ] Во всех новых functional-сценариях соблюдать `testing.10`, `testing.11`, `testing.12`.
+- [x] Во всех новых functional-сценариях соблюдать `testing.10`, `testing.11`, `testing.12`.
 
 #### Фаза 5: Валидация и завершение
 
-- [ ] Прогнать релевантные unit-тесты по затронутым модулям.
-- [ ] Прогнать `npm run validate`.
+- [x] Прогнать релевантные unit-тесты по затронутым модулям.
+- [x] Прогнать `npm run validate`.
 - [ ] После подтверждения пользователя запустить функциональные тесты.
-- [ ] Обновить этот `tasks.md` по факту выполнения (Completed/In Progress/Current status).
+- [x] Обновить этот `tasks.md` по факту выполнения (Completed/In Progress/Current status).
 
 ---
 
 ## Критерии готовности к переходу в код
 
-- Plan approved: **NO** (ожидается подтверждение пользователя).
+- Plan approved: **YES**.

@@ -103,12 +103,17 @@ function makeMocks() {
   const toolExecutor: jest.Mocked<IToolExecutor> = {
     executeBatch: jest.fn().mockResolvedValue([]),
   };
+  const agentTitleUpdater = {
+    getCurrentTitle: jest.fn().mockReturnValue('New Agent'),
+    rename: jest.fn(),
+  };
   const pipeline = new MainPipeline(
     messageManager,
     settingsManager,
     promptBuilder,
     createProvider,
-    toolExecutor
+    toolExecutor,
+    agentTitleUpdater
   );
 
   return {
@@ -118,6 +123,7 @@ function makeMocks() {
     promptBuilder,
     llmProvider,
     toolExecutor,
+    agentTitleUpdater,
     mockPublish,
   };
 }
@@ -455,6 +461,97 @@ describe('MainPipeline.run()', () => {
     expect(reasoningEvent).toBeDefined();
     expect(reasoningEvent?.delta).toBe('Soon!**Resolving next step**');
     expect(reasoningEvent?.accumulatedText).toBe('Soon!**Resolving next step**');
+  });
+
+  /* Preconditions: Stream contains markdown metadata comment with title payload split across chunks
+     Action: Run MainPipeline with text deltas that include <!-- clerkly:title: ... -->
+     Assertions: Agent rename is triggered with normalized title and llm text remains unchanged
+     Requirements: llm-integration.16.1, llm-integration.16.3, llm-integration.16.7, llm-integration.16.11 */
+  it('extracts title from markdown comment and renames agent without mutating output text', async () => {
+    const { pipeline, messageManager, llmProvider, agentTitleUpdater } = makeMocks();
+    (messageManager.list as jest.Mock).mockReturnValue([
+      makeMessage(1, 'user'),
+      makeMessage(2, 'user'),
+      makeMessage(3, 'user'),
+      makeMessage(4, 'user'),
+      makeMessage(5, 'user'),
+      makeMessage(6, 'user'),
+    ]);
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({ type: 'text', delta: 'Answer start ' });
+        onChunk({ type: 'text', delta: '<!-- clerkly:title: Sprint' });
+        onChunk({ type: 'text', delta: ' retrospective plan --> end' });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(agentTitleUpdater.rename).toHaveBeenCalledWith('agent-1', 'Sprint retrospective plan');
+    const lastPayload = (messageManager.update as jest.Mock).mock.calls.at(-1)?.[2] as {
+      data?: { text?: string };
+    };
+    expect(lastPayload.data?.text).toContain('<!-- clerkly:title: Sprint retrospective plan -->');
+  });
+
+  /* Preconditions: Stream has unterminated title comment and payload reaches 200 chars
+     Action: Run MainPipeline and finalize stream
+     Assertions: Rename is skipped and response flow completes
+     Requirements: llm-integration.16.4, llm-integration.16.5, llm-integration.16.12 */
+  it('skips rename when title comment exceeds 200 chars without closing marker', async () => {
+    const { pipeline, llmProvider, agentTitleUpdater } = makeMocks();
+    const longPayload = 'x'.repeat(200);
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({ type: 'text', delta: `<!-- clerkly:title:${longPayload}` });
+        onChunk({ type: 'text', delta: ' regular response text' });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(agentTitleUpdater.rename).not.toHaveBeenCalled();
+  });
+
+  /* Preconditions: Valid title metadata exists but rename callback throws error
+     Action: Run MainPipeline and execute auto-title update
+     Assertions: Pipeline still completes and does not create kind:error due to rename failure
+     Requirements: llm-integration.16.12 */
+  it('does not interrupt chat flow when auto-title rename throws', async () => {
+    const { pipeline, llmProvider, messageManager, agentTitleUpdater } = makeMocks();
+    (messageManager.list as jest.Mock).mockReturnValue([
+      makeMessage(1, 'user'),
+      makeMessage(2, 'user'),
+      makeMessage(3, 'user'),
+      makeMessage(4, 'user'),
+      makeMessage(5, 'user'),
+      makeMessage(6, 'user'),
+    ]);
+    agentTitleUpdater.rename.mockImplementation(() => {
+      throw new Error('rename failed');
+    });
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({ type: 'text', delta: '<!-- clerkly:title: Release board --> body' });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(agentTitleUpdater.rename).toHaveBeenCalledTimes(1);
+    expect(messageManager.create).not.toHaveBeenCalledWith(
+      'agent-1',
+      'error',
+      expect.anything(),
+      1,
+      true
+    );
   });
 
   it('persists buffered tool_call after llm finalization in same turn', async () => {

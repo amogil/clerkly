@@ -26,6 +26,11 @@ import {
   buildRunningToolPayload,
   buildTerminalToolPayload,
 } from '../code_exec/CodeExecPersistenceMapper';
+import {
+  AgentTitleCommentParser,
+  evaluateAgentTitleGuards,
+  normalizeAgentTitleCandidate,
+} from './AgentTitleRuntime';
 
 import type { LLMProvider } from '../../types';
 
@@ -56,6 +61,12 @@ type StreamProcessingResult = {
   activeLlmMessageId: number | null;
   finalAnswerCall: { callId: string; args: Record<string, unknown> } | null;
   finalAnswerOrder: MessageOrderMeta | null;
+  titleCandidate: string | null;
+};
+
+type AgentTitleUpdater = {
+  getCurrentTitle: (agentId: string) => string | null;
+  rename: (agentId: string, name: string) => void;
 };
 
 const FINAL_ANSWER_RETRY_EXHAUSTED_MESSAGE =
@@ -116,6 +127,7 @@ export type LLMErrorType =
  */
 export class MainPipeline {
   private logger = Logger.create('MainPipeline');
+  private lastTitleRenameTurnByAgent = new Map<string, number>();
 
   constructor(
     private messageManager: MessageManager,
@@ -123,7 +135,8 @@ export class MainPipeline {
     private promptBuilder: PromptBuilder,
     private createProvider: (provider: LLMProvider, apiKey: string) => ILLMProvider = (p, k) =>
       LLMProviderFactory.createProvider(p, k),
-    private toolExecutor: IToolExecutor = new ToolRunner({}, 3)
+    private toolExecutor: IToolExecutor = new ToolRunner({}, 3),
+    private agentTitleUpdater?: AgentTitleUpdater
   ) {}
 
   /**
@@ -252,6 +265,7 @@ export class MainPipeline {
         streamResult.finalAnswerOrder
       );
     }
+    this.applyAutoTitleCandidate(agentId, streamResult.titleCandidate);
     this.publishStepDiagnostics(agentId, userMessageId, streamResult.output);
     this.logger.info(`Pipeline completed for agent ${agentId}`);
   }
@@ -304,6 +318,8 @@ export class MainPipeline {
       let finalAnswerCall: { callId: string; args: Record<string, unknown> } | null = null;
       let finalAnswerOrder: MessageOrderMeta | null = null;
       let meaningfulChunkSeen = false;
+      const titleParser = new AgentTitleCommentParser();
+      let sawTextChunk = false;
 
       const clearFlushTimer = (): void => {
         if (flushTimer) {
@@ -495,7 +511,9 @@ export class MainPipeline {
               if (!chunk.delta) {
                 return;
               }
+              sawTextChunk = true;
               meaningfulChunkSeen = true;
+              titleParser.ingest(chunk.delta);
               if (pendingToolCall) {
                 flushPendingToolCall();
               }
@@ -580,6 +598,12 @@ export class MainPipeline {
 
         flushPendingToolCall();
 
+        if (!sawTextChunk && typeof output.text === 'string' && output.text.length > 0) {
+          titleParser.ingest(output.text);
+        }
+        titleParser.finalize();
+        const titleCandidate = titleParser.getCandidate();
+
         if (
           currentSegment.id !== null &&
           !currentSegment.text &&
@@ -621,6 +645,7 @@ export class MainPipeline {
             activeLlmMessageId: currentSegment.id,
             finalAnswerCall,
             finalAnswerOrder,
+            titleCandidate,
           };
         }
 
@@ -641,6 +666,7 @@ export class MainPipeline {
           activeLlmMessageId: currentSegment.id,
           finalAnswerCall,
           finalAnswerOrder,
+          titleCandidate,
         };
       } catch (error) {
         clearPendingToolCallFlushTimer();
@@ -692,6 +718,60 @@ export class MainPipeline {
         content: `Tool call validation failed: ${validationFeedback}. Regenerate tool call with valid arguments and continue.`,
       },
     ];
+  }
+
+  /**
+   * Apply valid title candidate through AgentManager update path.
+   * Requirements: llm-integration.16.8, llm-integration.16.9, llm-integration.16.10, llm-integration.16.11, llm-integration.16.12
+   */
+  private applyAutoTitleCandidate(agentId: string, candidate: string | null): void {
+    if (!candidate || !this.agentTitleUpdater) {
+      return;
+    }
+
+    try {
+      const normalizedCandidate = normalizeAgentTitleCandidate(candidate);
+      if (!normalizedCandidate) {
+        this.logger.debug(`Auto-title skipped for agent ${agentId}: invalid candidate`);
+        return;
+      }
+
+      const currentTitle = this.agentTitleUpdater.getCurrentTitle(agentId);
+      if (!currentTitle) {
+        return;
+      }
+
+      const userTurn = this.getUserTurnCount(agentId);
+      const guardDecision = evaluateAgentTitleGuards({
+        currentTitle,
+        nextTitle: normalizedCandidate,
+        currentUserTurn: userTurn,
+        lastRenameUserTurn: this.lastTitleRenameTurnByAgent.get(agentId) ?? null,
+      });
+      if (!guardDecision.allow) {
+        this.logger.debug(
+          `Auto-title skipped for agent ${agentId}: reason=${guardDecision.reason} similarity=${guardDecision.similarity}`
+        );
+        return;
+      }
+
+      this.agentTitleUpdater.rename(agentId, normalizedCandidate);
+      this.lastTitleRenameTurnByAgent.set(agentId, userTurn);
+    } catch (error) {
+      this.logger.warn(
+        `Auto-title failed for agent ${agentId}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  /**
+   * Calculate current user turn number for cooldown guard.
+   * Requirements: llm-integration.16.10
+   */
+  private getUserTurnCount(agentId: string): number {
+    return this.messageManager
+      .list(agentId)
+      .filter((message) => message.kind === 'user' && !message.hidden).length;
   }
 
   private validateToolCallArguments(toolName: string, args: Record<string, unknown>): void {
