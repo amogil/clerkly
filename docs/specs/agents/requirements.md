@@ -929,10 +929,13 @@
 
 14.5. UI НЕ ДОЛЖЕН показывать служебные markdown-метаданные auto-title (HTML comment вида `<!-- clerkly:title: ... -->`) как видимый текст сообщения.
 
+14.6. КОГДА текущий заголовок агента остаётся `New Agent`, НО в истории агента уже есть хотя бы одно meaningful user-message, ТО последующий `agent.updated` с новым `name` (в том числе после не-meaningful triggering turn) ДОЛЖЕН применяться и синхронно отображаться в UI по правилам 14.1 и 14.2.
+
 #### Функциональные Тесты
 
 - `tests/functional/llm-chat.spec.ts` - "should extract agent title from markdown comment in the same model turn"
 - `tests/functional/llm-chat.spec.ts` - "should keep default name when first user message is non-meaningful"
+- `tests/functional/llm-chat.spec.ts` - "should apply deferred rename on non-meaningful turn when history already has meaningful user message"
 - `tests/functional/llm-chat.spec.ts` - "should keep current name when auto-title candidate is non-meaningful"
 - `tests/functional/llm-chat.spec.ts` - "should skip rename for semantically similar title candidate (anti-flap)"
 

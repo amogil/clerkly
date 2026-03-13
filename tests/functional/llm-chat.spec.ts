@@ -2886,6 +2886,36 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expectNoToastError(context.window);
   });
 
+  /* Preconditions: Title is still default, history already contains meaningful user message, current triggering message is non-meaningful
+     Action: User sends meaningful message without title metadata, then sends non-meaningful message with valid title metadata
+     Assertions: Rename is applied on second turn because meaningful history already exists
+     Requirements: llm-integration.16.10, agents.14.1, agents.14.2 */
+  test('should apply deferred rename on non-meaningful turn when history already has meaningful user message', async () => {
+    const deferredTitle = 'Standard model gravity limits';
+    mockLLMServer.setStreamingMode(true, { chunkDelayMs: 0 });
+    mockLLMServer.setOpenAIStreamScripts([
+      { content: 'Meaningful answer without metadata' },
+      { content: `Second answer <!-- clerkly:title: ${deferredTitle} -->` },
+    ]);
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    const headerTitle = context.window.locator('[data-testid="agent-header-title"]');
+    await expect(headerTitle).toHaveText('New Agent');
+
+    await messageInput.fill('Explain limits of the standard model');
+    await messageInput.press('Enter');
+    await expect(context.window.locator('.message-llm-action-response').last()).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(headerTitle).toHaveText('New Agent');
+
+    await messageInput.fill('1');
+    await messageInput.press('Enter');
+    await expect(headerTitle).toHaveText(deferredTitle, { timeout: 10000 });
+    await expectNoToastError(context.window);
+  });
+
   /* Preconditions: First response renames agent, five user turns pass, next response suggests a new distinct intent
      Action: User sends sequential messages with deterministic scripted responses
      Assertions: Rename is applied again after cooldown when semantic difference is high
