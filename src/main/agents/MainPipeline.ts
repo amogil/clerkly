@@ -257,11 +257,7 @@ export class MainPipeline {
     }
 
     const messages = this.messageManager.listForModelHistory(agentId);
-    const autoTitleInstruction = this.buildAutoTitleSystemInstruction(
-      agentId,
-      userMessageId,
-      messages
-    );
+    const autoTitleInstruction = this.buildAutoTitleSystemInstruction(agentId, messages);
     const baseChatMessages = this.injectSystemMessage(
       this.promptBuilder.buildMessages(messages),
       autoTitleInstruction
@@ -346,7 +342,6 @@ export class MainPipeline {
     );
     this.applyAutoTitleCandidate(
       agentId,
-      userMessageId,
       streamResult.titleCandidate,
       streamResult.finalLlmMessageId,
       streamResult.finalLlmPayload,
@@ -1003,11 +998,7 @@ export class MainPipeline {
   }
 
   // Requirements: llm-integration.16.1, llm-integration.16.2, llm-integration.16.10
-  private buildAutoTitleSystemInstruction(
-    agentId: string,
-    userMessageId: number,
-    messages: Message[]
-  ): string | null {
+  private buildAutoTitleSystemInstruction(agentId: string, messages: Message[]): string | null {
     if (!this.agentTitleUpdater) {
       return null;
     }
@@ -1027,11 +1018,8 @@ export class MainPipeline {
     }
 
     const shouldEnforceMeaningfulFirstRename = this.isDefaultAgentTitle(currentTitle);
-    if (shouldEnforceMeaningfulFirstRename) {
-      const triggerMessage = messages.find((message) => message.id === userMessageId) ?? null;
-      if (!this.isMeaningfulUserMessage(triggerMessage)) {
-        return null;
-      }
+    if (shouldEnforceMeaningfulFirstRename && !this.hasMeaningfulUserMessageInHistory(messages)) {
+      return null;
     }
 
     return buildAutoTitleMetadataContractPrompt(currentTitle);
@@ -1066,7 +1054,6 @@ export class MainPipeline {
    */
   private applyAutoTitleCandidate(
     agentId: string,
-    userMessageId: number,
     candidate: string | null,
     sourceLlmMessageId: number | null,
     sourceLlmPayload: Record<string, unknown> | null,
@@ -1089,15 +1076,14 @@ export class MainPipeline {
       }
 
       const shouldEnforceMeaningfulFirstRename = this.isDefaultAgentTitle(currentTitle);
-      if (shouldEnforceMeaningfulFirstRename) {
-        const triggerMessage =
-          messagesSnapshot.find((message) => message.id === userMessageId) ?? null;
-        if (!this.isMeaningfulUserMessage(triggerMessage)) {
-          this.logger.debug(
-            `Auto-title skipped for agent ${agentId}: first rename requires meaningful user message`
-          );
-          return;
-        }
+      if (
+        shouldEnforceMeaningfulFirstRename &&
+        !this.hasMeaningfulUserMessageInHistory(messagesSnapshot)
+      ) {
+        this.logger.debug(
+          `Auto-title skipped for agent ${agentId}: first rename requires meaningful user message in history`
+        );
+        return;
       }
 
       const userTurn = this.getUserTurnCount(messagesSnapshot);
@@ -1164,12 +1150,13 @@ export class MainPipeline {
     let userTurn = 0;
     let currentTitle = DEFAULT_AGENT_TITLE;
     let lastRenameUserTurn: number | null = null;
-    let currentTurnHasMeaningfulUserText = false;
+    let hasMeaningfulUserMessageInHistory = false;
 
     for (const message of filteredMessages) {
       if (message.kind === 'user') {
         userTurn += 1;
-        currentTurnHasMeaningfulUserText = this.isMeaningfulUserMessage(message);
+        hasMeaningfulUserMessageInHistory =
+          hasMeaningfulUserMessageInHistory || this.isMeaningfulUserMessage(message);
         continue;
       }
 
@@ -1186,7 +1173,7 @@ export class MainPipeline {
         continue;
       }
 
-      if (this.isDefaultAgentTitle(currentTitle) && !currentTurnHasMeaningfulUserText) {
+      if (this.isDefaultAgentTitle(currentTitle) && !hasMeaningfulUserMessageInHistory) {
         continue;
       }
 
@@ -1324,6 +1311,11 @@ export class MainPipeline {
     } catch {
       return false;
     }
+  }
+
+  // Requirements: llm-integration.16.10
+  private hasMeaningfulUserMessageInHistory(messages: Message[]): boolean {
+    return messages.some((message) => !message.hidden && this.isMeaningfulUserMessage(message));
   }
 
   private validateToolCallArguments(toolName: string, args: Record<string, unknown>): void {

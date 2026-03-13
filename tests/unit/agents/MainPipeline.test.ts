@@ -706,6 +706,62 @@ describe('MainPipeline.run()', () => {
     expect(agentTitleUpdater.rename).not.toHaveBeenCalled();
   });
 
+  /* Preconditions: Current title is default, history already has meaningful user message, triggering message is non-meaningful
+     Action: Run MainPipeline and inspect provider chat messages
+     Assertions: Auto-title metadata contract is still injected because history is meaningful
+     Requirements: llm-integration.16.10 */
+  it('injects auto-title metadata contract when history has meaningful message and triggering message is non-meaningful', async () => {
+    const { pipeline, llmProvider, messageManager, agentTitleUpdater } = makeMocks();
+    const meaningfulUser = makeMessage(1, 'user');
+    meaningfulUser.payloadJson = JSON.stringify({ data: { text: 'Plan sprint roadmap' } });
+    const nonMeaningfulUser = makeMessage(2, 'user');
+    nonMeaningfulUser.payloadJson = JSON.stringify({ data: { text: '1' } });
+    const snapshot = [meaningfulUser, nonMeaningfulUser];
+    (messageManager.list as jest.Mock).mockReturnValue(snapshot);
+    (messageManager.listForModelHistory as jest.Mock).mockReturnValue(snapshot);
+    agentTitleUpdater.getCurrentTitle.mockReturnValue('New Agent');
+
+    llmProvider.chat.mockResolvedValue({ text: 'Answer' });
+
+    await pipeline.run('agent-1', 2);
+
+    const sentMessages = llmProvider.chat.mock.calls[0]?.[0] as ChatMessage[];
+    const systemPrompt = sentMessages
+      .filter((message) => message.role === 'system')
+      .map((message) => (typeof message.content === 'string' ? message.content : ''))
+      .join('\n');
+
+    expect(systemPrompt).toContain('Auto-title metadata contract:');
+    expect(systemPrompt).toContain('<!-- clerkly:title: <short title> -->');
+  });
+
+  /* Preconditions: Current title is default, history already has meaningful user message, triggering message is non-meaningful
+     Action: Run MainPipeline with valid auto-title metadata
+     Assertions: Rename is applied because meaningful-history guard passes
+     Requirements: llm-integration.16.10 */
+  it('applies first auto-rename when history has meaningful message and triggering message is non-meaningful', async () => {
+    const { pipeline, llmProvider, messageManager, agentTitleUpdater } = makeMocks();
+    const meaningfulUser = makeMessage(1, 'user');
+    meaningfulUser.payloadJson = JSON.stringify({ data: { text: 'Plan sprint roadmap' } });
+    const nonMeaningfulUser = makeMessage(2, 'user');
+    nonMeaningfulUser.payloadJson = JSON.stringify({ data: { text: '1' } });
+    const snapshot = [meaningfulUser, nonMeaningfulUser];
+    (messageManager.list as jest.Mock).mockReturnValue(snapshot);
+    (messageManager.listForModelHistory as jest.Mock).mockReturnValue(snapshot);
+    agentTitleUpdater.getCurrentTitle.mockReturnValue('New Agent');
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({ type: 'text', delta: '<!-- clerkly:title: Sprint planning board --> answer' });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 2);
+
+    expect(agentTitleUpdater.rename).toHaveBeenCalledWith('agent-1', 'Sprint planning board');
+  });
+
   /* Preconditions: Persisted history already contains a recent successful rename in fewer than 5 user turns
      Action: Run MainPipeline in a fresh pipeline instance and process new title candidate
      Assertions: Cooldown guard skips rename based on persisted history replay

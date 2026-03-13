@@ -637,7 +637,8 @@
   - семантический guard по Jaccard similarity токенов (threshold `0.7`);
   - cooldown guard: не чаще одного rename за 5 user-turns для одного агента;
   - cooldown replay ДОЛЖЕН учитывать только успешно применённые rename (не просто наличие comment в тексте ответа);
-  - initial-rename guard: ПОКА текущий заголовок агента равен `New Agent`, auto-rename ДОЛЖЕН выполняться только если triggering user-message является meaningful (не менее 3 буквенно-цифровых символов).
+  - initial-rename guard: ПОКА текущий заголовок агента равен `New Agent`, ЕСЛИ в истории агента ещё нет meaningful user-message (>=3 буквенно-цифровых символов), auto-rename ДОЛЖЕН выполняться только на meaningful triggering user-message;
+  - ПОКА текущий заголовок агента равен `New Agent`, ЕСЛИ в истории агента уже есть meaningful user-message, auto-rename МОЖЕТ выполняться и на turn с не-meaningful triggering user-message.
 
 16.11. Применение валидного candidate title ДОЛЖНО выполняться через существующий путь обновления агента (`AgentManager.update(...)`) с публикацией стандартного `agent.updated`.
 
