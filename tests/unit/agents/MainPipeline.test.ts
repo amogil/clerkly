@@ -490,10 +490,15 @@ describe('MainPipeline.run()', () => {
     await pipeline.run('agent-1', 1);
 
     expect(agentTitleUpdater.rename).toHaveBeenCalledWith('agent-1', 'Sprint retrospective plan');
-    const lastPayload = (messageManager.update as jest.Mock).mock.calls.at(-1)?.[2] as {
-      data?: { text?: string };
-    };
-    expect(lastPayload.data?.text).toContain('<!-- clerkly:title: Sprint retrospective plan -->');
+    const hasCommentInUpdatedText = (messageManager.update as jest.Mock).mock.calls.some(
+      (call: unknown[]) => {
+        const payload = call[2] as { data?: { text?: string } };
+        return (
+          payload.data?.text?.includes('<!-- clerkly:title: Sprint retrospective plan -->') ?? false
+        );
+      }
+    );
+    expect(hasCommentInUpdatedText).toBe(true);
   });
 
   /* Preconditions: First meaningful user turn, default chat title, cooldown guard allows rename metadata request
@@ -533,7 +538,11 @@ describe('MainPipeline.run()', () => {
     user1.payloadJson = JSON.stringify({ data: { text: 'Plan sprint backlog' } });
     const llmPast = makeMessage(2, 'llm');
     llmPast.payloadJson = JSON.stringify({
-      data: { text: 'Done <!-- clerkly:title: Sprint backlog planning -->' },
+      data: {
+        text: 'Done <!-- clerkly:title: Sprint backlog planning -->',
+        auto_title_applied: true,
+        auto_title_applied_title: 'Sprint backlog planning',
+      },
     });
     const user2 = makeMessage(3, 'user');
     user2.payloadJson = JSON.stringify({ data: { text: 'follow up one' } });
@@ -622,6 +631,56 @@ describe('MainPipeline.run()', () => {
     );
   });
 
+  /* Preconditions: First turn emits title comment but rename throws, so no applied marker is persisted
+     Action: Run next user turn immediately with another valid title candidate
+     Assertions: Cooldown is not activated by failed rename and second turn may rename immediately
+     Requirements: llm-integration.16.10, llm-integration.16.12 */
+  it('does not apply cooldown after failed rename with persisted comment only', async () => {
+    const { pipeline, llmProvider, messageManager, agentTitleUpdater } = makeMocks();
+
+    const user1 = makeMessage(1, 'user');
+    user1.payloadJson = JSON.stringify({ data: { text: 'Plan sprint backlog' } });
+    const llmFailed = makeMessage(10, 'llm');
+    llmFailed.payloadJson = JSON.stringify({
+      data: { text: 'Done <!-- clerkly:title: Sprint backlog planning -->' },
+    });
+    const user2 = makeMessage(11, 'user');
+    user2.payloadJson = JSON.stringify({ data: { text: 'Plan roadmap milestones' } });
+
+    (messageManager.list as jest.Mock).mockImplementation(() => [user1, llmFailed, user2]);
+    (messageManager.listForModelHistory as jest.Mock).mockReturnValue([user1, llmFailed, user2]);
+
+    agentTitleUpdater.rename
+      .mockImplementationOnce(() => {
+        throw new Error('rename failed');
+      })
+      .mockImplementationOnce(() => undefined);
+
+    llmProvider.chat
+      .mockImplementationOnce(
+        async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+          onChunk({ type: 'text', delta: '<!-- clerkly:title: Sprint backlog planning --> body' });
+          return { text: '' };
+        }
+      )
+      .mockImplementationOnce(
+        async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+          onChunk({ type: 'text', delta: '<!-- clerkly:title: Product roadmap plan --> body' });
+          return { text: '' };
+        }
+      );
+
+    await pipeline.run('agent-1', 1);
+    await pipeline.run('agent-1', 11);
+
+    expect(agentTitleUpdater.rename).toHaveBeenNthCalledWith(
+      1,
+      'agent-1',
+      'Sprint backlog planning'
+    );
+    expect(agentTitleUpdater.rename).toHaveBeenNthCalledWith(2, 'agent-1', 'Product roadmap plan');
+  });
+
   /* Preconditions: Candidate title exists, current title is default, triggering user message is non-meaningful
      Action: Run MainPipeline with auto-title metadata
      Assertions: First rename is skipped
@@ -655,7 +714,11 @@ describe('MainPipeline.run()', () => {
     user1.payloadJson = JSON.stringify({ data: { text: 'Plan sprint backlog' } });
     const llmPast = makeMessage(10, 'llm');
     llmPast.payloadJson = JSON.stringify({
-      data: { text: 'Done <!-- clerkly:title: Sprint backlog planning -->' },
+      data: {
+        text: 'Done <!-- clerkly:title: Sprint backlog planning -->',
+        auto_title_applied: true,
+        auto_title_applied_title: 'Sprint backlog planning',
+      },
     });
     const user2 = makeMessage(11, 'user');
     user2.payloadJson = JSON.stringify({ data: { text: 'follow up one' } });
@@ -732,7 +795,11 @@ describe('MainPipeline.run()', () => {
     user1.payloadJson = JSON.stringify({ data: { text: 'Plan sprint backlog' } });
     const llmPast = makeMessage(10, 'llm');
     llmPast.payloadJson = JSON.stringify({
-      data: { text: 'Done <!-- clerkly:title: Sprint backlog planning -->' },
+      data: {
+        text: 'Done <!-- clerkly:title: Sprint backlog planning -->',
+        auto_title_applied: true,
+        auto_title_applied_title: 'Sprint backlog planning',
+      },
     });
     const user2 = makeMessage(11, 'user');
     user2.payloadJson = JSON.stringify({ data: { text: 'follow up one' } });

@@ -1077,6 +1077,7 @@ export class MainPipeline {
       }
 
       this.agentTitleUpdater.rename(agentId, normalizedCandidate);
+      this.markAutoTitleApplied(agentId, sourceLlmMessageId, normalizedCandidate);
     } catch (error) {
       this.logger.warn(
         `Auto-title failed for agent ${agentId}: ${error instanceof Error ? error.message : String(error)}`
@@ -1133,11 +1134,11 @@ export class MainPipeline {
         continue;
       }
 
-      const historicalCandidate = this.extractTitleCandidateFromMessage(message);
-      if (!historicalCandidate) {
+      const historicalAppliedTitle = this.extractAppliedAutoTitleFromMessage(message);
+      if (!historicalAppliedTitle) {
         continue;
       }
-      const normalizedHistoricalCandidate = normalizeAgentTitleCandidate(historicalCandidate);
+      const normalizedHistoricalCandidate = normalizeAgentTitleCandidate(historicalAppliedTitle);
       if (!normalizedHistoricalCandidate) {
         continue;
       }
@@ -1168,20 +1169,66 @@ export class MainPipeline {
   }
 
   /**
-   * Parse auto-title metadata from persisted llm message payload.
-   * Requirements: llm-integration.16.1, llm-integration.16.3
+   * Persist durable marker for successful auto-title rename.
+   * Requirements: llm-integration.16.10, llm-integration.16.12
    */
-  private extractTitleCandidateFromMessage(message: Message): string | null {
+  private markAutoTitleApplied(
+    agentId: string,
+    sourceLlmMessageId: number | null,
+    appliedTitle: string
+  ): void {
+    if (sourceLlmMessageId === null) {
+      return;
+    }
+
     try {
-      const payload = JSON.parse(message.payloadJson) as { data?: { text?: unknown } };
-      const text = payload?.data?.text;
-      if (typeof text !== 'string' || text.length === 0) {
+      const sourceMessage =
+        this.messageManager.list(agentId).find((message) => message.id === sourceLlmMessageId) ??
+        null;
+      if (!sourceMessage) {
+        return;
+      }
+      const payload = JSON.parse(sourceMessage.payloadJson) as {
+        data?: Record<string, unknown>;
+      };
+      const data =
+        payload.data && typeof payload.data === 'object' && !Array.isArray(payload.data)
+          ? payload.data
+          : {};
+      data.auto_title_applied = true;
+      data.auto_title_applied_title = appliedTitle;
+      this.messageManager.update(
+        sourceLlmMessageId,
+        agentId,
+        {
+          ...payload,
+          data,
+        },
+        true
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Auto-title marker persist failed for agent ${agentId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
+  }
+
+  /**
+   * Parse durable successful auto-title marker from persisted llm message payload.
+   * Requirements: llm-integration.16.10
+   */
+  private extractAppliedAutoTitleFromMessage(message: Message): string | null {
+    try {
+      const payload = JSON.parse(message.payloadJson) as {
+        data?: { auto_title_applied?: unknown; auto_title_applied_title?: unknown };
+      };
+      if (payload?.data?.auto_title_applied !== true) {
         return null;
       }
-      const parser = new AgentTitleCommentParser();
-      parser.ingest(text);
-      parser.finalize();
-      return parser.getCandidate();
+      const title = payload?.data?.auto_title_applied_title;
+      return typeof title === 'string' ? title : null;
     } catch {
       return null;
     }
