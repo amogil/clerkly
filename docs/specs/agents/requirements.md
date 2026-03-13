@@ -931,9 +931,10 @@
 
 #### Функциональные Тесты
 
-- `tests/functional/llm-chat.spec.ts` - "should update agent name in header, list, and all-agents after agent.updated"
-- `tests/functional/llm-chat.spec.ts` - "should keep current name when auto-title is invalid"
-- `tests/functional/llm-chat.spec.ts` - "should not churn agent name for semantically similar title updates"
+- `tests/functional/llm-chat.spec.ts` - "should extract agent title from markdown comment in the same model turn"
+- `tests/functional/llm-chat.spec.ts` - "should keep default name when first user message is non-meaningful"
+- `tests/functional/llm-chat.spec.ts` - "should keep current name when auto-title candidate is non-meaningful"
+- `tests/functional/llm-chat.spec.ts` - "should skip rename for semantically similar title candidate (anti-flap)"
 
 ---
 

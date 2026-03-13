@@ -610,6 +610,8 @@
 
 16.1. Система ДОЛЖНА извлекать candidate title из markdown-ответа ассистента по контракту `<!-- clerkly:title: ... -->` в рамках того же `MainPipeline.run(...)`.
 
+16.1.1. КОГДА текущий turn удовлетворяет guard-условиям auto-title, ТО система ДОЛЖНА добавлять в model input per-turn system instruction с контрактом генерации `<!-- clerkly:title: ... -->` и контекстом текущего названия чата.
+
 16.2. Система НЕ ДОЛЖНА выполнять отдельный LLM-вызов для генерации названия агента.
 
 16.3. Parser ДОЛЖЕН обрабатывать stream инкрементально и искать первое вхождение префикса `<!-- clerkly:title:`.
@@ -625,6 +627,8 @@
 16.7. Система НЕ ДОЛЖНА модифицировать пользовательский output-stream ради извлечения title; извлечение выполняется параллельно с обычной доставкой контента.
 
 16.8. Candidate title ДОЛЖЕН нормализоваться (trim, single-line, collapse spaces, удаление краевой пунктуации) и валидироваться с ограничением `AGENT_TITLE_MAX_LENGTH = 200`.
+
+16.8.1. В рамках текущего scope задачи система ДОЛЖНА использовать единый лимит 200 символов для auto-title; отдельное ограничение по количеству слов НЕ применяется.
 
 16.9. ЕСЛИ candidate title после нормализации пустой или превышает лимит, ТО rename ДОЛЖЕН быть пропущен.
 
@@ -644,6 +648,8 @@
 #### Функциональные Тесты
 
 - `tests/functional/llm-chat.spec.ts` - "should extract agent title from markdown comment in the same model turn"
+- `tests/functional/llm-chat.spec.ts` - "should include auto-title metadata contract in system prompt"
 - `tests/functional/llm-chat.spec.ts` - "should ignore unterminated title comment when payload exceeds 200 chars"
+- `tests/functional/llm-chat.spec.ts` - "should keep default name when first user message is non-meaningful"
 - `tests/functional/llm-chat.spec.ts` - "should skip rename for semantically similar title candidate (anti-flap)"
 - `tests/functional/llm-chat.spec.ts` - "should apply rename for new intent after 5-turn cooldown"

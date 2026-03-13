@@ -2859,6 +2859,31 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expectNoToastError(context.window);
   });
 
+  /* Preconditions: Current title is "New Agent", first user message is non-meaningful, model returns valid title metadata
+     Action: User sends first non-meaningful message and waits for stream completion
+     Assertions: Initial auto-rename is skipped and title stays default
+     Requirements: llm-integration.16.10, agents.14.3 */
+  test('should keep default name when first user message is non-meaningful', async () => {
+    mockLLMServer.setStreamingMode(true, {
+      content: 'Body <!-- clerkly:title: Incident response checklist -->',
+      chunkDelayMs: 0,
+    });
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    const headerTitle = context.window.locator('[data-testid="agent-header-title"]');
+    await expect(headerTitle).toHaveText('New Agent');
+
+    await messageInput.fill('...');
+    await messageInput.press('Enter');
+
+    await expect(context.window.locator('.message-llm-action-response').last()).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(headerTitle).toHaveText('New Agent');
+    await expectNoToastError(context.window);
+  });
+
   /* Preconditions: First response renames agent, five user turns pass, next response suggests a new distinct intent
      Action: User sends sequential messages with deterministic scripted responses
      Assertions: Rename is applied again after cooldown when semantic difference is high
