@@ -74,7 +74,7 @@
 - [x] Обновить `docs/specs/agents/design.md`:
   - [x] Описать только UI data-flow: как `agent.updated` отражается во всех местах интерфейса.
   - [x] Описать отсутствие дополнительных UI-событий/видимых артефактов от meta-comment.
-  - [ ] Обновить Testing Strategy и Requirements Coverage.
+  - [x] Обновить Testing Strategy и Requirements Coverage.
 - [x] Обновить `docs/specs/llm-integration/{requirements,design}.md`:
   - [x] Зафиксировать контракт title-метаданных в markdown-stream (`<!-- clerkly:title: ... -->`).
   - [x] Зафиксировать, что отдельный LLM-вызов для title не выполняется (встроенная обработка в обычном turn).
@@ -157,7 +157,7 @@
     - [x] output-stream и persisted llm-текст не искажаются;
     - [x] при invalid comment rename не вызывается;
     - [x] при ошибке rename chat-flow продолжается.
-  - [ ] unit для `AgentManager` / `AgentIPCHandlers`:
+  - [x] unit для `AgentManager` / `AgentIPCHandlers`:
     - [x] rename только для текущего user-agent;
     - [x] `agent.updated` публикуется штатно.
 - [x] Добавить/обновить functional-тесты (необходимый минимум):
