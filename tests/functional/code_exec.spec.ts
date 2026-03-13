@@ -434,9 +434,7 @@ test.describe('code_exec tool_call rendering', () => {
     });
 
     expect(blockWidth).toBeLessThanOrEqual(messagesAreaWidth + 1);
-    expect(
-      inputLayout.hasHorizontalScroll || inputLayout.whiteSpace.includes('pre')
-    ).toBe(true);
+    expect(inputLayout.hasHorizontalScroll || inputLayout.whiteSpace.includes('pre')).toBe(true);
     expect(
       stdoutLayout.hasHorizontalScroll ||
         stdoutLayout.whiteSpace.includes('pre') ||
@@ -450,7 +448,7 @@ test.describe('code_exec tool_call rendering', () => {
   /* Preconditions: authenticated app
      Action: create done code_exec tool_call as last message
      Assertions: agent status remains in-progress (not completed/error)
-     Requirements: agents.9.2, agents.9.2.1 */
+     Requirements: agents.9.2 */
   test('should keep in-progress status for done tool_call(code_exec)', async () => {
     await launchWithMockLLM();
     const agentId = (await getAgentIdsFromApi(window))[0];

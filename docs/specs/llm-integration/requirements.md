@@ -373,6 +373,10 @@
 
 9.4. Статус агента в chat-flow ДОЛЖЕН вычисляться в одном месте по алгоритму `agents.9.2`; LLM pipeline ДОЛЖЕН сохранять `kind`/`done`/`hidden` семантику сообщений строго в соответствии с этим алгоритмом.
 
+9.4.1. КОГДА terminal `tool_call(code_exec)` имеет `output.status = "success"`, ТО до следующего шага tool-loop статус агента ДОЛЖЕН оставаться `in-progress`.
+
+9.4.2. КОГДА terminal `tool_call(code_exec)` имеет `output.status ∈ {"error","timeout","cancelled"}`, ТО статус агента ДОЛЖЕН оставаться `in-progress`.
+
 9.5. Основной пользовательский ответ модели ДОЛЖЕН оставаться в `kind: llm` (`data.text`).
 
 9.5.1. `tool_call` с `toolName = "final_answer"` ДОЛЖЕН содержать:
@@ -396,6 +400,13 @@
 9.6. В целевой модели невалидный `final_answer` НЕ ДОЛЖЕН фиксироваться как успешный `completed`; он ДОЛЖЕН либо быть исправлен через retry, либо завершиться `kind:error` при исчерпании retry-лимита.
 
 9.7. Контракт отображения `kind: tool_call` (в текущем scope: `final_answer`, `code_exec`) определяется только в спецификации `agents` (`agents.7.4.*`) и не дублируется в данном документе.
+
+#### Функциональные Тесты
+
+- `tests/functional/agent-status-calculation.spec.ts` - "should keep in-progress status for done code_exec success tool_call"
+- `tests/functional/agent-status-calculation.spec.ts` - "should keep in-progress status from done code_exec error tool_call"
+- `tests/functional/agent-status-calculation.spec.ts` - "should keep in-progress status from done code_exec timeout tool_call"
+- `tests/functional/agent-status-calculation.spec.ts` - "should keep in-progress status from done code_exec cancelled tool_call"
 
 ---
 

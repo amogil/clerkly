@@ -42,7 +42,7 @@ export class AgentManager {
 
   /**
    * Compute agent status from the latest visible message.
-   * Requirements: agents.9.2, agents.9.4
+   * Requirements: agents.9.2, agents.9.4, llm-integration.9.4, llm-integration.9.4.1, llm-integration.9.4.2
    */
   private computeAgentStatus(lastMessage: Message | null): AgentStatus {
     if (!lastMessage) {
@@ -70,6 +70,8 @@ export class AgentManager {
         return AGENT_STATUS.COMPLETED;
       }
       if (toolName === 'code_exec') {
+        // Keep agent in-progress across all terminal code_exec outcomes;
+        // next model step consumes terminal tool result from history.
         return AGENT_STATUS.IN_PROGRESS;
       }
       return AGENT_STATUS.AWAITING_RESPONSE;
@@ -88,6 +90,33 @@ export class AgentManager {
         data?: { toolName?: unknown };
       };
       return typeof payload?.data?.toolName === 'string' ? payload.data.toolName : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Extract terminal code_exec status from persisted payload.
+   * Requirements: llm-integration.9.4.1, llm-integration.9.4.2
+   */
+  private extractCodeExecTerminalStatus(
+    message: Message
+  ): 'running' | 'success' | 'error' | 'timeout' | 'cancelled' | null {
+    try {
+      const payload = JSON.parse(message.payloadJson) as {
+        data?: { output?: { status?: unknown } };
+      };
+      const status = payload?.data?.output?.status;
+      if (
+        status === 'running' ||
+        status === 'success' ||
+        status === 'error' ||
+        status === 'timeout' ||
+        status === 'cancelled'
+      ) {
+        return status;
+      }
+      return null;
     } catch {
       return null;
     }

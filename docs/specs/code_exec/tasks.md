@@ -80,11 +80,11 @@
   - [x] Persist start/update/final lifecycle для `kind: tool_call` с `toolName='code_exec'`.
   - [x] Нормализация статусов `running/success/error/timeout/cancelled` и кодов ошибок по фиксированному словарю.
   - [x] Реализовать общий validation/retry контракт tool calls для `code_exec` (schema validation → feedback модели → bounded retry/repair `maxRetries=2` → при исчерпании обычный `kind:error` в чате, не `tool_call`-ошибка).
-  - [x] Унифицировать этот же validation/retry flow для уже реализованного `final_answer` и остальных tool calls без расхождений по типу финальной ошибки.
-  - [x] Мигрировать `PromptBuilder`/`MessageManager.listForModelHistory` на новую логику: terminal-результаты всех `tool_call` (`final_answer`, `code_exec`, включая `cancelled/error`) включаются в model history; non-terminal не включаются.
+  - [x] Унифицировать validation/retry flow `code_exec` с общим контрактом всех tool calls (без feature-specific исключений).
+  - [x] Мигрировать `PromptBuilder`/`MessageManager.listForModelHistory` на новую логику: terminal-результаты всех `tool_call` (включая `cancelled/error`) включаются в model history; non-terminal не включаются.
   - [x] Реализовать сериализацию terminal `tool_call` в AI SDK tool-result формат для model history (`toolCallId`, `toolName`, `result`).
   - [x] Гарантировать немедленный переход к следующему шагу `model` после terminal `tool_call` любого статуса (`success/error/timeout/cancelled`) в цикле `model -> tools -> model`.
-  - [x] Выполнить проверку совместимости с уже реализованным `final_answer`: существующие persisted `tool_call(final_answer)` должны корректно участвовать в model history без скрытия и без миграции схемы БД.
+  - [x] Выполнить проверку совместимости c существующими persisted `tool_call` без миграции схемы БД.
 
 #### Фаза 4: Тестирование
 
@@ -95,7 +95,7 @@
 - [x] Добавить/обновить functional-тест `code_exec.spec.ts`: лимит входного кода `30 KiB` и ожидаемая ошибка валидации.
 - [x] Добавить/обновить functional-тест `code_exec.spec.ts`: лимиты `stdout/stderr` по `10 KiB` и корректные флаги truncation.
 - [x] Добавить/обновить functional-тест `code_exec.spec.ts`: для `window.open`/`location.assign`/`location.replace` возвращается terminal `policy_denied` (без silent deny и без исходящего запроса).
-- [x] Добавить/обновить functional-тест `llm-chat.spec.ts`: включение terminal tool results (`final_answer`, `code_exec`, включая `error/timeout/cancelled`) в model history в AI SDK tool-result формате.
+- [x] Добавить/обновить functional-тест `llm-chat.spec.ts`: включение terminal tool results (включая `error/timeout/cancelled`) в model history в AI SDK tool-result формате.
 - [x] Добавить/обновить functional-тест `llm-chat.spec.ts`: non-terminal `tool_call` (`running`) не попадает в model history.
 - [x] Добавить/обновить functional-тест `llm-chat.spec.ts`: после terminal `tool_call` любого статуса pipeline немедленно продолжает следующий шаг `model`.
 - [x] Покрыть полный набор сценариев по детальному тест-плану из `docs/specs/code_exec/design.md` (раздел "Стратегия тестирования").
@@ -111,7 +111,6 @@
 #### Фаза 6: Валидация
 
 - [x] Запустить `npm run validate`.
-- [x] Полный `npm run test:functional` вынесен в единый финальный пункт "Осталось" (ниже).
 
 #### Фаза 7: Resource Degraded Mode (SHALL)
 
@@ -143,7 +142,6 @@
 - [x] Обновить `docs/specs/llm-integration/design.md` coverage-table строкой `llm-integration.11.2.3.3` и привязать к конкретным тестам.
 - [x] Сверить текстовые названия функциональных тестов в requirements/design с фактическими тест-кейсами в `tests/functional/llm-chat.spec.ts` и `tests/functional/code_exec.spec.ts`.
 - [x] Прогнать `npm run validate`.
-- [x] Полный `npm run test:functional` вынесен в единый финальный пункт "Осталось" (ниже).
 
 #### Фаза 9: OAuth Build Injection Validation
 
@@ -152,19 +150,6 @@
 
 ---
 
-## Консолидированный План: Agents + LLM Integration (актуальный статус)
+## Осталось
 
-### Выполнено
-
-- ✅ Введён event-sourced порядок сообщений через `order: { runId, attemptId, sequence }` в persisted payload для сегментов `kind: llm`, `kind: tool_call` и `final_answer`.
-- ✅ Реализована runtime-сортировка по `(runId, attemptId, sequence)` с fallback на `(timestamp, id)` в renderer (`useAgentChat`).
-- ✅ Добавлены unit-тесты на стабильный порядок при перемешанной доставке событий.
-- ✅ Реализована и покрыта логика `pre-tool llm -> tool_call(running) -> post-tool llm` с terminal in-place update.
-- ✅ Сохранён контракт retry/repair (`maxRetries=2`) без persist `tool_call` для невалидных аргументов.
-- ✅ Сохранён контракт hidden-attempt (скрытие сообщений неуспешной попытки).
-- ✅ Добавлены/актуализированы unit/functional тесты для `final_answer` порядка и mid-tool аварийных сценариев.
-- ✅ Добавлен контракт batched streaming updates (не чаще 1 раза в 100ms) с force-flush на boundary и синхронизацией `llm-integration requirements/design`.
-
-### Осталось
-
-- [ ] По подтверждению пользователя выполнить только финальный полный прогон `npm run test:functional`.
+- [ ] По подтверждению пользователя выполнить полный прогон `npm run test:functional`.

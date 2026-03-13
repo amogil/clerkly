@@ -193,7 +193,7 @@ test.describe('Agent Status Calculation', () => {
   /* Preconditions: Agent exists and receives persisted done tool_call(final_answer)
      Action: Create tool_call message with toolName=final_answer
      Assertions: Status is computed as completed in header and avatar color
-     Requirements: agents.9.6 */
+     Requirements: agents.9.2, llm-integration.9.2 */
   test('should calculate completed status from done final_answer tool_call', async () => {
     const firstAgentDataTestId = await window
       .locator('[data-testid^="agent-icon-"]')
@@ -232,4 +232,94 @@ test.describe('Agent Status Calculation', () => {
     await expect(headerStatus).toBeVisible();
     await expect(headerStatus).toHaveText('Completed');
   });
+
+  /* Preconditions: Agent exists and receives persisted done tool_call(code_exec) with output.status=success
+     Action: Create terminal code_exec tool_call message
+     Assertions: Status remains in-progress in header and avatar color
+     Requirements: agents.9.2, llm-integration.9.4.1 */
+  test('should keep in-progress status for done code_exec success tool_call', async () => {
+    const firstAgentDataTestId = await window
+      .locator('[data-testid^="agent-icon-"]')
+      .first()
+      .getAttribute('data-testid');
+    const agentId = firstAgentDataTestId?.replace('agent-icon-', '');
+    expect(agentId).toBeTruthy();
+
+    await window.evaluate(async (id) => {
+      const api = (window as unknown as { api: any }).api;
+      const result = await api.messages.create(id, 'tool_call', {
+        data: {
+          callId: 'code-success-1',
+          toolName: 'code_exec',
+          arguments: { code: 'console.log(1)' },
+          output: { status: 'success', stdout: '1\n', stderr: '' },
+        },
+      });
+      if (!result?.success) {
+        throw new Error(result?.error || 'Failed to create code_exec tool_call');
+      }
+    }, agentId as string);
+
+    const agentAvatar = window
+      .locator('[data-testid^="agent-icon-"]')
+      .first()
+      .locator('[data-testid="agent-avatar-icon"]');
+    await expect
+      .poll(async () => await agentAvatar.getAttribute('class'), { timeout: 5000 })
+      .toContain('bg-blue-500');
+
+    const headerStatus = window.locator('[data-testid="agent-status-text"]').first();
+    await expect(headerStatus).toBeVisible();
+    await expect(headerStatus).toHaveText('In progress');
+  });
+
+  /* Preconditions: Agent exists and receives persisted done tool_call(code_exec) with terminal error statuses
+     Action: Create terminal code_exec tool_call message for each status
+     Assertions: Status remains in-progress in header and avatar color
+     Requirements: agents.9.2, llm-integration.9.4.2 */
+  for (const terminalStatus of ['error', 'timeout', 'cancelled'] as const) {
+    test(`should keep in-progress status from done code_exec ${terminalStatus} tool_call`, async () => {
+      const firstAgentDataTestId = await window
+        .locator('[data-testid^="agent-icon-"]')
+        .first()
+        .getAttribute('data-testid');
+      const agentId = firstAgentDataTestId?.replace('agent-icon-', '');
+      expect(agentId).toBeTruthy();
+
+      await window.evaluate(
+        async ({ id, status }) => {
+          const api = (window as unknown as { api: any }).api;
+          const result = await api.messages.create(id, 'tool_call', {
+            data: {
+              callId: `code-${status}-1`,
+              toolName: 'code_exec',
+              arguments: { code: 'throw new Error("x")' },
+              output: {
+                status,
+                stdout: '',
+                stderr: status === 'timeout' ? 'execution timeout' : 'execution failed',
+                error: { code: status === 'timeout' ? 'sandbox_timeout' : 'sandbox_runtime_error' },
+              },
+            },
+          });
+          if (!result?.success) {
+            throw new Error(result?.error || 'Failed to create code_exec tool_call');
+          }
+        },
+        { id: agentId as string, status: terminalStatus }
+      );
+
+      const agentAvatar = window
+        .locator('[data-testid^="agent-icon-"]')
+        .first()
+        .locator('[data-testid="agent-avatar-icon"]');
+      await expect
+        .poll(async () => await agentAvatar.getAttribute('class'), { timeout: 5000 })
+        .toContain('bg-blue-500');
+
+      const headerStatus = window.locator('[data-testid="agent-status-text"]').first();
+      await expect(headerStatus).toBeVisible();
+      await expect(headerStatus).toHaveText('In progress');
+    });
+  }
 });

@@ -1663,7 +1663,9 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     const actionContent = context.window.locator('.message-llm-action-response').last();
     await expect(actionContent).toContainText('repair completed', { timeout: 15000 });
     await expect(context.window.locator('[data-testid="message-code-exec-block"]')).toHaveCount(0);
-    await expect(context.window.locator('[data-testid="message-final-answer-block"]')).toHaveCount(0);
+    await expect(context.window.locator('[data-testid="message-final-answer-block"]')).toHaveCount(
+      0
+    );
 
     const requestCount = mockLLMServer
       .getRequestLogs()
@@ -1837,7 +1839,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
   /* Preconditions: MockLLMServer returns a single tool_call(final_answer) with summary_points
      Action: User sends a message
      Assertions: Final answer block is rendered as checklist with summary details
-     Requirements: llm-integration.9.2, llm-integration.9.7, llm-integration.11.6, agents.9.6 */
+     Requirements: llm-integration.9.2, llm-integration.9.7, llm-integration.11.6, agents.9.2 */
   test('should render final_answer tool_call as completed assistant response', async () => {
     mockLLMServer.setStreamingMode(true);
     mockLLMServer.setOpenAIStreamScripts([
@@ -2221,7 +2223,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
   /* Preconditions: MockLLMServer returns provider error
      Action: User sends a message and receives error bubble
      Assertions: Status is Error and final answer block is absent
-     Requirements: llm-integration.3.1, agents.9.5 */
+     Requirements: llm-integration.3.1, agents.9.2 */
   test('should not switch to completed on error response', async () => {
     mockLLMServer.setSuccess(false);
     mockLLMServer.setError(500, 'Internal Server Error');
