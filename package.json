@@ -4,7 +4,7 @@
   "description": "Clerkly - AI Agent для менеджеров. Electron-приложение для Mac OS X с локальным хранением данных.",
   "main": "dist/main/main/index.js",
   "author": "Clerkly Team",
-  "license": "MIT",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "private": true,
   "engines": {
     "node": ">=18.0.0"
