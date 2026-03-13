@@ -4,7 +4,7 @@
 
 Цель: реализовать безопасное выполнение JavaScript-кода моделью через `code_exec` в изолированной sandbox-среде.
 
-**Текущий статус:** Фаза 8 — Gap Closure (реализация завершена, ожидается только полный `npm run test:functional` по подтверждению пользователя)
+**Текущий статус:** Фаза 8 — Gap Closure (контракт terminal `code_exec` синхронизирован: агент остаётся `in-progress` для `success/error/timeout/cancelled`; добавлены доп. unit-тесты `MainPipeline`; ожидается только полный `npm run test:functional` по подтверждению пользователя)
 
 ---
 
@@ -52,6 +52,9 @@
 - ✅ В `MainPipeline` реализован 100ms batching для streaming `kind: llm` (persisted `message.updated` + delta-события) с force-flush на boundary-событиях (`tool_call/tool_result/done/error/abort`).
 - ✅ Добавлены плотные unit-тесты `MainPipeline` на throttling/buffering без потери данных и без нарушения порядка pre-tool/tool/post-tool.
 - ✅ Усилены functional-тесты `llm-chat.spec.ts` и `code_exec.spec.ts` для кейса отсутствия post-tool текста в первом model-step: `tool_call(code_exec)` обязан быть видимым в `running` до terminal update.
+- ✅ Обновлён статусный контракт terminal `code_exec` в chat-flow: для `success/error/timeout/cancelled` агент остаётся `in-progress`; результат передаётся в следующий model-step.
+- ✅ Расширено покрытие: unit-тесты `AgentManager` и `MainPipeline` на terminal `code_exec` статусы `error/timeout/cancelled` + целевой functional-прогон `agent-status-calculation.spec.ts`.
+- ✅ Добавлен параметризованный unit-кейс `MainPipeline`: `persists terminal tool_call and continues flow when tool_result arrives with %s status` для `error|timeout|cancelled`.
 
 ### В Работе
 - 🔄 Ожидает отдельного запуска полного `npm run test:functional` по подтверждению пользователя.
@@ -98,6 +101,7 @@
 - [x] Добавить/обновить functional-тест `llm-chat.spec.ts`: включение terminal tool results (включая `error/timeout/cancelled`) в model history в AI SDK tool-result формате.
 - [x] Добавить/обновить functional-тест `llm-chat.spec.ts`: non-terminal `tool_call` (`running`) не попадает в model history.
 - [x] Добавить/обновить functional-тест `llm-chat.spec.ts`: после terminal `tool_call` любого статуса pipeline немедленно продолжает следующий шаг `model`.
+- [x] Добавить/обновить unit-тест `MainPipeline`: terminal `tool_result` со статусами `error|timeout|cancelled` не создаёт `kind:error` и не прерывает обычный flow ответа.
 - [x] Покрыть полный набор сценариев по детальному тест-плану из `docs/specs/code_exec/design.md` (раздел "Стратегия тестирования").
 - [x] Обновить детальную матрицу покрытия по `code_exec.6.6` в `docs/specs/code_exec/design.md` после добавления/изменения тестов.
 - [x] Выполнять тестовую реализацию в порядке: сначала unit, затем functional.

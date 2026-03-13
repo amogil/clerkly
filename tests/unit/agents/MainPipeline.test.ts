@@ -1008,30 +1008,32 @@ describe('MainPipeline.run()', () => {
     );
   });
 
-  it('persists tool_call with error output when tool_result arrives with error status', async () => {
-    const { pipeline, llmProvider, messageManager } = makeMocks();
+  it.each(['error', 'timeout', 'cancelled'] as const)(
+    'persists terminal tool_call and continues flow when tool_result arrives with %s status',
+    async (terminalStatus) => {
+      const { pipeline, llmProvider, messageManager } = makeMocks();
 
-    llmProvider.chat.mockImplementation(
-      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
-        onChunk({
+      llmProvider.chat.mockImplementation(
+        async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+          onChunk({
           type: 'tool_call',
           callId: 'call-stub',
           toolName: 'unknown_tool',
           arguments: { foo: 'bar' },
         });
-        onChunk({
-          type: 'tool_result',
-          callId: 'call-stub',
-          toolName: 'unknown_tool',
-          arguments: { foo: 'bar' },
-          output: { message: 'Tool "unknown_tool" is not available.' },
-          status: 'error',
-        });
-        return { text: 'final after stub' };
-      }
-    );
+          onChunk({
+            type: 'tool_result',
+            callId: 'call-stub',
+            toolName: 'unknown_tool',
+            arguments: { foo: 'bar' },
+            output: { message: 'Tool "unknown_tool" is not available.' },
+            status: terminalStatus,
+          });
+          return { text: 'final after stub' };
+        }
+      );
 
-    await pipeline.run('agent-1', 1);
+      await pipeline.run('agent-1', 1);
 
     expect(messageManager.create).toHaveBeenCalledWith(
       'agent-1',
@@ -1048,18 +1050,37 @@ describe('MainPipeline.run()', () => {
       1,
       false
     );
-    expect(messageManager.update).toHaveBeenCalledWith(
-      100,
-      'agent-1',
-      expect.objectContaining({
-        data: expect.objectContaining({
-          callId: 'call-stub',
-          output: expect.objectContaining({ status: 'error' }),
+      expect(messageManager.update).toHaveBeenCalledWith(
+        100,
+        'agent-1',
+        expect.objectContaining({
+          data: expect.objectContaining({
+            callId: 'call-stub',
+            output: expect.objectContaining({ status: terminalStatus }),
+          }),
         }),
-      }),
-      true
-    );
-  });
+        true
+      );
+      expect(messageManager.create).not.toHaveBeenCalledWith(
+        'agent-1',
+        'error',
+        expect.anything(),
+        expect.anything(),
+        true
+      );
+      expect(messageManager.create).toHaveBeenCalledWith(
+        'agent-1',
+        'llm',
+        expect.objectContaining({
+          data: expect.objectContaining({
+            text: 'final after stub',
+          }),
+        }),
+        1,
+        true
+      );
+    }
+  );
 
   /* Preconditions: provider emits pre-tool reasoning, one valid tool_call, then post-tool text
      Action: run pipeline for one attempt
