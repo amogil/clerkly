@@ -19,6 +19,7 @@ import type { Agent } from '../db/schema';
 import type { Message } from '../db/schema';
 import type { AgentStatus } from '../../shared/utils/agentStatus';
 import { AGENT_STATUS, MESSAGE_KIND } from '../../shared/utils/agentStatus';
+import { DEFAULT_AGENT_TITLE } from '../../shared/constants/agents';
 
 /**
  * AgentManager - business logic for agents
@@ -270,7 +271,7 @@ export class AgentManager {
    */
   create(name?: string): Agent {
     // Use default name if not provided
-    const agentName = name || 'New Agent';
+    const agentName = name || DEFAULT_AGENT_TITLE;
 
     // Repository automatically generates agentId and injects userId
     const agent = this.dbManager.agents.create(agentName);

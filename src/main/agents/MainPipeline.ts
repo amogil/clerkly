@@ -3,7 +3,7 @@
 // Orchestrates the LLM request/response cycle for a single agent message
 
 import { MessageManager } from './MessageManager';
-import { PromptBuilder } from './PromptBuilder';
+import { PromptBuilder, buildAutoTitleMetadataContractPrompt } from './PromptBuilder';
 import { AIAgentSettingsManager } from '../AIAgentSettingsManager';
 import { LLMProviderFactory } from '../llm/LLMProviderFactory';
 import { MainEventBus } from '../events/MainEventBus';
@@ -15,7 +15,13 @@ import {
 } from '../../shared/events/types';
 import { LLM_CHAT_MODELS } from '../llm/LLMConfig';
 import { Logger } from '../Logger';
-import type { ILLMProvider, ChatChunk, ChatOptions, LLMChatResult } from '../llm/ILLMProvider';
+import type {
+  ILLMProvider,
+  ChatChunk,
+  ChatOptions,
+  LLMChatResult,
+  ChatMessage,
+} from '../llm/ILLMProvider';
 import { handleBackgroundError } from '../ErrorHandler';
 import { normalizeLLMError } from '../llm/ErrorNormalizer';
 import type { IToolExecutor } from '../tools/ToolRunner';
@@ -30,7 +36,10 @@ import {
   AgentTitleCommentParser,
   evaluateAgentTitleGuards,
   normalizeAgentTitleCandidate,
+  TITLE_RENAME_MIN_USER_TURN_GAP,
 } from './AgentTitleRuntime';
+import type { Message } from '../db/schema';
+import { DEFAULT_AGENT_TITLE } from '../../shared/constants/agents';
 
 import type { LLMProvider } from '../../types';
 
@@ -163,7 +172,10 @@ export type LLMErrorType =
  */
 export class MainPipeline {
   private logger = Logger.create('MainPipeline');
-  private lastTitleRenameTurnByAgent = new Map<string, number>();
+  private autoTitleHistoryCache = new Map<
+    string,
+    { lastProcessedMessageId: number; lastRenameUserTurn: number | null }
+  >();
 
   constructor(
     private messageManager: MessageManager,
@@ -209,6 +221,11 @@ export class MainPipeline {
     }
   }
 
+  // Requirements: llm-integration.16.10
+  clearAutoTitleCache(agentId: string): void {
+    this.autoTitleHistoryCache.delete(agentId);
+  }
+
   /**
    * Build settings and prompt context for the run.
    * Requirements: llm-integration.1.3, llm-integration.1.4, llm-integration.5.2
@@ -238,7 +255,15 @@ export class MainPipeline {
     }
 
     const messages = this.messageManager.listForModelHistory(agentId);
-    const baseChatMessages = this.promptBuilder.buildMessages(messages);
+    const autoTitleInstruction = this.buildAutoTitleSystemInstruction(
+      agentId,
+      userMessageId,
+      messages
+    );
+    const baseChatMessages = this.injectSystemMessage(
+      this.promptBuilder.buildMessages(messages),
+      autoTitleInstruction
+    );
     const builtPrompt = this.promptBuilder.build();
     const replyToMessageId = userMessageId;
     const options = {
@@ -301,7 +326,12 @@ export class MainPipeline {
         streamResult.finalAnswerOrder
       );
     }
-    this.applyAutoTitleCandidate(agentId, streamResult.titleCandidate);
+    this.applyAutoTitleCandidate(
+      agentId,
+      userMessageId,
+      streamResult.titleCandidate,
+      streamResult.finalLlmMessageId
+    );
     this.publishStepDiagnostics(agentId, userMessageId, streamResult.output);
     this.logger.info(`Pipeline completed for agent ${agentId}`);
   }
@@ -931,16 +961,80 @@ export class MainPipeline {
     ];
   }
 
+  // Requirements: llm-integration.16.1, llm-integration.16.2, llm-integration.16.10
+  private buildAutoTitleSystemInstruction(
+    agentId: string,
+    userMessageId: number,
+    messages: Message[]
+  ): string | null {
+    if (!this.agentTitleUpdater) {
+      return null;
+    }
+
+    const currentTitle = this.agentTitleUpdater.getCurrentTitle(agentId);
+    if (!currentTitle) {
+      return null;
+    }
+
+    const userTurn = this.getUserTurnCount(messages);
+    const lastRenameUserTurn = this.getLastRenameUserTurnFromHistory(agentId, messages, null);
+    if (
+      lastRenameUserTurn !== null &&
+      userTurn - lastRenameUserTurn < TITLE_RENAME_MIN_USER_TURN_GAP
+    ) {
+      return null;
+    }
+
+    const shouldEnforceMeaningfulFirstRename = this.isDefaultAgentTitle(currentTitle);
+    if (shouldEnforceMeaningfulFirstRename) {
+      const triggerMessage = messages.find((message) => message.id === userMessageId) ?? null;
+      if (!this.isMeaningfulUserMessage(triggerMessage)) {
+        return null;
+      }
+    }
+
+    return buildAutoTitleMetadataContractPrompt(currentTitle);
+  }
+
+  // Requirements: llm-integration.16.2
+  private injectSystemMessage(
+    messages: ReturnType<PromptBuilder['buildMessages']>,
+    instruction: string | null
+  ): ReturnType<PromptBuilder['buildMessages']> {
+    if (!instruction) {
+      return messages;
+    }
+
+    const firstNonSystemIndex = messages.findIndex((message) => message.role !== 'system');
+    const instructionMessage: ChatMessage = { role: 'system', content: instruction };
+
+    if (firstNonSystemIndex === -1) {
+      return [...messages, instructionMessage];
+    }
+
+    return [
+      ...messages.slice(0, firstNonSystemIndex),
+      instructionMessage,
+      ...messages.slice(firstNonSystemIndex),
+    ];
+  }
+
   /**
    * Apply valid title candidate through AgentManager update path.
    * Requirements: llm-integration.16.8, llm-integration.16.9, llm-integration.16.10, llm-integration.16.11, llm-integration.16.12
    */
-  private applyAutoTitleCandidate(agentId: string, candidate: string | null): void {
+  private applyAutoTitleCandidate(
+    agentId: string,
+    userMessageId: number,
+    candidate: string | null,
+    sourceLlmMessageId: number | null
+  ): void {
     if (!candidate || !this.agentTitleUpdater) {
       return;
     }
 
     try {
+      const allMessages = this.messageManager.list(agentId);
       const normalizedCandidate = normalizeAgentTitleCandidate(candidate);
       if (!normalizedCandidate) {
         this.logger.debug(`Auto-title skipped for agent ${agentId}: invalid candidate`);
@@ -952,12 +1046,28 @@ export class MainPipeline {
         return;
       }
 
-      const userTurn = this.getUserTurnCount(agentId);
+      const shouldEnforceMeaningfulFirstRename = this.isDefaultAgentTitle(currentTitle);
+      if (shouldEnforceMeaningfulFirstRename) {
+        const triggerMessage = allMessages.find((message) => message.id === userMessageId) ?? null;
+        if (!this.isMeaningfulUserMessage(triggerMessage)) {
+          this.logger.debug(
+            `Auto-title skipped for agent ${agentId}: first rename requires meaningful user message`
+          );
+          return;
+        }
+      }
+
+      const userTurn = this.getUserTurnCount(allMessages);
+      const lastRenameUserTurn = this.getLastRenameUserTurnFromHistory(
+        agentId,
+        allMessages,
+        sourceLlmMessageId
+      );
       const guardDecision = evaluateAgentTitleGuards({
         currentTitle,
         nextTitle: normalizedCandidate,
         currentUserTurn: userTurn,
-        lastRenameUserTurn: this.lastTitleRenameTurnByAgent.get(agentId) ?? null,
+        lastRenameUserTurn,
       });
       if (!guardDecision.allow) {
         this.logger.debug(
@@ -967,7 +1077,6 @@ export class MainPipeline {
       }
 
       this.agentTitleUpdater.rename(agentId, normalizedCandidate);
-      this.lastTitleRenameTurnByAgent.set(agentId, userTurn);
     } catch (error) {
       this.logger.warn(
         `Auto-title failed for agent ${agentId}: ${error instanceof Error ? error.message : String(error)}`
@@ -979,10 +1088,130 @@ export class MainPipeline {
    * Calculate current user turn number for cooldown guard.
    * Requirements: llm-integration.16.10
    */
-  private getUserTurnCount(agentId: string): number {
-    return this.messageManager
-      .list(agentId)
-      .filter((message) => message.kind === 'user' && !message.hidden).length;
+  private getUserTurnCount(messages: Message[]): number {
+    return messages.filter((message) => message.kind === 'user' && !message.hidden).length;
+  }
+
+  /**
+   * Recover durable cooldown state from persisted chat history.
+   * Requirements: llm-integration.16.10
+   */
+  private getLastRenameUserTurnFromHistory(
+    agentId: string,
+    messages: Message[],
+    excludedLlmMessageId: number | null
+  ): number | null {
+    const filteredMessages = messages.filter((message) => {
+      if (message.hidden) {
+        return false;
+      }
+      if (excludedLlmMessageId === null) {
+        return true;
+      }
+      return message.id !== excludedLlmMessageId;
+    });
+
+    const lastProcessedMessageId = filteredMessages.at(-1)?.id ?? 0;
+    const cache = this.autoTitleHistoryCache.get(agentId);
+    if (cache && cache.lastProcessedMessageId === lastProcessedMessageId) {
+      return cache.lastRenameUserTurn;
+    }
+
+    let userTurn = 0;
+    let currentTitle = DEFAULT_AGENT_TITLE;
+    let lastRenameUserTurn: number | null = null;
+    let currentTurnHasMeaningfulUserText = false;
+
+    for (const message of filteredMessages) {
+      if (message.kind === 'user') {
+        userTurn += 1;
+        currentTurnHasMeaningfulUserText = this.isMeaningfulUserMessage(message);
+        continue;
+      }
+
+      if (message.kind !== 'llm') {
+        continue;
+      }
+
+      const historicalCandidate = this.extractTitleCandidateFromMessage(message);
+      if (!historicalCandidate) {
+        continue;
+      }
+      const normalizedHistoricalCandidate = normalizeAgentTitleCandidate(historicalCandidate);
+      if (!normalizedHistoricalCandidate) {
+        continue;
+      }
+
+      if (this.isDefaultAgentTitle(currentTitle) && !currentTurnHasMeaningfulUserText) {
+        continue;
+      }
+
+      const guardDecision = evaluateAgentTitleGuards({
+        currentTitle,
+        nextTitle: normalizedHistoricalCandidate,
+        currentUserTurn: userTurn,
+        lastRenameUserTurn,
+      });
+      if (!guardDecision.allow) {
+        continue;
+      }
+
+      currentTitle = normalizedHistoricalCandidate;
+      lastRenameUserTurn = userTurn;
+    }
+
+    this.autoTitleHistoryCache.set(agentId, {
+      lastProcessedMessageId,
+      lastRenameUserTurn,
+    });
+    return lastRenameUserTurn;
+  }
+
+  /**
+   * Parse auto-title metadata from persisted llm message payload.
+   * Requirements: llm-integration.16.1, llm-integration.16.3
+   */
+  private extractTitleCandidateFromMessage(message: Message): string | null {
+    try {
+      const payload = JSON.parse(message.payloadJson) as { data?: { text?: unknown } };
+      const text = payload?.data?.text;
+      if (typeof text !== 'string' || text.length === 0) {
+        return null;
+      }
+      const parser = new AgentTitleCommentParser();
+      parser.ingest(text);
+      parser.finalize();
+      return parser.getCandidate();
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Check whether agent title is still the default one.
+   * Requirements: llm-integration.16.10
+   */
+  private isDefaultAgentTitle(title: string): boolean {
+    const normalized = normalizeAgentTitleCandidate(title);
+    return (normalized ?? title).toLocaleLowerCase() === DEFAULT_AGENT_TITLE.toLocaleLowerCase();
+  }
+
+  /**
+   * Determine if user message contains meaningful text for first auto-rename.
+   * Requirements: llm-integration.16.10
+   */
+  private isMeaningfulUserMessage(message: Message | null): boolean {
+    if (!message || message.kind !== 'user') {
+      return false;
+    }
+    try {
+      const payload = JSON.parse(message.payloadJson) as { data?: { text?: unknown } };
+      const text = typeof payload?.data?.text === 'string' ? payload.data.text : '';
+      const meaningfulUnits = text.match(/[\p{L}\p{N}]/gu) ?? [];
+      return meaningfulUnits.length >= 3;
+    } catch {
+      return false;
+    }
   }
 
   private validateToolCallArguments(toolName: string, args: Record<string, unknown>): void {

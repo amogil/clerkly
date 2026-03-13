@@ -10,6 +10,7 @@ import type {
   AgentArchivedPayload,
 } from '../../shared/events/types';
 import { callApi } from '../utils/apiWrapper';
+import { DEFAULT_AGENT_TITLE } from '../../shared/constants/agents';
 
 // Access window.api with proper typing
 declare const window: Window & {
@@ -74,7 +75,7 @@ export function useAgents(): UseAgentsResult {
         // No agents exist, create first one automatically
         const firstAgent = await callApi<AgentSnapshot>(
           () =>
-            window.api.agents.create('New Agent') as Promise<{
+            window.api.agents.create(DEFAULT_AGENT_TITLE) as Promise<{
               success: boolean;
               data?: AgentSnapshot;
               error?: string;
@@ -168,7 +169,7 @@ export function useAgents(): UseAgentsResult {
         // Create new agent to maintain auto-create first agent rule
         const newAgent = await callApi<AgentSnapshot>(
           () =>
-            window.api.agents.create('New Agent') as Promise<{
+            window.api.agents.create(DEFAULT_AGENT_TITLE) as Promise<{
               success: boolean;
               data?: AgentSnapshot;
               error?: string;
@@ -249,7 +250,7 @@ export function useAgents(): UseAgentsResult {
           // Requirements: error-notifications.2, realtime-events.9.8
           callApi<AgentSnapshot>(
             () =>
-              window.api.agents.create('New Agent') as Promise<{
+              window.api.agents.create(DEFAULT_AGENT_TITLE) as Promise<{
                 success: boolean;
                 data?: AgentSnapshot;
                 error?: string;

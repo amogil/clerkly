@@ -122,6 +122,7 @@ describe('AgentIPCHandlers', () => {
 
     mockPipeline = {
       run: jest.fn().mockResolvedValue(undefined),
+      clearAutoTitleCache: jest.fn(),
     } as unknown as jest.Mocked<MainPipeline>;
 
     handlers = new AgentIPCHandlers(mockAgentManager, mockMessageManager, mockPipeline);
@@ -405,6 +406,7 @@ describe('AgentIPCHandlers', () => {
       const result = await handler(mockEvent, { agentId: 'abc123xyz0' });
 
       expect(mockAgentManager.archive).toHaveBeenCalledWith('abc123xyz0');
+      expect(mockPipeline.clearAutoTitleCache).toHaveBeenCalledWith('abc123xyz0');
       expect(result).toEqual({ success: true });
     });
 

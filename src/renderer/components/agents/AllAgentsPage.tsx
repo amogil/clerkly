@@ -4,6 +4,7 @@ import { AgentAvatar } from './AgentAvatar';
 import { hasError, isNew, getStatusText, getStatusStyles } from '../../../shared/utils/agentStatus';
 import { DateTimeFormatter } from '../../../shared/utils/DateTimeFormatter';
 import type { AgentSnapshot } from '../../types/agent';
+import { DEFAULT_AGENT_TITLE } from '../../../shared/constants/agents';
 
 // Requirements: agents.2.1, agents.5.5, realtime-events.9
 
@@ -14,7 +15,7 @@ interface AllAgentsPageProps {
   onAgentClick: (agent: AgentSnapshot) => void;
 }
 
-const getAgentName = (agent: AgentSnapshot): string => agent.name || 'New Agent';
+const getAgentName = (agent: AgentSnapshot): string => agent.name || DEFAULT_AGENT_TITLE;
 
 export function AllAgentsPage({ agents, errorMessages, onBack, onAgentClick }: AllAgentsPageProps) {
   const historyAgents = agents.filter((agent) => !(!agent.name && isNew(agent.status)));

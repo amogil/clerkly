@@ -643,4 +643,5 @@
 
 - `tests/functional/llm-chat.spec.ts` - "should extract agent title from markdown comment in the same model turn"
 - `tests/functional/llm-chat.spec.ts` - "should ignore unterminated title comment when payload exceeds 200 chars"
-- `tests/functional/llm-chat.spec.ts` - "should apply anti-flapping guards for title updates"
+- `tests/functional/llm-chat.spec.ts` - "should skip rename for semantically similar title candidate (anti-flap)"
+- `tests/functional/llm-chat.spec.ts` - "should apply rename for new intent after 5-turn cooldown"

@@ -188,6 +188,7 @@ export class AgentIPCHandlers {
   ): Promise<IPCResult> {
     try {
       this.agentManager.archive(args.agentId);
+      this.pipeline.clearAutoTitleCache(args.agentId);
       this.logger.info(`Agent archived: ${args.agentId}`);
       return { success: true };
     } catch (error) {

@@ -6,6 +6,7 @@ import { eq, and, isNull, desc } from 'drizzle-orm';
 import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../schema';
 import { agents, Agent } from '../schema';
+import { DEFAULT_AGENT_TITLE } from '../../../shared/constants/agents';
 
 export class AgentsRepository {
   constructor(
@@ -44,7 +45,7 @@ export class AgentsRepository {
    * Create a new agent for the current user
    * Requirements: user-data-isolation.6.3, user-data-isolation.7.6
    */
-  create(name: string = 'New Agent'): Agent {
+  create(name: string = DEFAULT_AGENT_TITLE): Agent {
     const userId = this.getUserId();
     const agentId = this.generateId();
     const now = new Date().toISOString();

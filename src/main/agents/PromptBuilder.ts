@@ -10,6 +10,7 @@ import {
   validateCodeExecInput,
 } from '../code_exec/contracts';
 import { SandboxSessionManager } from '../code_exec/SandboxSessionManager';
+import { DEFAULT_AGENT_TITLE } from '../../shared/constants/agents';
 
 /**
  * Normalize prompt text for stable model input:
@@ -27,6 +28,23 @@ export function normalizePromptWhitespace(prompt: string): string {
     .join('\n');
 
   return normalizedByLine.replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/**
+ * Build dynamic system instruction for auto-title metadata generation.
+ * Requirements: llm-integration.16.1, llm-integration.16.2, llm-integration.16.10
+ */
+export function buildAutoTitleMetadataContractPrompt(currentTitle: string): string {
+  return [
+    'Auto-title metadata contract:',
+    '- You MAY emit exactly one HTML comment in this exact format: <!-- clerkly:title: <short title> -->',
+    `- Current chat title: "${currentTitle}".`,
+    `- If current title is "${DEFAULT_AGENT_TITLE}", emit only for the first meaningful user request.`,
+    '- Emit the comment only if the title should change now.',
+    '- Do not emit the comment for trivial/empty/low-signal requests.',
+    '- Keep <short title> concise, plain text, max 200 characters.',
+    '- The comment must not alter the user-facing answer semantics.',
+  ].join('\n');
 }
 
 /**

@@ -2700,7 +2700,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
 
     const actionContent = context.window.locator('.message-llm-action-response').last();
     await expect(actionContent).toBeVisible({ timeout: 10000 });
-    await expect(actionContent).toContainText(`<!-- clerkly:title: ${expectedTitle} -->`);
+    await expect(actionContent).not.toContainText(`<!-- clerkly:title: ${expectedTitle} -->`);
 
     const headerTitle = context.window.locator('[data-testid="agent-header-title"]');
     await expect(headerTitle).toHaveText(expectedTitle, { timeout: 10000 });
@@ -2730,6 +2730,38 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expect(agentCard).toBeVisible({ timeout: 5000 });
     await expect(agentCard).toContainText(expectedTitle);
     await expectNoToastError(context.window);
+  });
+
+  /* Preconditions: App uses mock provider and sends first chat request
+     Action: User sends a message, test inspects provider request body
+     Assertions: System prompt contains auto-title metadata contract
+     Requirements: llm-integration.16.1, llm-integration.16.2 */
+  test('should include auto-title metadata contract in system prompt', async () => {
+    mockLLMServer.setStreamingMode(true, {
+      content: 'Simple answer',
+      chunkDelayMs: 0,
+    });
+
+    context = await launchWithMockLLM();
+    mockLLMServer.clearRequestLogs();
+
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await messageInput.fill('Check prompt contract');
+    await messageInput.press('Enter');
+    await expect(context.window.locator('.message-llm-action-response').last()).toBeVisible({
+      timeout: 10000,
+    });
+
+    const lastRequest = mockLLMServer.getLastRequest();
+    expect(lastRequest).toBeDefined();
+    const messages = getRequestMessages(lastRequest!.body as Record<string, unknown>);
+    const systemPrompt = messages
+      .filter((message) => message.role === 'system')
+      .map((message) => contentToText(message.content))
+      .join('\n');
+
+    expect(systemPrompt).toContain('<!-- clerkly:title: <short title> -->');
+    expect(systemPrompt).toContain('Auto-title metadata contract:');
   });
 
   /* Preconditions: Mock stream returns unterminated auto-title comment with payload > 200 chars
