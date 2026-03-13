@@ -597,3 +597,50 @@
   - `code_exec`
 
 15.3. Другие спецификации (`agents`, `code_exec`, `realtime-events`) SHALL ссылаться на канонический список из `llm-integration` и SHALL NOT переопределять его независимо.
+
+---
+
+### 16. Извлечение auto-title из markdown-ответа модели
+
+**ID:** llm-integration.16
+
+**User Story:** Как разработчик, я хочу извлекать кандидат имени агента из того же model-turn, чтобы не делать отдельный LLM-запрос.
+
+#### Критерии Приемки
+
+16.1. Система ДОЛЖНА извлекать candidate title из markdown-ответа ассистента по контракту `<!-- clerkly:title: ... -->` в рамках того же `MainPipeline.run(...)`.
+
+16.2. Система НЕ ДОЛЖНА выполнять отдельный LLM-вызов для генерации названия агента.
+
+16.3. Parser ДОЛЖЕН обрабатывать stream инкрементально и искать первое вхождение префикса `<!-- clerkly:title:`.
+
+16.4. КОГДА parser вошёл в режим захвата payload, ТО захват ДОЛЖЕН завершаться:
+  - при обнаружении закрывающего `-->`, ИЛИ
+  - при достижении лимита `TITLE_COMMENT_PAYLOAD_MAX_LENGTH = 200`.
+
+16.5. ЕСЛИ захват достиг лимита 200 без `-->`, ТО comment ДОЛЖЕН считаться невалидным, а rename ДОЛЖЕН быть пропущен без влияния на основной ответ.
+
+16.6. За один model-turn система ДОЛЖНА обрабатывать не более одного валидного candidate title (первое валидное вхождение).
+
+16.7. Система НЕ ДОЛЖНА модифицировать пользовательский output-stream ради извлечения title; извлечение выполняется параллельно с обычной доставкой контента.
+
+16.8. Candidate title ДОЛЖЕН нормализоваться (trim, single-line, collapse spaces, удаление краевой пунктуации) и валидироваться с ограничением `AGENT_TITLE_MAX_LENGTH = 200`.
+
+16.9. ЕСЛИ candidate title после нормализации пустой или превышает лимит, ТО rename ДОЛЖЕН быть пропущен.
+
+16.10. Перед применением rename система ДОЛЖНА выполнять anti-flapping guards:
+  - exact-match guard на нормализованных строках;
+  - семантический guard по Jaccard similarity токенов (threshold `0.7`);
+  - cooldown guard: не чаще одного rename за 5 user-turns для одного агента.
+
+16.11. Применение валидного candidate title ДОЛЖНО выполняться через существующий путь обновления агента (`AgentManager.update(...)`) с публикацией стандартного `agent.updated`.
+
+16.12. Ошибки parser/валидации/rename НЕ ДОЛЖНЫ прерывать `MainPipeline.run(...)` и НЕ ДОЛЖНЫ создавать блокирующее `kind:error` сообщение; для таких случаев ДОЛЖНО быть достаточно диагностического логирования.
+
+16.13. Логика auto-title ДОЛЖНА сохранять изоляцию данных пользователя: rename применяется только к агенту текущего user-context.
+
+#### Функциональные Тесты
+
+- `tests/functional/llm-chat.spec.ts` - "should extract agent title from markdown comment in the same model turn"
+- `tests/functional/llm-chat.spec.ts` - "should ignore unterminated title comment when payload exceeds 200 chars"
+- `tests/functional/llm-chat.spec.ts` - "should apply anti-flapping guards for title updates"
