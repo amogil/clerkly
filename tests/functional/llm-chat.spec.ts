@@ -2801,4 +2801,70 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expect(headerTitle).toHaveText(initialTitle);
     await expectNoToastError(context.window);
   });
+
+  /* Preconditions: Model response includes title metadata with only whitespace/punctuation payload
+     Action: User sends message and waits for stream completion
+     Assertions: Agent keeps default name because normalized title is invalid
+     Requirements: llm-integration.16.8, llm-integration.16.9, agents.14.3 */
+  test('should keep current name when auto-title candidate is non-meaningful', async () => {
+    mockLLMServer.setStreamingMode(true, {
+      content: 'Body <!-- clerkly:title:   ...   -->',
+      chunkDelayMs: 0,
+    });
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    const headerTitle = context.window.locator('[data-testid="agent-header-title"]');
+    await expect(headerTitle).toHaveText('New Agent');
+
+    await messageInput.fill('Produce invalid auto title');
+    await messageInput.press('Enter');
+
+    await expect(context.window.locator('.message-llm-action-response').last()).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(headerTitle).toHaveText('New Agent');
+    await expectNoToastError(context.window);
+  });
+
+  /* Preconditions: First response renames agent, five user turns pass, next response suggests a new distinct intent
+     Action: User sends sequential messages with deterministic scripted responses
+     Assertions: Rename is applied again after cooldown when semantic difference is high
+     Requirements: llm-integration.16.10 */
+  test('should apply rename for new intent after 5-turn cooldown', async () => {
+    const firstTitle = 'Sprint planning backlog';
+    const secondTitle = 'Incident response postmortem';
+
+    mockLLMServer.setStreamingMode(true, { chunkDelayMs: 0 });
+    mockLLMServer.setOpenAIStreamScripts([
+      { content: `First answer <!-- clerkly:title: ${firstTitle} -->` },
+      { content: 'Filler answer 1' },
+      { content: 'Filler answer 2' },
+      { content: 'Filler answer 3' },
+      { content: 'Filler answer 4' },
+      { content: 'Filler answer 5' },
+      { content: `Distinct answer <!-- clerkly:title: ${secondTitle} -->` },
+    ]);
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    const headerTitle = context.window.locator('[data-testid="agent-header-title"]');
+
+    await messageInput.fill('Message 1');
+    await messageInput.press('Enter');
+    await expect(headerTitle).toHaveText(firstTitle, { timeout: 10000 });
+
+    for (let index = 2; index <= 6; index += 1) {
+      await messageInput.fill(`Message ${index}`);
+      await messageInput.press('Enter');
+      await expect(context.window.locator('.message-llm-action-response').last()).toBeVisible({
+        timeout: 10000,
+      });
+    }
+
+    await messageInput.fill('Message 7');
+    await messageInput.press('Enter');
+    await expect(headerTitle).toHaveText(secondTitle, { timeout: 10000 });
+    await expectNoToastError(context.window);
+  });
 });
