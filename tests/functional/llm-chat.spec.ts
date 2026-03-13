@@ -2762,6 +2762,8 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
 
     expect(systemPrompt).toContain('<!-- clerkly:title: <short title> -->');
     expect(systemPrompt).toContain('Auto-title metadata contract:');
+    expect(systemPrompt).toContain('target 3-12 words');
+    expect(systemPrompt).toContain('max 200 characters');
   });
 
   /* Preconditions: Mock stream returns unterminated auto-title comment with payload > 200 chars

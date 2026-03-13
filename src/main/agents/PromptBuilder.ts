@@ -42,7 +42,7 @@ export function buildAutoTitleMetadataContractPrompt(currentTitle: string): stri
     `- If current title is "${DEFAULT_AGENT_TITLE}", emit only for the first meaningful user request.`,
     '- Emit the comment only if the title should change now.',
     '- Do not emit the comment for trivial/empty/low-signal requests.',
-    '- Keep <short title> concise, plain text, max 200 characters.',
+    '- Keep <short title> concise plain text: target 3-12 words, max 200 characters.',
     '- The comment must not alter the user-facing answer semantics.',
   ].join('\n');
 }
