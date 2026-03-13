@@ -523,10 +523,7 @@ function computeAgentStatus(messages: Message[]): AgentStatus {
       return 'completed';
     }
     if (lastMessage.payload?.data?.toolName === 'code_exec') {
-      const terminalStatus = lastMessage.payload?.data?.output?.status;
-      if (terminalStatus === 'error' || terminalStatus === 'timeout' || terminalStatus === 'cancelled') {
-        return 'error';
-      }
+      // Keep agent in-progress for all terminal code_exec outcomes.
       return 'in-progress';
     }
     return 'awaiting-response';
