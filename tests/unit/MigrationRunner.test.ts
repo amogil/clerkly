@@ -1313,3 +1313,119 @@ describe('Migration 013: backfill legacy llm data.text from data.action.content'
     expect(userRow.data.action).toEqual({ content: 'must stay' });
   });
 });
+
+describe('Migration 014: add message order columns and migrate payload.data.order', () => {
+  let db: Database.Database;
+  const migrationsPath = path.join(process.cwd(), 'migrations');
+
+  beforeEach(() => {
+    db = new Database(':memory:');
+
+    db.exec(`
+      CREATE TABLE messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        agent_id TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        hidden INTEGER NOT NULL DEFAULT 0,
+        done INTEGER NOT NULL DEFAULT 0,
+        reply_to_message_id INTEGER,
+        usage_json TEXT
+      );
+    `);
+  });
+
+  afterEach(() => {
+    if (db && db.open) db.close();
+  });
+
+  /* Preconditions: llm/tool_call rows store order metadata inside payload.data.order
+     Action: run migration 014
+     Assertions: run_id/attempt_id/sequence are backfilled and payload.data.order removed
+     Requirements: llm-integration.6.7, llm-integration.6.8, llm-integration.6.9 */
+  it('should backfill run_id/attempt_id/sequence from payload.data.order and remove legacy payload order', () => {
+    db.prepare(
+      `INSERT INTO messages (agent_id, timestamp, kind, payload_json, done) VALUES (?, ?, ?, ?, ?)`
+    ).run(
+      'agent-1',
+      '2026-01-01T00:00:00Z',
+      'llm',
+      JSON.stringify({
+        data: { text: 'pre', order: { runId: 'run-1', attemptId: 1, sequence: 1 } },
+      }),
+      0
+    );
+    db.prepare(
+      `INSERT INTO messages (agent_id, timestamp, kind, payload_json, done) VALUES (?, ?, ?, ?, ?)`
+    ).run(
+      'agent-1',
+      '2026-01-01T00:01:00Z',
+      'tool_call',
+      JSON.stringify({
+        data: {
+          callId: 'call-1',
+          toolName: 'code_exec',
+          order: { runId: 'run-1', attemptId: 1, sequence: 2 },
+        },
+      }),
+      0
+    );
+
+    const sql = fs.readFileSync(
+      path.join(migrationsPath, '014_add_message_order_columns.sql'),
+      'utf-8'
+    );
+    db.exec(sql.split('-- DOWN')[0]!.replace('-- UP', '').trim());
+
+    const rows = db
+      .prepare('SELECT run_id, attempt_id, sequence, payload_json FROM messages ORDER BY id')
+      .all() as Array<{
+      run_id: string | null;
+      attempt_id: number | null;
+      sequence: number | null;
+      payload_json: string;
+    }>;
+
+    expect(rows[0]).toEqual(
+      expect.objectContaining({ run_id: 'run-1', attempt_id: 1, sequence: 1 })
+    );
+    expect(rows[1]).toEqual(
+      expect.objectContaining({ run_id: 'run-1', attempt_id: 1, sequence: 2 })
+    );
+
+    const firstPayload = JSON.parse(rows[0]!.payload_json) as { data?: Record<string, unknown> };
+    const secondPayload = JSON.parse(rows[1]!.payload_json) as { data?: Record<string, unknown> };
+    expect(firstPayload.data?.order).toBeUndefined();
+    expect(secondPayload.data?.order).toBeUndefined();
+  });
+
+  /* Preconditions: rows without payload.data.order
+     Action: run migration 014
+     Assertions: order columns remain NULL and migration stays safe
+     Requirements: llm-integration.6.10 */
+  it('should keep run order columns null when payload order is absent', () => {
+    db.prepare(
+      `INSERT INTO messages (agent_id, timestamp, kind, payload_json, done) VALUES (?, ?, ?, ?, ?)`
+    ).run(
+      'agent-1',
+      '2026-01-01T00:02:00Z',
+      'user',
+      JSON.stringify({ data: { text: 'hello' } }),
+      1
+    );
+
+    const sql = fs.readFileSync(
+      path.join(migrationsPath, '014_add_message_order_columns.sql'),
+      'utf-8'
+    );
+    db.exec(sql.split('-- DOWN')[0]!.replace('-- UP', '').trim());
+
+    const row = db.prepare('SELECT run_id, attempt_id, sequence FROM messages LIMIT 1').get() as {
+      run_id: string | null;
+      attempt_id: number | null;
+      sequence: number | null;
+    };
+    expect(row).toEqual({ run_id: null, attempt_id: null, sequence: null });
+  });
+});

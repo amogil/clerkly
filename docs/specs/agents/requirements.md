@@ -494,6 +494,9 @@
    - `agent_id TEXT NOT NULL` - ID агента
    - `timestamp TIMESTAMP NOT NULL` - время сообщения (ISO 8601 с timezone offset)
    - `kind TEXT NOT NULL` - тип сообщения (хранится в отдельной колонке, не в payload_json)
+   - `run_id TEXT` - идентификатор model-run (для `kind: llm`/`kind: tool_call`)
+   - `attempt_id INTEGER` - номер попытки внутри run (для `kind: llm`/`kind: tool_call`)
+   - `sequence INTEGER` - канонический порядковый номер шага внутри run/attempt (для `kind: llm`/`kind: tool_call`)
    - `hidden INTEGER NOT NULL DEFAULT 0` - флаг скрытия сообщения (скрытые сообщения не участвуют в UI и в расчёте статуса)
    - `done INTEGER NOT NULL DEFAULT 0` - флаг завершённости сообщения (`0` пока сообщение формируется/стримится, `1` после полного получения)
    - `reply_to_message_id INTEGER` - связь с сообщением, на которое даётся ответ (null для первого)
@@ -595,6 +598,8 @@
 7.4.8.3. КОГДА persisted-сообщение помечено `hidden = true`, оно НЕ ДОЛЖНО отображаться в чате и НЕ ДОЛЖНО нарушать порядок видимых блоков `kind: llm`/`kind: tool_call`.
 
 7.4.8.4. UI ДОЛЖЕН рендерить `tool_call`-блоки только из видимых persisted-сообщений (`hidden = false`), и НЕ ДОЛЖЕН показывать частично обработанные/промежуточные `tool_call`-артефакты, отсутствующие в видимой persisted-истории.
+
+7.4.8.5. Для вычисления persisted-порядка model-run UI ДОЛЖЕН использовать поля snapshot-сообщения `runId/attemptId/sequence` (проекция колонок `messages.run_id/attempt_id/sequence`) и НЕ ДОЛЖЕН читать порядок из `payload_json`.
 
 7.4.9. В явно выделенных text/code секциях tool-блоков (`Input`, `Output`, `JavaScript`, `stdout`, `stderr`) длинные строки НЕ ДОЛЖНЫ переноситься по ширине секции и ДОЛЖНЫ отображаться через горизонтальный скролл внутри соответствующего блока.
 

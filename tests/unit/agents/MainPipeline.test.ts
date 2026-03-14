@@ -75,7 +75,25 @@ function makeMocks() {
       if (kind === 'tool_call') return makeMessage(nextToolMessageId++, kind);
       return makeMessage(99, kind);
     }),
+    createWithOrder: jest
+      .fn()
+      .mockImplementation(
+        (
+          agentId: string,
+          kind: string,
+          payload: any,
+          replyToMessageId: number | null,
+          _order: unknown,
+          done?: boolean
+        ) => messageManager.create(agentId, kind, payload, replyToMessageId, done)
+      ),
     update: jest.fn(),
+    updateWithOrder: jest
+      .fn()
+      .mockImplementation(
+        (messageId: number, agentId: string, payload: any, _order: unknown, done?: boolean) =>
+          messageManager.update(messageId, agentId, payload, done)
+      ),
     setHidden: jest.fn(),
     hideAndMarkIncomplete: jest.fn(),
     setDone: jest.fn(),
@@ -1167,13 +1185,13 @@ describe('MainPipeline.run()', () => {
 
     await pipeline.run('agent-1', 1);
 
-    const finalCalls = (messageManager.create as jest.Mock).mock.calls.filter(
+    const finalCalls = (messageManager.createWithOrder as jest.Mock).mock.calls.filter(
       (call: unknown[]) =>
         call[1] === 'tool_call' &&
         Boolean((call[2] as { data?: { toolName?: string } }).data?.toolName === 'final_answer')
     );
     expect(finalCalls).toHaveLength(1);
-    expect((finalCalls[0]?.[2] as { data?: { order?: unknown } }).data?.order).toEqual(
+    expect(finalCalls[0]?.[4]).toEqual(
       expect.objectContaining({
         runId: expect.any(String),
         attemptId: 2,
@@ -1592,16 +1610,20 @@ describe('MainPipeline.run()', () => {
 
     await pipeline.run('agent-1', 1);
 
-    const creates = (messageManager.create as jest.Mock).mock.calls;
+    const creates = (messageManager.createWithOrder as jest.Mock).mock.calls;
     const llmCreates = creates.filter((call) => call[1] === 'llm');
     const toolCreates = creates.filter((call) => call[1] === 'tool_call');
 
     expect(llmCreates).toHaveLength(2);
     expect(toolCreates).toHaveLength(1);
 
-    const preOrder = (llmCreates[0]?.[2] as { data?: { order?: any } })?.data?.order;
-    const toolOrder = (toolCreates[0]?.[2] as { data?: { order?: any } })?.data?.order;
-    const postOrder = (llmCreates[1]?.[2] as { data?: { order?: any } })?.data?.order;
+    const preOrder = llmCreates[0]?.[4] as { runId: string; attemptId: number; sequence: number };
+    const toolOrder = toolCreates[0]?.[4] as { runId: string; attemptId: number; sequence: number };
+    const postOrder = llmCreates[1]?.[4] as {
+      runId: string;
+      attemptId: number;
+      sequence: number;
+    };
 
     expect(preOrder).toEqual(
       expect.objectContaining({ runId: expect.any(String), attemptId: 1, sequence: 1 })
@@ -2177,13 +2199,13 @@ describe('MainPipeline.run()', () => {
 
     await pipeline.run('agent-1', 1);
 
-    const finalCall = (messageManager.create as jest.Mock).mock.calls.find(
+    const finalCall = (messageManager.createWithOrder as jest.Mock).mock.calls.find(
       (call: unknown[]) =>
         call[1] === 'tool_call' &&
         Boolean((call[2] as { data?: { toolName?: string } }).data?.toolName === 'final_answer')
     );
     expect(finalCall).toBeDefined();
-    expect((finalCall?.[2] as { data?: { order?: unknown } }).data?.order).toEqual(
+    expect(finalCall?.[4]).toEqual(
       expect.objectContaining({
         runId: expect.any(String),
         attemptId: 1,

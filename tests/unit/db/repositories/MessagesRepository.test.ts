@@ -32,6 +32,9 @@ describe('MessagesRepository', () => {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         agent_id TEXT NOT NULL,
         kind TEXT NOT NULL,
+        run_id TEXT,
+        attempt_id INTEGER,
+        sequence INTEGER,
         timestamp TEXT NOT NULL,
         reply_to_message_id INTEGER,
         payload_json TEXT NOT NULL,
@@ -128,6 +131,23 @@ describe('MessagesRepository', () => {
       const agent = agentsRepo.create('Test');
       const message = messagesRepo.create(agent.agentId, 'user', '{}', null, true);
       expect(message.done).toBe(true);
+    });
+
+    /* Preconditions: model-run message with explicit order metadata
+       Action: Create message with runId/attemptId/sequence
+       Assertions: order metadata persisted in dedicated DB columns
+       Requirements: llm-integration.6.7, llm-integration.6.9 */
+    it('should persist run order columns on create', () => {
+      const agent = agentsRepo.create('Test');
+      const message = messagesRepo.create(agent.agentId, 'llm', '{}', null, false, undefined, {
+        runId: 'run-1',
+        attemptId: 2,
+        sequence: 7,
+      });
+
+      expect(message.runId).toBe('run-1');
+      expect(message.attemptId).toBe(2);
+      expect(message.sequence).toBe(7);
     });
 
     /* Preconditions: Parent user message exists
@@ -227,6 +247,26 @@ describe('MessagesRepository', () => {
       messagesRepo.update(message.id, agent2.agentId, '{"hacked":true}');
       const msgs = messagesRepo.listByAgent(agent1.agentId);
       expect(msgs[0].payloadJson).toBe('{"original":true}');
+    });
+
+    /* Preconditions: Existing llm message without order metadata
+       Action: Update message with order columns
+       Assertions: run order columns are updated alongside payload
+       Requirements: llm-integration.6.9 */
+    it('should update run order columns on update', () => {
+      const agent = agentsRepo.create('Test');
+      const message = messagesRepo.create(agent.agentId, 'llm', '{}', null);
+
+      messagesRepo.update(message.id, agent.agentId, '{"data":{"text":"Updated"}}', false, {
+        runId: 'run-2',
+        attemptId: 1,
+        sequence: 3,
+      });
+
+      const updated = messagesRepo.getById(message.id, agent.agentId);
+      expect(updated?.runId).toBe('run-2');
+      expect(updated?.attemptId).toBe(1);
+      expect(updated?.sequence).toBe(3);
     });
   });
 

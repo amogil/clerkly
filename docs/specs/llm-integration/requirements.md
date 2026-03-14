@@ -294,6 +294,17 @@
 
 6.6.1. Финальный текст ответа в chat-flow ДОЛЖЕН храниться в `payload.data.text`.
 
+6.7. Таблица `messages` ДОЛЖНА иметь отдельные колонки порядка model-run:
+  - `run_id TEXT`
+  - `attempt_id INTEGER`
+  - `sequence INTEGER`
+
+6.8. Данные порядка model-run (`run_id`, `attempt_id`, `sequence`) ДОЛЖНЫ храниться в одноимённых колонках таблицы `messages`.
+
+6.9. КОГДА сообщение относится к model-run шагу (`kind: llm` или `kind: tool_call`), ТО `run_id`, `attempt_id`, `sequence` ДОЛЖНЫ сохраняться в соответствующих колонках.
+
+6.10. КОГДА сообщение не относится к model-run шагу (`kind: user` или `kind: error`), ТО `run_id`, `attempt_id`, `sequence` МОГУТ оставаться `NULL`.
+
 ---
 
 ### 7. Семантика потока ответа

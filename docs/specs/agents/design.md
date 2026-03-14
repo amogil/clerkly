@@ -1590,6 +1590,7 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 - Для `toolName === 'code_exec'` используется AI Elements `Tool` family как отдельный технический блок вызова инструмента.
 - Для `toolName === 'final_answer'` используется отдельный компонент `"Final Answer"` на базе AI Elements `Queue`.
 - Визуальный порядок строится по persisted snapshot-последовательности: pre-tool `kind: llm` -> `kind: tool_call` (`running`) -> post-tool `kind: llm`; terminal-обновление `tool_call` применяется позже в том же блоке.
+- Для model-run порядка используются поля snapshot `runId/attemptId/sequence` (поступают из колонок `messages.run_id/attempt_id/sequence`), без чтения `payload.data.order`.
 - UI рендерит только persisted `kind: tool_call` snapshots из видимой истории сообщений и не материализует отдельные промежуточные блоки вне persisted-потока.
 - Сообщения с `hidden = true` полностью исключаются из renderer-проекции перед построением порядка, чтобы failed-attempt артефакты не попадали в видимый поток.
 - Компонент не имеет отдельного заголовка; рендерится только checklist `summary_points`.

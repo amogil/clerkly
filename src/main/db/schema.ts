@@ -86,6 +86,11 @@ export const messages = sqliteTable(
     id: integer('id').primaryKey({ autoIncrement: true }),
     agentId: text('agent_id').notNull(),
     kind: text('kind').notNull(),
+    // Requirements: llm-integration.6.7, llm-integration.6.9, llm-integration.6.10
+    // Canonical order metadata for model-run messages.
+    runId: text('run_id'),
+    attemptId: integer('attempt_id'),
+    sequence: integer('sequence'),
     timestamp: text('timestamp').notNull(),
     payloadJson: text('payload_json').notNull(),
     // Requirements: llm-integration.13
@@ -109,5 +114,10 @@ export const messages = sqliteTable(
   ]
 );
 
-export type Message = typeof messages.$inferSelect;
+type MessageRow = typeof messages.$inferSelect;
+export type Message = Omit<MessageRow, 'runId' | 'attemptId' | 'sequence'> & {
+  runId?: string | null;
+  attemptId?: number | null;
+  sequence?: number | null;
+};
 export type NewMessage = typeof messages.$inferInsert;

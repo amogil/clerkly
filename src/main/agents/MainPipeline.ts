@@ -328,6 +328,11 @@ export class MainPipeline {
       this.persistUsageEnvelope(streamResult.finalLlmMessageId, agentId, streamResult.output);
     }
     if (streamResult.finalAnswerCall) {
+      if (!streamResult.finalAnswerOrder) {
+        throw new InvalidFinalAnswerContractError(
+          'Missing order metadata for final_answer tool_call'
+        );
+      }
       this.persistFinalAnswerToolCall(
         agentId,
         context.replyToMessageId,
@@ -784,15 +789,16 @@ export class MainPipeline {
       callId: state.pendingToolCall.callId,
       toolName: state.pendingToolCall.toolName,
       arguments: state.pendingToolCall.args,
-      order: this.nextOrder(runId, attemptId, state),
     };
+    const toolOrder = this.nextOrder(runId, attemptId, state);
     const startedAt = new Date().toISOString();
     const runningPayload = buildRunningToolPayload(payloadData, startedAt);
-    const runningMessage = this.messageManager.create(
+    const runningMessage = this.messageManager.createWithOrder(
       agentId,
       'tool_call',
       runningPayload,
       context.replyToMessageId,
+      toolOrder,
       false
     );
     state.attemptMessageIds.add(runningMessage.id);
@@ -867,7 +873,6 @@ export class MainPipeline {
             ? { text: state.currentSegment.reasoning, excluded_from_replay: true }
             : undefined,
           text: state.currentSegment.text || undefined,
-          order: state.currentSegment.order ?? undefined,
         },
       };
     } else if (typeof output.text === 'string' && output.text.trim().length > 0) {
@@ -886,7 +891,6 @@ export class MainPipeline {
         data: {
           model: context.options.model,
           text: output.text,
-          order: fallbackOrder,
         },
       };
     }
@@ -1372,9 +1376,9 @@ export class MainPipeline {
     replyToMessageId: number,
     callId: string,
     args: Record<string, unknown>,
-    order: MessageOrderMeta | null
+    order: MessageOrderMeta
   ): void {
-    this.messageManager.create(
+    this.messageManager.createWithOrder(
       agentId,
       'tool_call',
       {
@@ -1382,10 +1386,10 @@ export class MainPipeline {
           callId,
           toolName: 'final_answer',
           arguments: this.normalizeFinalAnswerArguments(args),
-          order: order ?? undefined,
         },
       },
       replyToMessageId,
+      order,
       true
     );
   }
@@ -1473,16 +1477,16 @@ export class MainPipeline {
           ? { text: segment.reasoning, excluded_from_replay: true }
           : undefined,
         text: segment.text || undefined,
-        order: segment.order,
       },
     };
 
     if (segment.id === null) {
-      const llmMsg = this.messageManager.create(
+      const llmMsg = this.messageManager.createWithOrder(
         agentId,
         'llm',
         streamingPayload,
         replyToMessageId,
+        segment.order,
         false
       );
       attemptMessageIds.add(llmMsg.id);
@@ -1490,7 +1494,13 @@ export class MainPipeline {
       return llmMsg.id;
     }
 
-    this.messageManager.update(segment.id, agentId, streamingPayload, false);
+    this.messageManager.updateWithOrder(
+      segment.id,
+      agentId,
+      streamingPayload,
+      segment.order,
+      false
+    );
     return segment.id;
   }
 
@@ -1508,8 +1518,11 @@ export class MainPipeline {
     if (!hasReasoning && !hasText) {
       return null;
     }
+    if (!segment.order) {
+      throw new InvalidFinalAnswerContractError('Missing order metadata for llm segment');
+    }
 
-    this.messageManager.update(
+    this.messageManager.updateWithOrder(
       segment.id,
       agentId,
       {
@@ -1519,9 +1532,10 @@ export class MainPipeline {
             ? { text: segment.reasoning, excluded_from_replay: true }
             : undefined,
           text: segment.text || undefined,
-          order: segment.order ?? undefined,
         },
       },
+      segment.order,
+      true,
       true
     );
     return segment.id;
@@ -1534,17 +1548,19 @@ export class MainPipeline {
     text: string,
     order: MessageOrderMeta
   ): { id: number } {
-    return this.messageManager.create(
+    return this.messageManager.createWithOrder(
       agentId,
       'llm',
       {
         data: {
           model,
           text,
-          order,
         },
       },
       replyToMessageId,
+      order,
+      true,
+      undefined,
       true
     );
   }
