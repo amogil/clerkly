@@ -4,7 +4,9 @@
 
 Цель: реализовать автоматическое именование агента через LLM в рамках обычного ответа модели (без отдельного LLM-запроса) с потоковым парсингом markdown-комментария и anti-flapping guard.
 
-**Текущий статус:** Фаза 1 завершена (спеки), ожидание согласования кода
+**Расширение scope (согласовано):** в этом же PR включён UI-fix для корректного markdown/KaTeX-рендера `tool_call(final_answer)` checklist (`summary_points`), так как поведение затрагивает тот же LLM chat-flow и требовало синхронного обновления prompt/tests/specs.
+
+**Текущий статус:** Фаза 5 — финальная синхронизация и ревью-фиксы
 
 ---
 
@@ -43,14 +45,21 @@
   - ✅ markdown-рендер пунктов `Final Answer`;
   - ✅ unified metadata-tag для auto-title (`title + rename_need_score` в одном теге);
   - ✅ score-based guard (`rename_need_score >= 80`) вместо similarity-guard.
-- ✅ Синхронизированы сценарии тестирования в требованиях/дизайне (без реализации тестов в коде).
+- ✅ Синхронизированы сценарии тестирования в требованиях/дизайне.
+- ✅ Реализован runtime unified metadata-tag (`title + rename_need_score`) в `MainPipeline`.
+- ✅ Добавлены/обновлены unit-тесты и functional-тесты по auto-title flow.
+- ✅ Реализован рендер markdown в `tool_call(final_answer)` checklist (`summary_points`) и покрыт тестами.
+- ✅ Добавлена явная prompt-инструкция для `final_answer.summary_points`:
+  - Markdown (GFM) разрешён;
+  - математические выражения опциональны, но при использовании требуют `$...$`/`$$...$$`.
+- ✅ Добавлен functional-тест: `should render math inside tool_call(final_answer) checklist item`.
 
 ### В работе
-- 🔄 Ожидание согласования перед переходом к реализации в коде.
+- 🔄 Обработка замечаний ревью в PR.
 
 ### Запланировано
 
-#### Фаза 1: Обновление спецификаций (до кода)
+#### Фаза 1: Обновление спецификаций
 
 - [x] Обновить `docs/specs/agents/requirements.md`.
 - [x] Обновить `docs/specs/agents/design.md`.
@@ -60,38 +69,40 @@
 
 #### Фаза 2: Алгоритм (runtime)
 
-- [ ] Зафиксировать и реализовать алгоритм обработки unified metadata-тега в `MainPipeline`:
-  - [ ] Инкрементальный parser по префиксу `<!-- clerkly:title-meta:`.
-  - [ ] Захват payload до `-->` или `TITLE_META_PAYLOAD_MAX_LENGTH = 260`.
-  - [ ] JSON-парсинг payload (`title`, `rename_need_score`) и валидация.
-  - [ ] Применение rename только при `rename_need_score >= 80` и прохождении guard-ов.
-  - [ ] Отказоустойчивость: ошибки не ломают основной turn.
+- [x] Зафиксировать и реализовать алгоритм обработки unified metadata-тега в `MainPipeline`:
+  - [x] Инкрементальный parser по префиксу `<!-- clerkly:title-meta:`.
+  - [x] Захват payload до `-->` или `TITLE_META_PAYLOAD_MAX_LENGTH = 260`.
+  - [x] JSON-парсинг payload (`title`, `rename_need_score`) и валидация.
+  - [x] Применение rename только при `rename_need_score >= 80` и прохождении guard-ов.
+  - [x] Отказоустойчивость: ошибки не ломают основной turn.
 
 #### Фаза 3: Реализация (по модулям)
 
-- [ ] Обновить runtime-модули (`MainPipeline`, `AgentTitleRuntime`, prompt builder) под unified tag.
-- [ ] Обновить рендер `Final Answer`: markdown в `summary_points`.
-- [ ] Проверить публикацию `agent.updated` и отражение в UI.
+- [x] Обновить runtime-модули (`MainPipeline`, `AgentTitleRuntime`, prompt builder) под unified tag.
+- [x] Обновить рендер `Final Answer`: markdown в `summary_points`.
+- [x] Проверить публикацию `agent.updated` и отражение в UI.
 
 #### Фаза 4: Тесты
 
-- [ ] Добавить/обновить unit-тесты:
-  - [ ] parser unified metadata-тега;
-  - [ ] валидация `rename_need_score`;
-  - [ ] integration для rename-flow с новым контрактом.
-- [ ] Добавить/обновить functional-тесты:
-  - [ ] markdown в `Final Answer`;
-  - [ ] single-tag extraction (`title + score`);
-  - [ ] порог `rename_need_score` и invalid score.
+- [x] Добавить/обновить unit-тесты:
+  - [x] parser unified metadata-тега;
+  - [x] валидация `rename_need_score`;
+  - [x] integration для rename-flow с новым контрактом.
+- [x] Добавить/обновить functional-тесты:
+  - [x] markdown в `Final Answer`;
+  - [x] math в `Final Answer`;
+  - [x] single-tag extraction (`title + score`);
+  - [x] порог `rename_need_score` и invalid score.
 
 #### Фаза 5: Валидация и завершение
 
-- [ ] Прогнать релевантные unit-тесты по затронутым модулям.
+- [x] Прогнать релевантные unit-тесты по затронутым модулям.
 - [ ] Прогнать `npm run validate`.
-- [ ] После подтверждения пользователя запустить функциональные тесты.
+- [x] Запустить релевантные functional-тесты по `final_answer`/markdown/math сценариям.
 
 ---
 
-## Критерии готовности к переходу в код
+## Критерии готовности к завершению PR
 
-- Plan approved: **YES**.
+- Спеки синхронизированы с кодом и тестами: **YES**.
+- Открытые замечания ревью обработаны: **IN PROGRESS**.
