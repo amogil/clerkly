@@ -1,8 +1,8 @@
-// Requirements: llm-integration.16.10
+// Requirements: llm-integration.16.10, llm-integration.16.10.1
 
 import {
   evaluateAgentTitleGuards,
-  jaccardSimilarity,
+  isValidRenameNeedScore,
 } from '../../../src/main/agents/AgentTitleRuntime';
 
 describe('evaluateAgentTitleGuards', () => {
@@ -14,6 +14,7 @@ describe('evaluateAgentTitleGuards', () => {
     const decision = evaluateAgentTitleGuards({
       currentTitle: 'Project Kickoff',
       nextTitle: '  project kickoff  ',
+      renameNeedScore: 100,
       currentUserTurn: 10,
       lastRenameUserTurn: null,
     });
@@ -22,21 +23,21 @@ describe('evaluateAgentTitleGuards', () => {
     expect(decision.reason).toBe('exact_match');
   });
 
-  /* Preconditions: Titles are semantically close by token overlap
+  /* Preconditions: Score is below rename threshold
      Action: Evaluate anti-flapping guards
-     Assertions: Rename is skipped by semantic guard
+     Assertions: Rename is skipped by score guard
      Requirements: llm-integration.16.10 */
-  it('skips rename when Jaccard similarity is above threshold', () => {
+  it('skips rename when score is below threshold', () => {
     const decision = evaluateAgentTitleGuards({
-      currentTitle: 'release planning sprint tasks',
-      nextTitle: 'sprint release planning tasks',
+      currentTitle: 'Sprint bug triage',
+      nextTitle: 'Quarterly roadmap review',
+      renameNeedScore: 79,
       currentUserTurn: 10,
       lastRenameUserTurn: null,
     });
 
     expect(decision.allow).toBe(false);
-    expect(decision.reason).toBe('semantically_similar');
-    expect(decision.similarity).toBeGreaterThanOrEqual(0.7);
+    expect(decision.reason).toBe('score_below_threshold');
   });
 
   /* Preconditions: Titles are different, but cooldown period has not elapsed
@@ -47,6 +48,7 @@ describe('evaluateAgentTitleGuards', () => {
     const decision = evaluateAgentTitleGuards({
       currentTitle: 'Sprint bug triage',
       nextTitle: 'Backend migration blockers',
+      renameNeedScore: 95,
       currentUserTurn: 8,
       lastRenameUserTurn: 6,
     });
@@ -55,14 +57,15 @@ describe('evaluateAgentTitleGuards', () => {
     expect(decision.reason).toBe('cooldown');
   });
 
-  /* Preconditions: Titles are different and cooldown has elapsed
+  /* Preconditions: Titles are different, score passes, and cooldown has elapsed
      Action: Evaluate anti-flapping guards
      Assertions: Rename is allowed
      Requirements: llm-integration.16.10 */
-  it('allows rename for semantically different title after cooldown', () => {
+  it('allows rename when score is high and cooldown elapsed', () => {
     const decision = evaluateAgentTitleGuards({
       currentTitle: 'Sprint bug triage',
       nextTitle: 'Quarterly roadmap review',
+      renameNeedScore: 92,
       currentUserTurn: 12,
       lastRenameUserTurn: 6,
     });
@@ -72,14 +75,19 @@ describe('evaluateAgentTitleGuards', () => {
   });
 });
 
-describe('jaccardSimilarity', () => {
-  /* Preconditions: Two token sets partially overlap
-     Action: Calculate Jaccard similarity
-     Assertions: Intersection/union ratio is returned
-     Requirements: llm-integration.16.10 */
-  it('calculates set overlap ratio', () => {
-    const similarity = jaccardSimilarity('a b c', 'b c d');
-
-    expect(similarity).toBeCloseTo(0.5, 6);
+describe('isValidRenameNeedScore', () => {
+  /* Preconditions: Mixed score values
+     Action: Validate score values
+     Assertions: Only integer 0..100 values are accepted
+     Requirements: llm-integration.16.10.1 */
+  it('validates integer score range', () => {
+    expect(isValidRenameNeedScore(0)).toBe(true);
+    expect(isValidRenameNeedScore(80)).toBe(true);
+    expect(isValidRenameNeedScore(100)).toBe(true);
+    expect(isValidRenameNeedScore(-1)).toBe(false);
+    expect(isValidRenameNeedScore(101)).toBe(false);
+    expect(isValidRenameNeedScore(79.5)).toBe(false);
+    expect(isValidRenameNeedScore('90')).toBe(false);
+    expect(isValidRenameNeedScore(null)).toBe(false);
   });
 });

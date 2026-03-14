@@ -36,6 +36,9 @@ import {
   AgentTitleCommentParser,
   evaluateAgentTitleGuards,
   normalizeAgentTitleCandidate,
+  parseAgentTitleMetadataPayload,
+  type AgentTitleMetadata,
+  isValidRenameNeedScore,
   TITLE_RENAME_MIN_USER_TURN_GAP,
 } from './AgentTitleRuntime';
 import type { Message } from '../db/schema';
@@ -71,7 +74,7 @@ type StreamProcessingResult = {
   activeLlmMessageId: number | null;
   finalAnswerCall: { callId: string; args: Record<string, unknown> } | null;
   finalAnswerOrder: MessageOrderMeta | null;
-  titleCandidate: string | null;
+  titleMetadata: AgentTitleMetadata | null;
 };
 
 type AgentTitleUpdater = {
@@ -342,7 +345,7 @@ export class MainPipeline {
     );
     this.applyAutoTitleCandidate(
       agentId,
-      streamResult.titleCandidate,
+      streamResult.titleMetadata,
       streamResult.finalLlmMessageId,
       streamResult.finalLlmPayload,
       messagesForAutoTitle
@@ -837,7 +840,7 @@ export class MainPipeline {
       state.titleParser.ingest(output.text);
     }
     state.titleParser.finalize();
-    const titleCandidate = state.titleParser.getCandidate();
+    const titleMetadata = parseAgentTitleMetadataPayload(state.titleParser.getCandidate());
 
     if (
       state.currentSegment.id !== null &&
@@ -900,7 +903,7 @@ export class MainPipeline {
         activeLlmMessageId: state.currentSegment.id,
         finalAnswerCall: state.finalAnswerCall,
         finalAnswerOrder: state.finalAnswerOrder,
-        titleCandidate,
+        titleMetadata,
       };
     }
 
@@ -922,7 +925,7 @@ export class MainPipeline {
       activeLlmMessageId: state.currentSegment.id,
       finalAnswerCall: state.finalAnswerCall,
       finalAnswerOrder: state.finalAnswerOrder,
-      titleCandidate,
+      titleMetadata,
     };
   }
 
@@ -1054,19 +1057,23 @@ export class MainPipeline {
    */
   private applyAutoTitleCandidate(
     agentId: string,
-    candidate: string | null,
+    metadata: AgentTitleMetadata | null,
     sourceLlmMessageId: number | null,
     sourceLlmPayload: Record<string, unknown> | null,
     messagesSnapshot: Message[]
   ): void {
-    if (!candidate || !this.agentTitleUpdater) {
+    if (!metadata || !this.agentTitleUpdater) {
       return;
     }
 
     try {
-      const normalizedCandidate = normalizeAgentTitleCandidate(candidate);
+      const normalizedCandidate = normalizeAgentTitleCandidate(metadata.title);
       if (!normalizedCandidate) {
         this.logger.debug(`Auto-title skipped for agent ${agentId}: invalid candidate`);
+        return;
+      }
+      if (!isValidRenameNeedScore(metadata.renameNeedScore)) {
+        this.logger.debug(`Auto-title skipped for agent ${agentId}: invalid rename_need_score`);
         return;
       }
 
@@ -1095,12 +1102,13 @@ export class MainPipeline {
       const guardDecision = evaluateAgentTitleGuards({
         currentTitle,
         nextTitle: normalizedCandidate,
+        renameNeedScore: metadata.renameNeedScore,
         currentUserTurn: userTurn,
         lastRenameUserTurn,
       });
       if (!guardDecision.allow) {
         this.logger.debug(
-          `Auto-title skipped for agent ${agentId}: reason=${guardDecision.reason} similarity=${guardDecision.similarity}`
+          `Auto-title skipped for agent ${agentId}: reason=${guardDecision.reason} score=${metadata.renameNeedScore}`
         );
         return;
       }
@@ -1180,6 +1188,7 @@ export class MainPipeline {
       const guardDecision = evaluateAgentTitleGuards({
         currentTitle,
         nextTitle: normalizedHistoricalCandidate,
+        renameNeedScore: 100,
         currentUserTurn: userTurn,
         lastRenameUserTurn,
       });

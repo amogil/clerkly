@@ -1594,6 +1594,7 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 - Сообщения с `hidden = true` полностью исключаются из renderer-проекции перед построением порядка, чтобы failed-attempt артефакты не попадали в видимый поток.
 - Компонент не имеет отдельного заголовка; рендерится только checklist `summary_points`.
 - Каждый checklist-пункт рендерится с иконкой `Check` в зелёном круге.
+- Контент каждого checklist-пункта рендерится через общий markdown-рендерер `"MessageResponse"` (тот же markdown-контракт, что у `kind: llm`).
 - Компонент всегда отображается в раскрытом виде; сворачивание/разворачивание не поддерживается.
 - `Agents` не выполняет валидацию/repair `final_answer`; компонент рендерит только persisted payload.
 - Если `final_answer` присутствует в успешной попытке, `"Final Answer"` рендерится как последний видимый артефакт этой попытки.
@@ -1618,7 +1619,7 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 - Рендер строится только по persisted snapshot (`message.created`/`message.updated`) без локальной реконструкции результата.
 
 ```tsx
-// Requirements: agents.7.4.1, agents.7.4.2
+// Requirements: agents.7.4.1, agents.7.4.2, agents.7.4.2.5
 if (message.kind === 'tool_call' && toolName === 'final_answer') {
   return (
     <Queue data-testid="message-final-answer-block">
@@ -1627,7 +1628,9 @@ if (message.kind === 'tool_call' && toolName === 'final_answer') {
           {summaryPoints.map((point) => (
             <QueueItem key={point} data-testid="message-final-answer-item">
               <QueueItemIndicator completed />
-              <QueueItemContent completed>{point}</QueueItemContent>
+              <QueueItemContent completed>
+                <MessageResponse>{point}</MessageResponse>
+              </QueueItemContent>
             </QueueItem>
           ))}
         </div>
@@ -2203,7 +2206,7 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 
 Для отображения `tool_call` в текущем scope используется фиксированная стратегия:
 - AI Elements `Tool` family (см. [https://elements.ai-sdk.dev/components/tool](https://elements.ai-sdk.dev/components/tool)) для `tool_call(code_exec)`.
-- AI Elements `Queue` family для `tool_call(final_answer)`: финал отображается отдельным checklist-компонентом `Final Answer` (без отдельного header, только `summary_points`).
+- AI Elements `Queue` family для `tool_call(final_answer)`: финал отображается отдельным checklist-компонентом `Final Answer` (без отдельного header, только `summary_points`), при этом каждый пункт рендерится через markdown-рендерер `"MessageResponse"`.
 
 ### Архитектура
 

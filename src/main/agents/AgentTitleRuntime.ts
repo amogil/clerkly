@@ -1,13 +1,18 @@
 // Requirements: llm-integration.16
 
-export const TITLE_COMMENT_PREFIX = '<!-- clerkly:title:';
-export const TITLE_COMMENT_CLOSE = '-->';
-export const TITLE_COMMENT_PAYLOAD_MAX_LENGTH = 200;
+export const TITLE_META_COMMENT_PREFIX = '<!-- clerkly:title-meta:';
+export const TITLE_META_COMMENT_CLOSE = '-->';
+export const TITLE_META_PAYLOAD_MAX_LENGTH = 260;
 export const AGENT_TITLE_MAX_LENGTH = 200;
 export const TITLE_RENAME_MIN_USER_TURN_GAP = 5;
-export const TITLE_JACCARD_THRESHOLD = 0.7;
+export const TITLE_RENAME_NEED_SCORE_THRESHOLD = 80;
 
 type ParserMode = 'search' | 'capture';
+
+export type AgentTitleMetadata = {
+  title: string;
+  renameNeedScore: number;
+};
 
 /**
  * Incremental parser for title metadata comment in markdown output stream.
@@ -55,36 +60,34 @@ export class AgentTitleCommentParser {
   // Requirements: llm-integration.16.3
   private consumeSearch(input: string): string {
     const merged = this.searchTail + input;
-    const matchIndex = merged.indexOf(TITLE_COMMENT_PREFIX);
+    const matchIndex = merged.indexOf(TITLE_META_COMMENT_PREFIX);
 
     if (matchIndex === -1) {
-      const keep = Math.max(TITLE_COMMENT_PREFIX.length - 1, 0);
+      const keep = Math.max(TITLE_META_COMMENT_PREFIX.length - 1, 0);
       this.searchTail = keep > 0 ? merged.slice(-keep) : '';
       return '';
     }
 
-    const afterPrefixIndex = matchIndex + TITLE_COMMENT_PREFIX.length;
+    const afterPrefixIndex = matchIndex + TITLE_META_COMMENT_PREFIX.length;
     this.mode = 'capture';
     this.captureBuffer = '';
     this.searchTail = '';
     return merged.slice(afterPrefixIndex);
   }
 
-  // Requirements: llm-integration.16.4, llm-integration.16.5, llm-integration.16.6
+  // Requirements: llm-integration.16.4, llm-integration.16.4.1, llm-integration.16.5, llm-integration.16.6
   private consumeCapture(input: string): string {
     if (input.length === 0) {
       return '';
     }
 
-    const closeIndex = input.indexOf(TITLE_COMMENT_CLOSE);
+    const closeIndex = input.indexOf(TITLE_META_COMMENT_CLOSE);
     if (closeIndex >= 0) {
       const payloadPart = input.slice(0, closeIndex);
-      const remainingCapacity = TITLE_COMMENT_PAYLOAD_MAX_LENGTH - this.captureBuffer.length;
-
-      if (remainingCapacity <= 0 || payloadPart.length > remainingCapacity) {
-        const consumed = Math.max(remainingCapacity, 0);
+      const payloadLength = codePointLength(this.captureBuffer) + codePointLength(payloadPart);
+      if (payloadLength > TITLE_META_PAYLOAD_MAX_LENGTH) {
         this.resetAfterInvalidCapture();
-        return input.slice(consumed);
+        return input.slice(closeIndex + TITLE_META_COMMENT_CLOSE.length);
       }
 
       this.captureBuffer += payloadPart;
@@ -95,19 +98,17 @@ export class AgentTitleCommentParser {
       return '';
     }
 
-    const remainingCapacity = TITLE_COMMENT_PAYLOAD_MAX_LENGTH - this.captureBuffer.length;
+    const remainingCapacity = TITLE_META_PAYLOAD_MAX_LENGTH - codePointLength(this.captureBuffer);
     if (remainingCapacity <= 0) {
       this.resetAfterInvalidCapture();
       return input;
     }
 
-    const consumeLength = Math.min(input.length, remainingCapacity);
-    this.captureBuffer += input.slice(0, consumeLength);
-    const rest = input.slice(consumeLength);
-
-    if (this.captureBuffer.length >= TITLE_COMMENT_PAYLOAD_MAX_LENGTH) {
+    const { head, tail } = takeByCodePoints(input, remainingCapacity);
+    this.captureBuffer += head;
+    if (tail.length > 0) {
       this.resetAfterInvalidCapture();
-      return rest;
+      return tail;
     }
 
     return '';
@@ -122,8 +123,39 @@ export class AgentTitleCommentParser {
 }
 
 /**
+ * Parse and validate title metadata payload.
+ * Requirements: llm-integration.16.1.2, llm-integration.16.1.3, llm-integration.16.10.1
+ */
+export function parseAgentTitleMetadataPayload(payload: string | null): AgentTitleMetadata | null {
+  if (!payload) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(payload.trim()) as {
+      title?: unknown;
+      rename_need_score?: unknown;
+    };
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return null;
+    }
+
+    if (typeof parsed.title !== 'string') {
+      return null;
+    }
+    if (!isValidRenameNeedScore(parsed.rename_need_score)) {
+      return null;
+    }
+
+    return { title: parsed.title, renameNeedScore: parsed.rename_need_score };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Normalize user-visible agent title candidate and validate limits.
- * Requirements: llm-integration.16.8, llm-integration.16.9
+ * Requirements: llm-integration.16.8, llm-integration.16.8.2, llm-integration.16.9
  */
 export function normalizeAgentTitleCandidate(title: string): string | null {
   const collapsed = title
@@ -134,80 +166,88 @@ export function normalizeAgentTitleCandidate(title: string): string | null {
   if (!withoutEdgePunctuation) {
     return null;
   }
-  if (withoutEdgePunctuation.length > AGENT_TITLE_MAX_LENGTH) {
+  if (codePointLength(withoutEdgePunctuation) > AGENT_TITLE_MAX_LENGTH) {
     return null;
   }
   return withoutEdgePunctuation;
 }
 
-/**
- * Compute Jaccard similarity over normalized lowercase token sets.
- * Requirements: llm-integration.16.10
- */
-export function jaccardSimilarity(leftTitle: string, rightTitle: string): number {
-  const left = tokenizeForSimilarity(leftTitle);
-  const right = tokenizeForSimilarity(rightTitle);
-
-  if (left.size === 0 && right.size === 0) {
-    return 1;
-  }
-
-  const intersectionSize = [...left].filter((token) => right.has(token)).length;
-  const unionSize = new Set([...left, ...right]).size;
-  if (unionSize === 0) {
-    return 0;
-  }
-
-  return intersectionSize / unionSize;
-}
-
 export type AgentTitleGuardDecisionReason =
   | 'allow'
   | 'exact_match'
-  | 'semantically_similar'
+  | 'score_below_threshold'
+  | 'invalid_score'
   | 'cooldown';
 
 /**
  * Evaluate anti-flapping guards for auto-title rename.
- * Requirements: llm-integration.16.10
+ * Requirements: llm-integration.16.10, llm-integration.16.10.1
  */
 export function evaluateAgentTitleGuards(input: {
   currentTitle: string;
   nextTitle: string;
+  renameNeedScore: number;
   currentUserTurn: number;
   lastRenameUserTurn: number | null;
-}): { allow: boolean; reason: AgentTitleGuardDecisionReason; similarity: number } {
+}): { allow: boolean; reason: AgentTitleGuardDecisionReason } {
+  if (!isValidRenameNeedScore(input.renameNeedScore)) {
+    return { allow: false, reason: 'invalid_score' };
+  }
+
   const current = normalizeAgentTitleCandidate(input.currentTitle);
   const next = normalizeAgentTitleCandidate(input.nextTitle);
 
   if (!current || !next) {
-    return { allow: false, reason: 'exact_match', similarity: 1 };
+    return { allow: false, reason: 'exact_match' };
   }
 
-  const currentForCompare = current.toLocaleLowerCase();
-  const nextForCompare = next.toLocaleLowerCase();
-
-  if (currentForCompare === nextForCompare) {
-    return { allow: false, reason: 'exact_match', similarity: 1 };
+  if (current.toLocaleLowerCase() === next.toLocaleLowerCase()) {
+    return { allow: false, reason: 'exact_match' };
   }
 
-  const similarity = jaccardSimilarity(currentForCompare, nextForCompare);
-  if (similarity >= TITLE_JACCARD_THRESHOLD) {
-    return { allow: false, reason: 'semantically_similar', similarity };
+  if (input.renameNeedScore < TITLE_RENAME_NEED_SCORE_THRESHOLD) {
+    return { allow: false, reason: 'score_below_threshold' };
   }
 
   if (
     input.lastRenameUserTurn !== null &&
     input.currentUserTurn - input.lastRenameUserTurn < TITLE_RENAME_MIN_USER_TURN_GAP
   ) {
-    return { allow: false, reason: 'cooldown', similarity };
+    return { allow: false, reason: 'cooldown' };
   }
 
-  return { allow: true, reason: 'allow', similarity };
+  return { allow: true, reason: 'allow' };
 }
 
-// Requirements: llm-integration.16.10
-function tokenizeForSimilarity(title: string): Set<string> {
-  const tokens = title.toLocaleLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
-  return new Set(tokens);
+// Requirements: llm-integration.16.10.1
+export function isValidRenameNeedScore(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 100;
+}
+
+// Requirements: llm-integration.16.4.1, llm-integration.16.8.2
+function codePointLength(value: string): number {
+  return Array.from(value).length;
+}
+
+// Requirements: llm-integration.16.4.1
+function takeByCodePoints(value: string, maxPoints: number): { head: string; tail: string } {
+  if (maxPoints <= 0 || value.length === 0) {
+    return { head: '', tail: value };
+  }
+
+  let consumedUnits = 0;
+  let consumedPoints = 0;
+  while (consumedUnits < value.length && consumedPoints < maxPoints) {
+    const codePoint = value.codePointAt(consumedUnits);
+    if (codePoint === undefined) {
+      break;
+    }
+    consumedUnits += codePoint > 0xffff ? 2 : 1;
+    consumedPoints += 1;
+  }
+
+  return {
+    head: value.slice(0, consumedUnits),
+    tail: value.slice(consumedUnits),
+  };
 }

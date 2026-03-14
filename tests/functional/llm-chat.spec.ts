@@ -2686,10 +2686,10 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
      Action: User sends a message and waits for stream completion
      Assertions: Agent name updates in header, tooltip, and All Agents, while markdown text remains unmodified
      Requirements: llm-integration.16.1, llm-integration.16.7, agents.14.1, agents.14.2 */
-  test('should extract agent title from markdown comment in the same model turn', async () => {
+  test('should extract agent title and rename_need_score from single metadata comment in the same model turn', async () => {
     const expectedTitle = 'Sprint Review Summary';
     mockLLMServer.setStreamingMode(true, {
-      content: `Result body <!-- clerkly:title: ${expectedTitle} -->`,
+      content: `Result body <!-- clerkly:title-meta: {"title":"${expectedTitle}","rename_need_score":90} -->`,
       chunkDelayMs: 0,
     });
 
@@ -2700,7 +2700,9 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
 
     const actionContent = context.window.locator('.message-llm-action-response').last();
     await expect(actionContent).toBeVisible({ timeout: 10000 });
-    await expect(actionContent).not.toContainText(`<!-- clerkly:title: ${expectedTitle} -->`);
+    await expect(actionContent).not.toContainText(
+      `<!-- clerkly:title-meta: {"title":"${expectedTitle}","rename_need_score":90} -->`
+    );
 
     const headerTitle = context.window.locator('[data-testid="agent-header-title"]');
     await expect(headerTitle).toHaveText(expectedTitle, { timeout: 10000 });
@@ -2760,20 +2762,22 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
       .map((message) => contentToText(message.content))
       .join('\n');
 
-    expect(systemPrompt).toContain('<!-- clerkly:title: <short title> -->');
+    expect(systemPrompt).toContain(
+      '<!-- clerkly:title-meta: {"title":"<short title>","rename_need_score":NN} -->'
+    );
     expect(systemPrompt).toContain('Auto-title metadata contract:');
     expect(systemPrompt).toContain('target 3-12 words');
     expect(systemPrompt).toContain('max 200 characters');
   });
 
-  /* Preconditions: Mock stream returns unterminated auto-title comment with payload > 200 chars
+  /* Preconditions: Mock stream returns unterminated auto-title comment with payload > 260 chars
      Action: User sends a message and waits for stream completion
      Assertions: Agent name is not changed and chat flow remains successful
      Requirements: llm-integration.16.4, llm-integration.16.5, agents.14.3 */
-  test('should ignore unterminated title comment when payload exceeds 200 chars', async () => {
-    const overflowPayload = 'x'.repeat(220);
+  test('should ignore unterminated title metadata comment when payload exceeds 260 chars', async () => {
+    const overflowPayload = 'x'.repeat(280);
     mockLLMServer.setStreamingMode(true, {
-      content: `Answer <!-- clerkly:title:${overflowPayload}`,
+      content: `Answer <!-- clerkly:title-meta: {"title":"${overflowPayload}`,
       chunkDelayMs: 0,
     });
 
@@ -2792,23 +2796,27 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expectNoToastError(context.window);
   });
 
-  /* Preconditions: First response renames agent, cooldown is cleared by 5 filler turns, next response suggests semantically similar title
+  /* Preconditions: First response renames agent, cooldown is cleared by 5 filler turns, next response has score below threshold
      Action: User sends sequential messages through deterministic scripted stream
-     Assertions: Similar title suggestion is ignored and current title remains stable
+     Assertions: Low-score title suggestion is ignored and current title remains stable
      Requirements: llm-integration.16.10, agents.14.4 */
-  test('should skip rename for semantically similar title candidate (anti-flap)', async () => {
+  test('should skip rename when rename_need_score is below threshold', async () => {
     const initialTitle = 'Sprint planning backlog';
     const similarTitle = 'Backlog sprint planning';
 
     mockLLMServer.setStreamingMode(true, { chunkDelayMs: 0 });
     mockLLMServer.setOpenAIStreamScripts([
-      { content: `First answer <!-- clerkly:title: ${initialTitle} -->` },
+      {
+        content: `First answer <!-- clerkly:title-meta: {"title":"${initialTitle}","rename_need_score":90} -->`,
+      },
       { content: 'Filler answer 1' },
       { content: 'Filler answer 2' },
       { content: 'Filler answer 3' },
       { content: 'Filler answer 4' },
       { content: 'Filler answer 5' },
-      { content: `Similar answer <!-- clerkly:title: ${similarTitle} -->` },
+      {
+        content: `Similar answer <!-- clerkly:title-meta: {"title":"${similarTitle}","rename_need_score":79} -->`,
+      },
     ]);
 
     context = await launchWithMockLLM();
@@ -2842,7 +2850,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
      Requirements: llm-integration.16.8, llm-integration.16.9, agents.14.3 */
   test('should keep current name when auto-title candidate is non-meaningful', async () => {
     mockLLMServer.setStreamingMode(true, {
-      content: 'Body <!-- clerkly:title:   ...   -->',
+      content: 'Body <!-- clerkly:title-meta: {"title":"   ...   ","rename_need_score":90} -->',
       chunkDelayMs: 0,
     });
 
@@ -2867,7 +2875,8 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
      Requirements: llm-integration.16.10, agents.14.3 */
   test('should keep default name when first user message is non-meaningful', async () => {
     mockLLMServer.setStreamingMode(true, {
-      content: 'Body <!-- clerkly:title: Incident response checklist -->',
+      content:
+        'Body <!-- clerkly:title-meta: {"title":"Incident response checklist","rename_need_score":90} -->',
       chunkDelayMs: 0,
     });
 
@@ -2895,7 +2904,9 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     mockLLMServer.setStreamingMode(true, { chunkDelayMs: 0 });
     mockLLMServer.setOpenAIStreamScripts([
       { content: 'Meaningful answer without metadata' },
-      { content: `Second answer <!-- clerkly:title: ${deferredTitle} -->` },
+      {
+        content: `Second answer <!-- clerkly:title-meta: {"title":"${deferredTitle}","rename_need_score":90} -->`,
+      },
     ]);
 
     context = await launchWithMockLLM();
@@ -2916,9 +2927,9 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expectNoToastError(context.window);
   });
 
-  /* Preconditions: First response renames agent, five user turns pass, next response suggests a new distinct intent
+  /* Preconditions: First response renames agent, five user turns pass, next response suggests a new distinct intent with high score
      Action: User sends sequential messages with deterministic scripted responses
-     Assertions: Rename is applied again after cooldown when semantic difference is high
+     Assertions: Rename is applied again after cooldown when score is above threshold
      Requirements: llm-integration.16.10 */
   test('should apply rename for new intent after 5-turn cooldown', async () => {
     const firstTitle = 'Sprint planning backlog';
@@ -2926,13 +2937,17 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
 
     mockLLMServer.setStreamingMode(true, { chunkDelayMs: 0 });
     mockLLMServer.setOpenAIStreamScripts([
-      { content: `First answer <!-- clerkly:title: ${firstTitle} -->` },
+      {
+        content: `First answer <!-- clerkly:title-meta: {"title":"${firstTitle}","rename_need_score":90} -->`,
+      },
       { content: 'Filler answer 1' },
       { content: 'Filler answer 2' },
       { content: 'Filler answer 3' },
       { content: 'Filler answer 4' },
       { content: 'Filler answer 5' },
-      { content: `Distinct answer <!-- clerkly:title: ${secondTitle} -->` },
+      {
+        content: `Distinct answer <!-- clerkly:title-meta: {"title":"${secondTitle}","rename_need_score":92} -->`,
+      },
     ]);
 
     context = await launchWithMockLLM();
@@ -2954,6 +2969,32 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await messageInput.fill('Message 7');
     await messageInput.press('Enter');
     await expect(headerTitle).toHaveText(secondTitle, { timeout: 10000 });
+    await expectNoToastError(context.window);
+  });
+
+  /* Preconditions: Response contains metadata comment with non-integer score
+     Action: User sends message and waits for stream completion
+     Assertions: Agent title is not changed
+     Requirements: llm-integration.16.10.1 */
+  test('should skip rename when rename_need_score is invalid', async () => {
+    mockLLMServer.setStreamingMode(true, {
+      content:
+        'Body <!-- clerkly:title-meta: {"title":"Incident response checklist","rename_need_score":"high"} -->',
+      chunkDelayMs: 0,
+    });
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    const headerTitle = context.window.locator('[data-testid="agent-header-title"]');
+    await expect(headerTitle).toHaveText('New Agent');
+
+    await messageInput.fill('Trigger invalid score');
+    await messageInput.press('Enter');
+
+    await expect(context.window.locator('.message-llm-action-response').last()).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(headerTitle).toHaveText('New Agent');
     await expectNoToastError(context.window);
   });
 });

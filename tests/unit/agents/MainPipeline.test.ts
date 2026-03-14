@@ -463,8 +463,8 @@ describe('MainPipeline.run()', () => {
     expect(reasoningEvent?.accumulatedText).toBe('Soon!**Resolving next step**');
   });
 
-  /* Preconditions: Stream contains markdown metadata comment with title payload split across chunks
-     Action: Run MainPipeline with text deltas that include <!-- clerkly:title: ... -->
+  /* Preconditions: Stream contains markdown metadata comment with JSON payload split across chunks
+     Action: Run MainPipeline with text deltas that include <!-- clerkly:title-meta: ... -->
      Assertions: Agent rename is triggered with normalized title and llm text remains unchanged
      Requirements: llm-integration.16.1, llm-integration.16.3, llm-integration.16.7, llm-integration.16.11 */
   it('extracts title from markdown comment and renames agent without mutating output text', async () => {
@@ -481,8 +481,8 @@ describe('MainPipeline.run()', () => {
     llmProvider.chat.mockImplementation(
       async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
         onChunk({ type: 'text', delta: 'Answer start ' });
-        onChunk({ type: 'text', delta: '<!-- clerkly:title: Sprint' });
-        onChunk({ type: 'text', delta: ' retrospective plan --> end' });
+        onChunk({ type: 'text', delta: '<!-- clerkly:title-meta: {"title":"Sprint' });
+        onChunk({ type: 'text', delta: ' retrospective plan","rename_need_score":90} --> end' });
         return { text: '' };
       }
     );
@@ -494,7 +494,9 @@ describe('MainPipeline.run()', () => {
       (call: unknown[]) => {
         const payload = call[2] as { data?: { text?: string } };
         return (
-          payload.data?.text?.includes('<!-- clerkly:title: Sprint retrospective plan -->') ?? false
+          payload.data?.text?.includes(
+            '<!-- clerkly:title-meta: {"title":"Sprint retrospective plan","rename_need_score":90} -->'
+          ) ?? false
         );
       }
     );
@@ -523,7 +525,9 @@ describe('MainPipeline.run()', () => {
       .join('\n');
 
     expect(systemPrompt).toContain('Auto-title metadata contract:');
-    expect(systemPrompt).toContain('<!-- clerkly:title: <short title> -->');
+    expect(systemPrompt).toContain(
+      '<!-- clerkly:title-meta: {"title":"<short title>","rename_need_score":NN} -->'
+    );
     expect(systemPrompt).toContain('Current chat title: "New Agent".');
     expect(systemPrompt).toContain('target 3-12 words');
     expect(systemPrompt).toContain('max 200 characters');
@@ -541,7 +545,7 @@ describe('MainPipeline.run()', () => {
     const llmPast = makeMessage(2, 'llm');
     llmPast.payloadJson = JSON.stringify({
       data: {
-        text: 'Done <!-- clerkly:title: Sprint backlog planning -->',
+        text: 'Done <!-- clerkly:title-meta: {"title":"Sprint backlog planning","rename_need_score":90} -->',
         auto_title_applied: true,
         auto_title_applied_title: 'Sprint backlog planning',
       },
@@ -572,20 +576,25 @@ describe('MainPipeline.run()', () => {
       .join('\n');
 
     expect(systemPrompt).not.toContain('Auto-title metadata contract:');
-    expect(systemPrompt).not.toContain('<!-- clerkly:title: <short title> -->');
+    expect(systemPrompt).not.toContain(
+      '<!-- clerkly:title-meta: {"title":"<short title>","rename_need_score":NN} -->'
+    );
   });
 
-  /* Preconditions: Stream has unterminated title comment and payload reaches 200 chars
+  /* Preconditions: Stream has unterminated title metadata comment and payload reaches 260 chars
      Action: Run MainPipeline and finalize stream
      Assertions: Rename is skipped and response flow completes
      Requirements: llm-integration.16.4, llm-integration.16.5, llm-integration.16.12 */
-  it('skips rename when title comment exceeds 200 chars without closing marker', async () => {
+  it('skips rename when title metadata comment exceeds 260 chars without closing marker', async () => {
     const { pipeline, llmProvider, agentTitleUpdater } = makeMocks();
-    const longPayload = 'x'.repeat(200);
+    const longPayload = 'x'.repeat(260);
 
     llmProvider.chat.mockImplementation(
       async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
-        onChunk({ type: 'text', delta: `<!-- clerkly:title:${longPayload}` });
+        onChunk({
+          type: 'text',
+          delta: `<!-- clerkly:title-meta: {"title":"${longPayload}`,
+        });
         onChunk({ type: 'text', delta: ' regular response text' });
         return { text: '' };
       }
@@ -616,7 +625,11 @@ describe('MainPipeline.run()', () => {
 
     llmProvider.chat.mockImplementation(
       async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
-        onChunk({ type: 'text', delta: '<!-- clerkly:title: Release board --> body' });
+        onChunk({
+          type: 'text',
+          delta:
+            '<!-- clerkly:title-meta: {"title":"Release board","rename_need_score":90} --> body',
+        });
         return { text: '' };
       }
     );
@@ -644,7 +657,9 @@ describe('MainPipeline.run()', () => {
     user1.payloadJson = JSON.stringify({ data: { text: 'Plan sprint backlog' } });
     const llmFailed = makeMessage(10, 'llm');
     llmFailed.payloadJson = JSON.stringify({
-      data: { text: 'Done <!-- clerkly:title: Sprint backlog planning -->' },
+      data: {
+        text: 'Done <!-- clerkly:title-meta: {"title":"Sprint backlog planning","rename_need_score":90} -->',
+      },
     });
     const user2 = makeMessage(11, 'user');
     user2.payloadJson = JSON.stringify({ data: { text: 'Plan roadmap milestones' } });
@@ -661,13 +676,21 @@ describe('MainPipeline.run()', () => {
     llmProvider.chat
       .mockImplementationOnce(
         async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
-          onChunk({ type: 'text', delta: '<!-- clerkly:title: Sprint backlog planning --> body' });
+          onChunk({
+            type: 'text',
+            delta:
+              '<!-- clerkly:title-meta: {"title":"Sprint backlog planning","rename_need_score":90} --> body',
+          });
           return { text: '' };
         }
       )
       .mockImplementationOnce(
         async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
-          onChunk({ type: 'text', delta: '<!-- clerkly:title: Product roadmap plan --> body' });
+          onChunk({
+            type: 'text',
+            delta:
+              '<!-- clerkly:title-meta: {"title":"Product roadmap plan","rename_need_score":90} --> body',
+          });
           return { text: '' };
         }
       );
@@ -696,7 +719,11 @@ describe('MainPipeline.run()', () => {
 
     llmProvider.chat.mockImplementation(
       async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
-        onChunk({ type: 'text', delta: '<!-- clerkly:title: Useful title --> answer' });
+        onChunk({
+          type: 'text',
+          delta:
+            '<!-- clerkly:title-meta: {"title":"Useful title","rename_need_score":90} --> answer',
+        });
         return { text: '' };
       }
     );
@@ -732,7 +759,9 @@ describe('MainPipeline.run()', () => {
       .join('\n');
 
     expect(systemPrompt).toContain('Auto-title metadata contract:');
-    expect(systemPrompt).toContain('<!-- clerkly:title: <short title> -->');
+    expect(systemPrompt).toContain(
+      '<!-- clerkly:title-meta: {"title":"<short title>","rename_need_score":NN} -->'
+    );
   });
 
   /* Preconditions: Current title is default, history already has meaningful user message, triggering message is non-meaningful
@@ -752,7 +781,11 @@ describe('MainPipeline.run()', () => {
 
     llmProvider.chat.mockImplementation(
       async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
-        onChunk({ type: 'text', delta: '<!-- clerkly:title: Sprint planning board --> answer' });
+        onChunk({
+          type: 'text',
+          delta:
+            '<!-- clerkly:title-meta: {"title":"Sprint planning board","rename_need_score":90} --> answer',
+        });
         return { text: '' };
       }
     );
@@ -774,7 +807,7 @@ describe('MainPipeline.run()', () => {
     const llmPast = makeMessage(10, 'llm');
     llmPast.payloadJson = JSON.stringify({
       data: {
-        text: 'Done <!-- clerkly:title: Sprint backlog planning -->',
+        text: 'Done <!-- clerkly:title-meta: {"title":"Sprint backlog planning","rename_need_score":90} -->',
         auto_title_applied: true,
         auto_title_applied_title: 'Sprint backlog planning',
       },
@@ -792,7 +825,11 @@ describe('MainPipeline.run()', () => {
 
     llmProvider.chat.mockImplementation(
       async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
-        onChunk({ type: 'text', delta: '<!-- clerkly:title: Roadmap planning board --> body' });
+        onChunk({
+          type: 'text',
+          delta:
+            '<!-- clerkly:title-meta: {"title":"Roadmap planning board","rename_need_score":90} --> body',
+        });
         return { text: '' };
       }
     );
@@ -812,7 +849,11 @@ describe('MainPipeline.run()', () => {
 
     llmProvider.chat.mockImplementation(
       async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
-        onChunk({ type: 'text', delta: '<!-- clerkly:title: Stable title --> body' });
+        onChunk({
+          type: 'text',
+          delta:
+            '<!-- clerkly:title-meta: {"title":"Stable title","rename_need_score":90} --> body',
+        });
         return { text: '' };
       }
     );
@@ -836,7 +877,11 @@ describe('MainPipeline.run()', () => {
 
     llmProvider.chat.mockImplementation(
       async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
-        onChunk({ type: 'text', delta: '<!-- clerkly:title: Useful title --> body' });
+        onChunk({
+          type: 'text',
+          delta:
+            '<!-- clerkly:title-meta: {"title":"Useful title","rename_need_score":90} --> body',
+        });
         return { text: '' };
       }
     );
@@ -858,7 +903,7 @@ describe('MainPipeline.run()', () => {
     const llmPast = makeMessage(10, 'llm');
     llmPast.payloadJson = JSON.stringify({
       data: {
-        text: 'Done <!-- clerkly:title: Sprint backlog planning -->',
+        text: 'Done <!-- clerkly:title-meta: {"title":"Sprint backlog planning","rename_need_score":90} -->',
         auto_title_applied: true,
         auto_title_applied_title: 'Sprint backlog planning',
       },
@@ -876,7 +921,11 @@ describe('MainPipeline.run()', () => {
 
     llmProvider.chat.mockImplementation(
       async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
-        onChunk({ type: 'text', delta: '<!-- clerkly:title: Roadmap planning board --> body' });
+        onChunk({
+          type: 'text',
+          delta:
+            '<!-- clerkly:title-meta: {"title":"Roadmap planning board","rename_need_score":90} --> body',
+        });
         return { text: '' };
       }
     );

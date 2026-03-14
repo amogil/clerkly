@@ -608,25 +608,35 @@
 
 #### Критерии Приемки
 
-16.1. Система ДОЛЖНА извлекать candidate title из markdown-ответа ассистента по контракту `<!-- clerkly:title: ... -->` в рамках того же `MainPipeline.run(...)`.
+16.1. Система ДОЛЖНА извлекать метаданные auto-title из markdown-ответа ассистента по контракту `<!-- clerkly:title-meta: ... -->` в рамках того же `MainPipeline.run(...)`.
 
-16.1.1. КОГДА текущий turn удовлетворяет guard-условиям auto-title, ТО система ДОЛЖНА добавлять в model input per-turn system instruction с контрактом генерации `<!-- clerkly:title: ... -->` и контекстом текущего названия чата.
+16.1.1. КОГДА текущий turn удовлетворяет guard-условиям auto-title, ТО система ДОЛЖНА добавлять в model input per-turn system instruction с контрактом генерации `<!-- clerkly:title-meta: ... -->` и контекстом текущего названия чата.
+
+16.1.2. КОГДА текущий turn удовлетворяет guard-условиям auto-title, ТО система ДОЛЖНА запрашивать у модели единый metadata-пакет в одном теге `<!-- clerkly:title-meta: ... -->`, который содержит:
+  - `title` (строка);
+  - `rename_need_score` (целое число `0..100`, где большее значение означает более сильную необходимость смены текущего названия).
+
+16.1.3. Payload тега `<!-- clerkly:title-meta: ... -->` ДОЛЖЕН быть JSON-объектом формата `{"title":"<short title>","rename_need_score":NN}`.
 
 16.2. Система НЕ ДОЛЖНА выполнять отдельный LLM-вызов для генерации названия агента.
 
-16.3. Parser ДОЛЖЕН обрабатывать stream инкрементально и искать первое вхождение префикса `<!-- clerkly:title:`.
+16.3. Parser ДОЛЖЕН обрабатывать stream инкрементально и искать первое вхождение префикса `<!-- clerkly:title-meta:`.
 
 16.4. КОГДА parser вошёл в режим захвата payload, ТО захват ДОЛЖЕН завершаться:
   - при обнаружении закрывающего `-->`, ИЛИ
-  - при достижении лимита `TITLE_COMMENT_PAYLOAD_MAX_LENGTH = 200`.
+  - при достижении лимита `TITLE_META_PAYLOAD_MAX_LENGTH = 260`.
 
-16.5. ЕСЛИ захват достиг лимита 200 без `-->`, ТО comment ДОЛЖЕН считаться невалидным, а rename ДОЛЖЕН быть пропущен без влияния на основной ответ.
+16.4.1. Лимит `TITLE_META_PAYLOAD_MAX_LENGTH` ДОЛЖЕН считаться в Unicode-символах (code points), а НЕ в байтах.
 
-16.6. За один model-turn система ДОЛЖНА обрабатывать не более одного валидного candidate title (первое валидное вхождение).
+16.5. ЕСЛИ захват достиг лимита 260 без `-->`, ТО comment ДОЛЖЕН считаться невалидным, а rename ДОЛЖЕН быть пропущен без влияния на основной ответ.
+
+16.6. За один model-turn система ДОЛЖНА обрабатывать не более одного валидного metadata comment (первое валидное вхождение).
 
 16.7. Система НЕ ДОЛЖНА модифицировать пользовательский output-stream ради извлечения title; извлечение выполняется параллельно с обычной доставкой контента.
 
 16.8. Candidate title ДОЛЖЕН нормализоваться (trim, single-line, collapse spaces, удаление краевой пунктуации) и валидироваться с ограничением `AGENT_TITLE_MAX_LENGTH = 200`.
+
+16.8.2. Лимит `AGENT_TITLE_MAX_LENGTH` ДОЛЖЕН считаться в Unicode-символах (code points), а НЕ в байтах.
 
 16.8.1. Candidate title ДОЛЖЕН стремиться к краткому формату `3-12` слов (target); при этом превышение 200 символов ДОЛЖНО приводить к пропуску rename.
 
@@ -634,11 +644,13 @@
 
 16.10. Перед применением rename система ДОЛЖНА выполнять anti-flapping guards:
   - exact-match guard на нормализованных строках;
-  - семантический guard по Jaccard similarity токенов (threshold `0.7`);
+  - score guard: rename ДОЛЖЕН применяться только при `rename_need_score >= 80`;
   - cooldown guard: не чаще одного rename за 5 user-turns для одного агента;
   - cooldown replay ДОЛЖЕН учитывать только успешно применённые rename (не просто наличие comment в тексте ответа);
   - initial-rename guard: ПОКА текущий заголовок агента равен `New Agent`, ЕСЛИ в истории агента ещё нет meaningful user-message (>=3 буквенно-цифровых символов), auto-rename ДОЛЖЕН выполняться только на meaningful triggering user-message;
   - ПОКА текущий заголовок агента равен `New Agent`, ЕСЛИ в истории агента уже есть meaningful user-message, auto-rename МОЖЕТ выполняться и на turn с не-meaningful triggering user-message.
+
+16.10.1. ЕСЛИ `rename_need_score` отсутствует, невалиден или вне диапазона `0..100`, ТО rename ДОЛЖЕН быть пропущен для текущего turn.
 
 16.11. Применение валидного candidate title ДОЛЖНО выполняться через существующий путь обновления агента (`AgentManager.update(...)`) с публикацией стандартного `agent.updated`.
 
@@ -648,9 +660,10 @@
 
 #### Функциональные Тесты
 
-- `tests/functional/llm-chat.spec.ts` - "should extract agent title from markdown comment in the same model turn"
+- `tests/functional/llm-chat.spec.ts` - "should extract agent title and rename_need_score from single metadata comment in the same model turn"
 - `tests/functional/llm-chat.spec.ts` - "should include auto-title metadata contract in system prompt"
-- `tests/functional/llm-chat.spec.ts` - "should ignore unterminated title comment when payload exceeds 200 chars"
+- `tests/functional/llm-chat.spec.ts` - "should ignore unterminated title metadata comment when payload exceeds 260 chars"
 - `tests/functional/llm-chat.spec.ts` - "should keep default name when first user message is non-meaningful"
-- `tests/functional/llm-chat.spec.ts` - "should skip rename for semantically similar title candidate (anti-flap)"
+- `tests/functional/llm-chat.spec.ts` - "should skip rename when rename_need_score is below threshold"
+- `tests/functional/llm-chat.spec.ts` - "should skip rename when rename_need_score is invalid"
 - `tests/functional/llm-chat.spec.ts` - "should apply rename for new intent after 5-turn cooldown"

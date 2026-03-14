@@ -37,12 +37,13 @@ export function normalizePromptWhitespace(prompt: string): string {
 export function buildAutoTitleMetadataContractPrompt(currentTitle: string): string {
   return [
     'Auto-title metadata contract:',
-    '- You MAY emit exactly one HTML comment in this exact format: <!-- clerkly:title: <short title> -->',
+    '- You MAY emit exactly one HTML comment in this exact format: <!-- clerkly:title-meta: {"title":"<short title>","rename_need_score":NN} -->',
     `- Current chat title: "${currentTitle}".`,
     `- If current title is "${DEFAULT_AGENT_TITLE}", emit only for the first meaningful user request.`,
     '- Emit the comment only if the title should change now.',
     '- Do not emit the comment for trivial/empty/low-signal requests.',
     '- Keep <short title> concise plain text: target 3-12 words, max 200 characters.',
+    '- NN must be an integer 0..100; higher means stronger need to rename current title.',
     '- The comment must not alter the user-facing answer semantics.',
   ].join('\n');
 }

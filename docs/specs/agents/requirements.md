@@ -534,6 +534,8 @@
 
 7.4.2.4. В каждом checklist-пункте блока `"Final Answer"` зелёная иконка `Check` ДОЛЖНА быть выровнена по вертикальному центру первой строки текста пункта (а НЕ по центру всего многострочного блока).
 
+7.4.2.5. Текст каждого пункта `summary_points` в блоке `"Final Answer"` ДОЛЖЕН рендериться как Markdown (GFM) по тем же правилам, что и обычный `kind: llm` ответ.
+
 7.4.4. Для `tool_call(final_answer)` UI ДОЛЖЕН иметь отдельные тестовые идентификаторы:
   - `data-testid="message-final-answer-block"` для корневого блока,
   - `data-testid="message-final-answer-summary"` для контейнера checklist,
@@ -645,6 +647,7 @@
 - `tests/functional/llm-chat.spec.ts` - "should render math when model returns escaped dollar delimiters"
 - `tests/functional/llm-chat.spec.ts` - "should avoid duplicate line breaks between markdown blocks"
 - `tests/functional/llm-chat.spec.ts` - "should render tool_call(final_answer) as checklist block"
+- `tests/functional/llm-chat.spec.ts` - "should render markdown inside tool_call(final_answer) checklist item"
 - `tests/functional/llm-chat.spec.ts` - "should keep tool_call(final_answer) checklist always expanded"
 - `tests/functional/llm-chat.spec.ts` - "should keep visual order pre-tool llm -> tool_call(running) -> post-tool llm with in-place terminal update"
 - `tests/functional/llm-chat.spec.ts` - "should create tool_call only after reasoning phase and start post-tool text without waiting terminal result"
@@ -927,17 +930,17 @@
 
 14.4. КОГДА за короткий интервал приходят несколько `agent.updated` без фактического изменения `name`, ТО UI НЕ ДОЛЖЕН визуально «дребезжать» и ДОЛЖЕН сохранять стабильное отображение имени.
 
-14.5. UI НЕ ДОЛЖЕН показывать служебные markdown-метаданные auto-title (HTML comment вида `<!-- clerkly:title: ... -->`) как видимый текст сообщения.
+14.5. UI НЕ ДОЛЖЕН показывать служебные markdown-метаданные auto-title (HTML comment вида `<!-- clerkly:title-meta: ... -->`) как видимый текст сообщения.
 
 14.6. КОГДА текущий заголовок агента остаётся `New Agent`, НО в истории агента уже есть хотя бы одно meaningful user-message, ТО последующий `agent.updated` с новым `name` (в том числе после не-meaningful triggering turn) ДОЛЖЕН применяться и синхронно отображаться в UI по правилам 14.1 и 14.2.
 
 #### Функциональные Тесты
 
-- `tests/functional/llm-chat.spec.ts` - "should extract agent title from markdown comment in the same model turn"
+- `tests/functional/llm-chat.spec.ts` - "should reflect auto-renamed title in header, agents list and all-agents view"
 - `tests/functional/llm-chat.spec.ts` - "should keep default name when first user message is non-meaningful"
 - `tests/functional/llm-chat.spec.ts` - "should apply deferred rename on non-meaningful turn when history already has meaningful user message"
 - `tests/functional/llm-chat.spec.ts` - "should keep current name when auto-title candidate is non-meaningful"
-- `tests/functional/llm-chat.spec.ts` - "should skip rename for semantically similar title candidate (anti-flap)"
+- `tests/functional/llm-chat.spec.ts` - "should skip rename when rename_need_score is below threshold"
 
 ---
 
