@@ -387,6 +387,7 @@
   - `final_answer` вызывается только когда модель уверена, что работа завершена;
   - ЕСЛИ работа не завершена и `final_answer` не вызывается, модель ДОЛЖНА явно запросить у пользователя недостающую информацию или подтверждение следующего шага;
   - `final_answer` вызывается только в одиночку в рамках одного model-turn; в том же turn НЕ ДОЛЖНЫ вызываться другие инструменты;
+  - КОГДА пункт `summary_points` содержит математическое выражение, модель ДОЛЖНА использовать KaTeX-совместимые markdown-делимитеры `$...$` (inline) или `$$...$$` (block);
   - `summary_points` соблюдает лимиты `llm-integration.9.5.2-9.5.3` и перечисляет решённые задачи.
 
 9.5.2. `summary_points` ДОЛЖЕН содержать от 1 до 10 пунктов.
@@ -506,6 +507,7 @@
 - `tests/functional/llm-chat.spec.ts` — "should retry tool call on invalid arguments, not persist tool_call, and show kind:error after retry limit"
 - `tests/functional/llm-chat.spec.ts` — "should continue to next model step after terminal code_exec tool result"
 - `tests/functional/llm-chat.spec.ts` — "should render final_answer tool_call as completed assistant response"
+- `tests/functional/llm-chat.spec.ts` — "should render math inside tool_call(final_answer) checklist item"
 
 ### 12. Надёжность chat-flow и обработка некорректных ответов
 

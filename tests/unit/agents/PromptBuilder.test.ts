@@ -167,6 +167,12 @@ describe('PromptBuilder.build()', () => {
       );
       expect(result.systemPrompt).toContain('Call `final_answer` alone');
       expect(result.systemPrompt).toContain('list solved tasks');
+      expect(result.systemPrompt).toContain(
+        'You MAY use Markdown (GFM) inside `final_answer.summary_points`'
+      );
+      expect(result.systemPrompt).toContain(
+        'mathematical expressions are optional; if used, format them with Markdown math delimiters'
+      );
       expect(result.tools.some((tool) => tool.name === 'final_answer')).toBe(true);
       const finalAnswerTool = result.tools.find((tool) => tool.name === 'final_answer');
       expect(finalAnswerTool?.description).toContain('only after task is fully done');

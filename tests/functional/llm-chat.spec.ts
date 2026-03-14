@@ -1914,6 +1914,73 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     );
   });
 
+  /* Preconditions: MockLLMServer returns final_answer with markdown content in summary_points
+     Action: User sends a message
+     Assertions: markdown inside checklist item is normalized (no raw markdown markers) and code span is rendered
+     Requirements: agents.7.4.2.5 */
+  test('should render markdown inside tool_call(final_answer) checklist item', async () => {
+    mockLLMServer.setStreamingMode(true);
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        toolCalls: [
+          {
+            callId: 'final-checklist-md-1',
+            toolName: 'final_answer',
+            arguments: {
+              summary_points: ['**Bold** summary with `code`'],
+            },
+          },
+        ],
+      },
+    ]);
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await messageInput.fill('Render markdown in final answer');
+    await messageInput.press('Enter');
+
+    const item = context.window.locator('[data-testid="message-final-answer-item"]').first();
+    await expect(item).toBeVisible({ timeout: 15000 });
+    await expect(item.locator('code')).toHaveCount(1);
+    await expect(item).toContainText('Bold summary with');
+    await expect(item).not.toContainText('**Bold**');
+    await expect(item).not.toContainText('`code`');
+    await expectNoToastError(context.window);
+  });
+
+  /* Preconditions: MockLLMServer returns final_answer with inline math delimiters in summary_points
+     Action: User sends a message
+     Assertions: KaTeX is rendered inside final_answer checklist item
+     Requirements: agents.7.4.2.5, llm-integration.9.5.1.1 */
+  test('should render math inside tool_call(final_answer) checklist item', async () => {
+    mockLLMServer.setStreamingMode(true);
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        toolCalls: [
+          {
+            callId: 'final-checklist-math-1',
+            toolName: 'final_answer',
+            arguments: {
+              summary_points: ['Показал, что $\\ln(-q^2)$ соответствует хвосту $1/r^3$'],
+            },
+          },
+        ],
+      },
+    ]);
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await messageInput.fill('Render math in final answer');
+    await messageInput.press('Enter');
+
+    const item = context.window.locator('[data-testid="message-final-answer-item"]').first();
+    await expect(item).toBeVisible({ timeout: 15000 });
+    await expect(item.locator('.katex')).toHaveCount(2);
+    await expect(item.locator('.katex').first()).toBeVisible();
+    await expect(item).toContainText('Показал, что');
+    await expectNoToastError(context.window);
+  });
+
   /* Preconditions: MockLLMServer returns final_answer with summary_points
      Action: User sends a message
      Assertions: checklist summary remains expanded by default and visible without user interaction

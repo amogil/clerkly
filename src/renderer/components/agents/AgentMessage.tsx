@@ -224,9 +224,11 @@ export function AgentMessage({
                   <span className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-green-600">
                     <Check className="h-3 w-3 text-white" />
                   </span>
-                  <MessageResponse className="message-response-transparent-code-blocks text-sm leading-relaxed break-words">
-                    {point}
-                  </MessageResponse>
+                  <MessageContent className="w-full message-llm-action message-llm-action-response">
+                    <MessageResponse className="message-response-transparent-code-blocks text-sm leading-relaxed break-words">
+                      {point}
+                    </MessageResponse>
+                  </MessageContent>
                 </QueueItem>
               ))}
             </div>

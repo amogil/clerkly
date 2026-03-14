@@ -648,6 +648,7 @@
 - `tests/functional/llm-chat.spec.ts` - "should avoid duplicate line breaks between markdown blocks"
 - `tests/functional/llm-chat.spec.ts` - "should render tool_call(final_answer) as checklist block"
 - `tests/functional/llm-chat.spec.ts` - "should render markdown inside tool_call(final_answer) checklist item"
+- `tests/functional/llm-chat.spec.ts` - "should render math inside tool_call(final_answer) checklist item"
 - `tests/functional/llm-chat.spec.ts` - "should keep tool_call(final_answer) checklist always expanded"
 - `tests/functional/llm-chat.spec.ts` - "should keep visual order pre-tool llm -> tool_call(running) -> post-tool llm with in-place terminal update"
 - `tests/functional/llm-chat.spec.ts` - "should create tool_call only after reasoning phase and start post-tool text without waiting terminal result"
