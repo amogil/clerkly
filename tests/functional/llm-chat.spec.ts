@@ -2935,6 +2935,55 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expectNoToastError(context.window);
   });
 
+  /* Preconditions: Mock stream returns regular text with auto-title HTML comment and the same turn also emits tool_call(final_answer)
+     Action: User sends a message and waits for turn completion
+     Assertions: Agent rename is extracted from llm text, comment is not shown, and Final Answer checklist renders only real summary points
+     Requirements: llm-integration.16.1, llm-integration.16.1.4, llm-integration.9.5.3.2, agents.7.4.2.2.1 */
+  test('should extract agent title from llm text when the same turn also completes with final_answer', async () => {
+    const expectedTitle = 'Резюме статьи про AI-агентов';
+    mockLLMServer.setStreamingMode(true);
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        content: `Короткое резюме <!-- clerkly:title-meta: {"title":"${expectedTitle}","rename_need_score":91} -->`,
+        toolCalls: [
+          {
+            callId: 'final-title-text-1',
+            toolName: 'final_answer',
+            arguments: {
+              summary_points: ['Сформировал краткое резюме статьи на русском.'],
+            },
+          },
+        ],
+      },
+    ]);
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await messageInput.fill('Сделай краткое резюме статьи');
+    await messageInput.press('Enter');
+
+    const actionContent = context.window.locator('.message-llm-action-response').last();
+    await expect(actionContent).toBeVisible({ timeout: 10000 });
+    await expect(actionContent).toContainText('Короткое резюме');
+    await expect(actionContent).not.toContainText(
+      `<!-- clerkly:title-meta: {"title":"${expectedTitle}","rename_need_score":91} -->`
+    );
+
+    const finalAnswerBlock = context.window
+      .locator('[data-testid="message-final-answer-block"]')
+      .last();
+    await expect(finalAnswerBlock).toBeVisible({ timeout: 10000 });
+    const summary = context.window.locator('[data-testid="message-final-answer-summary"]').last();
+    await expect(summary).toContainText('Сформировал краткое резюме статьи на русском.');
+    await expect(context.window.locator('[data-testid="message-final-answer-item"]')).toHaveCount(
+      1
+    );
+
+    const headerTitle = context.window.locator('[data-testid="agent-header-title"]');
+    await expect(headerTitle).toHaveText(expectedTitle, { timeout: 10000 });
+    await expectNoToastError(context.window);
+  });
+
   /* Preconditions: App uses mock provider and sends first chat request
      Action: User sends a message, test inspects provider request body
      Assertions: System prompt contains auto-title metadata contract

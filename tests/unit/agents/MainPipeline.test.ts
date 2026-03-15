@@ -1200,6 +1200,58 @@ describe('MainPipeline.run()', () => {
     );
   });
 
+  /* Preconditions: provider returns final_answer with auto-title metadata comment embedded in summary_points
+     Action: run pipeline once
+     Assertions: invalid tool arguments are surfaced as provider error and final_answer is not persisted
+     Requirements: llm-integration.9.5.3.2, llm-integration.9.5.4, llm-integration.12.3 */
+  it('creates kind:error when final_answer contains auto-title metadata comment', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-title-meta',
+          toolName: 'final_answer',
+          arguments: {
+            summary_points: [
+              '<!-- clerkly:title-meta: {"title":"Sprint Summary","rename_need_score":90} -->',
+            ],
+          },
+        });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'error',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          error: expect.objectContaining({
+            type: 'provider',
+            message: expect.stringContaining('invalid tool call arguments'),
+          }),
+        }),
+      }),
+      1,
+      true
+    );
+    expect(messageManager.create).not.toHaveBeenCalledWith(
+      'agent-1',
+      'tool_call',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          toolName: 'final_answer',
+        }),
+      }),
+      1,
+      expect.anything()
+    );
+  });
+
   /* Preconditions: first attempt returns invalid final_answer, second attempt returns valid final_answer
      Action: run pipeline with retry/repair
      Assertions: persisted final_answer is created once with attemptId=2 in order metadata

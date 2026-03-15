@@ -408,6 +408,8 @@
 
 9.5.3.1. КАЖДЫЙ пункт `summary_points` ДОЛЖЕН содержать непустой текст: после `trim` длина ДОЛЖНА быть не менее 1 символа.
 
+9.5.3.2. Служебный auto-title metadata comment вида `<!-- clerkly:title-meta: ... -->` ДОЛЖЕН появляться только в текстовом ответе модели (`kind: llm`, `data.text`) и НЕ ДОЛЖЕН появляться в других payload-контрактах turn.
+
 9.5.4. ЕСЛИ `final_answer` нарушает ограничения по `summary_points`, ТО система ДОЛЖНА считать такой `final_answer` невалидным и запустить retry/repair по правилам `llm-integration.12.*`.
 
 9.5.5. ОТСУТСТВИЕ `summary_points` (или пустой массив) НЕ ДОЛЖНО считаться успешным `completed`; такой `final_answer` ДОЛЖЕН обрабатываться как невалидный по правилам retry/repair (`llm-integration.12.*`).
@@ -635,7 +637,7 @@
 
 #### Критерии Приемки
 
-16.1. Система ДОЛЖНА извлекать метаданные auto-title из markdown-ответа ассистента по контракту `<!-- clerkly:title-meta: ... -->` в рамках того же `MainPipeline.run(...)`.
+16.1. Система ДОЛЖНА извлекать метаданные auto-title из обычного markdown/text-ответа ассистента (`kind: llm`, `data.text`) по контракту `<!-- clerkly:title-meta: ... -->` в рамках того же `MainPipeline.run(...)`.
 
 16.1.1. КОГДА текущий turn удовлетворяет guard-условиям auto-title, ТО система ДОЛЖНА добавлять в model input per-turn system instruction с контрактом генерации `<!-- clerkly:title-meta: ... -->` и контекстом текущего названия чата.
 
@@ -644,6 +646,8 @@
   - `rename_need_score` (целое число `0..100`, где большее значение означает более сильную необходимость смены текущего названия).
 
 16.1.3. Payload тега `<!-- clerkly:title-meta: ... -->` ДОЛЖЕН быть JSON-объектом формата `{"title":"<short title>","rename_need_score":NN}`.
+
+16.1.4. Служебный тег `<!-- clerkly:title-meta: ... -->` ДОЛЖЕН размещаться только в обычном markdown/text-ответе модели и НЕ ДОЛЖЕН размещаться внутри аргументов инструментов.
 
 16.2. Система НЕ ДОЛЖНА выполнять отдельный LLM-вызов для генерации названия агента.
 
@@ -688,6 +692,7 @@
 #### Функциональные Тесты
 
 - `tests/functional/llm-chat.spec.ts` - "should extract agent title and rename_need_score from single metadata comment in the same model turn"
+- `tests/functional/llm-chat.spec.ts` - "should extract agent title from llm text when the same turn also completes with final_answer"
 - `tests/functional/llm-chat.spec.ts` - "should include auto-title metadata contract in system prompt"
 - `tests/functional/llm-chat.spec.ts` - "should ignore unterminated title metadata comment when payload exceeds 260 chars"
 - `tests/functional/llm-chat.spec.ts` - "should keep default name when first user message is non-meaningful"

@@ -39,6 +39,7 @@ import {
   parseAgentTitleMetadataPayload,
   type AgentTitleMetadata,
   isValidRenameNeedScore,
+  TITLE_META_COMMENT_PREFIX,
   TITLE_RENAME_MIN_USER_TURN_GAP,
 } from './AgentTitleRuntime';
 import type { Message } from '../db/schema';
@@ -1590,6 +1591,11 @@ export class MainPipeline {
       if (point.trim().length < 1) {
         throw new InvalidFinalAnswerContractError(
           'final_answer.summary_points items must be non-empty'
+        );
+      }
+      if (point.includes(TITLE_META_COMMENT_PREFIX)) {
+        throw new InvalidFinalAnswerContractError(
+          'final_answer.summary_points items must not contain auto-title metadata comments'
         );
       }
       if (point.length > 200) {
