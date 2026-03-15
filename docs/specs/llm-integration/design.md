@@ -191,7 +191,7 @@ CREATE TABLE messages (
 
 Контракт `final_answer` валидируется через strict-schema инструмента в `Vercel AI SDK`:
 - `summary_points`: обязательный массив длиной `1..10`;
-- каждый пункт `summary_points`: строка длиной `<= 200`.
+- каждый пункт `summary_points`: непустая строка (после `trim`) длиной `<= 200`.
 Невалидный `final_answer` не фиксируется как завершённый: retry/repair выполняется на стороне AI SDK; при исчерпании лимита создаётся `kind:error`.
 `reply_to_message_id` хранится в колонке `messages.reply_to_message_id` и передаётся в `MessageSnapshot` отдельным полем, не внутри payload.
 
@@ -867,6 +867,7 @@ User отправляет сообщение
 - `tests/functional/llm-chat.spec.ts` — "should render math inside tool_call(final_answer) checklist item"
 - `tests/functional/llm-chat.spec.ts` — "should cancel active request via stop button without creating error message"
 - `tests/functional/llm-chat.spec.ts` — "should show error when invalid final_answer exhausts retry limit"
+- `tests/functional/llm-chat.spec.ts` — "should show error when final_answer contains blank summary point"
 - `tests/functional/llm-chat.spec.ts` — "should render math when model returns LaTeX delimiters"
 - `tests/functional/llm-chat.spec.ts` — "should extract agent title and rename_need_score from single metadata comment in the same model turn"
 - `tests/functional/llm-chat.spec.ts` — "should include auto-title metadata contract in system prompt"
@@ -994,6 +995,7 @@ User отправляет сообщение
 | llm-integration.9.5.1.1 | ✓ | ✓ |
 | llm-integration.9.5.2 | ✓ | ✓ |
 | llm-integration.9.5.3 | ✓ | ✓ |
+| llm-integration.9.5.3.1 | ✓ | ✓ |
 | llm-integration.9.5.4 | ✓ | ✓ |
 | llm-integration.9.5.5 | ✓ | ✓ |
 | llm-integration.9.6 | ✓ | ✓ |

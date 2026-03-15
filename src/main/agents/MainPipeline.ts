@@ -1363,6 +1363,11 @@ export class MainPipeline {
           'final_answer.summary_points items must be strings'
         );
       }
+      if (point.trim().length < 1) {
+        throw new InvalidFinalAnswerContractError(
+          'final_answer.summary_points items must be non-empty'
+        );
+      }
       if (point.length > 200) {
         throw new InvalidFinalAnswerContractError(
           'final_answer.summary_points item length must be <= 200'

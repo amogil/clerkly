@@ -167,6 +167,7 @@ describe('PromptBuilder.build()', () => {
       );
       expect(result.systemPrompt).toContain('Call `final_answer` alone');
       expect(result.systemPrompt).toContain('list solved tasks');
+      expect(result.systemPrompt).toContain('1 to 10 non-empty points');
       expect(result.systemPrompt).toContain(
         'You MAY use Markdown (GFM) inside `final_answer.summary_points`'
       );
@@ -184,7 +185,7 @@ describe('PromptBuilder.build()', () => {
             minItems: 1,
             maxItems: 10,
             description: expect.stringContaining('Required concise list of solved tasks'),
-            items: expect.objectContaining({ maxLength: 200 }),
+            items: expect.objectContaining({ minLength: 1, maxLength: 200, pattern: '.*\\S.*' }),
           }),
         },
       });

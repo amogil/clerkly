@@ -778,7 +778,9 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
 
     const instructionsText = contentToText(body.instructions);
     const promptParts =
-      instructionsText.length > 0 ? [...instructionMessages, instructionsText] : instructionMessages;
+      instructionsText.length > 0
+        ? [...instructionMessages, instructionsText]
+        : instructionMessages;
     return promptParts.join('\n');
   };
 
@@ -2289,6 +2291,76 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
 
     await messageInput.fill('Finish with invalid completion');
+    await messageInput.press('Enter');
+
+    const errorBubble = context.window.locator('[data-testid="message-error"]').last();
+    await expect(errorBubble).toBeVisible({ timeout: 15000 });
+    await expect(errorBubble).toContainText(
+      'Model returned invalid tool call arguments too many times. Please try again later.'
+    );
+    await expect(context.window.locator('[data-testid="message-final-answer-block"]')).toHaveCount(
+      0
+    );
+    await expectNoToastError(context.window);
+  });
+
+  /* Preconditions: MockLLMServer returns invalid final_answer (blank summary_points item)
+     Action: User sends a message
+     Assertions: Retry limit is exhausted and kind:error is shown
+     Requirements: llm-integration.9.5.3.1, llm-integration.9.5.4, llm-integration.12.2.2, llm-integration.12.3 */
+  test('should show error when final_answer contains blank summary point', async () => {
+    mockLLMServer.setStreamingMode(true, { content: '' });
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        toolCalls: [
+          {
+            callId: 'final-blank-1',
+            toolName: 'final_answer',
+            arguments: {
+              summary_points: ['   '],
+            },
+          },
+        ],
+      },
+      {
+        toolCalls: [
+          {
+            callId: 'final-blank-2',
+            toolName: 'final_answer',
+            arguments: {
+              summary_points: ['\t'],
+            },
+          },
+        ],
+      },
+      {
+        toolCalls: [
+          {
+            callId: 'final-blank-3',
+            toolName: 'final_answer',
+            arguments: {
+              summary_points: ['\n'],
+            },
+          },
+        ],
+      },
+      {
+        toolCalls: [
+          {
+            callId: 'final-blank-4',
+            toolName: 'final_answer',
+            arguments: {
+              summary_points: [' '],
+            },
+          },
+        ],
+      },
+    ]);
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+
+    await messageInput.fill('Finish with blank summary point');
     await messageInput.press('Enter');
 
     const errorBubble = context.window.locator('[data-testid="message-error"]').last();

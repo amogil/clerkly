@@ -399,11 +399,13 @@
   - ЕСЛИ работа не завершена и `final_answer` не вызывается, модель ДОЛЖНА явно запросить у пользователя недостающую информацию или подтверждение следующего шага;
   - `final_answer` вызывается только в одиночку в рамках одного model-turn; в том же turn НЕ ДОЛЖНЫ вызываться другие инструменты;
   - КОГДА пункт `summary_points` содержит математическое выражение, модель ДОЛЖНА использовать KaTeX-совместимые markdown-делимитеры `$...$` (inline) или `$$...$$` (block);
-  - `summary_points` соблюдает лимиты `llm-integration.9.5.2-9.5.3` и перечисляет решённые задачи.
+  - `summary_points` соблюдает лимиты `llm-integration.9.5.2-9.5.3.1` и перечисляет решённые задачи.
 
 9.5.2. `summary_points` ДОЛЖЕН содержать от 1 до 10 пунктов.
 
 9.5.3. КАЖДЫЙ пункт `summary_points` ДОЛЖЕН иметь длину не более 200 символов.
+
+9.5.3.1. КАЖДЫЙ пункт `summary_points` ДОЛЖЕН содержать непустой текст: после `trim` длина ДОЛЖНА быть не менее 1 символа.
 
 9.5.4. ЕСЛИ `final_answer` нарушает ограничения по `summary_points`, ТО система ДОЛЖНА считать такой `final_answer` невалидным и запустить retry/repair по правилам `llm-integration.12.*`.
 
@@ -544,6 +546,7 @@
 
 - `tests/functional/llm-chat.spec.ts` — "should cancel active request via stop button without creating error message"
 - `tests/functional/llm-chat.spec.ts` — "should show error when invalid final_answer exhausts retry limit"
+- `tests/functional/llm-chat.spec.ts` — "should show error when final_answer contains blank summary point"
 
 ---
 

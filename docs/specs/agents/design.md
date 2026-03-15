@@ -1598,6 +1598,7 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 - Контент каждого checklist-пункта рендерится через общий markdown-рендерер `"MessageResponse"` (тот же markdown-контракт, что у `kind: llm`).
 - Компонент всегда отображается в раскрытом виде; сворачивание/разворачивание не поддерживается.
 - `Agents` не выполняет валидацию/repair `final_answer`; компонент рендерит только persisted payload.
+- Пустые/пробельные checklist-пункты не считаются валидным `final_answer` по контракту `llm-integration.9.5.3.1`, поэтому в корректном persisted payload не присутствуют.
 - Если `final_answer` присутствует в успешной попытке, `"Final Answer"` рендерится как последний видимый артефакт этой попытки.
 
 **Сообщения выполнения кода (`kind: 'tool_call'`, `toolName: 'code_exec'`):**

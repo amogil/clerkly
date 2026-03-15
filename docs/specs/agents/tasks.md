@@ -60,6 +60,7 @@
   - Markdown (GFM) разрешён;
   - математические выражения опциональны, но при использовании требуют `$...$`/`$$...$$`.
 - ✅ Добавлен functional-тест: `should render math inside tool_call(final_answer) checklist item`.
+- ✅ Уточнён контракт `final_answer.summary_points`: checklist-пункты не могут быть пустыми/пробельными.
 
 ### В работе
 - 🔄 Обработка замечаний ревью в PR.
