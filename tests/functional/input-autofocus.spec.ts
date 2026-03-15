@@ -6,6 +6,8 @@ import {
   createMockOAuthServer,
   activeChat,
   launchElectronWithMockOAuth,
+  closeElectron,
+  ElectronTestContext,
   getAgentIdsFromApi,
   completeOAuthFlow,
   expectAgentsVisible,
@@ -15,6 +17,7 @@ import type { MockOAuthServer } from './helpers/mock-oauth-server';
 let mockServer: MockOAuthServer;
 let electronApp: ElectronApplication;
 let window: Page;
+let context: ElectronTestContext | undefined;
 
 test.beforeAll(async () => {
   mockServer = await createMockOAuthServer();
@@ -36,7 +39,7 @@ test.beforeEach(async () => {
     family_name: 'Test User',
   });
 
-  const context = await launchElectronWithMockOAuth(mockServer);
+  context = await launchElectronWithMockOAuth(mockServer);
   electronApp = context.app;
   window = context.window;
 
@@ -45,9 +48,10 @@ test.beforeEach(async () => {
 });
 
 test.afterEach(async () => {
-  if (electronApp) {
-    await electronApp.close();
+  if (context) {
+    await closeElectron(context, true, false);
   }
+  context = undefined;
 });
 
 /* Preconditions: Application launched, first agent auto-created

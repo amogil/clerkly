@@ -739,8 +739,10 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     content: unknown;
   };
 
-  const getRequestMessages = (body: Record<string, unknown>): ProviderRequestMessage[] =>
-    (body.input ?? body.messages) as ProviderRequestMessage[];
+  const getRequestMessages = (body: Record<string, unknown>): ProviderRequestMessage[] => {
+    const candidate = body.input ?? body.messages;
+    return Array.isArray(candidate) ? (candidate as ProviderRequestMessage[]) : [];
+  };
 
   const contentToText = (content: unknown): string => {
     if (Array.isArray(content)) {
@@ -765,6 +767,19 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
       return (content as { text: string }).text;
     }
     return typeof content === 'string' ? content : '';
+  };
+
+  const getSystemPromptText = (body: Record<string, unknown>): string => {
+    const messages = getRequestMessages(body);
+    const instructionMessages = messages
+      .filter((message) => message.role === 'system' || message.role === 'developer')
+      .map((message) => contentToText(message.content))
+      .filter((text) => text.length > 0);
+
+    const instructionsText = contentToText(body.instructions);
+    const promptParts =
+      instructionsText.length > 0 ? [...instructionMessages, instructionsText] : instructionMessages;
+    return promptParts.join('\n');
   };
 
   async function renderMarkdownMessage(markdown: string): Promise<void> {
@@ -2823,11 +2838,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
 
     const lastRequest = mockLLMServer.getLastRequest();
     expect(lastRequest).toBeDefined();
-    const messages = getRequestMessages(lastRequest!.body as Record<string, unknown>);
-    const systemPrompt = messages
-      .filter((message) => message.role === 'system')
-      .map((message) => contentToText(message.content))
-      .join('\n');
+    const systemPrompt = getSystemPromptText(lastRequest!.body as Record<string, unknown>);
 
     expect(systemPrompt).toContain(
       '<!-- clerkly:title-meta: {"title":"<short title>","rename_need_score":NN} -->'
