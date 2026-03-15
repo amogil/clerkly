@@ -121,6 +121,8 @@
 
 3.3.6. ЕСЛИ `follow_redirects = true` и сервер возвращает redirect-ответ со статусом `307` ИЛИ `308`, ТО helper ДОЛЖЕН сохранять исходные `method` и `body` для следующего запроса
 
+3.3.6.1. ЕСЛИ redirect policy переписывает следующий запрос в `GET` без `body`, ТО helper ДОЛЖЕН удалять из следующего запроса body-specific headers, включая `content-type`, `content-length`, `content-encoding` и `transfer-encoding`
+
 3.3.7. ЕСЛИ redirect переводит запрос на другой origin, ТО helper ДОЛЖЕН удалять из следующего запроса чувствительные заголовки `authorization`, `proxy-authorization`, `cookie` и `cookie2`
 
 3.4. КОГДА запрос завершается успешно, ТО helper ДОЛЖЕН возвращать структурированный результат

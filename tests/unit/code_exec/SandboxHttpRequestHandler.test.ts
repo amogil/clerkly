@@ -271,12 +271,192 @@ describe('SandboxHttpRequestHandler', () => {
       expect.objectContaining({
         method: 'GET',
         body: undefined,
+        headers: undefined,
       })
     );
     expect(result).toMatchObject({
       status: 200,
       body: 'done',
     });
+  });
+
+  /* Preconditions: redirecting POST request receives 301 before final response
+     Action: execute helper with POST body and follow_redirects enabled
+     Assertions: helper rewrites redirected request to GET without a body for 301 responses
+     Requirements: sandbox-http-request.3.3.5 */
+  it('rewrites POST redirects to GET without body for 301 responses', async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(
+        makeResponse('', {
+          status: 301,
+          headers: { location: 'https://example.com/next' },
+        })
+      )
+      .mockResolvedValueOnce(
+        makeResponse('done', {
+          status: 200,
+          headers: { 'content-type': 'text/plain' },
+          url: 'https://example.com/next',
+        })
+      );
+    const handler = new SandboxHttpRequestHandler(fetchMock as unknown as typeof fetch);
+
+    await handler.execute({
+      url: 'https://example.com/start',
+      method: 'POST',
+      body: 'payload',
+      follow_redirects: true,
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'https://example.com/next',
+      expect.objectContaining({
+        method: 'GET',
+        body: undefined,
+        headers: undefined,
+      })
+    );
+  });
+
+  /* Preconditions: redirect response uses status 303 with a non-GET method and body-specific headers
+     Action: execute helper with follow_redirects enabled
+     Assertions: helper rewrites the next hop to GET without body and strips body-specific headers
+     Requirements: sandbox-http-request.3.3.4, sandbox-http-request.3.3.6.1 */
+  it('rewrites 303 redirects to GET and strips body-specific headers', async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(
+        makeResponse('', {
+          status: 303,
+          headers: { location: 'https://example.com/next' },
+        })
+      )
+      .mockResolvedValueOnce(
+        makeResponse('done', {
+          status: 200,
+          headers: { 'content-type': 'text/plain' },
+          url: 'https://example.com/next',
+        })
+      );
+    const handler = new SandboxHttpRequestHandler(fetchMock as unknown as typeof fetch);
+
+    await handler.execute({
+      url: 'https://example.com/start',
+      method: 'PUT',
+      body: 'payload',
+      headers: {
+        'content-type': 'application/json',
+        'content-length': '7',
+        accept: 'text/plain',
+      },
+      follow_redirects: true,
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'https://example.com/next',
+      expect.objectContaining({
+        method: 'GET',
+        body: undefined,
+        headers: { accept: 'text/plain' },
+      })
+    );
+  });
+
+  /* Preconditions: redirect response uses status 307 with a non-GET method and request body
+     Action: execute helper with follow_redirects enabled
+     Assertions: helper preserves method, body, and body-specific headers for the next hop
+     Requirements: sandbox-http-request.3.3.6 */
+  it('preserves method, body, and headers for 307 redirects', async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(
+        makeResponse('', {
+          status: 307,
+          headers: { location: 'https://example.com/next' },
+        })
+      )
+      .mockResolvedValueOnce(
+        makeResponse('done', {
+          status: 200,
+          headers: { 'content-type': 'text/plain' },
+          url: 'https://example.com/next',
+        })
+      );
+    const handler = new SandboxHttpRequestHandler(fetchMock as unknown as typeof fetch);
+
+    await handler.execute({
+      url: 'https://example.com/start',
+      method: 'PATCH',
+      body: 'payload',
+      headers: {
+        'content-type': 'application/json',
+        'content-length': '7',
+      },
+      follow_redirects: true,
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'https://example.com/next',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: 'payload',
+        headers: {
+          'content-type': 'application/json',
+          'content-length': '7',
+        },
+      })
+    );
+  });
+
+  /* Preconditions: redirect response uses status 308 with a non-GET method and request body
+     Action: execute helper with follow_redirects enabled
+     Assertions: helper preserves method, body, and body-specific headers for the next hop
+     Requirements: sandbox-http-request.3.3.6 */
+  it('preserves method, body, and headers for 308 redirects', async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(
+        makeResponse('', {
+          status: 308,
+          headers: { location: 'https://example.com/next' },
+        })
+      )
+      .mockResolvedValueOnce(
+        makeResponse('done', {
+          status: 200,
+          headers: { 'content-type': 'text/plain' },
+          url: 'https://example.com/next',
+        })
+      );
+    const handler = new SandboxHttpRequestHandler(fetchMock as unknown as typeof fetch);
+
+    await handler.execute({
+      url: 'https://example.com/start',
+      method: 'PUT',
+      body: 'payload',
+      headers: {
+        'content-type': 'application/json',
+        'content-length': '7',
+      },
+      follow_redirects: true,
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'https://example.com/next',
+      expect.objectContaining({
+        method: 'PUT',
+        body: 'payload',
+        headers: {
+          'content-type': 'application/json',
+          'content-length': '7',
+        },
+      })
+    );
   });
 
   /* Preconditions: redirect chain crosses to a different origin with sensitive headers attached

@@ -28,10 +28,7 @@ export type SandboxHttpRequestValidationErrorCode =
   | 'invalid_follow_redirects'
   | 'invalid_max_response_bytes';
 
-export type SandboxHttpRequestRuntimeErrorCode =
-  | 'fetch_failed'
-  | 'limit_exceeded'
-  | 'internal_error';
+export type SandboxHttpRequestRuntimeErrorCode = 'fetch_failed' | 'internal_error';
 
 export interface SandboxHttpRequestError {
   error: {
@@ -48,7 +45,7 @@ export interface SandboxHttpRequestSuccess {
   body_encoding: 'text' | 'base64';
   body: string;
   truncated: boolean;
-  applied_limit_bytes?: number;
+  applied_limit_bytes: number;
 }
 
 export type SandboxHttpRequestResult = SandboxHttpRequestSuccess | SandboxHttpRequestError;
@@ -69,6 +66,12 @@ const CROSS_ORIGIN_STRIPPED_HEADERS = new Set([
   'proxy-authorization',
   'cookie',
   'cookie2',
+]);
+const REWRITTEN_GET_STRIPPED_HEADERS = new Set([
+  'content-type',
+  'content-length',
+  'content-encoding',
+  'transfer-encoding',
 ]);
 
 function defaultFetch(...args: Parameters<FetchLike>): ReturnType<FetchLike> {
@@ -280,7 +283,13 @@ export class SandboxHttpRequestHandler {
           currentMethod,
           currentBody
         );
-        currentHeaders = this.getRedirectFollowHeaders(currentUrl, nextUrl, currentHeaders);
+        currentHeaders = this.getRedirectFollowHeaders(
+          currentUrl,
+          nextUrl,
+          currentHeaders,
+          currentMethod,
+          nextRequest.method
+        );
         currentUrl = nextUrl;
         currentMethod = nextRequest.method;
         currentBody = nextRequest.body;
@@ -407,23 +416,37 @@ export class SandboxHttpRequestHandler {
   private getRedirectFollowHeaders(
     currentUrl: string,
     nextUrl: string,
-    headers: Record<string, string> | undefined
+    headers: Record<string, string> | undefined,
+    currentMethod: HttpMethod,
+    nextMethod: HttpMethod
   ): Record<string, string> | undefined {
     if (!headers) {
       return headers;
     }
 
-    if (!this.isCrossOriginRedirect(currentUrl, nextUrl)) {
-      return headers;
+    let filteredHeaders = headers;
+
+    if (this.isRedirectRewriteToGet(currentMethod, nextMethod)) {
+      filteredHeaders = Object.fromEntries(
+        Object.entries(filteredHeaders).filter(
+          ([name]) => !REWRITTEN_GET_STRIPPED_HEADERS.has(name.toLowerCase())
+        )
+      );
     }
 
-    const filteredHeaders = Object.fromEntries(
-      Object.entries(headers).filter(
-        ([name]) => !CROSS_ORIGIN_STRIPPED_HEADERS.has(name.toLowerCase())
-      )
-    );
+    if (this.isCrossOriginRedirect(currentUrl, nextUrl)) {
+      filteredHeaders = Object.fromEntries(
+        Object.entries(filteredHeaders).filter(
+          ([name]) => !CROSS_ORIGIN_STRIPPED_HEADERS.has(name.toLowerCase())
+        )
+      );
+    }
 
     return Object.keys(filteredHeaders).length > 0 ? filteredHeaders : undefined;
+  }
+
+  private isRedirectRewriteToGet(currentMethod: HttpMethod, nextMethod: HttpMethod): boolean {
+    return nextMethod === 'GET' && currentMethod !== nextMethod;
   }
 
   private isCrossOriginRedirect(currentUrl: string, nextUrl: string): boolean {
