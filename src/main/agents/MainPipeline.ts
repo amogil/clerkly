@@ -1012,10 +1012,7 @@ export class MainPipeline {
   }
 
   // Requirements: llm-integration.9.5.6
-  private stripLeadingMirroredToolPayloadText(
-    text: string,
-    state: AttemptRuntimeState
-  ): string {
+  private stripLeadingMirroredToolPayloadText(text: string, state: AttemptRuntimeState): string {
     if (!state.sawAnyToolCall) {
       return text;
     }
@@ -1048,9 +1045,7 @@ export class MainPipeline {
   }
 
   // Requirements: llm-integration.9.5.6
-  private extractLeadingJsonObject(
-    text: string
-  ): { objectText: string; rest: string } | null {
+  private extractLeadingJsonObject(text: string): { objectText: string; rest: string } | null {
     let depth = 0;
     let inString = false;
     let escaped = false;
@@ -1139,8 +1134,7 @@ export class MainPipeline {
           typeof callId === 'string' &&
           state.finalAnswerCall !== null &&
           callId === state.finalAnswerCall.callId;
-        const matchingFinalAnswerEnvelope =
-          toolName === 'final_answer' && matchingFinalCallId;
+        const matchingFinalAnswerEnvelope = toolName === 'final_answer' && matchingFinalCallId;
         if (matchingFinalAnswerEnvelope) {
           return true;
         }
