@@ -850,18 +850,20 @@ React компонент для страницы настроек с секци�
 ```typescript
 // Requirements: settings.1
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
+import { callApi } from '../utils/apiWrapper';
+import { toast } from 'sonner';
 
 type LLMProvider = 'openai' | 'anthropic' | 'google';
 
 export function AIAgentSettings() {
   const [llmProvider, setLLMProvider] = useState<LLMProvider>('openai');
   const [apiKey, setAPIKey] = useState('');
-  const [isProductionLLMProviderLocked, setIsProductionLLMProviderLocked] = useState(false);
+  const [isProductionLLMProviderLocked, setIsProductionLLMProviderLocked] = useState(true);
+  const [isSettingsLoaded, setIsSettingsLoaded] = useState(false);
   const [showAPIKey, setShowAPIKey] = useState(false); // Requirements: settings.1.2, settings.1.8
-  const [loading, setLoading] = useState(true);
-  const [saveTimeout, setSaveTimeout] = useState<NodeJS.Timeout | null>(null);
+  const apiKeyPersistTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const effectiveLLMProvider = isProductionLLMProviderLocked ? 'openai' : llmProvider;
 
   // Load settings on mount
@@ -871,43 +873,94 @@ export function AIAgentSettings() {
 
   // Requirements: settings.1.10 - Load API key when provider changes
   useEffect(() => {
-    if (!loading) {
+    if (isSettingsLoaded && !isProductionLLMProviderLocked) {
       loadAPIKeyForProvider(llmProvider);
     }
-  }, [llmProvider, loading]);
+  }, [llmProvider, isSettingsLoaded, isProductionLLMProviderLocked]);
 
   const loadSettings = async () => {
+    let shouldLockToOpenAI = true;
+
     try {
-      const runtimeInfo = await window.api.app.getRuntimeInfo?.();
-      const isPackaged = runtimeInfo?.success === true && runtimeInfo.data?.isPackaged === true;
-      setIsProductionLLMProviderLocked(isPackaged);
+      const runtimeInfo = await window.api.app.getRuntimeInfo();
+      shouldLockToOpenAI =
+        runtimeInfo.success === true && runtimeInfo.data?.isPackaged === true;
 
-      if (isPackaged) {
-        setLLMProvider('openai');
-        const openAIKey = await window.api.aiAgent.getAPIKey('openai');
-        setAPIKey(openAIKey || '');
-        return;
+      if (!runtimeInfo.success) {
+        console.warn('Runtime info unavailable, keeping OpenAI-only lock active');
       }
+    } catch (error) {
+      console.error('Failed to load runtime info, keeping OpenAI-only lock active:', error);
+    }
 
-      const settings = await window.api.aiAgent.getSettings();
-      setLLMProvider(settings.llmProvider);
-      setAPIKey(settings.apiKeys[settings.llmProvider] || '');
+    setIsProductionLLMProviderLocked(shouldLockToOpenAI);
+
+    try {
+      if (shouldLockToOpenAI) {
+        setLLMProvider('openai');
+        const keyResult = await callApi(
+          () => window.api.settings.loadAPIKey('openai'),
+          'Loading API key'
+        );
+        setAPIKey(keyResult?.apiKey || '');
+      } else {
+        const providerResult = await callApi(
+          () => window.api.settings.loadLLMProvider(),
+          'Loading LLM provider'
+        );
+        const provider = providerResult?.provider || 'openai';
+        setLLMProvider(provider);
+
+        const keyResult = await callApi(
+          () => window.api.settings.loadAPIKey(provider),
+          'Loading API key'
+        );
+        setAPIKey(keyResult?.apiKey || '');
+      }
     } catch (error) {
       console.error('[AIAgentSettings] Failed to load settings:', error);
     } finally {
-      setLoading(false);
+      setIsSettingsLoaded(true);
     }
   };
 
   const loadAPIKeyForProvider = async (provider: LLMProvider) => {
     try {
-      const key = await window.api.aiAgent.getAPIKey(provider);
-      setAPIKey(key || '');
+      const keyResult = await callApi(
+        () => window.api.settings.loadAPIKey(provider),
+        'Loading API key'
+      );
+      setAPIKey(keyResult?.apiKey || '');
     } catch (error) {
       console.error(`[AIAgentSettings] Failed to load API key for ${provider}:`, error);
       setAPIKey('');
     }
   };
+
+  // Requirements: settings.1.9 - Debounced save/delete only after user input
+  const scheduleAPIKeyPersist = useCallback((provider: LLMProvider, value: string) => {
+    if (apiKeyPersistTimeoutRef.current) {
+      clearTimeout(apiKeyPersistTimeoutRef.current);
+    }
+
+    apiKeyPersistTimeoutRef.current = setTimeout(async () => {
+      try {
+        if (value.trim() === '') {
+          await callApi(() => window.api.settings.deleteAPIKey(provider), 'Deleting API key');
+        } else {
+          await callApi(
+            () => window.api.settings.saveAPIKey(provider, value),
+            'Saving API key'
+          );
+        }
+      } catch (error) {
+        console.error('[AIAgentSettings] Failed to save API key:', error);
+        toast.error('Saving API key failed');
+      } finally {
+        apiKeyPersistTimeoutRef.current = null;
+      }
+    }, 500);
+  }, []);
 
   // Requirements: settings.1.10 - Save provider immediately
   const handleProviderChange = async (provider: LLMProvider) => {
@@ -917,53 +970,25 @@ export function AIAgentSettings() {
 
     setLLMProvider(provider);
     try {
-      await window.api.aiAgent.saveLLMProvider(provider);
+      await callApi(() => window.api.settings.saveLLMProvider(provider), 'Saving LLM provider');
       console.log('[AIAgentSettings] Provider saved:', provider);
     } catch (error) {
       console.error('[AIAgentSettings] Failed to save provider:', error);
       // Requirements: settings.1.13 - Show error notification
-      window.api.error.notify('Failed to save LLM provider', 'AI Agent Settings');
+      toast.error('Saving LLM provider failed');
     }
   };
 
   // Requirements: settings.1.9 - Save API key with debounce
   const handleAPIKeyChange = useCallback((value: string) => {
     setAPIKey(value);
-
-    // Clear existing timeout
-    if (saveTimeout) {
-      clearTimeout(saveTimeout);
-    }
-
-    // Requirements: settings.1.9 - Debounce 500ms
-    const timeout = setTimeout(async () => {
-      try {
-        if (value.trim() === '') {
-          // Requirements: settings.1.11 - Delete if empty
-          await window.api.aiAgent.deleteAPIKey(llmProvider);
-          console.log('[AIAgentSettings] API key deleted');
-        } else {
-          await window.api.aiAgent.saveAPIKey(llmProvider, value);
-          console.log('[AIAgentSettings] API key saved');
-        }
-      } catch (error) {
-        console.error('[AIAgentSettings] Failed to save API key:', error);
-        // Requirements: settings.1.13 - Show error notification
-        window.api.error.notify('Failed to save API key', 'AI Agent Settings');
-      }
-    }, 500);
-
-    setSaveTimeout(timeout);
-  }, [llmProvider, saveTimeout]);
+    scheduleAPIKeyPersist(effectiveLLMProvider, value);
+  }, [effectiveLLMProvider, scheduleAPIKeyPersist]);
 
   // Requirements: settings.1.3, settings.1.4, settings.1.5, settings.1.6, settings.1.7 - Toggle visibility
   const toggleAPIKeyVisibility = () => {
     setShowAPIKey(!showAPIKey);
   };
-
-  if (loading) {
-    return <div>Loading AI Agent settings...</div>;
-  }
 
   return (
     <div className="llm-provider-settings">
@@ -976,13 +1001,13 @@ export function AIAgentSettings() {
           id="llm-provider"
           value={effectiveLLMProvider}
           onChange={(e) => handleProviderChange(e.target.value as LLMProvider)}
-          disabled={isProductionLLMProviderLocked}
+          disabled={!isSettingsLoaded || isProductionLLMProviderLocked}
         >
           <option value="openai">OpenAI (GPT)</option>
           <option value="anthropic">Anthropic (Claude)</option>
           <option value="google">Google (Gemini)</option>
         </select>
-        {isProductionLLMProviderLocked ? (
+        {isSettingsLoaded && isProductionLLMProviderLocked ? (
           <p>Currently only one provider is available: OpenAI.</p>
         ) : null}
       </div>

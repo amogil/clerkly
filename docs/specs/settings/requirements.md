@@ -220,7 +220,7 @@
 - `tests/functional/llm-connection-test.spec.ts` - "54.5: should show error notification on invalid API key"
 - `tests/functional/llm-connection-test.spec.ts` - "54.6: should test connection for all providers"
 - `tests/functional/llm-connection-test.spec.ts` - "54.7: should show Testing text during connection test"
-- `tests/functional/llm-connection-real.spec.ts` - "should validate Test Connection against real OpenAI API" (входит в стандартный functional прогон; требует `CLERKLY_OPENAI_API_KEY`)
+- `tests/functional/llm-connection-real.spec.ts` - "54.real.1: should validate Test Connection against real OpenAI API" (входит в стандартный functional прогон; требует `CLERKLY_OPENAI_API_KEY`)
 
 ### Требование 3: Форматирование Дат и Времени из Системных Настроек
 
