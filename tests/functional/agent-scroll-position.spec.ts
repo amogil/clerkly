@@ -226,7 +226,8 @@ test.describe('Agent Scroll Position', () => {
     await expect(messages).toHaveCount(30, { timeout: 10000 });
 
     // Scroll to top deterministically (wheel-based scrolling is flaky on CI).
-    const scrollContainerBefore = messagesArea.locator('..');
+    // Use the actual messages scroll viewport instead of its parent wrapper.
+    const scrollContainerBefore = messagesArea;
     await scrollContainerBefore.evaluate((el) => {
       el.scrollTop = 0;
     });
@@ -251,7 +252,7 @@ test.describe('Agent Scroll Position', () => {
     // Wait for agent-1 messages to load
     await expect(messages).toHaveCount(30, { timeout: 5000 });
 
-    const scrollContainerAfter = activeChat(window).messagesArea.locator('..');
+    const scrollContainerAfter = activeChat(window).messagesArea;
     const scrollTopAfter = await scrollContainerAfter.evaluate((el) => el.scrollTop);
 
     // Scroll position should be restored (within tolerance).

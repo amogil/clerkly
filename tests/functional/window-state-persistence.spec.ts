@@ -208,9 +208,9 @@ test.describe('Window State Persistence', () => {
 
     await context.window.waitForTimeout(500);
 
-    // Move window to specific position
-    const newX = 100;
-    const newY = 100;
+    // Move window to a position relative to current bounds to stay on-screen in CI.
+    const newX = initialBounds.x + 40;
+    const newY = initialBounds.y + 40;
 
     await setWindowPosition(context.app, newX, newY);
 
@@ -220,8 +220,8 @@ test.describe('Window State Persistence', () => {
     // Verify the move actually happened before closing
     const movedBounds = await getWindowBounds(context.app);
     console.log(`After move: ${JSON.stringify(movedBounds)}`);
-    expect(movedBounds.x).toBeGreaterThanOrEqual(newX - 10);
-    expect(movedBounds.y).toBeGreaterThanOrEqual(newY - 10);
+    expect(Math.abs(movedBounds.x - newX)).toBeLessThanOrEqual(20);
+    expect(Math.abs(movedBounds.y - newY)).toBeLessThanOrEqual(20);
 
     // Close application
     await context.app.close();
@@ -232,6 +232,7 @@ test.describe('Window State Persistence', () => {
     // Relaunch application with same data path
     context = await launchElectron(context.testDataPath);
     await context.window.waitForLoadState('domcontentloaded');
+    await assertLoginUIVisible(context);
 
     // Get restored bounds
     await expect
