@@ -201,11 +201,18 @@ describe('PromptBuilder.build()', () => {
        Action: build() is called
        Assertions: system prompt explicitly states async context and top-level await support
        Requirements: code_exec.1, llm-integration.4 */
-    it('should include async execution guidance for code_exec', () => {
+  it('should include async execution guidance for code_exec', () => {
       const sandboxManager = {} as SandboxSessionManager;
       const feature = new CodeExecFeature(sandboxManager);
       const result = makeBuilder('Base.', [feature]).build();
       expect(result.systemPrompt).toContain('top-level `await` is supported');
+      expect(result.systemPrompt).toContain('required string fields `task_summary`');
+      expect(result.systemPrompt).toContain('Sandbox HTTP helper:');
+      expect(result.systemPrompt).toContain('const result = await tools.http_request({ ... })');
+      expect(result.systemPrompt).toContain(
+        '{ "accept": "application/json", "x-trace-id": "abc-123" }'
+      );
+      expect(result.systemPrompt).toContain('Response example:');
     });
   });
 
@@ -427,6 +434,7 @@ describe('PromptBuilder.buildMessages()', () => {
           data: {
             callId: 'call-1',
             toolName: 'code_exec',
+            arguments: { task_summary: 'Run code', code: "console.log('ok')" },
             output: { status: 'success', stdout: 'ok' },
           },
         }),
@@ -482,7 +490,7 @@ describe('PromptBuilder.buildMessages()', () => {
           data: {
             callId: 'call-timeout',
             toolName: 'code_exec',
-            arguments: { code: 'while(true){}' },
+            arguments: { task_summary: 'Loop forever', code: 'while(true){}' },
             output: { status: 'timeout', stdout: '', stderr: 'timed out' },
           },
         }),
@@ -523,7 +531,11 @@ describe('PromptBuilder.buildMessages()', () => {
           data: {
             callId: 'call-args',
             toolName: 'code_exec',
-            arguments: { code: "console.log('x')", timeout_ms: 5000 },
+            arguments: {
+              task_summary: 'Print x',
+              code: "console.log('x')",
+              timeout_ms: 5000,
+            },
             output: { status: 'success', stdout: 'x' },
           },
         }),
@@ -538,7 +550,7 @@ describe('PromptBuilder.buildMessages()', () => {
           type: 'tool-call',
           toolCallId: 'call-args',
           toolName: 'code_exec',
-          input: { code: "console.log('x')", timeout_ms: 5000 },
+          input: { task_summary: 'Print x', code: "console.log('x')", timeout_ms: 5000 },
         },
       ],
     });

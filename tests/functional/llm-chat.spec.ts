@@ -1367,7 +1367,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
           data: {
             callId: 'running-call-1',
             toolName: 'code_exec',
-            arguments: { code: '1+1' },
+            arguments: { task_summary: 'Run code', code: '1+1' },
             output: { status: 'running' },
           },
         });
@@ -1461,7 +1461,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
           {
             callId: 'call-1',
             toolName: 'code_exec',
-            arguments: { code: "console.log('flow')", timeout_ms: 10000 },
+            arguments: { task_summary: 'Run code', code: "console.log('flow')", timeout_ms: 10000 },
           },
         ],
       },
@@ -1658,12 +1658,12 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
           {
             callId: 'multi-1',
             toolName: 'code_exec',
-            arguments: { code: "console.log('A')", timeout_ms: 10000 },
+            arguments: { task_summary: 'Run code', code: "console.log('A')", timeout_ms: 10000 },
           },
           {
             callId: 'multi-2',
             toolName: 'code_exec',
-            arguments: { code: "console.log('B')", timeout_ms: 10000 },
+            arguments: { task_summary: 'Run code', code: "console.log('B')", timeout_ms: 10000 },
           },
         ],
       },
@@ -1703,7 +1703,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
           {
             callId: 'code-loop-1',
             toolName: 'code_exec',
-            arguments: { code: "fetch('https://example.com')", timeout_ms: 10000 },
+            arguments: { task_summary: 'Run code', code: "fetch('https://example.com')", timeout_ms: 10000 },
           },
         ],
       },

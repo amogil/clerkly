@@ -72,6 +72,7 @@ describe('SandboxSessionManager.execute', () => {
   it('executes code and captures stdout', async () => {
     const manager = new SandboxSessionManager();
     const result = await manager.execute('agent-1', 'call-1', {
+      task_summary: 'Print hello',
       code: "console.log('hello')",
     });
 
@@ -83,6 +84,7 @@ describe('SandboxSessionManager.execute', () => {
   it('returns policy_denied for forbidden browser network API', async () => {
     const manager = new SandboxSessionManager();
     const result = await manager.execute('agent-1', 'call-1', {
+      task_summary: 'Try fetch',
       code: 'fetch("https://example.com")',
     });
 
@@ -93,6 +95,7 @@ describe('SandboxSessionManager.execute', () => {
   it('returns policy_denied for globalThis browser network API access', async () => {
     const manager = new SandboxSessionManager();
     const result = await manager.execute('agent-1', 'call-1', {
+      task_summary: 'Try global fetch',
       code: 'globalThis.fetch("https://example.com")',
     });
 
@@ -103,6 +106,7 @@ describe('SandboxSessionManager.execute', () => {
   it('returns policy_denied for multithreading API', async () => {
     const manager = new SandboxSessionManager();
     const result = await manager.execute('agent-1', 'call-1', {
+      task_summary: 'Create worker',
       code: 'new Worker("a.js")',
     });
 
@@ -119,6 +123,7 @@ describe('SandboxSessionManager.execute', () => {
       'agent-1',
       'call-1',
       {
+        task_summary: 'Print x',
         code: "console.log('x')",
       },
       controller.signal
@@ -138,6 +143,7 @@ describe('SandboxSessionManager.execute', () => {
   it('captures stderr from console.warn and console.error', async () => {
     const manager = new SandboxSessionManager();
     const result = await manager.execute('agent-1', 'call-1', {
+      task_summary: 'Write warnings',
       code: "console.warn('w'); console.error('e');",
     });
 
@@ -149,6 +155,7 @@ describe('SandboxSessionManager.execute', () => {
   it('returns policy_denied for forbidden tools allowlist access', async () => {
     const manager = new SandboxSessionManager();
     const result = await manager.execute('agent-1', 'call-1', {
+      task_summary: 'Call unknown tool',
       code: 'window.tools.someUnknownTool()',
     });
 
@@ -161,12 +168,12 @@ describe('SandboxSessionManager.execute', () => {
     const result = await (
       manager as unknown as {
         executeInOneSandbox: (
-          input: { code: string; timeoutMs: number },
+          input: { taskSummary: string; code: string; timeoutMs: number },
           context: { sessionId: string; signal: AbortSignal }
         ) => Promise<{ status: string; error?: { code?: string } }>;
       }
     ).executeInOneSandbox(
-      { code: 'while (true) {}', timeoutMs: 1 },
+      { taskSummary: 'Loop forever', code: 'while (true) {}', timeoutMs: 1 },
       { sessionId: 'timeout-test', signal: new AbortController().signal }
     );
 
@@ -177,6 +184,7 @@ describe('SandboxSessionManager.execute', () => {
   it('maps memory allocation failures to limit_exceeded', async () => {
     const manager = new SandboxSessionManager();
     const result = await manager.execute('agent-1', 'call-1', {
+      task_summary: 'Allocate large string',
       code: "const huge = 'x'.repeat(2 ** 31)",
     });
 
@@ -188,6 +196,7 @@ describe('SandboxSessionManager.execute', () => {
   it('returns sandbox_runtime_error for generic runtime exceptions', async () => {
     const manager = new SandboxSessionManager();
     const result = await manager.execute('agent-1', 'call-1', {
+      task_summary: 'Throw boom',
       code: 'throw new Error("boom")',
     });
 
@@ -204,6 +213,7 @@ describe('SandboxSessionManager.execute', () => {
       'agent-1',
       'call-1',
       {
+        task_summary: 'Wait and log done',
         code: 'await new Promise((resolve) => setTimeout(resolve, 30)); console.log("done")',
       },
       controller.signal
@@ -226,6 +236,7 @@ describe('SandboxSessionManager.execute', () => {
 
     const manager = new SandboxSessionManager();
     const result = await manager.execute('agent-1', 'call-1', {
+      task_summary: 'Wait and log ok',
       code: 'await new Promise((resolve) => setTimeout(resolve, 250)); console.log("ok")',
     });
 
@@ -245,6 +256,7 @@ describe('SandboxSessionManager.execute', () => {
 
     const manager = new SandboxSessionManager();
     const result = await manager.execute('agent-1', 'call-1', {
+      task_summary: 'Stress CPU briefly',
       code: 'await new Promise((resolve) => setTimeout(resolve, 250)); console.log("ok")',
       timeout_ms: 10000,
     });
@@ -311,13 +323,19 @@ describe('code_exec helpers', () => {
   });
 
   it('maps raw args to CodeExecToolInput shape', () => {
-    expect(toCodeExecInput({ code: 'x', timeout_ms: 123 })).toEqual({
+    expect(toCodeExecInput({ task_summary: 'Print x', code: 'x', timeout_ms: 123 })).toEqual({
+      task_summary: 'Print x',
       code: 'x',
       timeout_ms: 123,
     });
     expect(
-      toCodeExecInput({ code: 1, timeout_ms: '1' } as unknown as Record<string, unknown>)
+      toCodeExecInput({
+        task_summary: 1,
+        code: 1,
+        timeout_ms: '1',
+      } as unknown as Record<string, unknown>)
     ).toEqual({
+      task_summary: '',
       code: '',
       timeout_ms: undefined,
     });

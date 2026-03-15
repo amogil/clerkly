@@ -24,6 +24,11 @@ describe('validateSandboxToolPolicy', () => {
     const result = validateSandboxToolPolicy('search_docs');
     expect(result.ok).toBe(false);
   });
+
+  it('allows http_request sandbox helper', () => {
+    const result = validateSandboxToolPolicy('http_request');
+    expect(result.ok).toBe(true);
+  });
 });
 
 describe('createSandboxToolsProxy', () => {

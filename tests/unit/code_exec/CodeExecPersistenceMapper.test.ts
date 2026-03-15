@@ -12,7 +12,7 @@ describe('CodeExecPersistenceMapper', () => {
       {
         callId: 'call-1',
         toolName: 'code_exec',
-        arguments: { code: '1+1' },
+        arguments: { task_summary: 'Compute 1+1', code: '1+1' },
       },
       startedAt
     );
@@ -21,7 +21,7 @@ describe('CodeExecPersistenceMapper', () => {
       data: {
         callId: 'call-1',
         toolName: 'code_exec',
-        arguments: { code: '1+1' },
+        arguments: { task_summary: 'Compute 1+1', code: '1+1' },
         output: {
           status: 'running',
           stdout: '',
@@ -39,7 +39,7 @@ describe('CodeExecPersistenceMapper', () => {
       {
         callId: 'call-1',
         toolName: 'code_exec',
-        arguments: { code: '1+1' },
+        arguments: { task_summary: 'Compute 1+1', code: '1+1' },
       },
       {
         status: 'success',
@@ -56,7 +56,7 @@ describe('CodeExecPersistenceMapper', () => {
       data: {
         callId: 'call-1',
         toolName: 'code_exec',
-        arguments: { code: '1+1' },
+        arguments: { task_summary: 'Compute 1+1', code: '1+1' },
         output: {
           status: 'success',
           stdout: '2',

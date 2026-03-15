@@ -137,7 +137,10 @@ describe('AgentMessage — tool_call', () => {
             data: {
               callId: 'call-code',
               toolName: 'code_exec',
-              arguments: { code: "console.log('ok')" },
+              arguments: {
+                task_summary: 'Print ok to stdout',
+                code: "console.log('ok')",
+              },
               output: {
                 status: 'success',
                 stdout: 'ok\\n',
@@ -154,7 +157,7 @@ describe('AgentMessage — tool_call', () => {
     expect(screen.getByTestId('message-code-exec-block')).toBeInTheDocument();
     expect(screen.getByTestId('message-code-exec-block')).toHaveClass('bg-transparent');
     expect(screen.getByTestId('message-code-exec-icon')).toBeInTheDocument();
-    expect(screen.getByTestId('message-code-exec-title')).toHaveTextContent('Code');
+    expect(screen.getByTestId('message-code-exec-title')).toHaveTextContent('Print ok to stdout');
     expect(screen.getByTestId('message-code-exec-status')).toHaveTextContent('success');
     expect(screen.getByTestId('message-code-exec-status')).toHaveClass('bg-transparent');
     expect(screen.getByTestId('message-code-exec-status-icon')).toBeInTheDocument();

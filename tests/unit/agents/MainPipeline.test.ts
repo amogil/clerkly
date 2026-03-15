@@ -230,7 +230,7 @@ describe('MainPipeline.run()', () => {
       data: {
         callId: 'call-main-pipeline',
         toolName: 'code_exec',
-        arguments: { code: 'console.log(1)' },
+        arguments: { task_summary: 'Run code', code: 'console.log(1)' },
         output: { status: 'success', stdout: '1' },
       },
     });
@@ -389,13 +389,13 @@ describe('MainPipeline.run()', () => {
             type: 'tool_call',
             callId: 'call-force-flush',
             toolName: 'code_exec',
-            arguments: { code: "console.log('x')" },
+            arguments: { task_summary: 'Run code', code: "console.log('x')" },
           });
           onChunk({
             type: 'tool_result',
             callId: 'call-force-flush',
             toolName: 'code_exec',
-            arguments: { code: "console.log('x')" },
+            arguments: { task_summary: 'Run code', code: "console.log('x')" },
             output: { status: 'success', stdout: 'x\n', stderr: '' },
             status: 'success',
           });
@@ -1273,7 +1273,7 @@ describe('MainPipeline.run()', () => {
         type: 'tool_call',
         callId: `call-code-${attempt}`,
         toolName: 'code_exec',
-        arguments: { code: 'console.log(1)' },
+        arguments: { task_summary: 'Run code', code: 'console.log(1)' },
       });
       return { text: '' };
     });
@@ -1641,14 +1641,14 @@ describe('MainPipeline.run()', () => {
           type: 'tool_call',
           callId: 'call-ordered',
           toolName: 'code_exec',
-          arguments: { code: "console.log('ok')" },
+          arguments: { task_summary: 'Run code', code: "console.log('ok')" },
         });
         onChunk({ type: 'text', delta: 'post text' });
         onChunk({
           type: 'tool_result',
           callId: 'call-ordered',
           toolName: 'code_exec',
-          arguments: { code: "console.log('ok')" },
+          arguments: { task_summary: 'Run code', code: "console.log('ok')" },
           output: { status: 'success', stdout: 'ok\n', stderr: '' },
           status: 'success',
         });
@@ -1698,14 +1698,14 @@ describe('MainPipeline.run()', () => {
           type: 'tool_call',
           callId: 'call-pre-finalize',
           toolName: 'code_exec',
-          arguments: { code: "console.log('ok')" },
+          arguments: { task_summary: 'Run code', code: "console.log('ok')" },
         });
         onChunk({ type: 'text', delta: 'post text' });
         onChunk({
           type: 'tool_result',
           callId: 'call-pre-finalize',
           toolName: 'code_exec',
-          arguments: { code: "console.log('ok')" },
+          arguments: { task_summary: 'Run code', code: "console.log('ok')" },
           output: { status: 'success', stdout: 'ok\n', stderr: '' },
           status: 'success',
         });
@@ -1758,7 +1758,7 @@ describe('MainPipeline.run()', () => {
           type: 'tool_call',
           callId: 'call-buffered-reasoning',
           toolName: 'code_exec',
-          arguments: { code: "console.log('ok')" },
+          arguments: { task_summary: 'Run code', code: "console.log('ok')" },
         });
         onChunk({ type: 'reasoning', delta: 'tail' });
         onChunk({ type: 'text', delta: 'post text' });
@@ -1766,7 +1766,7 @@ describe('MainPipeline.run()', () => {
           type: 'tool_result',
           callId: 'call-buffered-reasoning',
           toolName: 'code_exec',
-          arguments: { code: "console.log('ok')" },
+          arguments: { task_summary: 'Run code', code: "console.log('ok')" },
           output: { status: 'success', stdout: 'ok\n', stderr: '' },
           status: 'success',
         });
@@ -1827,14 +1827,14 @@ describe('MainPipeline.run()', () => {
           type: 'tool_call',
           callId: 'call-no-post-text',
           toolName: 'code_exec',
-          arguments: { code: "console.log('ok')" },
+          arguments: { task_summary: 'Run code', code: "console.log('ok')" },
         });
         await new Promise((resolve) => setTimeout(resolve, 150));
         onChunk({
           type: 'tool_result',
           callId: 'call-no-post-text',
           toolName: 'code_exec',
-          arguments: { code: "console.log('ok')" },
+          arguments: { task_summary: 'Run code', code: "console.log('ok')" },
           output: { status: 'success', stdout: 'ok\n', stderr: '' },
           status: 'success',
         });

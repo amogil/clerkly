@@ -158,12 +158,12 @@ test.afterEach(async () => {
 test.describe('code_exec tool_call rendering', () => {
   /* Preconditions: authenticated app with one visible agent
      Action: create persisted kind:tool_call with toolName=code_exec and terminal output, then expand collapsed block by toggle
-     Assertions: dedicated code_exec block renders Code header/icon/status, starts collapsed by default with vertically centered header content, and shows transparent sections after expand
+     Assertions: dedicated code_exec block renders task summary header/icon/status, starts collapsed by default with vertically centered header content, and shows transparent sections after expand
      Exception Rationale (testing.3.13): this test validates renderer behavior for an already persisted historical
      tool_call(code_exec) message and intentionally bypasses LLM transport; LLM+UI path coverage remains in
      code_exec tool-loop scenarios below.
      Requirements: agents.7.4.5, agents.7.4.6, agents.7.4.6.9, agents.7.4.7 */
-  test('should render tool_call(code_exec) message block with Code header/icon/status and transparent streams', async () => {
+  test('should render tool_call(code_exec) message block with task summary header/icon/status and transparent streams', async () => {
     await launchWithMockLLM();
     const agentId = (await getAgentIdsFromApi(window))[0];
     expect(agentId).toBeTruthy();
@@ -175,6 +175,7 @@ test.describe('code_exec tool_call rendering', () => {
           callId: 'code-1',
           toolName: 'code_exec',
           arguments: {
+            task_summary: 'Print ok to stdout',
             code: "console.log('ok')",
             timeout_ms: 10000,
           },
@@ -197,7 +198,7 @@ test.describe('code_exec tool_call rendering', () => {
     });
     await expect(window.locator('[data-testid="message-code-exec-icon"]').last()).toBeVisible();
     await expect(window.locator('[data-testid="message-code-exec-title"]').last()).toHaveText(
-      'Code'
+      'Print ok to stdout'
     );
     await expect(window.locator('[data-testid="message-code-exec-status"]').last()).toHaveText(
       'success'
@@ -460,7 +461,7 @@ test.describe('code_exec tool_call rendering', () => {
         data: {
           callId: 'code-2',
           toolName: 'code_exec',
-          arguments: { code: '1+1' },
+          arguments: { task_summary: 'Run code', code: '1+1' },
           output: {
             status: 'error',
             stdout: '',
@@ -571,13 +572,31 @@ test.describe('code_exec tool loop execution', () => {
     mockLLMServer.setStreamingMode(true);
     mockLLMServer.setOpenAIStreamScripts([
       {
-        toolCalls: [{ callId: 'big-1', toolName: 'code_exec', arguments: { code: oversizedCode } }],
+        toolCalls: [
+          {
+            callId: 'big-1',
+            toolName: 'code_exec',
+            arguments: { task_summary: 'Run oversized code', code: oversizedCode },
+          },
+        ],
       },
       {
-        toolCalls: [{ callId: 'big-2', toolName: 'code_exec', arguments: { code: oversizedCode } }],
+        toolCalls: [
+          {
+            callId: 'big-2',
+            toolName: 'code_exec',
+            arguments: { task_summary: 'Run oversized code', code: oversizedCode },
+          },
+        ],
       },
       {
-        toolCalls: [{ callId: 'big-3', toolName: 'code_exec', arguments: { code: oversizedCode } }],
+        toolCalls: [
+          {
+            callId: 'big-3',
+            toolName: 'code_exec',
+            arguments: { task_summary: 'Run oversized code', code: oversizedCode },
+          },
+        ],
       },
     ]);
 
@@ -678,7 +697,7 @@ test.describe('code_exec tool loop execution', () => {
           {
             callId: 'parallel-a',
             toolName: 'code_exec',
-            arguments: { code: "console.log('A')", timeout_ms: 10000 },
+            arguments: { task_summary: 'Run code', code: "console.log('A')", timeout_ms: 10000 },
           },
         ],
       },
@@ -687,7 +706,7 @@ test.describe('code_exec tool loop execution', () => {
           {
             callId: 'parallel-b',
             toolName: 'code_exec',
-            arguments: { code: "console.log('B')", timeout_ms: 10000 },
+            arguments: { task_summary: 'Run code', code: "console.log('B')", timeout_ms: 10000 },
           },
         ],
       },
@@ -747,7 +766,7 @@ test.describe('code_exec tool loop execution', () => {
           {
             callId: 'audit-1',
             toolName: 'code_exec',
-            arguments: { code: "console.log('audit')", timeout_ms: 10000 },
+            arguments: { task_summary: 'Run code', code: "console.log('audit')", timeout_ms: 10000 },
           },
         ],
       },
@@ -1028,7 +1047,7 @@ test.describe('code_exec tool loop execution', () => {
           {
             callId: 'hist-1',
             toolName: 'code_exec',
-            arguments: { code: "console.log('history')", timeout_ms: 10000 },
+            arguments: { task_summary: 'Run code', code: "console.log('history')", timeout_ms: 10000 },
           },
         ],
       },
@@ -1112,7 +1131,7 @@ test.describe('code_exec tool loop execution', () => {
           {
             callId: 'timeout-1',
             toolName: 'code_exec',
-            arguments: { code: 'while (true) {}', timeout_ms: 10000 },
+            arguments: { task_summary: 'Run code', code: 'while (true) {}', timeout_ms: 10000 },
           },
         ],
       },
@@ -1147,7 +1166,7 @@ test.describe('code_exec tool loop execution', () => {
           {
             callId: 'memory-1',
             toolName: 'code_exec',
-            arguments: { code: "const huge = 'x'.repeat(2 ** 31); console.log(huge.length);" },
+            arguments: { task_summary: 'Run code', code: "const huge = 'x'.repeat(2 ** 31); console.log(huge.length);" },
           },
         ],
       },

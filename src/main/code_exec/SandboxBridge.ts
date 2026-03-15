@@ -5,7 +5,7 @@ export const POLICY_DENIED_MAIN_PIPELINE_TOOL_MESSAGE =
   'Main-pipeline-only tool is denied in sandbox runtime.';
 
 export const MAIN_PIPELINE_ONLY_TOOL_NAMES = ['final_answer', 'code_exec'] as const;
-export const SANDBOX_TOOLS_ALLOWLIST: readonly string[] = [];
+export const SANDBOX_TOOLS_ALLOWLIST = ['http_request'] as const;
 
 const MAIN_PIPELINE_ONLY_TOOLS = new Set<string>(MAIN_PIPELINE_ONLY_TOOL_NAMES);
 const SANDBOX_TOOLS_ALLOWLIST_SET = new Set<string>(SANDBOX_TOOLS_ALLOWLIST);

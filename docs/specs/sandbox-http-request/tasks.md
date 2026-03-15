@@ -4,7 +4,7 @@
 
 Цель Issue #65: вынести HTTP helper в отдельную спецификацию и реализовать его как кодовый helper `http_request` для `code_exec`, а не как main-pipeline tool.
 
-**Текущий статус:** Фаза 1 — спецификация и планирование
+**Текущий статус:** Фаза 5 — реализация завершена, ожидается финальная валидация
 
 ---
 
@@ -31,62 +31,82 @@
 - ✅ Уточнено, что `max_response_bytes` опционален и применяется только при явной передаче параметра.
 - ✅ Уточнено, что helper не преобразует HTML в текст и возвращает тело ответа как пришло.
 - ✅ Создана отдельная спецификация `docs/specs/sandbox-http-request/`.
+- ✅ `docs/specs/code_exec/requirements.md` синхронизирован ссылкой на профильную спецификацию `sandbox-http-request`.
+- ✅ `docs/specs/code_exec/design.md` синхронизирован по boundary между общим sandbox runtime и helper-ом `http_request`.
+- ✅ Спроектирован входной контракт helper-а: `url`, `method`, `headers`, `body`, `timeout_ms`, `follow_redirects`, `max_response_bytes`.
+- ✅ Зафиксированы validation rules для `method`, `headers` и `body`.
+- ✅ Зафиксированы defaults для `method`, `timeout_ms` и `follow_redirects`.
+- ✅ Спроектирован выходной контракт helper-а: `final_url`, `status`, `headers`, `content_type`, `body_encoding`, `body`, `truncated`, `applied_limit_bytes`.
+- ✅ Зафиксировано поведение для текстовых и нетекстовых ответов.
+- ✅ Зафиксировано поведение при `follow_redirects = false`.
+- ✅ Добавлен allowlisted sandbox helper `http_request`.
+- ✅ Реализован bounded HTTP request handler в main process.
+- ✅ Реализована валидация `method`, `headers` и `body`.
+- ✅ Реализован возврат redirect-ответа без follow при `follow_redirects = false`.
+- ✅ Реализован возврат текстовых ответов как `body_encoding = "text"` и нетекстовых как `body_encoding = "base64"`.
+- ✅ Реализованы structured errors.
+- ✅ Описание helper-а подмешано в prompt-инструкцию `code_exec`.
+- ✅ Добавлены unit-тесты для sandbox HTTP request handler.
+- ✅ Добавлены unit-тесты для allowlist/policy слоя.
+- ✅ Добавлены unit-тесты для `follow_redirects = false` и `body_encoding`.
+- ✅ Добавлены functional-сценарии в `tests/functional/code_exec.spec.ts`.
+- ✅ Прогнаны релевантные unit-тесты.
 
 ### В работе
-- 🔄 Синхронизация границ ответственности со спецификацией `code_exec`.
+- 🔄 Финальная валидация общего контура изменений без полного functional-прогона.
 
 ### Запланировано
 
 #### Фаза 1: Синхронизация спецификаций
 
-- [ ] При необходимости обновить `docs/specs/code_exec/requirements.md`.
-  - [ ] Сослаться на отдельную спецификацию `sandbox-http-request` как на профильную для данного helper-а.
-- [ ] При необходимости обновить `docs/specs/code_exec/design.md`.
-  - [ ] Зафиксировать boundary между общим sandbox runtime и helper-ом `http_request`.
+- [x] При необходимости обновить `docs/specs/code_exec/requirements.md`.
+  - [x] Сослаться на отдельную спецификацию `sandbox-http-request` как на профильную для данного helper-а.
+- [x] При необходимости обновить `docs/specs/code_exec/design.md`.
+  - [x] Зафиксировать boundary между общим sandbox runtime и helper-ом `http_request`.
 
 #### Фаза 2: Runtime контракт helper-а
 
-- [ ] Спроектировать входной контракт helper-а.
-  - [ ] `url`
-  - [ ] `method`
-  - [ ] `headers`
-  - [ ] `body`
-  - [ ] `timeout_ms`
-  - [ ] `follow_redirects`
-  - [ ] `max_response_bytes`
-  - [ ] validation rules для `method`, `headers` и `body`
-  - [ ] defaults только для `method`, `timeout_ms` и `follow_redirects`
-- [ ] Спроектировать выходной контракт helper-а.
-  - [ ] `final_url`
-  - [ ] `status`
-  - [ ] `headers`
-  - [ ] `content_type`
-  - [ ] `body_encoding`
-  - [ ] `body`
-  - [ ] `truncated`
-  - [ ] `applied_limit_bytes`
-  - [ ] поведение для текстовых и нетекстовых ответов
-  - [ ] поведение при `follow_redirects = false`
+- [x] Спроектировать входной контракт helper-а.
+  - [x] `url`
+  - [x] `method`
+  - [x] `headers`
+  - [x] `body`
+  - [x] `timeout_ms`
+  - [x] `follow_redirects`
+  - [x] `max_response_bytes`
+  - [x] validation rules для `method`, `headers` и `body`
+  - [x] defaults только для `method`, `timeout_ms` и `follow_redirects`
+- [x] Спроектировать выходной контракт helper-а.
+  - [x] `final_url`
+  - [x] `status`
+  - [x] `headers`
+  - [x] `content_type`
+  - [x] `body_encoding`
+  - [x] `body`
+  - [x] `truncated`
+  - [x] `applied_limit_bytes`
+  - [x] поведение для текстовых и нетекстовых ответов
+  - [x] поведение при `follow_redirects = false`
 
 #### Фаза 3: Реализация
 
-- [ ] Добавить allowlisted sandbox helper `http_request`.
-- [ ] Реализовать bounded HTTP request handler в main process.
-- [ ] Реализовать валидацию `method`, `headers` и `body`.
-- [ ] Реализовать возврат redirect-ответа без follow при `follow_redirects = false`.
-- [ ] Реализовать возврат текстовых ответов как `body_encoding = "text"` и нетекстовых как `body_encoding = "base64"`.
-- [ ] Реализовать structured errors.
-- [ ] Подмешать описание helper-а в prompt-инструкцию `code_exec`.
+- [x] Добавить allowlisted sandbox helper `http_request`.
+- [x] Реализовать bounded HTTP request handler в main process.
+- [x] Реализовать валидацию `method`, `headers` и `body`.
+- [x] Реализовать возврат redirect-ответа без follow при `follow_redirects = false`.
+- [x] Реализовать возврат текстовых ответов как `body_encoding = "text"` и нетекстовых как `body_encoding = "base64"`.
+- [x] Реализовать structured errors.
+- [x] Подмешать описание helper-а в prompt-инструкцию `code_exec`.
 
 #### Фаза 4: Тесты
 
-- [ ] Добавить unit-тесты для sandbox HTTP request handler.
-- [ ] Добавить unit-тесты для allowlist/policy слоя.
-- [ ] Добавить unit-тесты для `follow_redirects = false` и `body_encoding`.
-- [ ] Добавить functional-тесты в `tests/functional/code_exec.spec.ts`.
+- [x] Добавить unit-тесты для sandbox HTTP request handler.
+- [x] Добавить unit-тесты для allowlist/policy слоя.
+- [x] Добавить unit-тесты для `follow_redirects = false` и `body_encoding`.
+- [x] Добавить functional-тесты в `tests/functional/code_exec.spec.ts`.
 
 #### Фаза 5: Валидация
 
-- [ ] Прогнать релевантные unit-тесты.
+- [x] Прогнать релевантные unit-тесты.
 - [ ] Прогнать `npm run validate`.
 - [ ] После завершения запросить подтверждение на functional tests.

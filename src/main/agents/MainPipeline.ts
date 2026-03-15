@@ -1381,7 +1381,9 @@ export class MainPipeline {
       return message.id !== excludedLlmMessageId;
     });
 
-    const lastProcessedMessageId = filteredMessages.at(-1)?.id ?? 0;
+    const lastFilteredMessage =
+      filteredMessages.length > 0 ? filteredMessages[filteredMessages.length - 1] : null;
+    const lastProcessedMessageId = lastFilteredMessage ? lastFilteredMessage.id : 0;
     const cache = this.autoTitleHistoryCache.get(agentId);
     if (cache && cache.lastProcessedMessageId === lastProcessedMessageId) {
       return cache.lastRenameUserTurn;

@@ -268,6 +268,10 @@ export function AgentMessage({
         toolData.arguments && typeof toolData.arguments.code === 'string'
           ? toolData.arguments.code
           : JSON.stringify(toolData.arguments ?? {}, null, 2);
+      const taskSummary =
+        toolData.arguments && typeof toolData.arguments.task_summary === 'string'
+          ? toolData.arguments.task_summary
+          : 'Code';
       const StatusIcon = getCodeExecStatusIcon(status);
       const statusIconColorClass = getCodeExecStatusIconColorClass(status);
 
@@ -292,7 +296,7 @@ export function AgentMessage({
                     data-testid="message-code-exec-title"
                     className="font-medium text-foreground"
                   >
-                    Code
+                    {taskSummary}
                   </div>
                   <div
                     data-testid="message-code-exec-status"

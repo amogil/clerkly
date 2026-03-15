@@ -48,6 +48,68 @@ export function buildAutoTitleMetadataContractPrompt(currentTitle: string): stri
   ].join('\n');
 }
 
+const HTTP_REQUEST_PROMPT_SPEC = {
+  title: 'Sandbox HTTP helper:',
+  invocation: '`const result = await tools.http_request({ ... })`',
+  inputFields: [
+    '`url`: required absolute `http` or `https` URL string.',
+    '`method`: optional HTTP method string; default `GET`; allowed: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`.',
+    '`headers`: optional flat JSON object with string keys and string values, for example `{ "accept": "application/json", "x-trace-id": "abc-123" }`.',
+    '`body`: optional string request body; do not send `body` with `GET` or `HEAD`.',
+    '`timeout_ms`: optional integer in milliseconds; default `10000`; maximum `180000`.',
+    '`follow_redirects`: optional boolean; default `true`.',
+    '`max_response_bytes`: optional integer byte limit for the returned response body.',
+  ],
+  responseFields: [
+    '`status`: final HTTP status code.',
+    '`final_url`: final response URL after redirects.',
+    '`headers`: response headers as a flat object.',
+    '`content_type`: response content type string or `null`.',
+    '`body_encoding`: `text` for textual responses, `base64` for non-text responses.',
+    '`body`: response body string encoded according to `body_encoding`.',
+    '`truncated`: `true` if `max_response_bytes` cut the response body.',
+    '`applied_limit_bytes`: present only when `max_response_bytes` was provided.',
+  ],
+  requestExample: [
+    '```js',
+    'const result = await tools.http_request({',
+    '  url: "https://example.com/api/items?limit=5",',
+    '  method: "GET",',
+    '  headers: { "accept": "application/json" },',
+    '  timeout_ms: 10000,',
+    '});',
+    '```',
+  ],
+  responseExample: [
+    '```js',
+    '{',
+    '  status: 200,',
+    '  final_url: "https://example.com/api/items?limit=5",',
+    '  headers: { "content-type": "application/json; charset=utf-8" },',
+    '  content_type: "application/json; charset=utf-8",',
+    '  body_encoding: "text",',
+    '  body: "{\\"items\\":[...]}",',
+    '  truncated: false',
+    '}',
+    '```',
+  ],
+} as const;
+
+function buildHttpRequestPromptSection(): string {
+  return [
+    HTTP_REQUEST_PROMPT_SPEC.title,
+    `- Call form: ${HTTP_REQUEST_PROMPT_SPEC.invocation}.`,
+    '- Input fields:',
+    ...HTTP_REQUEST_PROMPT_SPEC.inputFields.map((field) => `  - ${field}`),
+    '- Response fields:',
+    ...HTTP_REQUEST_PROMPT_SPEC.responseFields.map((field) => `  - ${field}`),
+    '- Request example:',
+    ...HTTP_REQUEST_PROMPT_SPEC.requestExample,
+    '- Response example:',
+    ...HTTP_REQUEST_PROMPT_SPEC.responseExample,
+  ].join('\n');
+}
+
 /**
  * A feature that contributes a system prompt section and/or tools
  * Requirements: llm-integration.4.1
@@ -380,14 +442,15 @@ export class CodeExecFeature implements AgentFeature {
     return [
       'Code Exec tool usage:',
       '- Tool name: `code_exec`.',
-      `- Input schema: JSON object with required string field \`code\` and optional integer \`timeout_ms\` (${CODE_EXEC_LIMITS.timeoutMsMin}..${CODE_EXEC_LIMITS.timeoutMsPolicyCap}, default ${CODE_EXEC_LIMITS.timeoutMsDefault}).`,
+      `- Input schema: JSON object with required string fields \`task_summary\` (1..200 non-whitespace-trimmed chars) and \`code\`, plus optional integer \`timeout_ms\` (${CODE_EXEC_LIMITS.timeoutMsMin}..${CODE_EXEC_LIMITS.timeoutMsPolicyCap}, default ${CODE_EXEC_LIMITS.timeoutMsDefault}).`,
       '- Output fields: `status`, `stdout`, `stderr`, `stdout_truncated`, `stderr_truncated`, optional `error`.',
       '- Status values: running | success | error | timeout | cancelled.',
       '- Execution context: your code runs inside an async function, so top-level `await` is supported.',
       '- Error codes in normal chat-flow outputs: policy_denied | sandbox_runtime_error | limit_exceeded | internal_error.',
       '- `invalid_tool_arguments` is defensive/runtime-local only (direct runtime calls) and is not persisted as chat `tool_call(code_exec)` output.',
       `- Limits: code <= ${CODE_EXEC_LIMITS.maxCodeBytes} bytes (30 KiB), stdout <= ${CODE_EXEC_LIMITS.maxStdoutBytes} bytes (10 KiB), stderr <= ${CODE_EXEC_LIMITS.maxStderrBytes} bytes (10 KiB), CPU limit ${CODE_EXEC_LIMITS.sandboxCpuLimit} vCPU, RAM limit 2 GiB.`,
-      '- Allowed runtime API: console.log/info/warn/error and window.tools (sandbox allowlist only).',
+      '- Allowed runtime API: console.log/info/warn/error and tools/window.tools (sandbox allowlist only).',
+      buildHttpRequestPromptSection(),
       '- Browser-level network APIs are denied: fetch, XMLHttpRequest, WebSocket, sendBeacon, window.open, location.assign, location.replace.',
       '- Multithreading APIs are denied: Worker, SharedWorker, ServiceWorker, Worklet.',
       '- Positive example: compute values, print diagnostics via console.*.',

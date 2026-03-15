@@ -1,6 +1,7 @@
 // Requirements: code_exec.1.5, code_exec.2, code_exec.5
 
-import { app, BrowserWindow, session } from 'electron';
+import path from 'node:path';
+import { app, BrowserWindow, ipcMain, session } from 'electron';
 import { Logger } from '../Logger';
 import {
   CODE_EXEC_LIMITS,
@@ -21,6 +22,7 @@ import {
   POLICY_DENIED_TOOL_MESSAGE,
   SANDBOX_TOOLS_ALLOWLIST,
 } from './SandboxBridge';
+import { SandboxHttpRequestHandler } from './SandboxHttpRequestHandler';
 
 const POLICY_DENIED_NETWORK_MESSAGE =
   'Browser-level network APIs are not allowed in sandbox runtime.';
@@ -37,10 +39,26 @@ type SessionHandle = {
   cancel: () => void;
 };
 
+type SandboxToolInvoker = (input: unknown) => Promise<unknown>;
+
+const SANDBOX_TOOL_IPC_CHANNEL = 'code-exec:sandbox-tool';
+
+interface SandboxToolInvocationPayload {
+  sessionId?: unknown;
+  toolName?: unknown;
+  input?: unknown;
+}
+
 // Requirements: code_exec.1.5, code_exec.2.5-2.6, code_exec.2.10
 export class SandboxSessionManager {
+  private static isSandboxToolHandlerRegistered = false;
   private logger = Logger.create('SandboxSessionManager');
   private activeSessions = new Map<string, SessionHandle>();
+  private activeSandboxToolInvokers = new Map<string, Map<string, SandboxToolInvoker>>();
+
+  constructor(private readonly httpRequestHandler = new SandboxHttpRequestHandler()) {
+    this.registerSandboxToolHandler();
+  }
 
   // Requirements: code_exec.1.2, code_exec.2.3, code_exec.3.7
   async execute(
@@ -70,7 +88,7 @@ export class SandboxSessionManager {
 
     try {
       return await this.executeInOneSandbox(
-        validated.value as { code: string; timeoutMs: number },
+        validated.value as { taskSummary: string; code: string; timeoutMs: number },
         {
           sessionId,
           signal: cancelController.signal,
@@ -79,6 +97,7 @@ export class SandboxSessionManager {
     } finally {
       signal?.removeEventListener('abort', onAbort);
       this.activeSessions.delete(sessionId);
+      this.activeSandboxToolInvokers.delete(sessionId);
     }
   }
 
@@ -105,6 +124,7 @@ export class SandboxSessionManager {
     ]);
 
     this.activeSessions.clear();
+    this.activeSandboxToolInvokers.clear();
   }
 
   private createSessionHandle(id: string, cancelImpl: () => void): SessionHandle {
@@ -117,8 +137,40 @@ export class SandboxSessionManager {
     };
   }
 
+  private registerSandboxToolHandler(): void {
+    if (SandboxSessionManager.isSandboxToolHandlerRegistered || !ipcMain?.handle) {
+      return;
+    }
+
+    ipcMain.handle(
+      SANDBOX_TOOL_IPC_CHANNEL,
+      async (_event, payload: SandboxToolInvocationPayload) =>
+        this.handleSandboxToolInvocation(payload)
+    );
+    SandboxSessionManager.isSandboxToolHandlerRegistered = true;
+  }
+
+  private async handleSandboxToolInvocation(
+    payload: SandboxToolInvocationPayload
+  ): Promise<unknown> {
+    const sessionId = typeof payload.sessionId === 'string' ? payload.sessionId : '';
+    const toolName = typeof payload.toolName === 'string' ? payload.toolName : '';
+    const invokers = this.activeSandboxToolInvokers.get(sessionId);
+    const invoker = invokers?.get(toolName);
+    if (!invoker) {
+      return {
+        error: {
+          code: 'internal_error',
+          message: 'Sandbox tool invocation is not available for this session.',
+        },
+      };
+    }
+
+    return await invoker(payload.input);
+  }
+
   private async executeInOneSandbox(
-    input: { code: string; timeoutMs: number },
+    input: { taskSummary: string; code: string; timeoutMs: number },
     context: { sessionId: string; signal: AbortSignal }
   ): Promise<CodeExecToolOutput> {
     const stdoutChunks: string[] = [];
@@ -133,6 +185,8 @@ export class SandboxSessionManager {
     const sandboxWindow = new BrowserWindow({
       show: false,
       webPreferences: {
+        preload: path.join(__dirname, '../../preload/preload/codeExecSandbox.js'),
+        additionalArguments: [`--code-exec-session-id=${context.sessionId}`],
         sandbox: true,
         contextIsolation: true,
         nodeIntegration: false,
@@ -142,6 +196,12 @@ export class SandboxSessionManager {
       },
     });
     attachSandboxNavigationGuards(sandboxWindow.webContents);
+    this.activeSandboxToolInvokers.set(
+      context.sessionId,
+      new Map<string, SandboxToolInvoker>([
+        ['http_request', async (toolInput: unknown) => this.httpRequestHandler.execute(toolInput)],
+      ])
+    );
 
     const destroySandboxWindow = () => {
       try {
@@ -321,6 +381,12 @@ export class SandboxSessionManager {
         const POLICY_DENIED_TOOL_ALLOWLIST_MESSAGE = ${JSON.stringify(POLICY_DENIED_TOOL_MESSAGE)};
         const MAIN_PIPELINE_ONLY_TOOLS = new Set(${JSON.stringify(MAIN_PIPELINE_ONLY_TOOL_NAMES)});
         const SANDBOX_TOOLS_ALLOWLIST = new Set(${JSON.stringify(SANDBOX_TOOLS_ALLOWLIST)});
+        const sandboxBridge =
+          typeof globalThis.__sandboxBridge === 'object' &&
+          globalThis.__sandboxBridge &&
+          typeof globalThis.__sandboxBridge.invokeTool === 'function'
+            ? globalThis.__sandboxBridge
+            : null;
         const stdoutChunks = [];
         const stderrChunks = [];
 
@@ -350,13 +416,17 @@ export class SandboxSessionManager {
               if (typeof property !== 'string') {
                 return undefined;
               }
-              return () => {
+              return (input) => {
                 if (MAIN_PIPELINE_ONLY_TOOLS.has(property)) {
                   denyPolicy(POLICY_DENIED_MAIN_PIPELINE_TOOL_MESSAGE);
                 }
                 if (!SANDBOX_TOOLS_ALLOWLIST.has(property)) {
                   denyPolicy(POLICY_DENIED_TOOL_ALLOWLIST_MESSAGE);
                 }
+                if (!sandboxBridge) {
+                  throw new Error('sandbox_runtime_error::Sandbox tool bridge is unavailable.');
+                }
+                return sandboxBridge.invokeTool(property, input);
               };
             },
           }
@@ -679,6 +749,7 @@ export function normalizeCodeExecOutput(output: unknown): CodeExecToolOutput {
 // Requirements: code_exec.3.1.1
 export function toCodeExecInput(args: Record<string, unknown>): CodeExecToolInput {
   return {
+    task_summary: typeof args.task_summary === 'string' ? args.task_summary : '',
     code: typeof args.code === 'string' ? args.code : '',
     timeout_ms: typeof args.timeout_ms === 'number' ? args.timeout_ms : undefined,
   };

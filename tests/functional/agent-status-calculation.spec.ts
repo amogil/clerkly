@@ -251,7 +251,7 @@ test.describe('Agent Status Calculation', () => {
         data: {
           callId: 'code-success-1',
           toolName: 'code_exec',
-          arguments: { code: 'console.log(1)' },
+          arguments: { task_summary: 'Run code', code: 'console.log(1)' },
           output: { status: 'success', stdout: '1\n', stderr: '' },
         },
       });
@@ -291,7 +291,7 @@ test.describe('Agent Status Calculation', () => {
         data: {
           callId: 'code-success-transition-1',
           toolName: 'code_exec',
-          arguments: { code: 'console.log(1)' },
+          arguments: { task_summary: 'Run code', code: 'console.log(1)' },
           output: { status: 'success', stdout: '1\n', stderr: '' },
         },
       });
@@ -338,7 +338,7 @@ test.describe('Agent Status Calculation', () => {
             data: {
               callId: `code-${status}-1`,
               toolName: 'code_exec',
-              arguments: { code: 'throw new Error("x")' },
+              arguments: { task_summary: 'Run code', code: 'throw new Error("x")' },
               output: {
                 status,
                 stdout: '',
