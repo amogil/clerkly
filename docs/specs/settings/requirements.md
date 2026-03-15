@@ -52,6 +52,10 @@
    - LLM Provider (выпадающий список): OpenAI (GPT), Anthropic (Claude), Google (Gemini)
    - API Key (текстовое поле с возможностью скрыть/показать)
 
+1.1.1. ГДЕ приложение запущено в packaged production-сборке, ТО элемент "LLM Provider" ДОЛЖЕН оставаться видимым, быть disabled и отображать значение `OpenAI (GPT)`
+
+1.1.2. ГДЕ приложение запущено в packaged production-сборке, ТО непосредственно под элементом "LLM Provider" ДОЛЖЕН отображаться текст: "Currently only one provider is available: OpenAI."
+
 1.2. КОГДА пользователь вводит API ключ, ТО поле ДОЛЖНО отображать символы как пароль (скрыто по умолчанию)
 
 1.3. Поле API Key ДОЛЖНО содержать кнопку показать/скрыть (toggle visibility button) справа внутри поля
@@ -72,7 +76,7 @@
 
 1.9. КОГДА пользователь изменяет API Key, ТО изменения ДОЛЖНЫ автоматически сохраняться в базу данных с debounce 500ms после последнего изменения
 
-1.10. КОГДА пользователь изменяет LLM Provider (выпадающий список), ТО:
+1.10. ГДЕ приложение запущено вне packaged production-сборки, КОГДА пользователь изменяет LLM Provider (выпадающий список), ТО:
    - Изменение провайдера ДОЛЖНО сохраняться немедленно без debounce
    - Поле API Key ДОЛЖНО автоматически загрузить ключ выбранного провайдера (если он был сохранен ранее)
    - ЕСЛИ ключ для выбранного провайдера не найден: поле API Key ДОЛЖНО быть пустым с placeholder "Enter your API key"
@@ -108,6 +112,12 @@
    - Загрузить API ключ активного провайдера из соответствующего ключа
    - Отобразить провайдера и его ключ в UI
 
+1.20.1. ГДЕ приложение запущено в packaged production-сборке, КОГДА открывается страница Settings, ТО UI ДОЛЖЕН отображать `OpenAI (GPT)` и ДОЛЖЕН загружать API ключ `openai` независимо от сохраненного значения `ai_agent_llm_provider`
+
+1.20.2. ЕСЛИ runtime-контракт packaged-режима страницы Settings недоступен или возвращает ошибку, ТО UI ДОЛЖЕН fail-closed: оставить `LLM Provider` disabled, отобразить `OpenAI (GPT)` и загрузить API ключ `openai`
+
+1.20.3. ПОКА initial snapshot настроек страницы Settings не загружен, ТО поле `API Key` и действие `Test Connection` ДОЛЖНЫ оставаться non-interactive
+
 1.21. КОГДА настройки не найдены в базе (первый запуск или после очистки), ТО значения по умолчанию ДОЛЖНЫ быть:
    - LLM Provider: `openai`
    - API Key: пустая строка с placeholder "Enter your API key"
@@ -132,21 +142,20 @@
 
 **Примечание:** Изоляция данных LLM Provider между пользователями (сохранение и восстановление настроек при смене пользователя) реализуется через user-data-isolation.2 (колонка `user_id` в таблице `user_data`). Отдельные требования для изоляции настроек LLM Provider не нужны.
 
+**Примечание 2:** Временное packaged production-ограничение относится только к renderer UI страницы Settings. Логика main process и test/dev сценарии multi-provider этим требованием не изменяются.
+
 **Тестируемость:** Да - через модульные тесты AIAgentSettingsManager (включая шифрование/дешифрование), функциональные тесты UI компонента Settings
 
 #### Функциональные Тесты
 
-- `tests/functional/settings-ai-agent.spec.ts` - "should save LLM provider selection immediately"
-- `tests/functional/settings-ai-agent.spec.ts` - "should save API key with debounce"
-- `tests/functional/settings-ai-agent.spec.ts` - "should delete API key when field is cleared"
-- `tests/functional/settings-ai-agent.spec.ts` - "should encrypt API key when safeStorage available"
-- `tests/functional/settings-ai-agent.spec.ts` - "should save API key without encryption when safeStorage unavailable"
-- `tests/functional/settings-ai-agent.spec.ts` - "should load and decrypt API key on app start"
-- `tests/functional/settings-ai-agent.spec.ts` - "should toggle API key visibility"
-- `tests/functional/settings-ai-agent.spec.ts` - "should show error notification on save failure"
-- `tests/functional/settings-ai-agent.spec.ts` - "should persist settings after logout and restore on re-login"
-- `tests/functional/settings-ai-agent.spec.ts` - "should preserve API keys when switching providers"
-- `tests/functional/settings-ai-agent.spec.ts` - "should load correct API key when switching back to provider"
+- `tests/functional/settings-ai-agent.spec.ts` - "53.1: should save and load LLM provider selection"
+- `tests/functional/settings-ai-agent.spec.ts` - "53.2: should save and load API key with encryption"
+- `tests/functional/settings-ai-agent.spec.ts` - "53.3: should delete API key when field is cleared"
+- `tests/functional/settings-ai-agent.spec.ts` - "53.4: should preserve API keys when switching providers"
+- `tests/functional/settings-ai-agent.spec.ts` - "53.5: should toggle API key visibility"
+- `tests/functional/settings-ai-agent.spec.ts` - "53.6: should show error notification on save failure"
+- `tests/functional/user-data-isolation.spec.ts` - "should isolate data between different users"
+- `tests/functional/user-data-isolation.spec.ts` - "should restore user data after re-login"
 
 ### Требование 2: Тестирование Подключения к LLM Provider
 
@@ -206,13 +215,14 @@
 
 #### Функциональные Тесты
 
-- `tests/functional/llm-connection-test.spec.ts` - "should disable Test Connection button when API key is empty"
-- `tests/functional/llm-connection-test.spec.ts` - "should enable Test Connection button when API key is filled"
-- `tests/functional/llm-connection-test.spec.ts` - "should show Testing... during connection test"
-- `tests/functional/llm-connection-test.spec.ts` - "should show success notification on valid API key"
-- `tests/functional/llm-connection-test.spec.ts` - "should show error notification on invalid API key"
-- `tests/functional/llm-connection-test.spec.ts` - "should test connection for each provider (OpenAI, Anthropic, Google)"
-- `tests/functional/llm-connection-real.spec.ts` - "should validate Test Connection against real OpenAI API" (входит в стандартный functional прогон; требует `CLERKLY_OPENAI_API_KEY`)
+- `tests/functional/llm-connection-test.spec.ts` - "54.1: should disable Test Connection button when API key is empty"
+- `tests/functional/llm-connection-test.spec.ts` - "54.2: should enable Test Connection button when API key is filled"
+- `tests/functional/llm-connection-test.spec.ts` - "54.3: should send request with correct parameters"
+- `tests/functional/llm-connection-test.spec.ts` - "54.4: should show success notification on valid API key"
+- `tests/functional/llm-connection-test.spec.ts` - "54.5: should show error notification on invalid API key"
+- `tests/functional/llm-connection-test.spec.ts` - "54.6: should test connection for all providers"
+- `tests/functional/llm-connection-test.spec.ts` - "54.7: should show Testing text during connection test"
+- `tests/functional/llm-connection-real.spec.ts` - "54.real.1: should validate Test Connection against real OpenAI API" (входит в стандартный functional прогон; требует `CLERKLY_OPENAI_API_KEY`)
 
 ### Требование 3: Форматирование Дат и Времени из Системных Настроек
 
@@ -242,7 +252,7 @@
 
 #### Функциональные Тесты
 
-- Функциональные тесты для форматирования дат будут добавлены при реализации компонентов, отображающих timestamp
+- `tests/functional/agent-date-update.spec.ts` - "should update agent timestamp when new message is sent"
 
 ## Вне Области Применения
 

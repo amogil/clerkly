@@ -182,6 +182,12 @@ export interface API {
       reason?: string;
     }>;
     setChatsReady: () => Promise<{ success: boolean; error?: string }>;
+    // Requirements: settings.1.1.1, settings.1.1.2, settings.1.20.1
+    getRuntimeInfo: () => Promise<{
+      success: boolean;
+      data?: { isPackaged: boolean };
+      error?: string;
+    }>;
   };
   // Requirements: google-oauth-auth.8.1, google-oauth-auth.8.2, google-oauth-auth.8.3, account-profile.1.2, account-profile.1.5
   auth: {

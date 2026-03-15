@@ -829,20 +829,45 @@ class DateTimeFormatter {
 
 React компонент для страницы настроек с секцией LLM Provider.
 
+### Production-only packaged UI lock
+
+- Renderer получает признак packaged production-режима через обязательный IPC `app:get-runtime-info`.
+- Компонент `"Settings"` применяет этот признак только для UI секции `LLM Provider`.
+- В packaged production-режиме `"Settings"`:
+  - фиксирует отображаемый provider как `openai`;
+  - переводит combobox в `disabled`;
+  - показывает helper text о временной доступности только OpenAI;
+  - загружает и сохраняет API key только для `openai`.
+- Если `app:get-runtime-info` недоступен или возвращает ошибку, `"Settings"` ДОЛЖЕН fail-closed:
+  - оставить `LLM Provider` disabled;
+  - отобразить `OpenAI (GPT)`;
+  - загрузить API key `openai`;
+  - не возвращаться к multi-provider UI.
+- Пока initial snapshot настроек не загружен, `"Settings"` также держит в disabled/non-interactive состоянии:
+  - поле `API Key`;
+  - действие `Test Connection`.
+- Debounced save/delete API key запускается только из пользовательского ввода, а не из программной загрузки настроек. Это исключает удаление сохраненного `openai` key во время initial load.
+- `Main Process`, `AIAgentSettingsManager`, `SettingsIPCHandlers` и runtime-выбор провайдера НЕ изменяются этим механизмом.
+- В `dev` и `test` packaged lock не активируется, поэтому существующие multi-provider сценарии остаются без изменений.
+
 ```typescript
 // Requirements: settings.1
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
+import { callApi } from '../utils/apiWrapper';
+import { toast } from 'sonner';
 
 type LLMProvider = 'openai' | 'anthropic' | 'google';
 
 export function AIAgentSettings() {
   const [llmProvider, setLLMProvider] = useState<LLMProvider>('openai');
   const [apiKey, setAPIKey] = useState('');
+  const [isProductionLLMProviderLocked, setIsProductionLLMProviderLocked] = useState(true);
+  const [isSettingsLoaded, setIsSettingsLoaded] = useState(false);
   const [showAPIKey, setShowAPIKey] = useState(false); // Requirements: settings.1.2, settings.1.8
-  const [loading, setLoading] = useState(true);
-  const [saveTimeout, setSaveTimeout] = useState<NodeJS.Timeout | null>(null);
+  const apiKeyPersistTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const effectiveLLMProvider = isProductionLLMProviderLocked ? 'openai' : llmProvider;
 
   // Load settings on mount
   useEffect(() => {
@@ -851,84 +876,134 @@ export function AIAgentSettings() {
 
   // Requirements: settings.1.10 - Load API key when provider changes
   useEffect(() => {
-    if (!loading) {
+    if (isSettingsLoaded && !isProductionLLMProviderLocked) {
       loadAPIKeyForProvider(llmProvider);
     }
-  }, [llmProvider, loading]);
+  }, [llmProvider, isSettingsLoaded, isProductionLLMProviderLocked]);
 
   const loadSettings = async () => {
+    let shouldLockToOpenAI = true;
+
     try {
-      const settings = await window.api.aiAgent.getSettings();
-      setLLMProvider(settings.llmProvider);
-      setAPIKey(settings.apiKeys[settings.llmProvider] || '');
+      const runtimeInfo = await window.api.app.getRuntimeInfo();
+      shouldLockToOpenAI =
+        runtimeInfo.success === true && runtimeInfo.data?.isPackaged === true;
+
+      if (!runtimeInfo.success) {
+        console.warn('Runtime info unavailable, keeping OpenAI-only lock active');
+      }
+    } catch (error) {
+      console.error('Failed to load runtime info, keeping OpenAI-only lock active:', error);
+    }
+
+    setIsProductionLLMProviderLocked(shouldLockToOpenAI);
+
+    try {
+      if (shouldLockToOpenAI) {
+        setLLMProvider('openai');
+        const keyResult = await callApi(
+          () => window.api.settings.loadAPIKey('openai'),
+          'Loading API key'
+        );
+        setAPIKey(keyResult?.apiKey || '');
+      } else {
+        const providerResult = await callApi(
+          () => window.api.settings.loadLLMProvider(),
+          'Loading LLM provider'
+        );
+        const provider = providerResult?.provider || 'openai';
+        setLLMProvider(provider);
+
+        const keyResult = await callApi(
+          () => window.api.settings.loadAPIKey(provider),
+          'Loading API key'
+        );
+        setAPIKey(keyResult?.apiKey || '');
+      }
     } catch (error) {
       console.error('[AIAgentSettings] Failed to load settings:', error);
     } finally {
-      setLoading(false);
+      setIsSettingsLoaded(true);
     }
   };
 
   const loadAPIKeyForProvider = async (provider: LLMProvider) => {
     try {
-      const key = await window.api.aiAgent.getAPIKey(provider);
-      setAPIKey(key || '');
+      const keyResult = await callApi(
+        () => window.api.settings.loadAPIKey(provider),
+        'Loading API key'
+      );
+      setAPIKey(keyResult?.apiKey || '');
     } catch (error) {
       console.error(`[AIAgentSettings] Failed to load API key for ${provider}:`, error);
       setAPIKey('');
     }
   };
 
+  // Requirements: settings.1.9 - Debounced save/delete only after user input
+  const scheduleAPIKeyPersist = useCallback((provider: LLMProvider, value: string) => {
+    if (apiKeyPersistTimeoutRef.current) {
+      clearTimeout(apiKeyPersistTimeoutRef.current);
+    }
+
+    apiKeyPersistTimeoutRef.current = setTimeout(async () => {
+      try {
+        if (value.trim() === '') {
+          await callApi(() => window.api.settings.deleteAPIKey(provider), 'Deleting API key');
+        } else {
+          await callApi(
+            () => window.api.settings.saveAPIKey(provider, value),
+            'Saving API key'
+          );
+        }
+      } catch (error) {
+        console.error('[AIAgentSettings] Failed to save API key:', error);
+        toast.error('Saving API key failed');
+      } finally {
+        apiKeyPersistTimeoutRef.current = null;
+      }
+    }, 500);
+  }, []);
+
   // Requirements: settings.1.10 - Save provider immediately
   const handleProviderChange = async (provider: LLMProvider) => {
+    if (isProductionLLMProviderLocked) {
+      return;
+    }
+
     setLLMProvider(provider);
     try {
-      await window.api.aiAgent.saveLLMProvider(provider);
+      await callApi(() => window.api.settings.saveLLMProvider(provider), 'Saving LLM provider');
       console.log('[AIAgentSettings] Provider saved:', provider);
     } catch (error) {
       console.error('[AIAgentSettings] Failed to save provider:', error);
       // Requirements: settings.1.13 - Show error notification
-      window.api.error.notify('Failed to save LLM provider', 'AI Agent Settings');
+      toast.error('Saving LLM provider failed');
     }
   };
 
   // Requirements: settings.1.9 - Save API key with debounce
   const handleAPIKeyChange = useCallback((value: string) => {
-    setAPIKey(value);
-
-    // Clear existing timeout
-    if (saveTimeout) {
-      clearTimeout(saveTimeout);
+    if (!isSettingsLoaded) {
+      return;
     }
 
-    // Requirements: settings.1.9 - Debounce 500ms
-    const timeout = setTimeout(async () => {
-      try {
-        if (value.trim() === '') {
-          // Requirements: settings.1.11 - Delete if empty
-          await window.api.aiAgent.deleteAPIKey(llmProvider);
-          console.log('[AIAgentSettings] API key deleted');
-        } else {
-          await window.api.aiAgent.saveAPIKey(llmProvider, value);
-          console.log('[AIAgentSettings] API key saved');
-        }
-      } catch (error) {
-        console.error('[AIAgentSettings] Failed to save API key:', error);
-        // Requirements: settings.1.13 - Show error notification
-        window.api.error.notify('Failed to save API key', 'AI Agent Settings');
-      }
-    }, 500);
+    setAPIKey(value);
+    scheduleAPIKeyPersist(effectiveLLMProvider, value);
+  }, [effectiveLLMProvider, scheduleAPIKeyPersist]);
 
-    setSaveTimeout(timeout);
-  }, [llmProvider, saveTimeout]);
+  const handleTestConnection = async () => {
+    if (!isSettingsLoaded || apiKey.trim() === '' || testingConnection) {
+      return;
+    }
+
+    // test connection flow
+  };
 
   // Requirements: settings.1.3, settings.1.4, settings.1.5, settings.1.6, settings.1.7 - Toggle visibility
   const toggleAPIKeyVisibility = () => {
     setShowAPIKey(!showAPIKey);
   };
-
-  if (loading) {
-    return <div>Loading AI Agent settings...</div>;
-  }
 
   return (
     <div className="llm-provider-settings">
@@ -939,13 +1014,17 @@ export function AIAgentSettings() {
         <label htmlFor="llm-provider">LLM Provider</label>
         <select
           id="llm-provider"
-          value={llmProvider}
+          value={effectiveLLMProvider}
           onChange={(e) => handleProviderChange(e.target.value as LLMProvider)}
+          disabled={!isSettingsLoaded || isProductionLLMProviderLocked}
         >
           <option value="openai">OpenAI (GPT)</option>
           <option value="anthropic">Anthropic (Claude)</option>
           <option value="google">Google (Gemini)</option>
         </select>
+        {isSettingsLoaded && isProductionLLMProviderLocked ? (
+          <p>Currently only one provider is available: OpenAI.</p>
+        ) : null}
       </div>
 
       {/* Requirements: settings.1.1, settings.1.2, settings.1.3 - API Key input with toggle */}
@@ -957,6 +1036,7 @@ export function AIAgentSettings() {
             type={showAPIKey ? 'text' : 'password'}
             value={apiKey}
             onChange={(e) => handleAPIKeyChange(e.target.value)}
+            disabled={!isSettingsLoaded}
             placeholder="Enter your API key"
           />
           {/* Requirements: settings.1.3, settings.1.4, settings.1.5, settings.1.6, settings.1.7 */}
@@ -977,7 +1057,12 @@ export function AIAgentSettings() {
       </p>
 
       {/* Requirements: settings.1.26 - Test Connection button */}
-      <button type="button" className="test-connection" disabled>
+      <button
+        type="button"
+        className="test-connection"
+        disabled={!isSettingsLoaded || testingConnection || apiKey.trim() === ''}
+        onClick={handleTestConnection}
+      >
         Test Connection
       </button>
     </div>
@@ -991,6 +1076,7 @@ export function AIAgentSettings() {
 - Debounce 500ms для сохранения API ключа
 - Toggle visibility для API ключа (Eye/EyeOff иконки)
 - Автоматическая загрузка ключа при переключении провайдера
+- Блокировка поля `API Key` и `Test Connection` до завершения initial load
 - Удаление ключа при очистке поля
 - Показ уведомлений об ошибках
 
@@ -1082,9 +1168,15 @@ user_id: 'aB3xK9mNpQ'
 
 ### Property 1: Сохранение LLM провайдера
 
-*Для любого* выбранного LLM провайдера (openai, anthropic, google), изменение провайдера должно немедленно сохраниться в базу данных без debounce.
+*Для любого* выбранного LLM провайдера (openai, anthropic, google), в `dev/test` режиме изменение провайдера должно немедленно сохраниться в базу данных без debounce.
 
 **Validates: Requirements settings.1.10**
+
+### Property 1.1: Production-only packaged UI lock
+
+*Для любого* запуска packaged production-сборки, секция `"LLM Provider"` должна отображать disabled combobox со значением `OpenAI (GPT)`, показывать helper text о временной доступности только OpenAI и загружать API key для `openai` независимо от сохраненного `ai_agent_llm_provider`.
+
+**Validates: Requirements settings.1.1.1, settings.1.1.2, settings.1.20.1**
 
 ### Property 2: Сохранение API ключа с debounce
 
@@ -1451,41 +1543,28 @@ describe('DateTimeFormatter', () => {
 
 Функциональные тесты проверяют полную функциональность системы в реальных условиях использования.
 
-```typescript
-describe('Settings Functional Tests', () => {
-  /* Preconditions: application launched, user authenticated, navigated to Settings
-     Action: select LLM provider, enter API key, wait for auto-save
-     Assertions: settings saved to database, persist after app restart
-     Requirements: settings.1.9, settings.1.10 */
-  it('should save and persist AI Agent settings', async () => {
-    // Функциональный тест сохранения настроек
-  });
+- `tests/functional/settings-ai-agent.spec.ts`
+  - `53.1: should save and load LLM provider selection`
+  - `53.2: should save and load API key with encryption`
+  - `53.3: should delete API key when field is cleared`
+  - `53.4: should preserve API keys when switching providers`
+  - `53.5: should toggle API key visibility`
+  - `53.6: should show error notification on save failure`
+- `tests/functional/llm-connection-test.spec.ts`
+  - `54.1: should disable Test Connection button when API key is empty`
+  - `54.2: should enable Test Connection button when API key is filled`
+  - `54.3: should send request with correct parameters`
+  - `54.4: should show success notification on valid API key`
+  - `54.5: should show error notification on invalid API key`
+  - `54.6: should test connection for all providers`
+  - `54.7: should show Testing text during connection test`
+- `tests/functional/user-data-isolation.spec.ts`
+  - `should isolate data between different users`
+  - `should restore user data after re-login`
+- `tests/functional/agent-date-update.spec.ts`
+  - `should update agent timestamp when new message is sent`
 
-  /* Preconditions: Settings page open, API key field visible
-     Action: click toggle visibility button
-     Assertions: input type changes from password to text, icon changes
-     Requirements: settings.1.3, settings.1.4, settings.1.5 */
-  it('should toggle API key visibility', async () => {
-    // Функциональный тест переключения видимости
-  });
-
-  /* Preconditions: Settings page open, API keys saved for multiple providers
-     Action: switch between providers
-     Assertions: API key field updates with correct key for each provider
-     Requirements: settings.1.10, settings.1.19 */
-  it('should load correct API key when switching providers', async () => {
-    // Функциональный тест переключения провайдеров
-  });
-
-  /* Preconditions: application launched with system locale en-US
-     Action: view dates in application components
-     Assertions: all dates formatted in en-US format
-     Requirements: settings.3.1, settings.3.2 */
-  it('should format dates using system locale', async () => {
-    // Функциональный тест форматирования дат
-  });
-});
-```
+Отдельного functional coverage для packaged-only UI lock и детального форматирования дат пока нет; эти сценарии покрываются модульными тестами.
 
 
 ### Покрытие Требований
@@ -1493,6 +1572,8 @@ describe('Settings Functional Tests', () => {
 | Требование | Модульные Тесты | Функциональные Тесты |
 |------------|-----------------|----------------------|
 | settings.1.1 | ✓ | ✓ |
+| settings.1.1.1 | ✓ | - |
+| settings.1.1.2 | ✓ | - |
 | settings.1.2 | ✓ | ✓ |
 | settings.1.3 | ✓ | ✓ |
 | settings.1.4 | ✓ | ✓ |
@@ -1505,13 +1586,16 @@ describe('Settings Functional Tests', () => {
 | settings.1.11 | ✓ | ✓ |
 | settings.1.12 | ✓ | ✓ |
 | settings.1.13 | ✓ | ✓ |
-| settings.1.14 | ✓ | ✓ |
-| settings.1.15 | ✓ | ✓ |
+| settings.1.14 | ✓ | - |
+| settings.1.15 | ✓ | - |
 | settings.1.16 | ✓ | ✓ |
 | settings.1.17 | ✓ | - |
 | settings.1.18 | ✓ | - |
 | settings.1.19 | ✓ | ✓ |
 | settings.1.20 | ✓ | ✓ |
+| settings.1.20.1 | ✓ | - |
+| settings.1.20.2 | ✓ | - |
+| settings.1.20.3 | ✓ | - |
 | settings.1.21 | ✓ | ✓ |
 | settings.1.22 | ✓ | ✓ |
 | settings.1.23 | ✓ | - |
@@ -1529,13 +1613,13 @@ describe('Settings Functional Tests', () => {
 | settings.2.8 | ✓ | ✓ |
 | settings.2.9 | ✓ | - |
 | settings.2.10 | ✓ | - |
-| settings.3.1 | ✓ | ✓ |
-| settings.3.2 | ✓ | ✓ |
+| settings.3.1 | ✓ | - |
+| settings.3.2 | ✓ | - |
 | settings.3.3 | ✓ | - |
-| settings.3.4 | ✓ | ✓ |
-| settings.3.5 | ✓ | ✓ |
-| settings.3.6 | ✓ | ✓ |
-| settings.3.7 | - | ✓ |
+| settings.3.4 | ✓ | - |
+| settings.3.5 | ✓ | - |
+| settings.3.6 | ✓ | - |
+| settings.3.7 | - | - |
 
 ## Технические Решения
 
