@@ -2920,6 +2920,35 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     expect(systemPrompt).toContain('max 200 characters');
   });
 
+  /* Preconditions: App uses mock provider and sends first chat request
+     Action: User sends a message, test inspects provider request body
+     Assertions: System prompt forbids duplicating tool_call payload as plaintext JSON
+     Requirements: llm-integration.9.5.1.1 */
+  test('should include no tool-payload duplication rule in system prompt', async () => {
+    mockLLMServer.setStreamingMode(true, {
+      content: 'Simple answer',
+      chunkDelayMs: 0,
+    });
+
+    context = await launchWithMockLLM();
+    mockLLMServer.clearRequestLogs();
+
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await messageInput.fill('Check final_answer prompt guard');
+    await messageInput.press('Enter');
+    await expect(context.window.locator('.message-llm-action-response').last()).toBeVisible({
+      timeout: 10000,
+    });
+
+    const lastRequest = mockLLMServer.getLastRequest();
+    expect(lastRequest).toBeDefined();
+    const systemPrompt = getSystemPromptText(lastRequest!.body as Record<string, unknown>);
+
+    expect(systemPrompt).toContain(
+      'Do not duplicate tool payload as plain assistant text: never output raw JSON that mirrors `final_answer` arguments/output.'
+    );
+  });
+
   /* Preconditions: Mock stream returns unterminated auto-title comment with payload > 260 chars
      Action: User sends a message and waits for stream completion
      Assertions: Agent name is not changed and chat flow remains successful

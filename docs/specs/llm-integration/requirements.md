@@ -398,6 +398,7 @@
   - `final_answer` вызывается только когда модель уверена, что работа завершена;
   - ЕСЛИ работа не завершена и `final_answer` не вызывается, модель ДОЛЖНА явно запросить у пользователя недостающую информацию или подтверждение следующего шага;
   - `final_answer` вызывается только в одиночку в рамках одного model-turn; в том же turn НЕ ДОЛЖНЫ вызываться другие инструменты;
+  - payload вызова инструмента НЕ ДОЛЖЕН дублироваться в plain-text ответе модели; модель НЕ ДОЛЖНА выводить сырой JSON, который зеркалирует `tool_call` (`summary_points`, `toolName`, `arguments`, `output`);
   - КОГДА пункт `summary_points` содержит математическое выражение, модель ДОЛЖНА использовать KaTeX-совместимые markdown-делимитеры `$...$` (inline) или `$$...$$` (block);
   - `summary_points` соблюдает лимиты `llm-integration.9.5.2-9.5.3.1` и перечисляет решённые задачи.
 
@@ -410,6 +411,10 @@
 9.5.4. ЕСЛИ `final_answer` нарушает ограничения по `summary_points`, ТО система ДОЛЖНА считать такой `final_answer` невалидным и запустить retry/repair по правилам `llm-integration.12.*`.
 
 9.5.5. ОТСУТСТВИЕ `summary_points` (или пустой массив) НЕ ДОЛЖНО считаться успешным `completed`; такой `final_answer` ДОЛЖЕН обрабатываться как невалидный по правилам retry/repair (`llm-integration.12.*`).
+
+9.5.6. КОГДА в успешной попытке присутствует валидный `tool_call`, ТО система НЕ ДОЛЖНА сохранять отдельный пользовательский `kind: llm` ответ, если его текст является техническим сериализованным payload вызова инструмента (например, JSON с полями `summary_points`, `toolName`, `arguments`, `output`).
+
+9.5.6.1. Это правило ДОЛЖНО применяться к ответам провайдера, где в одном model-turn одновременно пришли `kind: llm` text-chunks/`output.text` и валидный `tool_call`; дублирование в UI в таком случае считается следствием персиста, а не отдельной ошибки renderer.
 
 9.6. В целевой модели невалидный `final_answer` НЕ ДОЛЖЕН фиксироваться как успешный `completed`; он ДОЛЖЕН либо быть исправлен через retry, либо завершиться `kind:error` при исчерпании retry-лимита.
 
@@ -521,6 +526,8 @@
 - `tests/functional/llm-chat.spec.ts` — "should continue to next model step after terminal code_exec tool result"
 - `tests/functional/llm-chat.spec.ts` — "should render final_answer tool_call as completed assistant response"
 - `tests/functional/llm-chat.spec.ts` — "should render math inside tool_call(final_answer) checklist item"
+- `tests/functional/llm-chat.spec.ts` — "should include no tool-payload duplication rule in system prompt"
+- `tests/functional/llm-chat.spec.ts` — "should not render raw final_answer JSON text when tool_call(final_answer) is present"
 
 ### 12. Надёжность chat-flow и обработка некорректных ответов
 

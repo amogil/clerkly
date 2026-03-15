@@ -166,6 +166,9 @@ describe('PromptBuilder.build()', () => {
         'explicitly ask the user what information or confirmation you need next'
       );
       expect(result.systemPrompt).toContain('Call `final_answer` alone');
+      expect(result.systemPrompt).toContain(
+        'Do not duplicate tool payload as plain assistant text'
+      );
       expect(result.systemPrompt).toContain('list solved tasks');
       expect(result.systemPrompt).toContain('1 to 10 non-empty points');
       expect(result.systemPrompt).toContain(
