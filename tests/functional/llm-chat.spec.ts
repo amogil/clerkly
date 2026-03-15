@@ -521,12 +521,12 @@ test.describe('LLM Chat (real OpenAI)', () => {
 
     const stopButton = context.window.locator('[data-testid="prompt-input-stop"]');
     await expect(stopButton).toBeVisible({ timeout: 15000 });
-    await expect(context.window.locator('[data-testid="prompt-input-send"]')).toBeVisible({
-      timeout: 120000,
-    });
 
     const actionContent = context.window.locator('.message-llm-action-response').last();
     await expect(actionContent).toBeVisible({ timeout: 120000 });
+    await expect
+      .poll(async () => ((await actionContent.textContent()) ?? '').length, { timeout: 120000 })
+      .toBeGreaterThan(400);
 
     await closeElectron(context, false);
 
