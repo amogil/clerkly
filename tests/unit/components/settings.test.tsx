@@ -532,7 +532,7 @@ describe('Settings Component - Test Connection', () => {
   /* Preconditions: Settings component runs in packaged production mode and initial API key loading is delayed
      Action: Render settings screen before load completes
      Assertions: API key input and Test Connection stay disabled until initial settings are loaded
-     Requirements: settings.1.20.1, settings.2.2 */
+     Requirements: settings.1.20.1, settings.1.20.3, settings.2.2 */
   it('should block API key editing and connection testing until packaged settings load completes', async () => {
     let resolveAPIKey: ((value: { success: boolean; data: { apiKey: string } }) => void) | null =
       null;

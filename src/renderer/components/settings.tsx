@@ -70,7 +70,7 @@ export function Settings({ onSignOut, onNavigate: _onNavigate }: SettingsProps) 
     }, 500);
   }, []);
 
-  // Requirements: settings.1.9, settings.1.11, settings.1.12
+  // Requirements: settings.1.9, settings.1.11, settings.1.12, settings.1.20.3
   const handleAPIKeyChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!isSettingsLoaded) {
       return;
