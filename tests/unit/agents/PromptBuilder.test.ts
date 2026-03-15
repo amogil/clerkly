@@ -205,10 +205,35 @@ describe('PromptBuilder.build()', () => {
       const sandboxManager = {} as SandboxSessionManager;
       const feature = new CodeExecFeature(sandboxManager);
       const result = makeBuilder('Base.', [feature]).build();
+      expect(result.systemPrompt).toContain('Tool priority and completion rules:');
+      expect(result.systemPrompt).toContain(
+        '`code_exec` is your primary work tool for computation, extraction, transformation, structured analysis, verification'
+      );
+      expect(result.systemPrompt).toContain(
+        'Inside one `code_exec` call, your sandbox code may use multiple allowlisted helper calls when needed to solve the task'
+      );
+      expect(result.systemPrompt).toContain(
+        'Independent allowlisted helper calls inside one `code_exec` may run sequentially with `await` or concurrently with standard async JavaScript patterns such as `await Promise.all([...])`'
+      );
+      expect(result.systemPrompt).toContain(
+        'This does not change the outer chat-flow rule: each model response may request at most one top-level tool call'
+      );
+      expect(result.systemPrompt).toContain(
+        'Before making another tool call, check whether the available tool results are already sufficient to answer the user'
+      );
+      expect(result.systemPrompt).toContain(
+        '`final_answer` is not a work tool; use it only to finish the task once the work is complete'
+      );
       expect(result.systemPrompt).toContain('top-level `await` is supported');
       expect(result.systemPrompt).toContain('required string fields `task_summary`');
-      expect(result.systemPrompt).toContain('Sandbox HTTP helper:');
+      expect(result.systemPrompt).toContain('HTTP requests inside code_exec:');
       expect(result.systemPrompt).toContain('const result = await tools.http_request({ ... })');
+      expect(result.systemPrompt).toContain(
+        'When sandbox code needs external HTTP interaction, call `await tools.http_request(...)` to send requests to pages, APIs, feeds, files, or other HTTP resources'
+      );
+      expect(result.systemPrompt).toContain(
+        'fetch an HTTP resource with `await tools.http_request({...})`, then parse, validate, transform, or summarize the returned body inside `code_exec`'
+      );
       expect(result.systemPrompt).toContain(
         '{ "accept": "application/json", "x-trace-id": "abc-123" }'
       );
@@ -228,6 +253,20 @@ describe('PromptBuilder.build()', () => {
       expect(result.systemPrompt).toContain('Error example:');
       expect(result.systemPrompt).toContain('message: "network down"');
       expect(result.systemPrompt).toContain('Response example:');
+    });
+
+    /* Preconditions: CodeExecFeature is enabled for the model-facing tool registry
+       Action: build() collects LLM tools
+       Assertions: code_exec tool description explicitly advertises public URL/API fetching via tools.http_request
+       Requirements: code_exec.1, sandbox-http-request.1.4 */
+    it('should advertise URL fetching capability in code_exec tool description', () => {
+      const sandboxManager = {} as SandboxSessionManager;
+      const feature = new CodeExecFeature(sandboxManager);
+      const result = makeBuilder('Base.', [feature]).build();
+
+      expect(result.tools.find((tool) => tool.name === 'code_exec')?.description).toContain(
+        'primary work tool for computation, extraction, transformation, analysis, and verification'
+      );
     });
   });
 

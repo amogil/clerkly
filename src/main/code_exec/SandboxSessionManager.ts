@@ -49,6 +49,11 @@ interface SandboxToolInvocationPayload {
   input?: unknown;
 }
 
+// Requirements: code_exec.1.5, code_exec.2.2, sandbox-http-request.1.1-1.2
+export function resolveCodeExecSandboxPreloadPath(appPath = app.getAppPath()): string {
+  return path.join(appPath, 'dist/preload/preload/codeExecSandbox.js');
+}
+
 // Requirements: code_exec.1.5, code_exec.2.5-2.6, code_exec.2.10
 export class SandboxSessionManager {
   private static isSandboxToolHandlerRegistered = false;
@@ -185,7 +190,7 @@ export class SandboxSessionManager {
     const sandboxWindow = new BrowserWindow({
       show: false,
       webPreferences: {
-        preload: path.join(__dirname, '../../preload/preload/codeExecSandbox.js'),
+        preload: resolveCodeExecSandboxPreloadPath(),
         additionalArguments: [`--code-exec-session-id=${context.sessionId}`],
         sandbox: true,
         contextIsolation: true,

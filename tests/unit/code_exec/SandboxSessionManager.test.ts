@@ -2,9 +2,42 @@
 
 jest.mock('electron', () => {
   const getAppMetrics = jest.fn(() => []);
+  const getAppPath = jest.fn(() => '/Users/amogil/Documents/projects/clerkly');
+  const sandboxBridgeInvokeTool = jest.fn(async (toolName: string, input: unknown) => {
+    if (toolName !== 'http_request') {
+      return {
+        error: {
+          code: 'internal_error',
+          message: `Unexpected tool: ${toolName}`,
+        },
+      };
+    }
+
+    return {
+      status: 200,
+      final_url: (input as { url?: string }).url ?? 'https://example.com',
+      headers: {
+        'content-type': 'text/plain; charset=utf-8',
+      },
+      content_type: 'text/plain; charset=utf-8',
+      body_encoding: 'text',
+      body: 'ok',
+      truncated: false,
+      applied_limit_bytes: 262144,
+    };
+  });
+  const browserWindowInstances: unknown[] = [];
 
   class MockBrowserWindow {
     private destroyed = false;
+    public options: { webPreferences?: { preload?: string; additionalArguments?: string[] } };
+
+    constructor(options: {
+      webPreferences?: { preload?: string; additionalArguments?: string[] };
+    }) {
+      this.options = options;
+      browserWindowInstances.push(this);
+    }
 
     public webContents = {
       executeJavaScript: jest.fn(async (script: string) => {
@@ -12,10 +45,23 @@ jest.mock('electron', () => {
           return await new Promise(() => undefined);
         }
         const nodeVm = require('node:vm') as typeof import('node:vm');
+        const hasSandboxBridge =
+          this.options.webPreferences?.preload ===
+            `${getAppPath()}/dist/preload/preload/codeExecSandbox.js` &&
+          this.options.webPreferences?.additionalArguments?.some((arg) =>
+            arg.startsWith('--code-exec-session-id=')
+          );
         return await nodeVm.runInNewContext(script, {
           setTimeout,
           clearTimeout,
           Promise,
+          ...(hasSandboxBridge
+            ? {
+                __sandboxBridge: {
+                  invokeTool: sandboxBridgeInvokeTool,
+                },
+              }
+            : {}),
         });
       }),
       isDestroyed: jest.fn(() => this.destroyed),
@@ -42,6 +88,7 @@ jest.mock('electron', () => {
   return {
     app: {
       getAppMetrics,
+      getAppPath,
     },
     BrowserWindow: MockBrowserWindow,
     session: {
@@ -54,6 +101,10 @@ jest.mock('electron', () => {
         clearStorageData: jest.fn(async () => undefined),
       })),
     },
+    __mocks: {
+      sandboxBridgeInvokeTool,
+      browserWindowInstances,
+    },
   };
 });
 
@@ -61,12 +112,46 @@ import { app } from 'electron';
 import { SandboxSessionManager } from '../../../src/main/code_exec/SandboxSessionManager';
 import {
   normalizeCodeExecOutput,
+  resolveCodeExecSandboxPreloadPath,
   toCodeExecInput,
 } from '../../../src/main/code_exec/SandboxSessionManager';
+
+const electronMocks = jest.requireMock('electron').__mocks as {
+  sandboxBridgeInvokeTool: jest.Mock;
+  browserWindowInstances: Array<{
+    options: { webPreferences?: { preload?: string; additionalArguments?: string[] } };
+  }>;
+};
 
 describe('SandboxSessionManager.execute', () => {
   afterEach(() => {
     jest.clearAllMocks();
+    electronMocks.browserWindowInstances.length = 0;
+  });
+
+  /* Preconditions: Sandbox session manager uses Electron app path to configure preload and runtime exposes sandbox bridge when preload/session args are correct
+     Action: Execute sandbox code that calls await window.tools.http_request(...)
+     Assertions: http_request succeeds through the sandbox bridge and BrowserWindow preload points to dist/preload/preload/codeExecSandbox.js
+     Requirements: code_exec.1.5, code_exec.2.2, sandbox-http-request.1.1, sandbox-http-request.1.2, sandbox-http-request.1.3 */
+  it('uses preload bridge so sandbox code can call http_request', async () => {
+    const manager = new SandboxSessionManager();
+    const result = await manager.execute('agent-1', 'call-bridge', {
+      task_summary: 'Fetch URL through bridge',
+      code: 'const response = await window.tools.http_request({ url: "https://example.com" }); console.log(response.status);',
+    });
+
+    const lastInstance = electronMocks.browserWindowInstances.at(-1);
+    expect(lastInstance?.options.webPreferences?.preload).toBe(
+      '/Users/amogil/Documents/projects/clerkly/dist/preload/preload/codeExecSandbox.js'
+    );
+    expect(lastInstance?.options.webPreferences?.additionalArguments).toContainEqual(
+      expect.stringMatching(/^--code-exec-session-id=/)
+    );
+    expect(electronMocks.sandboxBridgeInvokeTool).toHaveBeenCalledWith('http_request', {
+      url: 'https://example.com',
+    });
+    expect(result.status).toBe('success');
+    expect(result.stdout).toContain('200');
   });
 
   it('executes code and captures stdout', async () => {
@@ -290,6 +375,16 @@ describe('SandboxSessionManager.shutdown', () => {
 });
 
 describe('code_exec helpers', () => {
+  /* Preconditions: Electron app path points at repository root
+     Action: Resolve the sandbox preload path
+     Assertions: Returned path points to dist/preload/preload/codeExecSandbox.js under app.getAppPath()
+     Requirements: code_exec.1.5, code_exec.2.2 */
+  it('resolves preload path from Electron app path', () => {
+    expect(resolveCodeExecSandboxPreloadPath()).toBe(
+      '/Users/amogil/Documents/projects/clerkly/dist/preload/preload/codeExecSandbox.js'
+    );
+  });
+
   it('normalizes invalid output into internal_error', () => {
     const result = normalizeCodeExecOutput(null);
     expect(result.status).toBe('error');
@@ -346,6 +441,7 @@ describe('SandboxSessionManager private helpers', () => {
   afterEach(() => {
     jest.useRealTimers();
     jest.clearAllMocks();
+    electronMocks.browserWindowInstances.length = 0;
   });
 
   it('returns output unchanged when degraded mode is disabled', () => {

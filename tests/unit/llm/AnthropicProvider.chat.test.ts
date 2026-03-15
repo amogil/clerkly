@@ -11,7 +11,6 @@ jest.mock('ai', () => ({
   streamText: jest.fn(),
   tool: jest.fn((definition) => ({ ...definition })),
   jsonSchema: jest.fn((schema) => schema),
-  stepCountIs: jest.fn(() => ({ kind: 'step-count' })),
 }));
 
 jest.mock('@ai-sdk/anthropic', () => ({
@@ -79,6 +78,11 @@ describe('AnthropicProvider.chat()', () => {
     expect(chunks).toContainEqual({ type: 'reasoning', delta: 'Think ' });
     expect(chunks).toContainEqual({ type: 'text', delta: 'Anthropic' });
     expect(chunks).toContainEqual({ type: 'text', delta: ' answer' });
+    expect(aiModule.streamText).toHaveBeenCalledWith(
+      expect.not.objectContaining({
+        stopWhen: expect.anything(),
+      })
+    );
   });
 
   it('emits tool_call chunks for multiple calls in one turn', async () => {

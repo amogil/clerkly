@@ -49,9 +49,10 @@ export function buildAutoTitleMetadataContractPrompt(currentTitle: string): stri
 }
 
 const HTTP_REQUEST_PROMPT_SPEC = {
-  title: 'Sandbox HTTP helper:',
+  title: 'HTTP requests inside code_exec:',
   invocation: '`const result = await tools.http_request({ ... })`',
   behaviorNotes: [
+    'When sandbox code needs external HTTP interaction, call `await tools.http_request(...)` to send requests to pages, APIs, feeds, files, or other HTTP resources for retrieval, submission, inspection, extraction, transformation, or verification.',
     'If `max_response_bytes` is omitted, an internal safety cap of `262144` bytes still applies to the returned response body.',
     'When `follow_redirects` is `true`, redirects are followed for up to `10` hops.',
     '`303` becomes `GET` without `body`; `301/302` change `POST` to `GET` without `body`; `307/308` preserve `method` and `body`.',
@@ -467,12 +468,20 @@ export class CodeExecFeature implements AgentFeature {
 
   getSystemPromptSection(): string {
     return [
+      'Tool priority and completion rules:',
+      '- `code_exec` is your primary work tool for computation, extraction, transformation, structured analysis, verification, and other tasks that benefit from sandbox code.',
+      '- Before making another tool call, check whether the available tool results are already sufficient to answer the user.',
+      '- Use another tool call only when a concrete missing fact or transformation still blocks the answer.',
+      '- `final_answer` is not a work tool; use it only to finish the task once the work is complete.',
       'Code Exec tool usage:',
       '- Tool name: `code_exec`.',
       `- Input schema: JSON object with required string fields \`task_summary\` (1..200 non-whitespace-trimmed chars) and \`code\`, plus optional integer \`timeout_ms\` (${CODE_EXEC_LIMITS.timeoutMsMin}..${CODE_EXEC_LIMITS.timeoutMsPolicyCap}, default ${CODE_EXEC_LIMITS.timeoutMsDefault}).`,
       '- Output fields: `status`, `stdout`, `stderr`, `stdout_truncated`, `stderr_truncated`, optional `error`.',
       '- Status values: running | success | error | timeout | cancelled.',
       '- Execution context: your code runs inside an async function, so top-level `await` is supported.',
+      '- Inside one `code_exec` call, your sandbox code may use multiple allowlisted helper calls when needed to solve the task.',
+      '- Independent allowlisted helper calls inside one `code_exec` may run sequentially with `await` or concurrently with standard async JavaScript patterns such as `await Promise.all([...])`, as long as sandbox policy and limits are respected.',
+      '- This does not change the outer chat-flow rule: each model response may request at most one top-level tool call.',
       '- Error codes in normal chat-flow outputs: policy_denied | sandbox_runtime_error | limit_exceeded | internal_error.',
       '- `invalid_tool_arguments` is defensive/runtime-local only (direct runtime calls) and is not persisted as chat `tool_call(code_exec)` output.',
       `- Limits: code <= ${CODE_EXEC_LIMITS.maxCodeBytes} bytes (30 KiB), stdout <= ${CODE_EXEC_LIMITS.maxStdoutBytes} bytes (10 KiB), stderr <= ${CODE_EXEC_LIMITS.maxStderrBytes} bytes (10 KiB), CPU limit ${CODE_EXEC_LIMITS.sandboxCpuLimit} vCPU, RAM limit 2 GiB.`,
@@ -481,6 +490,7 @@ export class CodeExecFeature implements AgentFeature {
       '- Browser-level network APIs are denied: fetch, XMLHttpRequest, WebSocket, sendBeacon, window.open, location.assign, location.replace.',
       '- Multithreading APIs are denied: Worker, SharedWorker, ServiceWorker, Worklet.',
       '- Positive example: compute values, print diagnostics via console.*.',
+      '- Positive example: fetch an HTTP resource with `await tools.http_request({...})`, then parse, validate, transform, or summarize the returned body inside `code_exec`.',
       '- Negative example: trying window.open/fetch/window.api must return policy_denied.',
       '- When error.code is limit_exceeded, reduce code size/complexity or split work into multiple tool calls.',
       '- When stderr warns about throttling/degraded mode, treat results as potentially slower/partial.',
@@ -492,7 +502,7 @@ export class CodeExecFeature implements AgentFeature {
       {
         name: 'code_exec',
         description:
-          'Execute JavaScript in isolated sandbox runtime with strict policy and resource limits.',
+          'Execute JavaScript in isolated sandbox runtime with strict policy and resource limits; use it as the primary work tool for computation, extraction, transformation, analysis, and verification.',
         parameters: CODE_EXEC_TOOL_SCHEMA,
         execute: async (args: Record<string, unknown>, signal?: AbortSignal) => {
           const validated = validateCodeExecInput(args);

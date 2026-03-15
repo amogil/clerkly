@@ -47,9 +47,12 @@
 - ✅ Реализованы structured errors.
 - ✅ Описание helper-а подмешано в prompt-инструкцию `code_exec`.
 - ✅ Model-facing prompt-контракт helper-а усилен limits, redirect policy и structured error shape.
+- ✅ Prompt/tool discoverability усилена явной подсказкой использовать `code_exec` + `await tools.http_request(...)` для чтения публичных URL/страниц/API-ответов.
+- ✅ Исправлен bootstrap preload bridge для sandbox runtime, чтобы `window.tools.http_request(...)` был реально доступен в приложении.
 - ✅ Добавлены unit-тесты для sandbox HTTP request handler.
 - ✅ Добавлены unit-тесты для allowlist/policy слоя.
 - ✅ Добавлены unit-тесты для `follow_redirects = false` и `body_encoding`.
+- ✅ Добавлены unit-тесты на preload bridge bootstrap и доступность `window.tools.http_request(...)` в sandbox runtime.
 - ✅ Добавлены functional-сценарии в `tests/functional/code_exec.spec.ts`.
 - ✅ Прогнаны релевантные unit-тесты.
 

@@ -91,8 +91,7 @@ export class GoogleProvider implements ILLMProvider {
         (globalThis as { ReadableStream?: unknown }).ReadableStream = webStreams.ReadableStream;
       }
 
-      const { streamText, tool, jsonSchema, stepCountIs } = await import('ai');
-      const stopWhen = typeof stepCountIs === 'function' ? stepCountIs(5) : undefined;
+      const { streamText, tool, jsonSchema } = await import('ai');
       const { createGoogleGenerativeAI } = await import('@ai-sdk/google');
 
       const google = createGoogleGenerativeAI({ apiKey: this.apiKey, baseURL });
@@ -107,7 +106,6 @@ export class GoogleProvider implements ILLMProvider {
         messages: messages as unknown as Parameters<typeof streamText>[0]['messages'],
         sendReasoning: true,
         tools,
-        ...(stopWhen ? { stopWhen } : {}),
         maxRetries: AI_SDK_MAX_RETRIES,
         abortSignal: controller.signal,
         onStepFinish: (event: Record<string, unknown>) => {
