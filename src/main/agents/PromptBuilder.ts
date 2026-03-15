@@ -53,12 +53,14 @@ const HTTP_REQUEST_PROMPT_SPEC = {
   invocation: '`const result = await tools.http_request({ ... })`',
   behaviorNotes: [
     'If `max_response_bytes` is omitted, an internal safety cap of `262144` bytes still applies to the returned response body.',
+    'When `follow_redirects` is `true`, redirects are followed for up to `10` hops.',
+    '`303` becomes `GET` without `body`; `301/302` change `POST` to `GET` without `body`; `307/308` preserve `method` and `body`.',
     'On cross-origin redirects, sensitive request headers (`authorization`, `proxy-authorization`, `cookie`, `cookie2`) are stripped before the next hop.',
   ],
   inputFields: [
     '`url`: required absolute `http` or `https` URL string.',
     '`method`: optional HTTP method string; default `GET`; allowed: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`.',
-    '`headers`: optional flat JSON object with string keys and string values, for example `{ "accept": "application/json", "x-trace-id": "abc-123" }`.',
+    '`headers`: optional `Record<string, string>` flat JSON object, for example `{ "accept": "application/json", "x-trace-id": "abc-123" }`.',
     '`body`: optional string request body; do not send `body` with `GET` or `HEAD`.',
     '`timeout_ms`: optional integer in milliseconds; default `10000`; maximum `180000`.',
     '`follow_redirects`: optional boolean; default `true`.',
@@ -73,6 +75,10 @@ const HTTP_REQUEST_PROMPT_SPEC = {
     '`body`: response body string encoded according to `body_encoding`.',
     '`truncated`: `true` if the applied response body limit cut the body.',
     '`applied_limit_bytes`: actual response body limit in bytes, either explicit `max_response_bytes` or the default internal cap `262144`.',
+  ],
+  errorFields: [
+    '`error.code`: short machine-readable error code.',
+    '`error.message`: short human-readable error message.',
   ],
   requestExample: [
     '```js',
@@ -98,6 +104,16 @@ const HTTP_REQUEST_PROMPT_SPEC = {
     '}',
     '```',
   ],
+  errorExample: [
+    '```js',
+    '{',
+    '  error: {',
+    '    code: "fetch_failed",',
+    '    message: "network down"',
+    '  }',
+    '}',
+    '```',
+  ],
 } as const;
 
 function buildHttpRequestPromptSection(): string {
@@ -110,10 +126,14 @@ function buildHttpRequestPromptSection(): string {
     ...HTTP_REQUEST_PROMPT_SPEC.inputFields.map((field) => `  - ${field}`),
     '- Response fields:',
     ...HTTP_REQUEST_PROMPT_SPEC.responseFields.map((field) => `  - ${field}`),
+    '- Error fields:',
+    ...HTTP_REQUEST_PROMPT_SPEC.errorFields.map((field) => `  - ${field}`),
     '- Request example:',
     ...HTTP_REQUEST_PROMPT_SPEC.requestExample,
     '- Response example:',
     ...HTTP_REQUEST_PROMPT_SPEC.responseExample,
+    '- Error example:',
+    ...HTTP_REQUEST_PROMPT_SPEC.errorExample,
   ].join('\n');
 }
 

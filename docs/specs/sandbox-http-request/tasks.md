@@ -46,6 +46,7 @@
 - ✅ Реализован возврат текстовых ответов как `body_encoding = "text"` и нетекстовых как `body_encoding = "base64"`.
 - ✅ Реализованы structured errors.
 - ✅ Описание helper-а подмешано в prompt-инструкцию `code_exec`.
+- ✅ Model-facing prompt-контракт helper-а усилен limits, redirect policy и structured error shape.
 - ✅ Добавлены unit-тесты для sandbox HTTP request handler.
 - ✅ Добавлены unit-тесты для allowlist/policy слоя.
 - ✅ Добавлены unit-тесты для `follow_redirects = false` и `body_encoding`.
@@ -97,6 +98,7 @@
 - [x] Реализовать возврат текстовых ответов как `body_encoding = "text"` и нетекстовых как `body_encoding = "base64"`.
 - [x] Реализовать structured errors.
 - [x] Подмешать описание helper-а в prompt-инструкцию `code_exec`.
+- [x] Сделать model-facing prompt-контракт compact reference card с limits, redirect policy и error shape.
 
 #### Фаза 4: Тесты
 

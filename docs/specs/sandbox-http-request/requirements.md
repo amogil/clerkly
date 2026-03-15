@@ -30,6 +30,12 @@
 
 1.4. Prompt/tool-инструкция для модели ДОЛЖНА описывать назначение helper-а, входной контракт, ограничения и формат результата
 
+1.4.1. Prompt/tool-инструкция ДОЛЖНА явно описывать default и maximum ограничения helper-а, включая `timeout_ms`, `max_response_bytes` и внутренний safety cap `262144` bytes
+
+1.4.2. Prompt/tool-инструкция ДОЛЖНА явно описывать redirect policy helper-а, включая лимит `10` переходов, правила переписывания `303`, `301/302 POST` и `307/308`, а также очистку чувствительных заголовков при cross-origin redirect
+
+1.4.3. Prompt/tool-инструкция ДОЛЖНА явно описывать shape успешного результата и shape structured error с полями `error.code` и `error.message`
+
 #### Функциональные Тесты
 
 - `tests/functional/code_exec.spec.ts` - "should allow sandbox code to execute async http_request helper"
@@ -163,7 +169,11 @@
 
 4.1. ЕСЛИ URL, method или другие входные параметры невалидны, ТО helper ДОЛЖЕН возвращать структурированную ошибку валидации
 
+4.1.1. Structured validation error ДОЛЖНА включать объект `error` с полями `code` и `message`
+
 4.2. ЕСЛИ HTTP-запрос завершается сетевой ошибкой или timeout, ТО helper ДОЛЖЕН возвращать структурированную runtime error
+
+4.2.1. Structured runtime error ДОЛЖНА включать объект `error` с полями `code` и `message`
 
 4.3. Общая sandbox policy для данного helper-а ДОЛЖНА соответствовать спецификации `code_exec`
 
