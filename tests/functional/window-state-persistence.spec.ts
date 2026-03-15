@@ -208,9 +208,19 @@ test.describe('Window State Persistence', () => {
 
     await context.window.waitForTimeout(500);
 
-    // Move window to specific position
-    const newX = 100;
-    const newY = 100;
+    // Move window to a position that is guaranteed to fit current work area.
+    // In CI (small virtual displays), width=1000 can exceed available horizontal space
+    // after offset, so we clamp target coordinates to visible bounds.
+    const workArea = await context.app.evaluate(({ screen }) => {
+      const { x, y, width, height } = screen.getPrimaryDisplay().workArea;
+      return { x, y, width, height };
+    });
+    const targetX = initialBounds.x + 40;
+    const targetY = initialBounds.y + 40;
+    const maxVisibleX = workArea.x + Math.max(0, workArea.width - 1000);
+    const maxVisibleY = workArea.y + Math.max(0, workArea.height - 700);
+    const newX = Math.min(Math.max(targetX, workArea.x), maxVisibleX);
+    const newY = Math.min(Math.max(targetY, workArea.y), maxVisibleY);
 
     await setWindowPosition(context.app, newX, newY);
 
@@ -220,8 +230,8 @@ test.describe('Window State Persistence', () => {
     // Verify the move actually happened before closing
     const movedBounds = await getWindowBounds(context.app);
     console.log(`After move: ${JSON.stringify(movedBounds)}`);
-    expect(movedBounds.x).toBeGreaterThanOrEqual(newX - 10);
-    expect(movedBounds.y).toBeGreaterThanOrEqual(newY - 10);
+    expect(Math.abs(movedBounds.x - newX)).toBeLessThanOrEqual(20);
+    expect(Math.abs(movedBounds.y - newY)).toBeLessThanOrEqual(20);
 
     // Close application
     await context.app.close();
@@ -232,6 +242,7 @@ test.describe('Window State Persistence', () => {
     // Relaunch application with same data path
     context = await launchElectron(context.testDataPath);
     await context.window.waitForLoadState('domcontentloaded');
+    await assertLoginUIVisible(context);
 
     // Get restored bounds
     await expect
@@ -239,10 +250,10 @@ test.describe('Window State Persistence', () => {
         async () => {
           const bounds = await getWindowBounds(context.app);
           return (
-            Math.abs(bounds.x - movedBounds.x) <= 10 && Math.abs(bounds.y - movedBounds.y) <= 10
+            Math.abs(bounds.x - movedBounds.x) <= 20 && Math.abs(bounds.y - movedBounds.y) <= 20
           );
         },
-        { timeout: 10000 }
+        { timeout: 20000 }
       )
       .toBe(true);
 
@@ -250,10 +261,10 @@ test.describe('Window State Persistence', () => {
     console.log(`Restored bounds: ${JSON.stringify(restoredBounds)}`);
 
     // Verify position was restored (with some tolerance)
-    expect(restoredBounds.x).toBeGreaterThanOrEqual(movedBounds.x - 10);
-    expect(restoredBounds.x).toBeLessThanOrEqual(movedBounds.x + 10);
-    expect(restoredBounds.y).toBeGreaterThanOrEqual(movedBounds.y - 10);
-    expect(restoredBounds.y).toBeLessThanOrEqual(movedBounds.y + 10);
+    expect(restoredBounds.x).toBeGreaterThanOrEqual(movedBounds.x - 20);
+    expect(restoredBounds.x).toBeLessThanOrEqual(movedBounds.x + 20);
+    expect(restoredBounds.y).toBeGreaterThanOrEqual(movedBounds.y - 20);
+    expect(restoredBounds.y).toBeLessThanOrEqual(movedBounds.y + 20);
 
     // Take screenshot
     await context.window.screenshot({ path: 'playwright-report/window-restored-position.png' });

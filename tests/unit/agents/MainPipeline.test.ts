@@ -75,7 +75,25 @@ function makeMocks() {
       if (kind === 'tool_call') return makeMessage(nextToolMessageId++, kind);
       return makeMessage(99, kind);
     }),
+    createWithOrder: jest
+      .fn()
+      .mockImplementation(
+        (
+          agentId: string,
+          kind: string,
+          payload: any,
+          replyToMessageId: number | null,
+          _order: unknown,
+          done?: boolean
+        ) => messageManager.create(agentId, kind, payload, replyToMessageId, done)
+      ),
     update: jest.fn(),
+    updateWithOrder: jest
+      .fn()
+      .mockImplementation(
+        (messageId: number, agentId: string, payload: any, _order: unknown, done?: boolean) =>
+          messageManager.update(messageId, agentId, payload, done)
+      ),
     setHidden: jest.fn(),
     hideAndMarkIncomplete: jest.fn(),
     setDone: jest.fn(),
@@ -103,12 +121,17 @@ function makeMocks() {
   const toolExecutor: jest.Mocked<IToolExecutor> = {
     executeBatch: jest.fn().mockResolvedValue([]),
   };
+  const agentTitleUpdater = {
+    getCurrentTitle: jest.fn().mockReturnValue('New Agent'),
+    rename: jest.fn(),
+  };
   const pipeline = new MainPipeline(
     messageManager,
     settingsManager,
     promptBuilder,
     createProvider,
-    toolExecutor
+    toolExecutor,
+    agentTitleUpdater
   );
 
   return {
@@ -118,6 +141,7 @@ function makeMocks() {
     promptBuilder,
     llmProvider,
     toolExecutor,
+    agentTitleUpdater,
     mockPublish,
   };
 }
@@ -457,6 +481,479 @@ describe('MainPipeline.run()', () => {
     expect(reasoningEvent?.accumulatedText).toBe('Soon!**Resolving next step**');
   });
 
+  /* Preconditions: Stream contains markdown metadata comment with JSON payload split across chunks
+     Action: Run MainPipeline with text deltas that include <!-- clerkly:title-meta: ... -->
+     Assertions: Agent rename is triggered with normalized title and llm text remains unchanged
+     Requirements: llm-integration.16.1, llm-integration.16.3, llm-integration.16.7, llm-integration.16.11 */
+  it('extracts title from markdown comment and renames agent without mutating output text', async () => {
+    const { pipeline, messageManager, llmProvider, agentTitleUpdater } = makeMocks();
+    (messageManager.list as jest.Mock).mockReturnValue([
+      makeMessage(1, 'user'),
+      makeMessage(2, 'user'),
+      makeMessage(3, 'user'),
+      makeMessage(4, 'user'),
+      makeMessage(5, 'user'),
+      makeMessage(6, 'user'),
+    ]);
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({ type: 'text', delta: 'Answer start ' });
+        onChunk({ type: 'text', delta: '<!-- clerkly:title-meta: {"title":"Sprint' });
+        onChunk({ type: 'text', delta: ' retrospective plan","rename_need_score":90} --> end' });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(agentTitleUpdater.rename).toHaveBeenCalledWith('agent-1', 'Sprint retrospective plan');
+    const hasCommentInUpdatedText = (messageManager.update as jest.Mock).mock.calls.some(
+      (call: unknown[]) => {
+        const payload = call[2] as { data?: { text?: string } };
+        return (
+          payload.data?.text?.includes(
+            '<!-- clerkly:title-meta: {"title":"Sprint retrospective plan","rename_need_score":90} -->'
+          ) ?? false
+        );
+      }
+    );
+    expect(hasCommentInUpdatedText).toBe(true);
+  });
+
+  /* Preconditions: First meaningful user turn, default chat title, cooldown guard allows rename metadata request
+     Action: Run MainPipeline and inspect provider chat messages
+     Assertions: Runtime system prompt includes auto-title contract and current title context
+     Requirements: llm-integration.16.1, llm-integration.16.2, llm-integration.16.10 */
+  it('injects auto-title metadata contract into system messages when current turn is eligible', async () => {
+    const { pipeline, llmProvider, messageManager, agentTitleUpdater } = makeMocks();
+    const user = makeMessage(1, 'user');
+    user.payloadJson = JSON.stringify({ data: { text: 'Plan sprint roadmap' } });
+    (messageManager.listForModelHistory as jest.Mock).mockReturnValue([user]);
+    agentTitleUpdater.getCurrentTitle.mockReturnValue('New Agent');
+
+    llmProvider.chat.mockResolvedValue({ text: 'Answer' });
+
+    await pipeline.run('agent-1', 1);
+
+    const sentMessages = llmProvider.chat.mock.calls[0]?.[0] as ChatMessage[];
+    const systemPrompt = sentMessages
+      .filter((message) => message.role === 'system')
+      .map((message) => (typeof message.content === 'string' ? message.content : ''))
+      .join('\n');
+
+    expect(systemPrompt).toContain('Auto-title metadata contract:');
+    expect(systemPrompt).toContain(
+      '<!-- clerkly:title-meta: {"title":"<short title>","rename_need_score":NN} -->'
+    );
+    expect(systemPrompt).toContain('Current chat title: "New Agent".');
+    expect(systemPrompt).toContain('target 3-12 words');
+    expect(systemPrompt).toContain('max 200 characters');
+  });
+
+  /* Preconditions: Last successful rename happened fewer than 5 user turns ago
+     Action: Run MainPipeline and inspect provider chat messages
+     Assertions: Runtime auto-title contract is omitted while cooldown is active
+     Requirements: llm-integration.16.10 */
+  it('does not inject auto-title metadata contract while cooldown is active', async () => {
+    const { pipeline, llmProvider, messageManager, agentTitleUpdater } = makeMocks();
+
+    const user1 = makeMessage(1, 'user');
+    user1.payloadJson = JSON.stringify({ data: { text: 'Plan sprint backlog' } });
+    const llmPast = makeMessage(2, 'llm');
+    llmPast.payloadJson = JSON.stringify({
+      data: {
+        text: 'Done <!-- clerkly:title-meta: {"title":"Sprint backlog planning","rename_need_score":90} -->',
+        auto_title_applied: true,
+        auto_title_applied_title: 'Sprint backlog planning',
+      },
+    });
+    const user2 = makeMessage(3, 'user');
+    user2.payloadJson = JSON.stringify({ data: { text: 'follow up one' } });
+    const user3 = makeMessage(4, 'user');
+    user3.payloadJson = JSON.stringify({ data: { text: 'follow up two' } });
+    const user4 = makeMessage(5, 'user');
+    user4.payloadJson = JSON.stringify({ data: { text: 'follow up three' } });
+    (messageManager.listForModelHistory as jest.Mock).mockReturnValue([
+      user1,
+      llmPast,
+      user2,
+      user3,
+      user4,
+    ]);
+    agentTitleUpdater.getCurrentTitle.mockReturnValue('Sprint backlog planning');
+
+    llmProvider.chat.mockResolvedValue({ text: 'Answer' });
+
+    await pipeline.run('agent-1', 5);
+
+    const sentMessages = llmProvider.chat.mock.calls[0]?.[0] as ChatMessage[];
+    const systemPrompt = sentMessages
+      .filter((message) => message.role === 'system')
+      .map((message) => (typeof message.content === 'string' ? message.content : ''))
+      .join('\n');
+
+    expect(systemPrompt).not.toContain('Auto-title metadata contract:');
+    expect(systemPrompt).not.toContain(
+      '<!-- clerkly:title-meta: {"title":"<short title>","rename_need_score":NN} -->'
+    );
+  });
+
+  /* Preconditions: Stream has unterminated title metadata comment and payload reaches 260 chars
+     Action: Run MainPipeline and finalize stream
+     Assertions: Rename is skipped and response flow completes
+     Requirements: llm-integration.16.4, llm-integration.16.5, llm-integration.16.12 */
+  it('skips rename when title metadata comment exceeds 260 chars without closing marker', async () => {
+    const { pipeline, llmProvider, agentTitleUpdater } = makeMocks();
+    const longPayload = 'x'.repeat(260);
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'text',
+          delta: `<!-- clerkly:title-meta: {"title":"${longPayload}`,
+        });
+        onChunk({ type: 'text', delta: ' regular response text' });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(agentTitleUpdater.rename).not.toHaveBeenCalled();
+  });
+
+  /* Preconditions: Valid title metadata exists but rename callback throws error
+     Action: Run MainPipeline and execute auto-title update
+     Assertions: Pipeline still completes and does not create kind:error due to rename failure
+     Requirements: llm-integration.16.12 */
+  it('does not interrupt chat flow when auto-title rename throws', async () => {
+    const { pipeline, llmProvider, messageManager, agentTitleUpdater } = makeMocks();
+    (messageManager.list as jest.Mock).mockReturnValue([
+      makeMessage(1, 'user'),
+      makeMessage(2, 'user'),
+      makeMessage(3, 'user'),
+      makeMessage(4, 'user'),
+      makeMessage(5, 'user'),
+      makeMessage(6, 'user'),
+    ]);
+    agentTitleUpdater.rename.mockImplementation(() => {
+      throw new Error('rename failed');
+    });
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'text',
+          delta:
+            '<!-- clerkly:title-meta: {"title":"Release board","rename_need_score":90} --> body',
+        });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(agentTitleUpdater.rename).toHaveBeenCalledTimes(1);
+    expect(messageManager.create).not.toHaveBeenCalledWith(
+      'agent-1',
+      'error',
+      expect.anything(),
+      1,
+      true
+    );
+  });
+
+  /* Preconditions: First turn emits title comment but rename throws, so no applied marker is persisted
+     Action: Run next user turn immediately with another valid title candidate
+     Assertions: Cooldown is not activated by failed rename and second turn may rename immediately
+     Requirements: llm-integration.16.10, llm-integration.16.12 */
+  it('does not apply cooldown after failed rename with persisted comment only', async () => {
+    const { pipeline, llmProvider, messageManager, agentTitleUpdater } = makeMocks();
+
+    const user1 = makeMessage(1, 'user');
+    user1.payloadJson = JSON.stringify({ data: { text: 'Plan sprint backlog' } });
+    const llmFailed = makeMessage(10, 'llm');
+    llmFailed.payloadJson = JSON.stringify({
+      data: {
+        text: 'Done <!-- clerkly:title-meta: {"title":"Sprint backlog planning","rename_need_score":90} -->',
+      },
+    });
+    const user2 = makeMessage(11, 'user');
+    user2.payloadJson = JSON.stringify({ data: { text: 'Plan roadmap milestones' } });
+
+    (messageManager.list as jest.Mock).mockImplementation(() => [user1, llmFailed, user2]);
+    (messageManager.listForModelHistory as jest.Mock).mockReturnValue([user1, llmFailed, user2]);
+
+    agentTitleUpdater.rename
+      .mockImplementationOnce(() => {
+        throw new Error('rename failed');
+      })
+      .mockImplementationOnce(() => undefined);
+
+    llmProvider.chat
+      .mockImplementationOnce(
+        async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+          onChunk({
+            type: 'text',
+            delta:
+              '<!-- clerkly:title-meta: {"title":"Sprint backlog planning","rename_need_score":90} --> body',
+          });
+          return { text: '' };
+        }
+      )
+      .mockImplementationOnce(
+        async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+          onChunk({
+            type: 'text',
+            delta:
+              '<!-- clerkly:title-meta: {"title":"Product roadmap plan","rename_need_score":90} --> body',
+          });
+          return { text: '' };
+        }
+      );
+
+    await pipeline.run('agent-1', 1);
+    await pipeline.run('agent-1', 11);
+
+    expect(agentTitleUpdater.rename).toHaveBeenNthCalledWith(
+      1,
+      'agent-1',
+      'Sprint backlog planning'
+    );
+    expect(agentTitleUpdater.rename).toHaveBeenNthCalledWith(2, 'agent-1', 'Product roadmap plan');
+  });
+
+  /* Preconditions: Candidate title exists, current title is default, triggering user message is non-meaningful
+     Action: Run MainPipeline with auto-title metadata
+     Assertions: First rename is skipped
+     Requirements: llm-integration.16.10 */
+  it('skips first auto-rename when triggering user message is non-meaningful', async () => {
+    const { pipeline, llmProvider, messageManager, agentTitleUpdater } = makeMocks();
+    const meaninglessUser = makeMessage(1, 'user');
+    meaninglessUser.payloadJson = JSON.stringify({ data: { text: '...' } });
+    (messageManager.list as jest.Mock).mockReturnValue([meaninglessUser]);
+    (messageManager.listForModelHistory as jest.Mock).mockReturnValue([meaninglessUser]);
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'text',
+          delta:
+            '<!-- clerkly:title-meta: {"title":"Useful title","rename_need_score":90} --> answer',
+        });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(agentTitleUpdater.rename).not.toHaveBeenCalled();
+  });
+
+  /* Preconditions: Current title is default, history already has meaningful user message, triggering message is non-meaningful
+     Action: Run MainPipeline and inspect provider chat messages
+     Assertions: Auto-title metadata contract is still injected because history is meaningful
+     Requirements: llm-integration.16.10 */
+  it('injects auto-title metadata contract when history has meaningful message and triggering message is non-meaningful', async () => {
+    const { pipeline, llmProvider, messageManager, agentTitleUpdater } = makeMocks();
+    const meaningfulUser = makeMessage(1, 'user');
+    meaningfulUser.payloadJson = JSON.stringify({ data: { text: 'Plan sprint roadmap' } });
+    const nonMeaningfulUser = makeMessage(2, 'user');
+    nonMeaningfulUser.payloadJson = JSON.stringify({ data: { text: '1' } });
+    const snapshot = [meaningfulUser, nonMeaningfulUser];
+    (messageManager.list as jest.Mock).mockReturnValue(snapshot);
+    (messageManager.listForModelHistory as jest.Mock).mockReturnValue(snapshot);
+    agentTitleUpdater.getCurrentTitle.mockReturnValue('New Agent');
+
+    llmProvider.chat.mockResolvedValue({ text: 'Answer' });
+
+    await pipeline.run('agent-1', 2);
+
+    const sentMessages = llmProvider.chat.mock.calls[0]?.[0] as ChatMessage[];
+    const systemPrompt = sentMessages
+      .filter((message) => message.role === 'system')
+      .map((message) => (typeof message.content === 'string' ? message.content : ''))
+      .join('\n');
+
+    expect(systemPrompt).toContain('Auto-title metadata contract:');
+    expect(systemPrompt).toContain(
+      '<!-- clerkly:title-meta: {"title":"<short title>","rename_need_score":NN} -->'
+    );
+  });
+
+  /* Preconditions: Current title is default, history already has meaningful user message, triggering message is non-meaningful
+     Action: Run MainPipeline with valid auto-title metadata
+     Assertions: Rename is applied because meaningful-history guard passes
+     Requirements: llm-integration.16.10 */
+  it('applies first auto-rename when history has meaningful message and triggering message is non-meaningful', async () => {
+    const { pipeline, llmProvider, messageManager, agentTitleUpdater } = makeMocks();
+    const meaningfulUser = makeMessage(1, 'user');
+    meaningfulUser.payloadJson = JSON.stringify({ data: { text: 'Plan sprint roadmap' } });
+    const nonMeaningfulUser = makeMessage(2, 'user');
+    nonMeaningfulUser.payloadJson = JSON.stringify({ data: { text: '1' } });
+    const snapshot = [meaningfulUser, nonMeaningfulUser];
+    (messageManager.list as jest.Mock).mockReturnValue(snapshot);
+    (messageManager.listForModelHistory as jest.Mock).mockReturnValue(snapshot);
+    agentTitleUpdater.getCurrentTitle.mockReturnValue('New Agent');
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'text',
+          delta:
+            '<!-- clerkly:title-meta: {"title":"Sprint planning board","rename_need_score":90} --> answer',
+        });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 2);
+
+    expect(agentTitleUpdater.rename).toHaveBeenCalledWith('agent-1', 'Sprint planning board');
+  });
+
+  /* Preconditions: Persisted history already contains a recent successful rename in fewer than 5 user turns
+     Action: Run MainPipeline in a fresh pipeline instance and process new title candidate
+     Assertions: Cooldown guard skips rename based on persisted history replay
+     Requirements: llm-integration.16.10 */
+  it('enforces cooldown from persisted history replay without in-memory state', async () => {
+    const { pipeline, llmProvider, messageManager, agentTitleUpdater } = makeMocks();
+
+    const user1 = makeMessage(1, 'user');
+    user1.payloadJson = JSON.stringify({ data: { text: 'Plan sprint backlog' } });
+    const llmPast = makeMessage(10, 'llm');
+    llmPast.payloadJson = JSON.stringify({
+      data: {
+        text: 'Done <!-- clerkly:title-meta: {"title":"Sprint backlog planning","rename_need_score":90} -->',
+        auto_title_applied: true,
+        auto_title_applied_title: 'Sprint backlog planning',
+      },
+    });
+    const user2 = makeMessage(11, 'user');
+    user2.payloadJson = JSON.stringify({ data: { text: 'follow up one' } });
+    const user3 = makeMessage(12, 'user');
+    user3.payloadJson = JSON.stringify({ data: { text: 'follow up two' } });
+    const user4 = makeMessage(13, 'user');
+    user4.payloadJson = JSON.stringify({ data: { text: 'follow up three' } });
+    const snapshot = [user1, llmPast, user2, user3, user4];
+    (messageManager.list as jest.Mock).mockReturnValue(snapshot);
+    (messageManager.listForModelHistory as jest.Mock).mockReturnValue(snapshot);
+    agentTitleUpdater.getCurrentTitle.mockReturnValue('Sprint backlog planning');
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'text',
+          delta:
+            '<!-- clerkly:title-meta: {"title":"Roadmap planning board","rename_need_score":90} --> body',
+        });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 13);
+
+    expect(agentTitleUpdater.rename).not.toHaveBeenCalled();
+  });
+
+  /* Preconditions: Agent title updater returns empty current title
+     Action: Run MainPipeline with valid auto-title metadata
+     Assertions: Rename is skipped because guard cannot compare against current title
+     Requirements: llm-integration.16.12 */
+  it('skips auto-rename when current title is unavailable', async () => {
+    const { pipeline, llmProvider, agentTitleUpdater } = makeMocks();
+    agentTitleUpdater.getCurrentTitle.mockReturnValue('');
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'text',
+          delta:
+            '<!-- clerkly:title-meta: {"title":"Stable title","rename_need_score":90} --> body',
+        });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(agentTitleUpdater.rename).not.toHaveBeenCalled();
+  });
+
+  /* Preconditions: Triggering user message has invalid JSON payload while current title is default
+     Action: Run MainPipeline with valid auto-title metadata
+     Assertions: First rename is skipped because meaningful-text check fails safely on parse error
+     Requirements: llm-integration.16.10, llm-integration.16.12 */
+  it('skips first auto-rename when triggering user payload is invalid JSON', async () => {
+    const { pipeline, llmProvider, messageManager, agentTitleUpdater } = makeMocks();
+    const invalidUser = makeMessage(1, 'user');
+    invalidUser.payloadJson = '{ invalid';
+    (messageManager.list as jest.Mock).mockReturnValue([invalidUser]);
+    (messageManager.listForModelHistory as jest.Mock).mockReturnValue([invalidUser]);
+    agentTitleUpdater.getCurrentTitle.mockReturnValue('New Agent');
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'text',
+          delta:
+            '<!-- clerkly:title-meta: {"title":"Useful title","rename_need_score":90} --> body',
+        });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(agentTitleUpdater.rename).not.toHaveBeenCalled();
+  });
+
+  /* Preconditions: Persisted history snapshot does not change between runs
+     Action: Run MainPipeline twice for the same agent with identical message list
+     Assertions: Cooldown decision remains stable and rename is not applied in both runs
+     Requirements: llm-integration.16.10 */
+  it('keeps cooldown decision stable across repeated runs with identical history snapshot', async () => {
+    const { pipeline, llmProvider, messageManager, agentTitleUpdater } = makeMocks();
+
+    const user1 = makeMessage(1, 'user');
+    user1.payloadJson = JSON.stringify({ data: { text: 'Plan sprint backlog' } });
+    const llmPast = makeMessage(10, 'llm');
+    llmPast.payloadJson = JSON.stringify({
+      data: {
+        text: 'Done <!-- clerkly:title-meta: {"title":"Sprint backlog planning","rename_need_score":90} -->',
+        auto_title_applied: true,
+        auto_title_applied_title: 'Sprint backlog planning',
+      },
+    });
+    const user2 = makeMessage(11, 'user');
+    user2.payloadJson = JSON.stringify({ data: { text: 'follow up one' } });
+    const user3 = makeMessage(12, 'user');
+    user3.payloadJson = JSON.stringify({ data: { text: 'follow up two' } });
+    const user4 = makeMessage(13, 'user');
+    user4.payloadJson = JSON.stringify({ data: { text: 'follow up three' } });
+    const snapshot = [user1, llmPast, user2, user3, user4];
+    (messageManager.list as jest.Mock).mockReturnValue(snapshot);
+    (messageManager.listForModelHistory as jest.Mock).mockReturnValue(snapshot);
+    agentTitleUpdater.getCurrentTitle.mockReturnValue('Sprint backlog planning');
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'text',
+          delta:
+            '<!-- clerkly:title-meta: {"title":"Roadmap planning board","rename_need_score":90} --> body',
+        });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 13);
+    await pipeline.run('agent-1', 13);
+
+    expect(agentTitleUpdater.rename).not.toHaveBeenCalled();
+  });
+
   it('persists buffered tool_call after llm finalization in same turn', async () => {
     const { pipeline, llmProvider, toolExecutor, messageManager } = makeMocks();
 
@@ -655,6 +1152,54 @@ describe('MainPipeline.run()', () => {
     );
   });
 
+  /* Preconditions: provider returns final_answer with whitespace-only summary_points item
+     Action: run pipeline once
+     Assertions: invalid tool arguments are surfaced as provider error and final_answer is not persisted
+     Requirements: llm-integration.9.5.3.1, llm-integration.9.5.4, llm-integration.12.3 */
+  it('creates kind:error when final_answer contains blank summary point', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-blank',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['   '] },
+        });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'error',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          error: expect.objectContaining({
+            type: 'provider',
+            message: expect.stringContaining('invalid tool call arguments'),
+          }),
+        }),
+      }),
+      1,
+      true
+    );
+    expect(messageManager.create).not.toHaveBeenCalledWith(
+      'agent-1',
+      'tool_call',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          toolName: 'final_answer',
+        }),
+      }),
+      1,
+      expect.anything()
+    );
+  });
+
   /* Preconditions: first attempt returns invalid final_answer, second attempt returns valid final_answer
      Action: run pipeline with retry/repair
      Assertions: persisted final_answer is created once with attemptId=2 in order metadata
@@ -688,13 +1233,13 @@ describe('MainPipeline.run()', () => {
 
     await pipeline.run('agent-1', 1);
 
-    const finalCalls = (messageManager.create as jest.Mock).mock.calls.filter(
+    const finalCalls = (messageManager.createWithOrder as jest.Mock).mock.calls.filter(
       (call: unknown[]) =>
         call[1] === 'tool_call' &&
         Boolean((call[2] as { data?: { toolName?: string } }).data?.toolName === 'final_answer')
     );
     expect(finalCalls).toHaveLength(1);
-    expect((finalCalls[0]?.[2] as { data?: { order?: unknown } }).data?.order).toEqual(
+    expect(finalCalls[0]?.[4]).toEqual(
       expect.objectContaining({
         runId: expect.any(String),
         attemptId: 2,
@@ -1113,16 +1658,20 @@ describe('MainPipeline.run()', () => {
 
     await pipeline.run('agent-1', 1);
 
-    const creates = (messageManager.create as jest.Mock).mock.calls;
+    const creates = (messageManager.createWithOrder as jest.Mock).mock.calls;
     const llmCreates = creates.filter((call) => call[1] === 'llm');
     const toolCreates = creates.filter((call) => call[1] === 'tool_call');
 
     expect(llmCreates).toHaveLength(2);
     expect(toolCreates).toHaveLength(1);
 
-    const preOrder = (llmCreates[0]?.[2] as { data?: { order?: any } })?.data?.order;
-    const toolOrder = (toolCreates[0]?.[2] as { data?: { order?: any } })?.data?.order;
-    const postOrder = (llmCreates[1]?.[2] as { data?: { order?: any } })?.data?.order;
+    const preOrder = llmCreates[0]?.[4] as { runId: string; attemptId: number; sequence: number };
+    const toolOrder = toolCreates[0]?.[4] as { runId: string; attemptId: number; sequence: number };
+    const postOrder = llmCreates[1]?.[4] as {
+      runId: string;
+      attemptId: number;
+      sequence: number;
+    };
 
     expect(preOrder).toEqual(
       expect.objectContaining({ runId: expect.any(String), attemptId: 1, sequence: 1 })
@@ -1698,13 +2247,13 @@ describe('MainPipeline.run()', () => {
 
     await pipeline.run('agent-1', 1);
 
-    const finalCall = (messageManager.create as jest.Mock).mock.calls.find(
+    const finalCall = (messageManager.createWithOrder as jest.Mock).mock.calls.find(
       (call: unknown[]) =>
         call[1] === 'tool_call' &&
         Boolean((call[2] as { data?: { toolName?: string } }).data?.toolName === 'final_answer')
     );
     expect(finalCall).toBeDefined();
-    expect((finalCall?.[2] as { data?: { order?: unknown } }).data?.order).toEqual(
+    expect(finalCall?.[4]).toEqual(
       expect.objectContaining({
         runId: expect.any(String),
         attemptId: 1,
@@ -2120,6 +2669,404 @@ describe('MainPipeline.run()', () => {
       expect.objectContaining({
         data: expect.not.objectContaining({
           output: expect.anything(),
+        }),
+      })
+    );
+  });
+
+  /* Preconditions: Provider returns valid final_answer tool_call and output.text contains raw JSON mirroring summary_points
+     Action: Run pipeline for one user turn
+     Assertions: final_answer tool_call is persisted, but duplicate kind:llm text bubble is not persisted
+     Requirements: llm-integration.9.5.6, llm-integration.9.5.6.1 */
+  it('does not persist duplicate llm text when output.text mirrors final_answer payload JSON', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-json-dup',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['Done'] },
+        });
+        return { text: '{"summary_points":["Done"]}' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(0);
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'tool_call',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          toolName: 'final_answer',
+          arguments: { summary_points: ['Done'] },
+        }),
+      }),
+      1,
+      true
+    );
+  });
+
+  /* Preconditions: Provider returns valid final_answer tool_call and output.text contains JSON with different summary_points
+     Action: Run pipeline for one user turn
+     Assertions: JSON text is persisted as kind:llm because it does not mirror current final_answer payload
+     Requirements: llm-integration.9.5.6, llm-integration.9.5.6.1 */
+  it('persists llm text when output.text JSON does not mirror final_answer payload', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-json-non-mirror',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['Done'] },
+        });
+        return { text: '{"summary_points":["Different payload"]}' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(1);
+    expect(llmCreates[0]?.[2]).toEqual(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          text: '{"summary_points":["Different payload"]}',
+        }),
+      })
+    );
+  });
+
+  /* Preconditions: Provider returns valid final_answer tool_call and output.text contains fenced JSON mirroring summary_points
+     Action: Run pipeline for one user turn
+     Assertions: Duplicate technical JSON text is suppressed and kind:llm is not persisted
+     Requirements: llm-integration.9.5.6, llm-integration.9.5.6.1 */
+  it('does not persist duplicate llm text when output.text fenced JSON mirrors final_answer payload', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-json-fenced',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['Done'] },
+        });
+        return { text: '```json\n{"summary_points":["Done"]}\n```' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(0);
+  });
+
+  /* Preconditions: Provider returns valid final_answer tool_call and output.text contains nested data.summary_points mirroring payload
+     Action: Run pipeline for one user turn
+     Assertions: Duplicate technical JSON text is suppressed and kind:llm is not persisted
+     Requirements: llm-integration.9.5.6, llm-integration.9.5.6.1 */
+  it('does not persist duplicate llm text when output.text nested JSON mirrors final_answer payload', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-json-nested',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['Done'] },
+        });
+        return { text: '{"data":{"summary_points":["Done"]}}' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(0);
+  });
+
+  /* Preconditions: Provider returns valid final_answer tool_call and output.text contains tool envelope with matching final_answer callId
+     Action: Run pipeline for one user turn
+     Assertions: Envelope mirror text is treated as duplicate technical payload and suppressed
+     Requirements: llm-integration.9.5.6, llm-integration.9.5.6.1 */
+  it('does not persist duplicate llm text when output.text mirrors final_answer envelope with matching callId', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-json-envelope',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['Done'] },
+        });
+        return {
+          text: '{"toolName":"final_answer","callId":"call-final-json-envelope","arguments":{"summary_points":["Other"]}}',
+        };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(0);
+  });
+
+  /* Preconditions: Provider returns valid final_answer tool_call and output.text contains final_answer envelope with different callId
+     Action: Run pipeline for one user turn
+     Assertions: Non-mirror envelope text is preserved as kind:llm
+     Requirements: llm-integration.9.5.6, llm-integration.9.5.6.1 */
+  it('persists llm text when output.text final_answer envelope has different callId', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-envelope-current',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['Done'] },
+        });
+        return {
+          text: '{"toolName":"final_answer","callId":"call-final-envelope-other","arguments":{"summary_points":["Done"]}}',
+        };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(1);
+  });
+
+  /* Preconditions: Provider returns valid final_answer tool_call and output.text contains envelope with matching callId but non-final toolName
+     Action: Run pipeline for one user turn
+     Assertions: Non-final-answer envelope text is preserved as kind:llm
+     Requirements: llm-integration.9.5.6, llm-integration.9.5.6.1 */
+  it('persists llm text when output.text envelope has matching callId but non-final toolName', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-envelope-same-id',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['Done'] },
+        });
+        return {
+          text: '{"toolName":"code_exec","callId":"call-final-envelope-same-id","arguments":{"summary_points":["Done"]}}',
+        };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(1);
+  });
+
+  /* Preconditions: Provider returns valid final_answer tool_call and output.text contains non-JSON textual payload
+     Action: Run pipeline for one user turn
+     Assertions: Non-JSON text is preserved as kind:llm
+     Requirements: llm-integration.9.5.6, llm-integration.9.5.6.1 */
+  it('persists llm text when output.text is non-JSON payload-like text', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-non-json',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['Done'] },
+        });
+        return { text: 'summary_points: ["Done"]' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(1);
+  });
+
+  /* Preconditions: Provider returns no tool_call and output.text contains JSON with summary_points
+     Action: Run pipeline for one user turn
+     Assertions: Text is preserved because suppression is disabled without any tool_call
+     Requirements: llm-integration.9.5.6, llm-integration.9.5.6.1 */
+  it('persists llm text when output.text looks like payload but turn has no tool_call', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockResolvedValue({ text: '{"summary_points":["Done"]}' });
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(1);
+  });
+
+  /* Preconditions: Provider streams final_answer tool_call and then streamed JSON chunks mirroring final payload
+     Action: Run pipeline for one user turn
+     Assertions: Streamed mirror text is suppressed and kind:llm is not persisted
+     Requirements: llm-integration.9.5.6, llm-integration.9.5.6.1 */
+  it('does not persist duplicate llm text when streamed JSON chunks mirror final_answer payload', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-stream-mirror',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['Done'] },
+        });
+        onChunk({ type: 'text', delta: '{"summary_points":' });
+        onChunk({ type: 'text', delta: '["Done"]}' });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(1);
+    expect(messageManager.hideAndMarkIncomplete).toHaveBeenCalledWith(2, 'agent-1');
+    const completedLlmCreates = llmCreates.filter((call: unknown[]) => call[4] === true);
+    expect(completedLlmCreates).toHaveLength(0);
+  });
+
+  /* Preconditions: Provider streams final_answer tool_call and then streamed JSON chunks with non-mirror payload
+     Action: Run pipeline for one user turn
+     Assertions: Streamed non-mirror text is preserved as kind:llm
+     Requirements: llm-integration.9.5.6, llm-integration.9.5.6.1 */
+  it('persists llm text when streamed JSON chunks do not mirror final_answer payload', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-stream-non-mirror',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['Done'] },
+        });
+        onChunk({ type: 'text', delta: '{"summary_points":' });
+        onChunk({ type: 'text', delta: '["Different payload"]}' });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(1);
+    expect(llmCreates[0]?.[2]).toEqual(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          text: '{"summary_points":["Different payload"]}',
+        }),
+      })
+    );
+  });
+
+  /* Preconditions: Provider streams final_answer tool_call and then unfinished JSON-like text chunks that never become parseable
+     Action: Run pipeline for one user turn
+     Assertions: Non-mirror malformed streamed text is preserved as completed kind:llm
+     Requirements: llm-integration.9.5.6, llm-integration.9.5.6.1 */
+  it('persists llm text when streamed JSON-like text after tool_call remains malformed', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-stream-malformed',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['Done'] },
+        });
+        onChunk({ type: 'text', delta: '{"summary_points": ' });
+        onChunk({ type: 'text', delta: '"unterminated"' });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(1);
+    expect(llmCreates[0]?.[2]).toEqual(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          text: '{"summary_points": "unterminated"',
+        }),
+      })
+    );
+  });
+
+  /* Preconditions: Provider returns final_answer tool_call and output.text contains mirrored JSON prefix plus regular assistant text
+     Action: Run pipeline for one user turn
+     Assertions: Mirrored JSON prefix is removed and only regular assistant text is persisted in kind:llm
+     Requirements: llm-integration.9.5.6, llm-integration.9.5.6.1 */
+  it('strips mirrored final_answer JSON prefix and preserves trailing assistant text', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-json-prefix-with-tail',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['Checklist item'] },
+        });
+        return {
+          text: '{"summary_points":["Checklist item"]}Hello! How can I help?',
+        };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(1);
+    expect(llmCreates[0]?.[2]).toEqual(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          text: 'Hello! How can I help?',
         }),
       })
     );

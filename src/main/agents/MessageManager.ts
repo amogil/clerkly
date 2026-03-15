@@ -13,6 +13,9 @@ import { Logger } from '../Logger';
 import type { Message } from '../db/schema';
 import type { MessagePayload } from '../../shared/utils/agentStatus';
 import type { LLMUsage } from '../llm/ILLMProvider';
+import type { MessageOrderColumns } from '../db/repositories/MessagesRepository';
+
+type PersistedMessageOrder = Required<MessageOrderColumns>;
 
 /**
  * MessageManager - business logic for messages
@@ -51,6 +54,9 @@ export class MessageManager {
       kind: message.kind,
       timestamp: new Date(message.timestamp).getTime(),
       payload,
+      runId: message.runId ?? null,
+      attemptId: message.attemptId ?? null,
+      sequence: message.sequence ?? null,
       replyToMessageId: message.replyToMessageId ?? null,
       hidden: message.hidden ?? false,
       done: message.done ?? false,
@@ -243,6 +249,68 @@ export class MessageManager {
 
     if (emitEvent) {
       // Fetch updated message to get correct kind for the event
+      const updated = this.dbManager.messages.getById(messageId, agentId);
+      if (updated) {
+        const changedFields = done === undefined ? ['payload'] : ['done', 'payload'];
+        MainEventBus.getInstance().publish(
+          new MessageUpdatedEvent(this.toEventMessage(updated), changedFields)
+        );
+      }
+    }
+  }
+
+  /**
+   * Create a new message for an agent with explicit run order metadata.
+   * Requirements: llm-integration.6.9
+   */
+  createWithOrder(
+    agentId: string,
+    kind: string,
+    payload: MessagePayload,
+    replyToMessageId: number | null,
+    order: PersistedMessageOrder,
+    done: boolean = false,
+    timestamp?: string,
+    emitEvent: boolean = true
+  ): Message {
+    const payloadJson = JSON.stringify(payload);
+    const message = this.dbManager.messages.create(
+      agentId,
+      kind,
+      payloadJson,
+      replyToMessageId,
+      done,
+      timestamp,
+      order
+    );
+
+    this.logger.info(`Message created: ${message.id} for agent ${agentId}`);
+
+    if (emitEvent) {
+      MainEventBus.getInstance().publish(new MessageCreatedEvent(this.toEventMessage(message)));
+    }
+
+    return message;
+  }
+
+  /**
+   * Update message payload and persist run order metadata.
+   * Requirements: llm-integration.6.9
+   */
+  updateWithOrder(
+    messageId: number,
+    agentId: string,
+    payload: MessagePayload,
+    order: PersistedMessageOrder,
+    done?: boolean,
+    emitEvent: boolean = true
+  ): void {
+    const payloadJson = JSON.stringify(payload);
+    this.dbManager.messages.update(messageId, agentId, payloadJson, done, order);
+
+    this.logger.info(`Message updated: ${messageId}`);
+
+    if (emitEvent) {
       const updated = this.dbManager.messages.getById(messageId, agentId);
       if (updated) {
         const changedFields = done === undefined ? ['payload'] : ['done', 'payload'];

@@ -8,6 +8,12 @@ import * as schema from '../schema';
 import { messages, Message } from '../schema';
 import { AgentsRepository } from './AgentsRepository';
 
+export interface MessageOrderColumns {
+  runId?: string | null;
+  attemptId?: number | null;
+  sequence?: number | null;
+}
+
 export class MessagesRepository {
   constructor(
     private db: BetterSQLite3Database<typeof schema>,
@@ -97,7 +103,8 @@ export class MessagesRepository {
     payloadJson: string,
     replyToMessageId: number | null,
     done: boolean = false,
-    timestamp?: string
+    timestamp?: string,
+    order?: MessageOrderColumns
   ): Message {
     this.checkAccess(agentId);
 
@@ -110,7 +117,17 @@ export class MessagesRepository {
 
     const message = this.db
       .insert(messages)
-      .values({ agentId, kind, timestamp: messageTimestamp, payloadJson, replyToMessageId, done })
+      .values({
+        agentId,
+        kind,
+        timestamp: messageTimestamp,
+        payloadJson,
+        replyToMessageId,
+        done,
+        runId: order?.runId ?? null,
+        attemptId: order?.attemptId ?? null,
+        sequence: order?.sequence ?? null,
+      })
       .returning()
       .get();
 
@@ -239,11 +256,32 @@ export class MessagesRepository {
    * Update a message's payload
    * Requirements: user-data-isolation.7.6
    */
-  update(messageId: number, agentId: string, payloadJson: string, done?: boolean): void {
+  update(
+    messageId: number,
+    agentId: string,
+    payloadJson: string,
+    done?: boolean,
+    order?: MessageOrderColumns
+  ): void {
     this.checkAccess(agentId);
-    const patch: { payloadJson: string; done?: boolean } = { payloadJson };
+    const patch: {
+      payloadJson: string;
+      done?: boolean;
+      runId?: string | null;
+      attemptId?: number | null;
+      sequence?: number | null;
+    } = { payloadJson };
     if (done !== undefined) {
       patch.done = done;
+    }
+    if (order && 'runId' in order) {
+      patch.runId = order.runId ?? null;
+    }
+    if (order && 'attemptId' in order) {
+      patch.attemptId = order.attemptId ?? null;
+    }
+    if (order && 'sequence' in order) {
+      patch.sequence = order.sequence ?? null;
     }
 
     this.db

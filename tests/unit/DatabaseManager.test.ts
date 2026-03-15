@@ -884,6 +884,9 @@ describe('DatabaseManager Repository Accessors', () => {
         CREATE TABLE IF NOT EXISTS messages (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           agent_id TEXT NOT NULL,
+          run_id TEXT,
+          attempt_id INTEGER,
+          sequence INTEGER,
           timestamp TEXT NOT NULL,
           payload_json TEXT NOT NULL,
           usage_json TEXT,

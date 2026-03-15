@@ -2,27 +2,18 @@
 
 import type { MessageSnapshot } from '../../shared/events/types';
 
-type MessageOrderMeta = {
-  runId?: unknown;
-  attemptId?: unknown;
-  sequence?: unknown;
-};
-
 function readOrder(message: MessageSnapshot): {
   runId: string;
   attemptId: number;
   sequence: number;
 } | null {
-  const data = (message.payload?.data ?? {}) as { order?: MessageOrderMeta };
-  const order = data.order;
-  if (!order || typeof order !== 'object') return null;
-  if (typeof order.runId !== 'string') return null;
-  if (typeof order.attemptId !== 'number') return null;
-  if (typeof order.sequence !== 'number') return null;
+  if (typeof message.runId !== 'string') return null;
+  if (typeof message.attemptId !== 'number') return null;
+  if (typeof message.sequence !== 'number') return null;
   return {
-    runId: order.runId,
-    attemptId: order.attemptId,
-    sequence: order.sequence,
+    runId: message.runId,
+    attemptId: message.attemptId,
+    sequence: message.sequence,
   };
 }
 

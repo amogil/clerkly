@@ -10,6 +10,7 @@ import {
   validateCodeExecInput,
 } from '../code_exec/contracts';
 import { SandboxSessionManager } from '../code_exec/SandboxSessionManager';
+import { DEFAULT_AGENT_TITLE } from '../../shared/constants/agents';
 
 /**
  * Normalize prompt text for stable model input:
@@ -27,6 +28,24 @@ export function normalizePromptWhitespace(prompt: string): string {
     .join('\n');
 
   return normalizedByLine.replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/**
+ * Build dynamic system instruction for auto-title metadata generation.
+ * Requirements: llm-integration.16.1, llm-integration.16.2, llm-integration.16.10
+ */
+export function buildAutoTitleMetadataContractPrompt(currentTitle: string): string {
+  return [
+    'Auto-title metadata contract:',
+    '- You MUST emit exactly one HTML comment in this exact format: <!-- clerkly:title-meta: {"title":"<short title>","rename_need_score":NN} -->',
+    `- Current chat title: "${currentTitle}".`,
+    `- If current title is "${DEFAULT_AGENT_TITLE}", emit only for the first meaningful user request.`,
+    '- Emit the comment only if the title should change now.',
+    '- Do not emit the comment for trivial/empty/low-signal requests.',
+    '- Keep <short title> concise plain text: target 3-12 words, max 200 characters.',
+    '- NN must be an integer 0..100; higher means stronger need to rename current title.',
+    '- The comment must not alter the user-facing answer semantics.',
+  ].join('\n');
 }
 
 /**
@@ -308,7 +327,10 @@ export class FinalAnswerFeature implements AgentFeature {
       '- Call the `final_answer` tool only when you are confident the requested work is completed.',
       '- If the requested work is not complete and you are not calling `final_answer`, explicitly ask the user what information or confirmation you need next.',
       '- Call `final_answer` alone: do not combine it with any other tool call in the same turn.',
-      '- Use `final_answer.summary_points` to list solved tasks (required: 1 to 10 points, each max 200 characters).',
+      '- Do not duplicate tool payload as plain assistant text: never output raw JSON that mirrors `final_answer` arguments/output.',
+      '- Use `final_answer.summary_points` to list solved tasks (required: 1 to 10 non-empty points, each max 200 characters).',
+      '- You MAY use Markdown (GFM) inside `final_answer.summary_points` when it improves clarity.',
+      '- In `final_answer.summary_points`, mathematical expressions are optional; if used, format them with Markdown math delimiters: inline `$...$`, block `$$...$$`.',
     ].join('\n');
   }
 
@@ -331,7 +353,9 @@ export class FinalAnswerFeature implements AgentFeature {
               maxItems: 10,
               items: {
                 type: 'string',
+                minLength: 1,
                 maxLength: 200,
+                pattern: '.*\\S.*',
               },
             },
           },

@@ -225,11 +225,16 @@ test.describe('Agent Scroll Position', () => {
 
     await expect(messages).toHaveCount(30, { timeout: 10000 });
 
-    // Scroll to the very top — large enough value to guarantee reaching top
-    await messagesArea.hover();
-    await window.mouse.wheel(0, -999999);
+    // Scroll to top deterministically (wheel-based scrolling is flaky on CI).
+    // Use the actual messages scroll viewport instead of its parent wrapper.
+    const scrollContainerBefore = messagesArea;
+    await scrollContainerBefore.evaluate((el) => {
+      el.scrollTop = 0;
+    });
+    await expect
+      .poll(async () => scrollContainerBefore.evaluate((el) => el.scrollTop), { timeout: 3000 })
+      .toBeLessThan(100);
 
-    const scrollContainerBefore = messagesArea.locator('..');
     const scrollTopBefore = await scrollContainerBefore.evaluate((el) => el.scrollTop);
 
     // Create new agent (agent-2) and switch to it
@@ -247,12 +252,11 @@ test.describe('Agent Scroll Position', () => {
     // Wait for agent-1 messages to load
     await expect(messages).toHaveCount(30, { timeout: 5000 });
 
-    const scrollContainerAfter = activeChat(window).messagesArea.locator('..');
+    const scrollContainerAfter = activeChat(window).messagesArea;
     const scrollTopAfter = await scrollContainerAfter.evaluate((el) => el.scrollTop);
 
-    // Scroll position should be restored (within a small tolerance).
-    expect(scrollTopBefore).toBeLessThan(5);
-    expect(scrollTopAfter).toBeLessThan(100);
+    // Scroll position should be restored (within tolerance).
+    expect(Math.abs(scrollTopAfter - scrollTopBefore)).toBeLessThan(80);
   });
 
   /* Preconditions: Active agent has long history and user scrolled up

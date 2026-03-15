@@ -3,7 +3,7 @@
 // Orchestrates the LLM request/response cycle for a single agent message
 
 import { MessageManager } from './MessageManager';
-import { PromptBuilder } from './PromptBuilder';
+import { PromptBuilder, buildAutoTitleMetadataContractPrompt } from './PromptBuilder';
 import { AIAgentSettingsManager } from '../AIAgentSettingsManager';
 import { LLMProviderFactory } from '../llm/LLMProviderFactory';
 import { MainEventBus } from '../events/MainEventBus';
@@ -15,7 +15,13 @@ import {
 } from '../../shared/events/types';
 import { LLM_CHAT_MODELS } from '../llm/LLMConfig';
 import { Logger } from '../Logger';
-import type { ILLMProvider, ChatOptions, LLMChatResult } from '../llm/ILLMProvider';
+import type {
+  ILLMProvider,
+  ChatChunk,
+  ChatOptions,
+  LLMChatResult,
+  ChatMessage,
+} from '../llm/ILLMProvider';
 import { handleBackgroundError } from '../ErrorHandler';
 import { normalizeLLMError } from '../llm/ErrorNormalizer';
 import type { IToolExecutor } from '../tools/ToolRunner';
@@ -26,6 +32,17 @@ import {
   buildRunningToolPayload,
   buildTerminalToolPayload,
 } from '../code_exec/CodeExecPersistenceMapper';
+import {
+  AgentTitleCommentParser,
+  evaluateAgentTitleGuards,
+  normalizeAgentTitleCandidate,
+  parseAgentTitleMetadataPayload,
+  type AgentTitleMetadata,
+  isValidRenameNeedScore,
+  TITLE_RENAME_MIN_USER_TURN_GAP,
+} from './AgentTitleRuntime';
+import type { Message } from '../db/schema';
+import { DEFAULT_AGENT_TITLE } from '../../shared/constants/agents';
 
 import type { LLMProvider } from '../../types';
 
@@ -53,9 +70,52 @@ type MessageOrderMeta = {
 type StreamProcessingResult = {
   output: LLMChatResult;
   finalLlmMessageId: number | null;
+  finalLlmPayload: Record<string, unknown> | null;
   activeLlmMessageId: number | null;
   finalAnswerCall: { callId: string; args: Record<string, unknown> } | null;
   finalAnswerOrder: MessageOrderMeta | null;
+  titleMetadata: AgentTitleMetadata | null;
+};
+
+type AgentTitleUpdater = {
+  getCurrentTitle: (agentId: string) => string | null;
+  rename: (agentId: string, name: string) => void;
+};
+
+type StreamingCallContext = {
+  chatMessages: ReturnType<PromptBuilder['buildMessages']>;
+  options: ChatOptions;
+  replyToMessageId: number;
+  llmProvider: ILLMProvider;
+};
+
+type AttemptRuntimeState = {
+  attemptMessageIds: Set<number>;
+  runningToolCalls: Map<string, RunningToolState>;
+  pendingToolCall: { callId: string; toolName: string; args: Record<string, unknown> } | null;
+  sequence: number;
+  currentSegment: LlmSegmentState;
+  pendingReasoningDelta: string;
+  pendingTextDelta: string;
+  pendingFirstType: 'reasoning' | 'text' | null;
+  lastFlushAt: number;
+  flushTimer: ReturnType<typeof setTimeout> | null;
+  pendingToolCallFlushTimer: ReturnType<typeof setTimeout> | null;
+  finalLlmMessageId: number | null;
+  toolCallsInCurrentStep: number;
+  sawAnyToolCall: boolean;
+  finalAnswerCall: { callId: string; args: Record<string, unknown> } | null;
+  finalAnswerOrder: MessageOrderMeta | null;
+  meaningfulChunkSeen: boolean;
+  titleParser: AgentTitleCommentParser;
+  sawTextChunk: boolean;
+};
+
+type AttemptCycleState = {
+  attempts: number;
+  invalidFinalAnswerSeen: boolean;
+  validationFeedback: string | null;
+  runId: string;
 };
 
 const FINAL_ANSWER_RETRY_EXHAUSTED_MESSAGE =
@@ -116,6 +176,10 @@ export type LLMErrorType =
  */
 export class MainPipeline {
   private logger = Logger.create('MainPipeline');
+  private autoTitleHistoryCache = new Map<
+    string,
+    { lastProcessedMessageId: number; lastRenameUserTurn: number | null }
+  >();
 
   constructor(
     private messageManager: MessageManager,
@@ -123,7 +187,8 @@ export class MainPipeline {
     private promptBuilder: PromptBuilder,
     private createProvider: (provider: LLMProvider, apiKey: string) => ILLMProvider = (p, k) =>
       LLMProviderFactory.createProvider(p, k),
-    private toolExecutor: IToolExecutor = new ToolRunner({}, 3)
+    private toolExecutor: IToolExecutor = new ToolRunner({}, 3),
+    private agentTitleUpdater?: AgentTitleUpdater
   ) {}
 
   /**
@@ -160,6 +225,11 @@ export class MainPipeline {
     }
   }
 
+  // Requirements: llm-integration.16.10
+  clearAutoTitleCache(agentId: string): void {
+    this.autoTitleHistoryCache.delete(agentId);
+  }
+
   /**
    * Build settings and prompt context for the run.
    * Requirements: llm-integration.1.3, llm-integration.1.4, llm-integration.5.2
@@ -171,6 +241,7 @@ export class MainPipeline {
   ): Promise<{
     provider: LLMProvider;
     apiKey: string;
+    historyMessages: Message[];
     baseChatMessages: ReturnType<PromptBuilder['buildMessages']>;
     options: ChatOptions;
     replyToMessageId: number;
@@ -189,7 +260,11 @@ export class MainPipeline {
     }
 
     const messages = this.messageManager.listForModelHistory(agentId);
-    const baseChatMessages = this.promptBuilder.buildMessages(messages);
+    const autoTitleInstruction = this.buildAutoTitleSystemInstruction(agentId, messages);
+    const baseChatMessages = this.injectSystemMessage(
+      this.promptBuilder.buildMessages(messages),
+      autoTitleInstruction
+    );
     const builtPrompt = this.promptBuilder.build();
     const replyToMessageId = userMessageId;
     const options = {
@@ -198,7 +273,15 @@ export class MainPipeline {
     };
     const llmProvider = this.createProvider(provider, apiKey);
 
-    return { provider, apiKey, baseChatMessages, options, replyToMessageId, llmProvider };
+    return {
+      provider,
+      apiKey,
+      historyMessages: messages,
+      baseChatMessages,
+      options,
+      replyToMessageId,
+      llmProvider,
+    };
   }
 
   /**
@@ -207,6 +290,7 @@ export class MainPipeline {
    */
   private async executeWithRetries(
     context: {
+      historyMessages: Message[];
       baseChatMessages: ReturnType<PromptBuilder['buildMessages']>;
       options: ChatOptions;
       replyToMessageId: number;
@@ -244,6 +328,11 @@ export class MainPipeline {
       this.persistUsageEnvelope(streamResult.finalLlmMessageId, agentId, streamResult.output);
     }
     if (streamResult.finalAnswerCall) {
+      if (!streamResult.finalAnswerOrder) {
+        throw new InvalidFinalAnswerContractError(
+          'Missing order metadata for final_answer tool_call'
+        );
+      }
       this.persistFinalAnswerToolCall(
         agentId,
         context.replyToMessageId,
@@ -252,6 +341,20 @@ export class MainPipeline {
         streamResult.finalAnswerOrder
       );
     }
+    const messagesForAutoTitle = this.extendHistorySnapshotWithFinalLlm(
+      context.historyMessages,
+      agentId,
+      context.replyToMessageId,
+      streamResult.finalLlmMessageId,
+      streamResult.finalLlmPayload
+    );
+    this.applyAutoTitleCandidate(
+      agentId,
+      streamResult.titleMetadata,
+      streamResult.finalLlmMessageId,
+      streamResult.finalLlmPayload,
+      messagesForAutoTitle
+    );
     this.publishStepDiagnostics(agentId, userMessageId, streamResult.output);
     this.logger.info(`Pipeline completed for agent ${agentId}`);
   }
@@ -261,419 +364,854 @@ export class MainPipeline {
    * Requirements: llm-integration.1.5, llm-integration.1.6, llm-integration.2
    */
   private async callProviderWithStreaming(
-    context: {
-      chatMessages: ReturnType<PromptBuilder['buildMessages']>;
-      options: ChatOptions;
-      replyToMessageId: number;
-      llmProvider: ILLMProvider;
-    },
+    context: StreamingCallContext,
     agentId: string,
     signal: AbortSignal | undefined,
     setLastLlmMessageId: (messageId: number) => void
   ): Promise<StreamProcessingResult> {
-    let attempts = 0;
-    let invalidFinalAnswerSeen = false;
-    let validationFeedback: string | null = null;
-    const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    const cycleState: AttemptCycleState = {
+      attempts: 0,
+      invalidFinalAnswerSeen: false,
+      validationFeedback: null,
+      runId: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+    };
 
     for (;;) {
-      const attemptMessageIds = new Set<number>();
-      const runningToolCalls = new Map<string, RunningToolState>();
-      let pendingToolCall: {
-        callId: string;
-        toolName: string;
-        args: Record<string, unknown>;
-      } | null = null;
-      const attemptId = attempts + 1;
-      let sequence = 0;
-      const nextOrder = (): MessageOrderMeta => ({
-        runId,
-        attemptId,
-        sequence: ++sequence,
-      });
-      let currentSegment: LlmSegmentState = { id: null, reasoning: '', text: '', order: null };
-      let pendingReasoningDelta = '';
-      let pendingTextDelta = '';
-      let pendingFirstType: 'reasoning' | 'text' | null = null;
-      let lastFlushAt = 0;
-      let flushTimer: ReturnType<typeof setTimeout> | null = null;
-      let pendingToolCallFlushTimer: ReturnType<typeof setTimeout> | null = null;
-      let finalLlmMessageId: number | null = null;
-      let toolCallsInCurrentStep = 0;
-      let sawAnyToolCall = false;
-      let finalAnswerCall: { callId: string; args: Record<string, unknown> } | null = null;
-      let finalAnswerOrder: MessageOrderMeta | null = null;
-      let meaningfulChunkSeen = false;
-
-      const clearFlushTimer = (): void => {
-        if (flushTimer) {
-          clearTimeout(flushTimer);
-          flushTimer = null;
-        }
-      };
-
-      const clearPendingToolCallFlushTimer = (): void => {
-        if (pendingToolCallFlushTimer) {
-          clearTimeout(pendingToolCallFlushTimer);
-          pendingToolCallFlushTimer = null;
-        }
-      };
-
-      const flushBufferedLlmSegment = (): void => {
-        if (!pendingReasoningDelta && !pendingTextDelta) {
-          return;
-        }
-
-        currentSegment.id = this.upsertLlmSegment(
-          currentSegment,
-          agentId,
-          context.replyToMessageId,
-          context.options.model,
-          nextOrder,
-          setLastLlmMessageId,
-          attemptMessageIds
-        );
-
-        const emitReasoning = (): void => {
-          if (!pendingReasoningDelta) return;
-          MainEventBus.getInstance().publish(
-            new MessageLlmReasoningUpdatedEvent(
-              currentSegment.id as number,
-              agentId,
-              pendingReasoningDelta,
-              currentSegment.reasoning
-            )
-          );
-        };
-        const emitText = (): void => {
-          if (!pendingTextDelta) return;
-          MainEventBus.getInstance().publish(
-            new MessageLlmTextUpdatedEvent(
-              currentSegment.id as number,
-              agentId,
-              pendingTextDelta,
-              currentSegment.text
-            )
-          );
-        };
-
-        if (pendingFirstType === 'text') {
-          emitText();
-          emitReasoning();
-        } else {
-          emitReasoning();
-          emitText();
-        }
-
-        pendingReasoningDelta = '';
-        pendingTextDelta = '';
-        pendingFirstType = null;
-        lastFlushAt = Date.now();
-      };
-
-      const scheduleLlmFlush = (force: boolean = false): void => {
-        if (!pendingReasoningDelta && !pendingTextDelta) {
-          return;
-        }
-
-        if (force) {
-          clearFlushTimer();
-          flushBufferedLlmSegment();
-          return;
-        }
-
-        const now = Date.now();
-        const elapsedSinceLastFlush = now - lastFlushAt;
-        if (lastFlushAt === 0 || elapsedSinceLastFlush >= STREAM_FLUSH_INTERVAL_MS) {
-          clearFlushTimer();
-          flushBufferedLlmSegment();
-          return;
-        }
-
-        if (!flushTimer) {
-          const delayMs = STREAM_FLUSH_INTERVAL_MS - elapsedSinceLastFlush;
-          flushTimer = setTimeout(
-            () => {
-              flushTimer = null;
-              flushBufferedLlmSegment();
-            },
-            Math.max(1, delayMs)
-          );
-        }
-      };
-
-      const flushPendingToolCall = (): void => {
-        clearPendingToolCallFlushTimer();
-        scheduleLlmFlush(true);
-        if (!pendingToolCall) {
-          return;
-        }
-
-        finalLlmMessageId = this.finalizeLlmSegmentIfNonEmpty(
-          currentSegment,
-          agentId,
-          context.options.model
-        );
-        if (finalLlmMessageId !== null) {
-          setLastLlmMessageId(finalLlmMessageId);
-        }
-        currentSegment = { id: null, reasoning: '', text: '', order: null };
-        pendingReasoningDelta = '';
-        pendingTextDelta = '';
-        pendingFirstType = null;
-        lastFlushAt = 0;
-        clearFlushTimer();
-
-        const payloadData: Record<string, unknown> = {
-          callId: pendingToolCall.callId,
-          toolName: pendingToolCall.toolName,
-          arguments: pendingToolCall.args,
-          order: nextOrder(),
-        };
-        const startedAt = new Date().toISOString();
-        const runningPayload = buildRunningToolPayload(payloadData, startedAt);
-        const runningMessage = this.messageManager.create(
-          agentId,
-          'tool_call',
-          runningPayload,
-          context.replyToMessageId,
-          false
-        );
-        attemptMessageIds.add(runningMessage.id);
-        runningToolCalls.set(pendingToolCall.callId, {
-          messageId: runningMessage.id,
-          callId: pendingToolCall.callId,
-          toolName: pendingToolCall.toolName,
-          args: pendingToolCall.args,
-          startedAt,
-        });
-        pendingToolCall = null;
-      };
-
-      const schedulePendingToolCallFlush = (): void => {
-        if (!pendingToolCall) {
-          return;
-        }
-        clearPendingToolCallFlushTimer();
-        pendingToolCallFlushTimer = setTimeout(() => {
-          pendingToolCallFlushTimer = null;
-          flushPendingToolCall();
-        }, STREAM_FLUSH_INTERVAL_MS);
-      };
+      const attemptState = this.initializeAttemptRuntimeState();
+      const attemptId = cycleState.attempts + 1;
 
       try {
-        const chatMessagesForAttempt = this.buildRetryChatMessages(
-          context.chatMessages,
-          validationFeedback
-        );
-        const output = await context.llmProvider.chat(
-          chatMessagesForAttempt,
-          context.options,
-          (chunk) => {
-            if (signal?.aborted) {
-              return;
-            }
-
-            if (chunk.type === 'reasoning') {
-              if (!chunk.delta) {
-                return;
-              }
-              meaningfulChunkSeen = true;
-              currentSegment.reasoning += chunk.delta;
-              if (!pendingFirstType) {
-                pendingFirstType = 'reasoning';
-              }
-              pendingReasoningDelta += chunk.delta;
-              scheduleLlmFlush();
-              if (pendingToolCall) {
-                schedulePendingToolCallFlush();
-              }
-              return;
-            }
-
-            if (chunk.type === 'text') {
-              if (!chunk.delta) {
-                return;
-              }
-              meaningfulChunkSeen = true;
-              if (pendingToolCall) {
-                flushPendingToolCall();
-              }
-              currentSegment.text += chunk.delta;
-              if (!pendingFirstType) {
-                pendingFirstType = 'text';
-              }
-              pendingTextDelta += chunk.delta;
-              scheduleLlmFlush();
-              return;
-            }
-
-            if (chunk.type === 'tool_call') {
-              meaningfulChunkSeen = true;
-              scheduleLlmFlush(true);
-              sawAnyToolCall = true;
-              toolCallsInCurrentStep += 1;
-              if (toolCallsInCurrentStep > 1) {
-                throw new InvalidToolArgumentsError(
-                  'Model returned more than one tool_call in a single response'
-                );
-              }
-
-              this.validateToolCallArguments(chunk.toolName, chunk.arguments);
-
-              if (chunk.toolName === 'final_answer') {
-                finalAnswerCall = {
-                  callId: chunk.callId,
-                  args: this.normalizeFinalAnswerArguments(chunk.arguments),
-                };
-                return;
-              }
-
-              pendingToolCall = {
-                callId: chunk.callId,
-                toolName: chunk.toolName,
-                args: chunk.arguments,
-              };
-              schedulePendingToolCallFlush();
-              return;
-            }
-
-            if (chunk.type === 'tool_result') {
-              meaningfulChunkSeen = true;
-              scheduleLlmFlush(true);
-              toolCallsInCurrentStep = 0;
-              if (pendingToolCall && pendingToolCall.callId === chunk.callId) {
-                flushPendingToolCall();
-              }
-              const running = runningToolCalls.get(chunk.callId);
-              if (!running) {
-                return;
-              }
-
-              const payloadData: Record<string, unknown> = {
-                callId: running.callId,
-                toolName: running.toolName,
-                arguments: running.args,
-              };
-              const terminalOutput = this.normalizeToolOutputPayload(
-                running.toolName,
-                chunk.status,
-                chunk.output
-              );
-              const finishedAt = new Date().toISOString();
-              const terminalPayload = buildTerminalToolPayload(
-                payloadData,
-                terminalOutput,
-                running.startedAt,
-                finishedAt
-              );
-              this.messageManager.update(running.messageId, agentId, terminalPayload, true);
-              runningToolCalls.delete(chunk.callId);
-              return;
-            }
-
-            if (chunk.type === 'turn_error') {
-              throw new Error(chunk.message);
-            }
-          }
-        );
-
-        flushPendingToolCall();
-
-        if (
-          currentSegment.id !== null &&
-          !currentSegment.text &&
-          typeof output.text === 'string' &&
-          output.text.length > 0
-        ) {
-          currentSegment.text = output.text;
-        }
-
-        const finalizedSegmentId = this.finalizeLlmSegmentIfNonEmpty(
-          currentSegment,
+        return await this.runProviderAttempt(
+          context,
           agentId,
-          context.options.model
+          signal,
+          setLastLlmMessageId,
+          cycleState,
+          attemptState,
+          attemptId
         );
-        if (finalizedSegmentId !== null) {
-          finalLlmMessageId = finalizedSegmentId;
-          setLastLlmMessageId(finalizedSegmentId);
-        } else if (typeof output.text === 'string' && output.text.trim().length > 0) {
-          const msg = this.createCompletedLlmMessage(
-            agentId,
-            context.replyToMessageId,
-            context.options.model,
-            output.text,
-            nextOrder()
-          );
-          attemptMessageIds.add(msg.id);
-          finalLlmMessageId = msg.id;
-          setLastLlmMessageId(msg.id);
-        }
-
-        if (finalAnswerCall) {
-          finalAnswerOrder = nextOrder();
-        }
-
-        if (signal?.aborted) {
-          return {
-            output,
-            finalLlmMessageId,
-            activeLlmMessageId: currentSegment.id,
-            finalAnswerCall,
-            finalAnswerOrder,
-          };
-        }
-
-        if (finalLlmMessageId === null && !finalAnswerCall && !sawAnyToolCall) {
-          throw new InvalidFinalAnswerContractError(
-            'Model returned no assistant text and no completion tool call'
-          );
-        }
-        if (invalidFinalAnswerSeen && !finalAnswerCall) {
-          throw new InvalidFinalAnswerContractError(
-            'Model did not return final_answer after invalid completion retry. Please try again later.'
-          );
-        }
-
-        return {
-          output,
-          finalLlmMessageId,
-          activeLlmMessageId: currentSegment.id,
-          finalAnswerCall,
-          finalAnswerOrder,
-        };
       } catch (error) {
-        clearPendingToolCallFlushTimer();
-        const isInvalidFinalAnswer =
-          error instanceof InvalidFinalAnswerContractError ||
-          error instanceof InvalidToolArgumentsError;
-        if (!isInvalidFinalAnswer) {
-          flushPendingToolCall();
-        }
-        if (isInvalidFinalAnswer) {
-          invalidFinalAnswerSeen = Boolean(finalAnswerCall);
-          validationFeedback =
-            error instanceof Error ? error.message : 'Invalid tool call arguments.';
-        }
-        const shouldRetryInvalidFinalAnswer =
-          isInvalidFinalAnswer && attempts < MAX_INVALID_TOOL_CALL_RETRIES && !signal?.aborted;
-        const shouldRetrySilentFailure =
-          !isInvalidFinalAnswer && attempts < 1 && !meaningfulChunkSeen && !signal?.aborted;
-        const shouldRetry = shouldRetryInvalidFinalAnswer || shouldRetrySilentFailure;
-
+        const shouldRetry = this.handleAttemptFailure(
+          error,
+          context,
+          agentId,
+          signal,
+          cycleState,
+          attemptState,
+          setLastLlmMessageId
+        );
         if (!shouldRetry) {
-          if (isInvalidFinalAnswer) {
-            throw new InvalidToolCallRetryExhaustedError();
-          }
           throw error;
         }
-
-        for (const messageId of attemptMessageIds) {
-          this.messageManager.setHidden(messageId, agentId);
-        }
-        attempts += 1;
+        cycleState.attempts += 1;
       }
     }
+  }
+
+  // Requirements: llm-integration.1.5, llm-integration.1.6, llm-integration.2
+  private initializeAttemptRuntimeState(): AttemptRuntimeState {
+    return {
+      attemptMessageIds: new Set<number>(),
+      runningToolCalls: new Map<string, RunningToolState>(),
+      pendingToolCall: null,
+      sequence: 0,
+      currentSegment: { id: null, reasoning: '', text: '', order: null },
+      pendingReasoningDelta: '',
+      pendingTextDelta: '',
+      pendingFirstType: null,
+      lastFlushAt: 0,
+      flushTimer: null,
+      pendingToolCallFlushTimer: null,
+      finalLlmMessageId: null,
+      toolCallsInCurrentStep: 0,
+      sawAnyToolCall: false,
+      finalAnswerCall: null,
+      finalAnswerOrder: null,
+      meaningfulChunkSeen: false,
+      titleParser: new AgentTitleCommentParser(),
+      sawTextChunk: false,
+    };
+  }
+
+  // Requirements: llm-integration.1.5, llm-integration.1.6, llm-integration.2
+  private async runProviderAttempt(
+    context: StreamingCallContext,
+    agentId: string,
+    signal: AbortSignal | undefined,
+    setLastLlmMessageId: (messageId: number) => void,
+    cycleState: AttemptCycleState,
+    attemptState: AttemptRuntimeState,
+    attemptId: number
+  ): Promise<StreamProcessingResult> {
+    const chatMessagesForAttempt = this.buildRetryChatMessages(
+      context.chatMessages,
+      cycleState.validationFeedback
+    );
+    const output = await context.llmProvider.chat(
+      chatMessagesForAttempt,
+      context.options,
+      (chunk) => {
+        this.handleStreamChunk(
+          chunk,
+          context,
+          agentId,
+          signal,
+          attemptState,
+          cycleState.runId,
+          attemptId,
+          setLastLlmMessageId
+        );
+      }
+    );
+
+    this.flushPendingToolCall(
+      context,
+      agentId,
+      cycleState.runId,
+      attemptId,
+      setLastLlmMessageId,
+      attemptState
+    );
+
+    return this.finalizeAttemptResult(
+      output,
+      context,
+      agentId,
+      signal,
+      cycleState,
+      attemptState,
+      setLastLlmMessageId,
+      attemptId
+    );
+  }
+
+  // Requirements: llm-integration.1.5, llm-integration.1.6, llm-integration.2
+  private handleStreamChunk(
+    chunk: ChatChunk,
+    context: StreamingCallContext,
+    agentId: string,
+    signal: AbortSignal | undefined,
+    state: AttemptRuntimeState,
+    runId: string,
+    attemptId: number,
+    setLastLlmMessageId: (messageId: number) => void
+  ): void {
+    if (signal?.aborted) {
+      return;
+    }
+
+    if (chunk.type === 'reasoning') {
+      if (!chunk.delta) {
+        return;
+      }
+      state.meaningfulChunkSeen = true;
+      state.currentSegment.reasoning += chunk.delta;
+      if (!state.pendingFirstType) {
+        state.pendingFirstType = 'reasoning';
+      }
+      state.pendingReasoningDelta += chunk.delta;
+      this.scheduleLlmFlush(context, agentId, runId, attemptId, setLastLlmMessageId, state);
+      if (state.pendingToolCall) {
+        this.schedulePendingToolCallFlush(
+          context,
+          agentId,
+          runId,
+          attemptId,
+          setLastLlmMessageId,
+          state
+        );
+      }
+      return;
+    }
+
+    if (chunk.type === 'text') {
+      if (!chunk.delta) {
+        return;
+      }
+      state.sawTextChunk = true;
+      state.meaningfulChunkSeen = true;
+      state.titleParser.ingest(chunk.delta);
+      if (state.pendingToolCall) {
+        this.flushPendingToolCall(context, agentId, runId, attemptId, setLastLlmMessageId, state);
+      }
+      state.currentSegment.text += chunk.delta;
+      if (!state.pendingFirstType) {
+        state.pendingFirstType = 'text';
+      }
+      state.pendingTextDelta += chunk.delta;
+      if (this.shouldDeferToolPayloadTextFlush(state)) {
+        return;
+      }
+      this.scheduleLlmFlush(context, agentId, runId, attemptId, setLastLlmMessageId, state);
+      return;
+    }
+
+    if (chunk.type === 'tool_call') {
+      state.meaningfulChunkSeen = true;
+      this.scheduleLlmFlush(context, agentId, runId, attemptId, setLastLlmMessageId, state, true);
+      state.sawAnyToolCall = true;
+      state.toolCallsInCurrentStep += 1;
+      if (state.toolCallsInCurrentStep > 1) {
+        throw new InvalidToolArgumentsError(
+          'Model returned more than one tool_call in a single response'
+        );
+      }
+
+      this.validateToolCallArguments(chunk.toolName, chunk.arguments);
+
+      if (chunk.toolName === 'final_answer') {
+        state.finalAnswerCall = {
+          callId: chunk.callId,
+          args: this.normalizeFinalAnswerArguments(chunk.arguments),
+        };
+        return;
+      }
+
+      state.pendingToolCall = {
+        callId: chunk.callId,
+        toolName: chunk.toolName,
+        args: chunk.arguments,
+      };
+      this.schedulePendingToolCallFlush(
+        context,
+        agentId,
+        runId,
+        attemptId,
+        setLastLlmMessageId,
+        state
+      );
+      return;
+    }
+
+    if (chunk.type === 'tool_result') {
+      state.meaningfulChunkSeen = true;
+      this.scheduleLlmFlush(context, agentId, runId, attemptId, setLastLlmMessageId, state, true);
+      state.toolCallsInCurrentStep = 0;
+      if (state.pendingToolCall && state.pendingToolCall.callId === chunk.callId) {
+        this.flushPendingToolCall(context, agentId, runId, attemptId, setLastLlmMessageId, state);
+      }
+      const running = state.runningToolCalls.get(chunk.callId);
+      if (!running) {
+        return;
+      }
+
+      const payloadData: Record<string, unknown> = {
+        callId: running.callId,
+        toolName: running.toolName,
+        arguments: running.args,
+      };
+      const terminalOutput = this.normalizeToolOutputPayload(
+        running.toolName,
+        chunk.status,
+        chunk.output
+      );
+      const finishedAt = new Date().toISOString();
+      const terminalPayload = buildTerminalToolPayload(
+        payloadData,
+        terminalOutput,
+        running.startedAt,
+        finishedAt
+      );
+      this.messageManager.update(running.messageId, agentId, terminalPayload, true);
+      state.runningToolCalls.delete(chunk.callId);
+      return;
+    }
+
+    if (chunk.type === 'turn_error') {
+      throw new Error(chunk.message);
+    }
+  }
+
+  // Requirements: llm-integration.1.6.4, llm-integration.2.3.1
+  private clearFlushTimer(state: AttemptRuntimeState): void {
+    if (state.flushTimer) {
+      clearTimeout(state.flushTimer);
+      state.flushTimer = null;
+    }
+  }
+
+  // Requirements: llm-integration.1.6.4, llm-integration.2.3.1
+  private clearPendingToolCallFlushTimer(state: AttemptRuntimeState): void {
+    if (state.pendingToolCallFlushTimer) {
+      clearTimeout(state.pendingToolCallFlushTimer);
+      state.pendingToolCallFlushTimer = null;
+    }
+  }
+
+  // Requirements: llm-integration.1.5, llm-integration.1.6
+  private nextOrder(
+    runId: string,
+    attemptId: number,
+    state: AttemptRuntimeState
+  ): MessageOrderMeta {
+    return {
+      runId,
+      attemptId,
+      sequence: ++state.sequence,
+    };
+  }
+
+  // Requirements: llm-integration.1.6.4, llm-integration.2.3.1, llm-integration.2.5.1
+  private flushBufferedLlmSegment(
+    context: StreamingCallContext,
+    agentId: string,
+    runId: string,
+    attemptId: number,
+    setLastLlmMessageId: (messageId: number) => void,
+    state: AttemptRuntimeState
+  ): void {
+    if (!state.pendingReasoningDelta && !state.pendingTextDelta) {
+      return;
+    }
+
+    state.currentSegment.id = this.upsertLlmSegment(
+      state.currentSegment,
+      agentId,
+      context.replyToMessageId,
+      context.options.model,
+      () => this.nextOrder(runId, attemptId, state),
+      setLastLlmMessageId,
+      state.attemptMessageIds
+    );
+
+    const emitReasoning = (): void => {
+      if (!state.pendingReasoningDelta) return;
+      MainEventBus.getInstance().publish(
+        new MessageLlmReasoningUpdatedEvent(
+          state.currentSegment.id as number,
+          agentId,
+          state.pendingReasoningDelta,
+          state.currentSegment.reasoning
+        )
+      );
+    };
+    const emitText = (): void => {
+      if (!state.pendingTextDelta) return;
+      MainEventBus.getInstance().publish(
+        new MessageLlmTextUpdatedEvent(
+          state.currentSegment.id as number,
+          agentId,
+          state.pendingTextDelta,
+          state.currentSegment.text
+        )
+      );
+    };
+
+    if (state.pendingFirstType === 'text') {
+      emitText();
+      emitReasoning();
+    } else {
+      emitReasoning();
+      emitText();
+    }
+
+    state.pendingReasoningDelta = '';
+    state.pendingTextDelta = '';
+    state.pendingFirstType = null;
+    state.lastFlushAt = Date.now();
+  }
+
+  // Requirements: llm-integration.1.6.4, llm-integration.2.3.1
+  private scheduleLlmFlush(
+    context: StreamingCallContext,
+    agentId: string,
+    runId: string,
+    attemptId: number,
+    setLastLlmMessageId: (messageId: number) => void,
+    state: AttemptRuntimeState,
+    force: boolean = false
+  ): void {
+    if (!state.pendingReasoningDelta && !state.pendingTextDelta) {
+      return;
+    }
+
+    if (force) {
+      this.clearFlushTimer(state);
+      this.flushBufferedLlmSegment(context, agentId, runId, attemptId, setLastLlmMessageId, state);
+      return;
+    }
+
+    const now = Date.now();
+    const elapsedSinceLastFlush = now - state.lastFlushAt;
+    if (state.lastFlushAt === 0 || elapsedSinceLastFlush >= STREAM_FLUSH_INTERVAL_MS) {
+      this.clearFlushTimer(state);
+      this.flushBufferedLlmSegment(context, agentId, runId, attemptId, setLastLlmMessageId, state);
+      return;
+    }
+
+    if (!state.flushTimer) {
+      const delayMs = STREAM_FLUSH_INTERVAL_MS - elapsedSinceLastFlush;
+      state.flushTimer = setTimeout(
+        () => {
+          state.flushTimer = null;
+          this.flushBufferedLlmSegment(
+            context,
+            agentId,
+            runId,
+            attemptId,
+            setLastLlmMessageId,
+            state
+          );
+        },
+        Math.max(1, delayMs)
+      );
+    }
+  }
+
+  // Requirements: llm-integration.11.1.2, llm-integration.11.1.5
+  private flushPendingToolCall(
+    context: StreamingCallContext,
+    agentId: string,
+    runId: string,
+    attemptId: number,
+    setLastLlmMessageId: (messageId: number) => void,
+    state: AttemptRuntimeState
+  ): void {
+    this.clearPendingToolCallFlushTimer(state);
+    this.scheduleLlmFlush(context, agentId, runId, attemptId, setLastLlmMessageId, state, true);
+    if (!state.pendingToolCall) {
+      return;
+    }
+
+    state.finalLlmMessageId = this.finalizeLlmSegmentIfNonEmpty(
+      state.currentSegment,
+      agentId,
+      context.options.model
+    );
+    if (state.finalLlmMessageId !== null) {
+      setLastLlmMessageId(state.finalLlmMessageId);
+    }
+    state.currentSegment = { id: null, reasoning: '', text: '', order: null };
+    state.pendingReasoningDelta = '';
+    state.pendingTextDelta = '';
+    state.pendingFirstType = null;
+    state.lastFlushAt = 0;
+    this.clearFlushTimer(state);
+
+    const payloadData: Record<string, unknown> = {
+      callId: state.pendingToolCall.callId,
+      toolName: state.pendingToolCall.toolName,
+      arguments: state.pendingToolCall.args,
+    };
+    const toolOrder = this.nextOrder(runId, attemptId, state);
+    const startedAt = new Date().toISOString();
+    const runningPayload = buildRunningToolPayload(payloadData, startedAt);
+    const runningMessage = this.messageManager.createWithOrder(
+      agentId,
+      'tool_call',
+      runningPayload,
+      context.replyToMessageId,
+      toolOrder,
+      false
+    );
+    state.attemptMessageIds.add(runningMessage.id);
+    state.runningToolCalls.set(state.pendingToolCall.callId, {
+      messageId: runningMessage.id,
+      callId: state.pendingToolCall.callId,
+      toolName: state.pendingToolCall.toolName,
+      args: state.pendingToolCall.args,
+      startedAt,
+    });
+    state.pendingToolCall = null;
+  }
+
+  // Requirements: llm-integration.1.6.4, llm-integration.2.3.1
+  private schedulePendingToolCallFlush(
+    context: StreamingCallContext,
+    agentId: string,
+    runId: string,
+    attemptId: number,
+    setLastLlmMessageId: (messageId: number) => void,
+    state: AttemptRuntimeState
+  ): void {
+    if (!state.pendingToolCall) {
+      return;
+    }
+    this.clearPendingToolCallFlushTimer(state);
+    state.pendingToolCallFlushTimer = setTimeout(() => {
+      state.pendingToolCallFlushTimer = null;
+      this.flushPendingToolCall(context, agentId, runId, attemptId, setLastLlmMessageId, state);
+    }, STREAM_FLUSH_INTERVAL_MS);
+  }
+
+  // Requirements: llm-integration.1.5, llm-integration.1.6, llm-integration.2
+  private finalizeAttemptResult(
+    output: LLMChatResult,
+    context: StreamingCallContext,
+    agentId: string,
+    signal: AbortSignal | undefined,
+    cycleState: AttemptCycleState,
+    state: AttemptRuntimeState,
+    setLastLlmMessageId: (messageId: number) => void,
+    attemptId: number
+  ): StreamProcessingResult {
+    const outputText = typeof output.text === 'string' ? output.text : '';
+    const rawToolPayloadCandidateText =
+      outputText.trim().length > 0 ? outputText : state.currentSegment.text;
+    const toolPayloadCandidateText = this.stripLeadingMirroredToolPayloadText(
+      rawToolPayloadCandidateText,
+      state
+    );
+    if (state.currentSegment.text) {
+      state.currentSegment.text = this.stripLeadingMirroredToolPayloadText(
+        state.currentSegment.text,
+        state
+      );
+    }
+    const suppressTechnicalToolPayloadText =
+      this.shouldSuppressTechnicalToolPayloadText(toolPayloadCandidateText, state) ||
+      toolPayloadCandidateText.trim().length === 0;
+    if (suppressTechnicalToolPayloadText && state.currentSegment.id !== null) {
+      this.hideIncompleteLlmMessage(state.currentSegment.id, agentId);
+      state.currentSegment = { id: null, reasoning: '', text: '', order: null };
+    }
+
+    if (!state.sawTextChunk && outputText.length > 0) {
+      state.titleParser.ingest(outputText);
+    }
+    state.titleParser.finalize();
+    const titleMetadata = parseAgentTitleMetadataPayload(state.titleParser.getCandidate());
+
+    if (
+      state.currentSegment.id !== null &&
+      !state.currentSegment.text &&
+      outputText.length > 0 &&
+      !suppressTechnicalToolPayloadText
+    ) {
+      state.currentSegment.text = outputText;
+    }
+
+    let finalLlmPayload: Record<string, unknown> | null = null;
+    const finalizedSegmentId = this.finalizeLlmSegmentIfNonEmpty(
+      state.currentSegment,
+      agentId,
+      context.options.model
+    );
+    if (finalizedSegmentId !== null) {
+      state.finalLlmMessageId = finalizedSegmentId;
+      setLastLlmMessageId(finalizedSegmentId);
+      finalLlmPayload = {
+        data: {
+          model: context.options.model,
+          reasoning: state.currentSegment.reasoning
+            ? { text: state.currentSegment.reasoning, excluded_from_replay: true }
+            : undefined,
+          text: state.currentSegment.text || undefined,
+        },
+      };
+    } else if (toolPayloadCandidateText.trim().length > 0 && !suppressTechnicalToolPayloadText) {
+      const fallbackOrder = this.nextOrder(cycleState.runId, attemptId, state);
+      const msg = this.createCompletedLlmMessage(
+        agentId,
+        context.replyToMessageId,
+        context.options.model,
+        toolPayloadCandidateText,
+        fallbackOrder
+      );
+      state.attemptMessageIds.add(msg.id);
+      state.finalLlmMessageId = msg.id;
+      setLastLlmMessageId(msg.id);
+      finalLlmPayload = {
+        data: {
+          model: context.options.model,
+          text: toolPayloadCandidateText,
+        },
+      };
+    }
+
+    if (state.finalAnswerCall) {
+      state.finalAnswerOrder = this.nextOrder(cycleState.runId, attemptId, state);
+    }
+
+    if (signal?.aborted) {
+      return {
+        output,
+        finalLlmMessageId: state.finalLlmMessageId,
+        finalLlmPayload,
+        activeLlmMessageId: state.currentSegment.id,
+        finalAnswerCall: state.finalAnswerCall,
+        finalAnswerOrder: state.finalAnswerOrder,
+        titleMetadata,
+      };
+    }
+
+    if (state.finalLlmMessageId === null && !state.finalAnswerCall && !state.sawAnyToolCall) {
+      throw new InvalidFinalAnswerContractError(
+        'Model returned no assistant text and no completion tool call'
+      );
+    }
+    if (cycleState.invalidFinalAnswerSeen && !state.finalAnswerCall) {
+      throw new InvalidFinalAnswerContractError(
+        'Model did not return final_answer after invalid completion retry. Please try again later.'
+      );
+    }
+
+    return {
+      output,
+      finalLlmMessageId: state.finalLlmMessageId,
+      finalLlmPayload,
+      activeLlmMessageId: state.currentSegment.id,
+      finalAnswerCall: state.finalAnswerCall,
+      finalAnswerOrder: state.finalAnswerOrder,
+      titleMetadata,
+    };
+  }
+
+  // Requirements: llm-integration.9.5.6, llm-integration.9.5.6.1
+  private shouldSuppressTechnicalToolPayloadText(
+    outputText: string,
+    state: AttemptRuntimeState
+  ): boolean {
+    if (!state.sawAnyToolCall) {
+      return false;
+    }
+    const parsedPayload = this.parseToolPayloadMirrorJson(outputText);
+    if (!parsedPayload) {
+      return false;
+    }
+    return this.isToolPayloadMirror(parsedPayload, state);
+  }
+
+  // Requirements: llm-integration.9.5.6, llm-integration.9.5.6.1
+  private shouldDeferToolPayloadTextFlush(state: AttemptRuntimeState): boolean {
+    if (!state.sawAnyToolCall) {
+      return false;
+    }
+    if (state.currentSegment.id !== null) {
+      return false;
+    }
+    const trimmed = state.currentSegment.text.trimStart();
+    if (!trimmed.startsWith('{') && !trimmed.startsWith('```')) {
+      return false;
+    }
+
+    const parsedPayload = this.parseToolPayloadMirrorJson(state.currentSegment.text);
+    if (!parsedPayload) {
+      return true;
+    }
+    return this.isToolPayloadMirror(parsedPayload, state);
+  }
+
+  // Requirements: llm-integration.9.5.6
+  private parseToolPayloadMirrorJson(text: string): Record<string, unknown> | null {
+    const trimmed = text.trim();
+    if (!trimmed) {
+      return null;
+    }
+
+    const directParsed = this.parseJsonObject(trimmed);
+    if (directParsed) {
+      return directParsed;
+    }
+
+    const fencedMatch = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+    if (!fencedMatch) {
+      return null;
+    }
+    return this.parseJsonObject(fencedMatch[1] ?? '');
+  }
+
+  // Requirements: llm-integration.9.5.6
+  private stripLeadingMirroredToolPayloadText(
+    text: string,
+    state: AttemptRuntimeState
+  ): string {
+    if (!state.sawAnyToolCall) {
+      return text;
+    }
+    const trimmedStart = text.trimStart();
+    if (!trimmedStart) {
+      return text;
+    }
+
+    const fencedPrefixMatch = trimmedStart.match(/^```(?:json)?\s*([\s\S]*?)\s*```/i);
+    if (fencedPrefixMatch) {
+      const fencedParsed = this.parseJsonObject(fencedPrefixMatch[1] ?? '');
+      if (fencedParsed && this.isToolPayloadMirror(fencedParsed, state)) {
+        return trimmedStart.slice(fencedPrefixMatch[0].length).trimStart();
+      }
+    }
+
+    if (!trimmedStart.startsWith('{')) {
+      return text;
+    }
+
+    const extracted = this.extractLeadingJsonObject(trimmedStart);
+    if (!extracted) {
+      return text;
+    }
+    const parsedPrefix = this.parseJsonObject(extracted.objectText);
+    if (!parsedPrefix || !this.isToolPayloadMirror(parsedPrefix, state)) {
+      return text;
+    }
+    return extracted.rest.trimStart();
+  }
+
+  // Requirements: llm-integration.9.5.6
+  private extractLeadingJsonObject(
+    text: string
+  ): { objectText: string; rest: string } | null {
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    for (let i = 0; i < text.length; i += 1) {
+      const char = text[i];
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+          continue;
+        }
+        if (char === '\\') {
+          escaped = true;
+          continue;
+        }
+        if (char === '"') {
+          inString = false;
+        }
+        continue;
+      }
+      if (char === '"') {
+        inString = true;
+        continue;
+      }
+      if (char === '{') {
+        depth += 1;
+        continue;
+      }
+      if (char === '}') {
+        depth -= 1;
+        if (depth === 0) {
+          return {
+            objectText: text.slice(0, i + 1),
+            rest: text.slice(i + 1),
+          };
+        }
+      }
+    }
+    return null;
+  }
+
+  // Requirements: llm-integration.9.5.6
+  private parseJsonObject(text: string): Record<string, unknown> | null {
+    try {
+      const parsed = JSON.parse(text);
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        return null;
+      }
+      return parsed as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }
+
+  // Requirements: llm-integration.9.5.6
+  private isToolPayloadMirror(
+    parsedPayload: Record<string, unknown>,
+    state: AttemptRuntimeState
+  ): boolean {
+    const containers: Record<string, unknown>[] = [parsedPayload];
+    const dataPayload = parsedPayload['data'];
+    if (dataPayload && typeof dataPayload === 'object' && !Array.isArray(dataPayload)) {
+      containers.push(dataPayload as Record<string, unknown>);
+    }
+
+    for (const container of containers) {
+      const summaryPoints = container['summary_points'];
+      const toolName = container['toolName'];
+      const callId = container['callId'];
+      const hasEnvelopeKeys =
+        Object.prototype.hasOwnProperty.call(container, 'toolName') ||
+        Object.prototype.hasOwnProperty.call(container, 'arguments') ||
+        Object.prototype.hasOwnProperty.call(container, 'output') ||
+        Object.prototype.hasOwnProperty.call(container, 'callId');
+
+      if (Array.isArray(summaryPoints)) {
+        if (
+          state.finalAnswerCall &&
+          this.areSummaryPointsEqual(summaryPoints, state.finalAnswerCall.args['summary_points'])
+        ) {
+          return true;
+        }
+      }
+
+      if (hasEnvelopeKeys) {
+        const matchingFinalCallId =
+          typeof callId === 'string' &&
+          state.finalAnswerCall !== null &&
+          callId === state.finalAnswerCall.callId;
+        const matchingFinalAnswerEnvelope =
+          toolName === 'final_answer' && matchingFinalCallId;
+        if (matchingFinalAnswerEnvelope) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  // Requirements: llm-integration.9.5.6
+  private areSummaryPointsEqual(candidate: unknown[], expected: unknown): boolean {
+    if (!Array.isArray(expected)) {
+      return false;
+    }
+    if (candidate.length !== expected.length) {
+      return false;
+    }
+    return candidate.every((item, index) => item === expected[index]);
+  }
+
+  // Requirements: llm-integration.11.3.1, llm-integration.11.1.5
+  private handleAttemptFailure(
+    error: unknown,
+    context: StreamingCallContext,
+    agentId: string,
+    signal: AbortSignal | undefined,
+    cycleState: AttemptCycleState,
+    state: AttemptRuntimeState,
+    setLastLlmMessageId: (messageId: number) => void
+  ): boolean {
+    this.clearPendingToolCallFlushTimer(state);
+    const isInvalidFinalAnswer =
+      error instanceof InvalidFinalAnswerContractError ||
+      error instanceof InvalidToolArgumentsError;
+    if (!isInvalidFinalAnswer) {
+      this.flushPendingToolCall(
+        context,
+        agentId,
+        cycleState.runId,
+        cycleState.attempts + 1,
+        setLastLlmMessageId,
+        state
+      );
+    }
+    if (isInvalidFinalAnswer) {
+      cycleState.invalidFinalAnswerSeen = Boolean(state.finalAnswerCall);
+      cycleState.validationFeedback =
+        error instanceof Error ? error.message : 'Invalid tool call arguments.';
+    }
+    const shouldRetryInvalidFinalAnswer =
+      isInvalidFinalAnswer &&
+      cycleState.attempts < MAX_INVALID_TOOL_CALL_RETRIES &&
+      !signal?.aborted;
+    const shouldRetrySilentFailure =
+      !isInvalidFinalAnswer &&
+      cycleState.attempts < 1 &&
+      !state.meaningfulChunkSeen &&
+      !signal?.aborted;
+    const shouldRetry = shouldRetryInvalidFinalAnswer || shouldRetrySilentFailure;
+
+    if (!shouldRetry) {
+      if (isInvalidFinalAnswer) {
+        throw new InvalidToolCallRetryExhaustedError();
+      }
+      throw error;
+    }
+
+    for (const messageId of state.attemptMessageIds) {
+      this.messageManager.setHidden(messageId, agentId);
+    }
+    return true;
   }
 
   // Requirements: llm-integration.11.2.3, llm-integration.11.2.3.1, llm-integration.11.2.3.3
@@ -692,6 +1230,333 @@ export class MainPipeline {
         content: `Tool call validation failed: ${validationFeedback}. Regenerate tool call with valid arguments and continue.`,
       },
     ];
+  }
+
+  // Requirements: llm-integration.16.1, llm-integration.16.2, llm-integration.16.10
+  private buildAutoTitleSystemInstruction(agentId: string, messages: Message[]): string | null {
+    if (!this.agentTitleUpdater) {
+      return null;
+    }
+
+    const currentTitle = this.agentTitleUpdater.getCurrentTitle(agentId);
+    if (!currentTitle) {
+      return null;
+    }
+
+    const userTurn = this.getUserTurnCount(messages);
+    const lastRenameUserTurn = this.getLastRenameUserTurnFromHistory(agentId, messages, null);
+    if (
+      lastRenameUserTurn !== null &&
+      userTurn - lastRenameUserTurn < TITLE_RENAME_MIN_USER_TURN_GAP
+    ) {
+      return null;
+    }
+
+    const shouldEnforceMeaningfulFirstRename = this.isDefaultAgentTitle(currentTitle);
+    if (shouldEnforceMeaningfulFirstRename && !this.hasMeaningfulUserMessageInHistory(messages)) {
+      return null;
+    }
+
+    return buildAutoTitleMetadataContractPrompt(currentTitle);
+  }
+
+  // Requirements: llm-integration.16.2
+  private injectSystemMessage(
+    messages: ReturnType<PromptBuilder['buildMessages']>,
+    instruction: string | null
+  ): ReturnType<PromptBuilder['buildMessages']> {
+    if (!instruction) {
+      return messages;
+    }
+
+    const firstNonSystemIndex = messages.findIndex((message) => message.role !== 'system');
+    const instructionMessage: ChatMessage = { role: 'system', content: instruction };
+
+    if (firstNonSystemIndex === -1) {
+      return [...messages, instructionMessage];
+    }
+
+    return [
+      ...messages.slice(0, firstNonSystemIndex),
+      instructionMessage,
+      ...messages.slice(firstNonSystemIndex),
+    ];
+  }
+
+  /**
+   * Apply valid title candidate through AgentManager update path.
+   * Requirements: llm-integration.16.8, llm-integration.16.9, llm-integration.16.10, llm-integration.16.11, llm-integration.16.12
+   */
+  private applyAutoTitleCandidate(
+    agentId: string,
+    metadata: AgentTitleMetadata | null,
+    sourceLlmMessageId: number | null,
+    sourceLlmPayload: Record<string, unknown> | null,
+    messagesSnapshot: Message[]
+  ): void {
+    if (!metadata || !this.agentTitleUpdater) {
+      return;
+    }
+
+    try {
+      const normalizedCandidate = normalizeAgentTitleCandidate(metadata.title);
+      if (!normalizedCandidate) {
+        this.logger.debug(`Auto-title skipped for agent ${agentId}: invalid candidate`);
+        return;
+      }
+      if (!isValidRenameNeedScore(metadata.renameNeedScore)) {
+        this.logger.debug(`Auto-title skipped for agent ${agentId}: invalid rename_need_score`);
+        return;
+      }
+
+      const currentTitle = this.agentTitleUpdater.getCurrentTitle(agentId);
+      if (!currentTitle) {
+        return;
+      }
+
+      const shouldEnforceMeaningfulFirstRename = this.isDefaultAgentTitle(currentTitle);
+      if (
+        shouldEnforceMeaningfulFirstRename &&
+        !this.hasMeaningfulUserMessageInHistory(messagesSnapshot)
+      ) {
+        this.logger.debug(
+          `Auto-title skipped for agent ${agentId}: first rename requires meaningful user message in history`
+        );
+        return;
+      }
+
+      const userTurn = this.getUserTurnCount(messagesSnapshot);
+      const lastRenameUserTurn = this.getLastRenameUserTurnFromHistory(
+        agentId,
+        messagesSnapshot,
+        sourceLlmMessageId
+      );
+      const guardDecision = evaluateAgentTitleGuards({
+        currentTitle,
+        nextTitle: normalizedCandidate,
+        renameNeedScore: metadata.renameNeedScore,
+        currentUserTurn: userTurn,
+        lastRenameUserTurn,
+      });
+      if (!guardDecision.allow) {
+        this.logger.debug(
+          `Auto-title skipped for agent ${agentId}: reason=${guardDecision.reason} score=${metadata.renameNeedScore}`
+        );
+        return;
+      }
+
+      this.agentTitleUpdater.rename(agentId, normalizedCandidate);
+      this.markAutoTitleApplied(agentId, sourceLlmMessageId, sourceLlmPayload, normalizedCandidate);
+    } catch (error) {
+      this.logger.warn(
+        `Auto-title failed for agent ${agentId}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  /**
+   * Calculate current user turn number for cooldown guard.
+   * Requirements: llm-integration.16.10
+   */
+  private getUserTurnCount(messages: Message[]): number {
+    return messages.filter((message) => message.kind === 'user' && !message.hidden).length;
+  }
+
+  /**
+   * Recover durable cooldown state from persisted chat history.
+   * Requirements: llm-integration.16.10
+   */
+  private getLastRenameUserTurnFromHistory(
+    agentId: string,
+    messages: Message[],
+    excludedLlmMessageId: number | null
+  ): number | null {
+    const filteredMessages = messages.filter((message) => {
+      if (message.hidden) {
+        return false;
+      }
+      if (excludedLlmMessageId === null) {
+        return true;
+      }
+      return message.id !== excludedLlmMessageId;
+    });
+
+    const lastProcessedMessageId = filteredMessages.at(-1)?.id ?? 0;
+    const cache = this.autoTitleHistoryCache.get(agentId);
+    if (cache && cache.lastProcessedMessageId === lastProcessedMessageId) {
+      return cache.lastRenameUserTurn;
+    }
+
+    let userTurn = 0;
+    let currentTitle = DEFAULT_AGENT_TITLE;
+    let lastRenameUserTurn: number | null = null;
+    let hasMeaningfulUserMessageInHistory = false;
+
+    for (const message of filteredMessages) {
+      if (message.kind === 'user') {
+        userTurn += 1;
+        hasMeaningfulUserMessageInHistory =
+          hasMeaningfulUserMessageInHistory || this.isMeaningfulUserMessage(message);
+        continue;
+      }
+
+      if (message.kind !== 'llm') {
+        continue;
+      }
+
+      const historicalAppliedTitle = this.extractAppliedAutoTitleFromMessage(message);
+      if (!historicalAppliedTitle) {
+        continue;
+      }
+      const normalizedHistoricalCandidate = normalizeAgentTitleCandidate(historicalAppliedTitle);
+      if (!normalizedHistoricalCandidate) {
+        continue;
+      }
+
+      if (this.isDefaultAgentTitle(currentTitle) && !hasMeaningfulUserMessageInHistory) {
+        continue;
+      }
+
+      const guardDecision = evaluateAgentTitleGuards({
+        currentTitle,
+        nextTitle: normalizedHistoricalCandidate,
+        renameNeedScore: 100,
+        currentUserTurn: userTurn,
+        lastRenameUserTurn,
+      });
+      if (!guardDecision.allow) {
+        continue;
+      }
+
+      currentTitle = normalizedHistoricalCandidate;
+      lastRenameUserTurn = userTurn;
+    }
+
+    this.autoTitleHistoryCache.set(agentId, {
+      lastProcessedMessageId,
+      lastRenameUserTurn,
+    });
+    return lastRenameUserTurn;
+  }
+
+  /**
+   * Persist durable marker for successful auto-title rename.
+   * Requirements: llm-integration.16.10, llm-integration.16.12
+   */
+  private markAutoTitleApplied(
+    agentId: string,
+    sourceLlmMessageId: number | null,
+    sourceLlmPayload: Record<string, unknown> | null,
+    appliedTitle: string
+  ): void {
+    if (sourceLlmMessageId === null || !sourceLlmPayload) {
+      return;
+    }
+
+    try {
+      const data =
+        sourceLlmPayload.data &&
+        typeof sourceLlmPayload.data === 'object' &&
+        !Array.isArray(sourceLlmPayload.data)
+          ? (sourceLlmPayload.data as Record<string, unknown>)
+          : {};
+      data.auto_title_applied = true;
+      data.auto_title_applied_title = appliedTitle;
+      this.messageManager.update(
+        sourceLlmMessageId,
+        agentId,
+        {
+          ...sourceLlmPayload,
+          data,
+        },
+        true
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Auto-title marker persist failed for agent ${agentId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
+  }
+
+  /**
+   * Parse durable successful auto-title marker from persisted llm message payload.
+   * Requirements: llm-integration.16.10
+   */
+  private extractAppliedAutoTitleFromMessage(message: Message): string | null {
+    try {
+      const payload = JSON.parse(message.payloadJson) as {
+        data?: { auto_title_applied?: unknown; auto_title_applied_title?: unknown };
+      };
+      if (payload?.data?.auto_title_applied !== true) {
+        return null;
+      }
+      const title = payload?.data?.auto_title_applied_title;
+      return typeof title === 'string' ? title : null;
+    } catch {
+      return null;
+    }
+  }
+
+  // Requirements: llm-integration.16.10
+  private extendHistorySnapshotWithFinalLlm(
+    baseHistory: Message[],
+    agentId: string,
+    replyToMessageId: number,
+    finalLlmMessageId: number | null,
+    finalLlmPayload: Record<string, unknown> | null
+  ): Message[] {
+    if (finalLlmMessageId === null || !finalLlmPayload) {
+      return baseHistory;
+    }
+
+    return [
+      ...baseHistory,
+      {
+        id: finalLlmMessageId,
+        agentId,
+        kind: 'llm',
+        timestamp: new Date().toISOString(),
+        payloadJson: JSON.stringify(finalLlmPayload),
+        usageJson: null,
+        replyToMessageId,
+        hidden: false,
+        done: true,
+      },
+    ];
+  }
+
+  /**
+   * Check whether agent title is still the default one.
+   * Requirements: llm-integration.16.10
+   */
+  private isDefaultAgentTitle(title: string): boolean {
+    const normalized = normalizeAgentTitleCandidate(title);
+    return (normalized ?? title).toLocaleLowerCase() === DEFAULT_AGENT_TITLE.toLocaleLowerCase();
+  }
+
+  /**
+   * Determine if user message contains meaningful text for first auto-rename.
+   * Requirements: llm-integration.16.10
+   */
+  private isMeaningfulUserMessage(message: Message | null): boolean {
+    if (!message || message.kind !== 'user') {
+      return false;
+    }
+    try {
+      const payload = JSON.parse(message.payloadJson) as { data?: { text?: unknown } };
+      const text = typeof payload?.data?.text === 'string' ? payload.data.text : '';
+      const meaningfulUnits = text.match(/[\p{L}\p{N}]/gu) ?? [];
+      return meaningfulUnits.length >= 3;
+    } catch {
+      return false;
+    }
+  }
+
+  // Requirements: llm-integration.16.10
+  private hasMeaningfulUserMessageInHistory(messages: Message[]): boolean {
+    return messages.some((message) => !message.hidden && this.isMeaningfulUserMessage(message));
   }
 
   private validateToolCallArguments(toolName: string, args: Record<string, unknown>): void {
@@ -726,6 +1591,11 @@ export class MainPipeline {
           'final_answer.summary_points items must be strings'
         );
       }
+      if (point.trim().length < 1) {
+        throw new InvalidFinalAnswerContractError(
+          'final_answer.summary_points items must be non-empty'
+        );
+      }
       if (point.length > 200) {
         throw new InvalidFinalAnswerContractError(
           'final_answer.summary_points item length must be <= 200'
@@ -739,9 +1609,9 @@ export class MainPipeline {
     replyToMessageId: number,
     callId: string,
     args: Record<string, unknown>,
-    order: MessageOrderMeta | null
+    order: MessageOrderMeta
   ): void {
-    this.messageManager.create(
+    this.messageManager.createWithOrder(
       agentId,
       'tool_call',
       {
@@ -749,10 +1619,10 @@ export class MainPipeline {
           callId,
           toolName: 'final_answer',
           arguments: this.normalizeFinalAnswerArguments(args),
-          order: order ?? undefined,
         },
       },
       replyToMessageId,
+      order,
       true
     );
   }
@@ -840,16 +1710,16 @@ export class MainPipeline {
           ? { text: segment.reasoning, excluded_from_replay: true }
           : undefined,
         text: segment.text || undefined,
-        order: segment.order,
       },
     };
 
     if (segment.id === null) {
-      const llmMsg = this.messageManager.create(
+      const llmMsg = this.messageManager.createWithOrder(
         agentId,
         'llm',
         streamingPayload,
         replyToMessageId,
+        segment.order,
         false
       );
       attemptMessageIds.add(llmMsg.id);
@@ -857,7 +1727,13 @@ export class MainPipeline {
       return llmMsg.id;
     }
 
-    this.messageManager.update(segment.id, agentId, streamingPayload, false);
+    this.messageManager.updateWithOrder(
+      segment.id,
+      agentId,
+      streamingPayload,
+      segment.order,
+      false
+    );
     return segment.id;
   }
 
@@ -875,8 +1751,11 @@ export class MainPipeline {
     if (!hasReasoning && !hasText) {
       return null;
     }
+    if (!segment.order) {
+      throw new InvalidFinalAnswerContractError('Missing order metadata for llm segment');
+    }
 
-    this.messageManager.update(
+    this.messageManager.updateWithOrder(
       segment.id,
       agentId,
       {
@@ -886,9 +1765,10 @@ export class MainPipeline {
             ? { text: segment.reasoning, excluded_from_replay: true }
             : undefined,
           text: segment.text || undefined,
-          order: segment.order ?? undefined,
         },
       },
+      segment.order,
+      true,
       true
     );
     return segment.id;
@@ -901,17 +1781,19 @@ export class MainPipeline {
     text: string,
     order: MessageOrderMeta
   ): { id: number } {
-    return this.messageManager.create(
+    return this.messageManager.createWithOrder(
       agentId,
       'llm',
       {
         data: {
           model,
           text,
-          order,
         },
       },
       replyToMessageId,
+      order,
+      true,
+      undefined,
       true
     );
   }

@@ -1590,12 +1590,15 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 - Для `toolName === 'code_exec'` используется AI Elements `Tool` family как отдельный технический блок вызова инструмента.
 - Для `toolName === 'final_answer'` используется отдельный компонент `"Final Answer"` на базе AI Elements `Queue`.
 - Визуальный порядок строится по persisted snapshot-последовательности: pre-tool `kind: llm` -> `kind: tool_call` (`running`) -> post-tool `kind: llm`; terminal-обновление `tool_call` применяется позже в том же блоке.
+- Для model-run порядка используются поля snapshot `runId/attemptId/sequence` (поступают из колонок `messages.run_id/attempt_id/sequence`), без чтения `payload.data.order`.
 - UI рендерит только persisted `kind: tool_call` snapshots из видимой истории сообщений и не материализует отдельные промежуточные блоки вне persisted-потока.
 - Сообщения с `hidden = true` полностью исключаются из renderer-проекции перед построением порядка, чтобы failed-attempt артефакты не попадали в видимый поток.
 - Компонент не имеет отдельного заголовка; рендерится только checklist `summary_points`.
 - Каждый checklist-пункт рендерится с иконкой `Check` в зелёном круге.
+- Контент каждого checklist-пункта рендерится через общий markdown-рендерер `"MessageResponse"` (тот же markdown-контракт, что у `kind: llm`).
 - Компонент всегда отображается в раскрытом виде; сворачивание/разворачивание не поддерживается.
 - `Agents` не выполняет валидацию/repair `final_answer`; компонент рендерит только persisted payload.
+- Пустые/пробельные checklist-пункты не считаются валидным `final_answer` по контракту `llm-integration.9.5.3.1`, поэтому в корректном persisted payload не присутствуют.
 - Если `final_answer` присутствует в успешной попытке, `"Final Answer"` рендерится как последний видимый артефакт этой попытки.
 
 **Сообщения выполнения кода (`kind: 'tool_call'`, `toolName: 'code_exec'`):**
@@ -1618,7 +1621,7 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 - Рендер строится только по persisted snapshot (`message.created`/`message.updated`) без локальной реконструкции результата.
 
 ```tsx
-// Requirements: agents.7.4.1, agents.7.4.2
+// Requirements: agents.7.4.1, agents.7.4.2, agents.7.4.2.5
 if (message.kind === 'tool_call' && toolName === 'final_answer') {
   return (
     <Queue data-testid="message-final-answer-block">
@@ -1627,7 +1630,9 @@ if (message.kind === 'tool_call' && toolName === 'final_answer') {
           {summaryPoints.map((point) => (
             <QueueItem key={point} data-testid="message-final-answer-item">
               <QueueItemIndicator completed />
-              <QueueItemContent completed>{point}</QueueItemContent>
+              <QueueItemContent completed>
+                <MessageResponse>{point}</MessageResponse>
+              </QueueItemContent>
             </QueueItem>
           ))}
         </div>
@@ -1990,6 +1995,9 @@ import { Logo } from '../logo';
 | `tests/unit/agents/computeAgentStatus.test.ts` | agents.9 |
 | `tests/unit/agents/ActivityIndicator.test.tsx` | agents.11 |
 | `tests/unit/agents/MainPipeline.test.ts` | agents.4.11.6-4.11.7, llm-integration.1, llm-integration.2 |
+| `tests/unit/agents/AgentTitleCommentParser.test.ts` | llm-integration.16.3-16.7 |
+| `tests/unit/agents/AgentTitleNormalization.test.ts` | llm-integration.16.8, llm-integration.16.9 |
+| `tests/unit/agents/AgentTitleAntiFlap.test.ts` | llm-integration.16.10 |
 | `tests/unit/components/ai-elements/prompt-input.test.tsx` | agents.4.2-4.7, agents.4.24 |
 | `tests/unit/components/agents/AgentMessage.test.tsx` | agents.4.10, agents.4.11.1, agents.4.11.3-4.11.5, agents.7.4.5-7.4.7, llm-integration.2, llm-integration.7 |
 | `tests/unit/components/agents/AgentReasoningTrigger.test.tsx` | agents.4.11, agents.4.11.2, llm-integration.2, llm-integration.7.2 |
@@ -2015,7 +2023,7 @@ import { Logo } from '../logo';
 | `tests/functional/agent-status-all-places.spec.ts` | agents.6.1-6.5 | Проверка консистентного отображения каждого статуса (`new`, `in-progress`, `awaiting-response`, `error`, `completed`) в Header, Agent List tooltip и All Agents |
 | `tests/functional/message-format.spec.ts` | agents.7 | - |
 | `tests/functional/code_exec.spec.ts` | agents.7.4.5-7.4.9, agents.4.23 | Отдельные сценарии для `tool_call(code_exec)`: header/icon/status, вертикальное выравнивание в collapsed, JS highlighting, transparent sections и width/overflow |
-| `tests/functional/llm-chat.spec.ts` | agents.4.11, agents.4.11.2, agents.7.7, agents.4.24, llm-integration.2, llm-integration.7.2, llm-integration.8.7 | - |
+| `tests/functional/llm-chat.spec.ts` | agents.4.11, agents.4.11.2, agents.7.7, agents.4.24, agents.14.1-14.6, llm-integration.2, llm-integration.7.2, llm-integration.8.7, llm-integration.16 | Включает сценарий deferred rename после non-meaningful triggering turn при наличии meaningful user-message в истории |
 | `tests/functional/agent-status-calculation.spec.ts` | agents.9 | - |
 | `tests/functional/agent-data-isolation.spec.ts` | agents.10 | - |
 | `tests/functional/agent-activity-indicator.spec.ts` | agents.11 | - |
@@ -2152,6 +2160,7 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 | agents.13.13, agents.13.14, agents.13.15 | ✓ | ✓ |
 | agents.13.17 (state-changed событие) | ✓ | - |
 | agents.13.18 (startup source of truth = polling) | ✓ | ✓ |
+| agents.14.1, agents.14.2, agents.14.3, agents.14.4, agents.14.5, agents.14.6 (auto-title UI updates, stability, deferred rename after non-meaningful turn) | - | ✓ |
 | user-data-isolation.6 | ✓ | ✓ |
 
 ## Зависимости
@@ -2199,7 +2208,7 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 
 Для отображения `tool_call` в текущем scope используется фиксированная стратегия:
 - AI Elements `Tool` family (см. [https://elements.ai-sdk.dev/components/tool](https://elements.ai-sdk.dev/components/tool)) для `tool_call(code_exec)`.
-- AI Elements `Queue` family для `tool_call(final_answer)`: финал отображается отдельным checklist-компонентом `Final Answer` (без отдельного header, только `summary_points`).
+- AI Elements `Queue` family для `tool_call(final_answer)`: финал отображается отдельным checklist-компонентом `Final Answer` (без отдельного header, только `summary_points`), при этом каждый пункт рендерится через markdown-рендерер `"MessageResponse"`.
 
 ### Архитектура
 
@@ -2387,6 +2396,22 @@ interface UseAgentChatResult {
 - `docs/specs/reactive-ui-architecture/design.md`.
 
 В этой спецификации `agents` фиксируются только компонентные правила и контракты рендера, относящиеся к UI агентов.
+
+### UI-обновление имени агента (auto-title)
+
+Изменение имени агента в UI выполняется только на основе persisted snapshot-события `agent.updated`.
+
+**UI-контракт:**
+- Когда main process публикует `agent.updated` с новым `agent.name`, renderer применяет обновлённый snapshot без дополнительных запросов к БД/IPC.
+- Новое имя отображается консистентно во всех местах UI агентов:
+  - заголовок активного агента (`AgentHeader`);
+  - иконки и tooltip в header list;
+  - карточки в `"All Agents"`.
+- Если после отправки сообщения имя агента не изменилось, UI сохраняет текущее имя и не показывает отдельные блокирующие ошибки.
+
+**Граница ответственности:**
+- Эта спецификация не описывает механизм извлечения title из LLM-ответа, parser-состояния, similarity/cooldown и другую runtime-логику.
+- Полный runtime-контракт auto-title фиксируется в `docs/specs/llm-integration/design.md`.
 
 ## Установка и обновление AI Elements компонентов
 

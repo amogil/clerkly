@@ -521,12 +521,12 @@ test.describe('LLM Chat (real OpenAI)', () => {
 
     const stopButton = context.window.locator('[data-testid="prompt-input-stop"]');
     await expect(stopButton).toBeVisible({ timeout: 15000 });
-    await expect(context.window.locator('[data-testid="prompt-input-send"]')).toBeVisible({
-      timeout: 120000,
-    });
 
     const actionContent = context.window.locator('.message-llm-action-response').last();
     await expect(actionContent).toBeVisible({ timeout: 120000 });
+    await expect
+      .poll(async () => ((await actionContent.textContent()) ?? '').length, { timeout: 120000 })
+      .toBeGreaterThan(400);
 
     await closeElectron(context, false);
 
@@ -739,8 +739,10 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     content: unknown;
   };
 
-  const getRequestMessages = (body: Record<string, unknown>): ProviderRequestMessage[] =>
-    (body.input ?? body.messages) as ProviderRequestMessage[];
+  const getRequestMessages = (body: Record<string, unknown>): ProviderRequestMessage[] => {
+    const candidate = body.input ?? body.messages;
+    return Array.isArray(candidate) ? (candidate as ProviderRequestMessage[]) : [];
+  };
 
   const contentToText = (content: unknown): string => {
     if (Array.isArray(content)) {
@@ -765,6 +767,21 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
       return (content as { text: string }).text;
     }
     return typeof content === 'string' ? content : '';
+  };
+
+  const getSystemPromptText = (body: Record<string, unknown>): string => {
+    const messages = getRequestMessages(body);
+    const instructionMessages = messages
+      .filter((message) => message.role === 'system' || message.role === 'developer')
+      .map((message) => contentToText(message.content))
+      .filter((text) => text.length > 0);
+
+    const instructionsText = contentToText(body.instructions);
+    const promptParts =
+      instructionsText.length > 0
+        ? [...instructionMessages, instructionsText]
+        : instructionMessages;
+    return promptParts.join('\n');
   };
 
   async function renderMarkdownMessage(markdown: string): Promise<void> {
@@ -1914,6 +1931,116 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     );
   });
 
+  /* Preconditions: MockLLMServer returns valid final_answer tool_call and duplicate raw JSON in output text
+     Action: User sends a message
+     Assertions: UI renders only final_answer checklist block and does not show duplicate raw JSON llm bubble
+     Requirements: llm-integration.9.5.6, llm-integration.9.5.6.1 */
+  test('should not render raw final_answer JSON text when tool_call(final_answer) is present', async () => {
+    mockLLMServer.setStreamingMode(true);
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        toolCalls: [
+          {
+            callId: 'final-checklist-json-dup-1',
+            toolName: 'final_answer',
+            arguments: {
+              summary_points: ['Checklist item'],
+            },
+          },
+        ],
+        content: '{"summary_points":["Checklist item"]}',
+      },
+    ]);
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await messageInput.fill('Render tool call without duplicate JSON');
+    await messageInput.press('Enter');
+
+    const finalAnswerBlock = context.window
+      .locator('[data-testid="message-final-answer-block"]')
+      .last();
+    await expect(finalAnswerBlock).toBeVisible({ timeout: 15000 });
+    await expect(context.window.locator('[data-testid="message-final-answer-item"]')).toHaveCount(
+      1
+    );
+    await expect(finalAnswerBlock).toContainText('Checklist item');
+
+    await expect(
+      context.window.locator('.message-llm-action-response', {
+        hasText: '{"summary_points":["Checklist item"]}',
+      })
+    ).toHaveCount(0);
+    await expectNoToastError(context.window);
+  });
+
+  /* Preconditions: MockLLMServer returns final_answer with markdown content in summary_points
+     Action: User sends a message
+     Assertions: markdown inside checklist item is normalized (no raw markdown markers) and code span is rendered
+     Requirements: agents.7.4.2.5 */
+  test('should render markdown inside tool_call(final_answer) checklist item', async () => {
+    mockLLMServer.setStreamingMode(true);
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        toolCalls: [
+          {
+            callId: 'final-checklist-md-1',
+            toolName: 'final_answer',
+            arguments: {
+              summary_points: ['**Bold** summary with `code`'],
+            },
+          },
+        ],
+      },
+    ]);
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await messageInput.fill('Render markdown in final answer');
+    await messageInput.press('Enter');
+
+    const item = context.window.locator('[data-testid="message-final-answer-item"]').first();
+    await expect(item).toBeVisible({ timeout: 15000 });
+    await expect(item.locator('code')).toHaveCount(1);
+    await expect(item).toContainText('Bold summary with');
+    await expect(item).not.toContainText('**Bold**');
+    await expect(item).not.toContainText('`code`');
+    await expectNoToastError(context.window);
+  });
+
+  /* Preconditions: MockLLMServer returns final_answer with inline math delimiters in summary_points
+     Action: User sends a message
+     Assertions: KaTeX is rendered inside final_answer checklist item
+     Requirements: agents.7.4.2.5, llm-integration.9.5.1.1 */
+  test('should render math inside tool_call(final_answer) checklist item', async () => {
+    mockLLMServer.setStreamingMode(true);
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        toolCalls: [
+          {
+            callId: 'final-checklist-math-1',
+            toolName: 'final_answer',
+            arguments: {
+              summary_points: ['Показал, что $\\ln(-q^2)$ соответствует хвосту $1/r^3$'],
+            },
+          },
+        ],
+      },
+    ]);
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await messageInput.fill('Render math in final answer');
+    await messageInput.press('Enter');
+
+    const item = context.window.locator('[data-testid="message-final-answer-item"]').first();
+    await expect(item).toBeVisible({ timeout: 15000 });
+    await expect(item.locator('.katex')).toHaveCount(2);
+    await expect(item.locator('.katex').first()).toBeVisible();
+    await expect(item).toContainText('Показал, что');
+    await expectNoToastError(context.window);
+  });
+
   /* Preconditions: MockLLMServer returns final_answer with summary_points
      Action: User sends a message
      Assertions: checklist summary remains expanded by default and visible without user interaction
@@ -2207,6 +2334,76 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
 
     await messageInput.fill('Finish with invalid completion');
+    await messageInput.press('Enter');
+
+    const errorBubble = context.window.locator('[data-testid="message-error"]').last();
+    await expect(errorBubble).toBeVisible({ timeout: 15000 });
+    await expect(errorBubble).toContainText(
+      'Model returned invalid tool call arguments too many times. Please try again later.'
+    );
+    await expect(context.window.locator('[data-testid="message-final-answer-block"]')).toHaveCount(
+      0
+    );
+    await expectNoToastError(context.window);
+  });
+
+  /* Preconditions: MockLLMServer returns invalid final_answer (blank summary_points item)
+     Action: User sends a message
+     Assertions: Retry limit is exhausted and kind:error is shown
+     Requirements: llm-integration.9.5.3.1, llm-integration.9.5.4, llm-integration.12.2.2, llm-integration.12.3 */
+  test('should show error when final_answer contains blank summary point', async () => {
+    mockLLMServer.setStreamingMode(true, { content: '' });
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        toolCalls: [
+          {
+            callId: 'final-blank-1',
+            toolName: 'final_answer',
+            arguments: {
+              summary_points: ['   '],
+            },
+          },
+        ],
+      },
+      {
+        toolCalls: [
+          {
+            callId: 'final-blank-2',
+            toolName: 'final_answer',
+            arguments: {
+              summary_points: ['\t'],
+            },
+          },
+        ],
+      },
+      {
+        toolCalls: [
+          {
+            callId: 'final-blank-3',
+            toolName: 'final_answer',
+            arguments: {
+              summary_points: ['\n'],
+            },
+          },
+        ],
+      },
+      {
+        toolCalls: [
+          {
+            callId: 'final-blank-4',
+            toolName: 'final_answer',
+            arguments: {
+              summary_points: [' '],
+            },
+          },
+        ],
+      },
+    ]);
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+
+    await messageInput.fill('Finish with blank summary point');
     await messageInput.press('Enter');
 
     const errorBubble = context.window.locator('[data-testid="message-error"]').last();
@@ -2680,5 +2877,346 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
 
     await expect(actionContent.locator('a[href^="#fn"]')).toHaveCount(0);
     await expect(actionContent.locator('.footnotes')).toHaveCount(0);
+  });
+
+  /* Preconditions: Mock stream returns markdown with auto-title HTML comment in same model turn
+     Action: User sends a message and waits for stream completion
+     Assertions: Agent name updates in header, tooltip, and All Agents, while markdown text remains unmodified
+     Requirements: llm-integration.16.1, llm-integration.16.7, agents.14.1, agents.14.2 */
+  test('should extract agent title and rename_need_score from single metadata comment in the same model turn', async () => {
+    const expectedTitle = 'Sprint Review Summary';
+    mockLLMServer.setStreamingMode(true, {
+      content: `Result body <!-- clerkly:title-meta: {"title":"${expectedTitle}","rename_need_score":90} -->`,
+      chunkDelayMs: 0,
+    });
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await messageInput.fill('Summarize sprint');
+    await messageInput.press('Enter');
+
+    const actionContent = context.window.locator('.message-llm-action-response').last();
+    await expect(actionContent).toBeVisible({ timeout: 10000 });
+    await expect(actionContent).not.toContainText(
+      `<!-- clerkly:title-meta: {"title":"${expectedTitle}","rename_need_score":90} -->`
+    );
+
+    const headerTitle = context.window.locator('[data-testid="agent-header-title"]');
+    await expect(headerTitle).toHaveText(expectedTitle, { timeout: 10000 });
+
+    const firstAgentId = (await getAgentIdsFromApi(context.window))[0];
+    expect(firstAgentId).toBeTruthy();
+
+    const headerIcon = context.window.locator(`[data-testid="agent-icon-${firstAgentId}"]`);
+    await expect(headerIcon).toBeVisible({ timeout: 5000 });
+    await headerIcon.hover();
+    await expect(headerIcon.locator('div.absolute.top-full')).toContainText(expectedTitle, {
+      timeout: 5000,
+    });
+
+    const allAgentsButton = context.window.locator('[data-testid="all-agents-button"]');
+    if ((await allAgentsButton.count()) === 0) {
+      for (let index = 0; index < 12; index += 1) {
+        await context.window.evaluate(async (i) => {
+          await (window as any).api.agents.create(`Overflow Agent ${i}`);
+        }, index);
+      }
+    }
+    await expect(allAgentsButton).toBeVisible({ timeout: 10000 });
+    await allAgentsButton.click();
+
+    const agentCard = context.window.locator(`[data-testid="agent-card-${firstAgentId}"]`);
+    await expect(agentCard).toBeVisible({ timeout: 5000 });
+    await expect(agentCard).toContainText(expectedTitle);
+    await expectNoToastError(context.window);
+  });
+
+  /* Preconditions: App uses mock provider and sends first chat request
+     Action: User sends a message, test inspects provider request body
+     Assertions: System prompt contains auto-title metadata contract
+     Requirements: llm-integration.16.1, llm-integration.16.2 */
+  test('should include auto-title metadata contract in system prompt', async () => {
+    mockLLMServer.setStreamingMode(true, {
+      content: 'Simple answer',
+      chunkDelayMs: 0,
+    });
+
+    context = await launchWithMockLLM();
+    mockLLMServer.clearRequestLogs();
+
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await messageInput.fill('Check prompt contract');
+    await messageInput.press('Enter');
+    await expect(context.window.locator('.message-llm-action-response').last()).toBeVisible({
+      timeout: 10000,
+    });
+
+    const lastRequest = mockLLMServer.getLastRequest();
+    expect(lastRequest).toBeDefined();
+    const systemPrompt = getSystemPromptText(lastRequest!.body as Record<string, unknown>);
+
+    expect(systemPrompt).toContain(
+      '<!-- clerkly:title-meta: {"title":"<short title>","rename_need_score":NN} -->'
+    );
+    expect(systemPrompt).toContain('Auto-title metadata contract:');
+    expect(systemPrompt).toContain('target 3-12 words');
+    expect(systemPrompt).toContain('max 200 characters');
+  });
+
+  /* Preconditions: App uses mock provider and sends first chat request
+     Action: User sends a message, test inspects provider request body
+     Assertions: System prompt forbids duplicating tool_call payload as plaintext JSON
+     Requirements: llm-integration.9.5.1.1 */
+  test('should include no tool-payload duplication rule in system prompt', async () => {
+    mockLLMServer.setStreamingMode(true, {
+      content: 'Simple answer',
+      chunkDelayMs: 0,
+    });
+
+    context = await launchWithMockLLM();
+    mockLLMServer.clearRequestLogs();
+
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await messageInput.fill('Check final_answer prompt guard');
+    await messageInput.press('Enter');
+    await expect(context.window.locator('.message-llm-action-response').last()).toBeVisible({
+      timeout: 10000,
+    });
+
+    const lastRequest = mockLLMServer.getLastRequest();
+    expect(lastRequest).toBeDefined();
+    const systemPrompt = getSystemPromptText(lastRequest!.body as Record<string, unknown>);
+
+    expect(systemPrompt).toContain(
+      'Do not duplicate tool payload as plain assistant text: never output raw JSON that mirrors `final_answer` arguments/output.'
+    );
+  });
+
+  /* Preconditions: Mock stream returns unterminated auto-title comment with payload > 260 chars
+     Action: User sends a message and waits for stream completion
+     Assertions: Agent name is not changed and chat flow remains successful
+     Requirements: llm-integration.16.4, llm-integration.16.5, agents.14.3 */
+  test('should ignore unterminated title metadata comment when payload exceeds 260 chars', async () => {
+    const overflowPayload = 'x'.repeat(280);
+    mockLLMServer.setStreamingMode(true, {
+      content: `Answer <!-- clerkly:title-meta: {"title":"${overflowPayload}`,
+      chunkDelayMs: 0,
+    });
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    const headerTitle = context.window.locator('[data-testid="agent-header-title"]');
+    await expect(headerTitle).toHaveText('New Agent');
+
+    await messageInput.fill('Trigger invalid title metadata');
+    await messageInput.press('Enter');
+
+    await expect(context.window.locator('.message-llm-action-response').last()).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(headerTitle).toHaveText('New Agent');
+    await expectNoToastError(context.window);
+  });
+
+  /* Preconditions: First response renames agent, cooldown is cleared by 5 filler turns, next response has score below threshold
+     Action: User sends sequential messages through deterministic scripted stream
+     Assertions: Low-score title suggestion is ignored and current title remains stable
+     Requirements: llm-integration.16.10, agents.14.4 */
+  test('should skip rename when rename_need_score is below threshold', async () => {
+    const initialTitle = 'Sprint planning backlog';
+    const similarTitle = 'Backlog sprint planning';
+
+    mockLLMServer.setStreamingMode(true, { chunkDelayMs: 0 });
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        content: `First answer <!-- clerkly:title-meta: {"title":"${initialTitle}","rename_need_score":90} -->`,
+      },
+      { content: 'Filler answer 1' },
+      { content: 'Filler answer 2' },
+      { content: 'Filler answer 3' },
+      { content: 'Filler answer 4' },
+      { content: 'Filler answer 5' },
+      {
+        content: `Similar answer <!-- clerkly:title-meta: {"title":"${similarTitle}","rename_need_score":79} -->`,
+      },
+    ]);
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    const headerTitle = context.window.locator('[data-testid="agent-header-title"]');
+
+    await messageInput.fill('Message 1');
+    await messageInput.press('Enter');
+    await expect(headerTitle).toHaveText(initialTitle, { timeout: 10000 });
+
+    for (let index = 2; index <= 6; index += 1) {
+      await messageInput.fill(`Message ${index}`);
+      await messageInput.press('Enter');
+      await expect(context.window.locator('.message-llm-action-response').last()).toBeVisible({
+        timeout: 10000,
+      });
+    }
+
+    await messageInput.fill('Message 7');
+    await messageInput.press('Enter');
+    await expect(context.window.locator('.message-llm-action-response').last()).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(headerTitle).toHaveText(initialTitle);
+    await expectNoToastError(context.window);
+  });
+
+  /* Preconditions: Model response includes title metadata with only whitespace/punctuation payload
+     Action: User sends message and waits for stream completion
+     Assertions: Agent keeps default name because normalized title is invalid
+     Requirements: llm-integration.16.8, llm-integration.16.9, agents.14.3 */
+  test('should keep current name when auto-title candidate is non-meaningful', async () => {
+    mockLLMServer.setStreamingMode(true, {
+      content: 'Body <!-- clerkly:title-meta: {"title":"   ...   ","rename_need_score":90} -->',
+      chunkDelayMs: 0,
+    });
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    const headerTitle = context.window.locator('[data-testid="agent-header-title"]');
+    await expect(headerTitle).toHaveText('New Agent');
+
+    await messageInput.fill('Produce invalid auto title');
+    await messageInput.press('Enter');
+
+    await expect(context.window.locator('.message-llm-action-response').last()).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(headerTitle).toHaveText('New Agent');
+    await expectNoToastError(context.window);
+  });
+
+  /* Preconditions: Current title is "New Agent", first user message is non-meaningful, model returns valid title metadata
+     Action: User sends first non-meaningful message and waits for stream completion
+     Assertions: Initial auto-rename is skipped and title stays default
+     Requirements: llm-integration.16.10, agents.14.3 */
+  test('should keep default name when first user message is non-meaningful', async () => {
+    mockLLMServer.setStreamingMode(true, {
+      content:
+        'Body <!-- clerkly:title-meta: {"title":"Incident response checklist","rename_need_score":90} -->',
+      chunkDelayMs: 0,
+    });
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    const headerTitle = context.window.locator('[data-testid="agent-header-title"]');
+    await expect(headerTitle).toHaveText('New Agent');
+
+    await messageInput.fill('...');
+    await messageInput.press('Enter');
+
+    await expect(context.window.locator('.message-llm-action-response').last()).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(headerTitle).toHaveText('New Agent');
+    await expectNoToastError(context.window);
+  });
+
+  /* Preconditions: Title is still default, history already contains meaningful user message, current triggering message is non-meaningful
+     Action: User sends meaningful message without title metadata, then sends non-meaningful message with valid title metadata
+     Assertions: Rename is applied on second turn because meaningful history already exists
+     Requirements: llm-integration.16.10, agents.14.1, agents.14.2 */
+  test('should apply deferred rename on non-meaningful turn when history already has meaningful user message', async () => {
+    const deferredTitle = 'Standard model gravity limits';
+    mockLLMServer.setStreamingMode(true, { chunkDelayMs: 0 });
+    mockLLMServer.setOpenAIStreamScripts([
+      { content: 'Meaningful answer without metadata' },
+      {
+        content: `Second answer <!-- clerkly:title-meta: {"title":"${deferredTitle}","rename_need_score":90} -->`,
+      },
+    ]);
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    const headerTitle = context.window.locator('[data-testid="agent-header-title"]');
+    await expect(headerTitle).toHaveText('New Agent');
+
+    await messageInput.fill('Explain limits of the standard model');
+    await messageInput.press('Enter');
+    await expect(context.window.locator('.message-llm-action-response').last()).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(headerTitle).toHaveText('New Agent');
+
+    await messageInput.fill('1');
+    await messageInput.press('Enter');
+    await expect(headerTitle).toHaveText(deferredTitle, { timeout: 10000 });
+    await expectNoToastError(context.window);
+  });
+
+  /* Preconditions: First response renames agent, five user turns pass, next response suggests a new distinct intent with high score
+     Action: User sends sequential messages with deterministic scripted responses
+     Assertions: Rename is applied again after cooldown when score is above threshold
+     Requirements: llm-integration.16.10 */
+  test('should apply rename for new intent after 5-turn cooldown', async () => {
+    const firstTitle = 'Sprint planning backlog';
+    const secondTitle = 'Incident response postmortem';
+
+    mockLLMServer.setStreamingMode(true, { chunkDelayMs: 0 });
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        content: `First answer <!-- clerkly:title-meta: {"title":"${firstTitle}","rename_need_score":90} -->`,
+      },
+      { content: 'Filler answer 1' },
+      { content: 'Filler answer 2' },
+      { content: 'Filler answer 3' },
+      { content: 'Filler answer 4' },
+      { content: 'Filler answer 5' },
+      {
+        content: `Distinct answer <!-- clerkly:title-meta: {"title":"${secondTitle}","rename_need_score":92} -->`,
+      },
+    ]);
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    const headerTitle = context.window.locator('[data-testid="agent-header-title"]');
+
+    await messageInput.fill('Message 1');
+    await messageInput.press('Enter');
+    await expect(headerTitle).toHaveText(firstTitle, { timeout: 10000 });
+
+    for (let index = 2; index <= 6; index += 1) {
+      await messageInput.fill(`Message ${index}`);
+      await messageInput.press('Enter');
+      await expect(context.window.locator('.message-llm-action-response').last()).toBeVisible({
+        timeout: 10000,
+      });
+    }
+
+    await messageInput.fill('Message 7');
+    await messageInput.press('Enter');
+    await expect(headerTitle).toHaveText(secondTitle, { timeout: 10000 });
+    await expectNoToastError(context.window);
+  });
+
+  /* Preconditions: Response contains metadata comment with non-integer score
+     Action: User sends message and waits for stream completion
+     Assertions: Agent title is not changed
+     Requirements: llm-integration.16.10.1 */
+  test('should skip rename when rename_need_score is invalid', async () => {
+    mockLLMServer.setStreamingMode(true, {
+      content:
+        'Body <!-- clerkly:title-meta: {"title":"Incident response checklist","rename_need_score":"high"} -->',
+      chunkDelayMs: 0,
+    });
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    const headerTitle = context.window.locator('[data-testid="agent-header-title"]');
+    await expect(headerTitle).toHaveText('New Agent');
+
+    await messageInput.fill('Trigger invalid score');
+    await messageInput.press('Enter');
+
+    await expect(context.window.locator('.message-llm-action-response').last()).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(headerTitle).toHaveText('New Agent');
+    await expectNoToastError(context.window);
   });
 });

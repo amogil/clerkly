@@ -122,6 +122,7 @@ describe('AgentIPCHandlers', () => {
 
     mockPipeline = {
       run: jest.fn().mockResolvedValue(undefined),
+      clearAutoTitleCache: jest.fn(),
     } as unknown as jest.Mocked<MainPipeline>;
 
     handlers = new AgentIPCHandlers(mockAgentManager, mockMessageManager, mockPipeline);
@@ -372,6 +373,25 @@ describe('AgentIPCHandlers', () => {
 
       expect(result).toEqual({ success: false, error: 'Access denied' });
     });
+
+    /* Preconditions: Handlers registered, target agent belongs to another user context
+       Action: Invoke agents:update for foreign agentId
+       Assertions: Access denial is returned and no success payload is produced
+       Requirements: user-data-isolation.6.5, agents.10.4 */
+    it('should return access denied for rename of foreign agent', async () => {
+      mockAgentManager.update = jest.fn().mockImplementation(() => {
+        throw new Error('Access denied');
+      });
+      handlers.registerHandlers();
+      const handler = registeredHandlers.get('agents:update')!;
+
+      const result = await handler(mockEvent, { agentId: 'foreign-agent-id', name: 'New Name' });
+
+      expect(mockAgentManager.update).toHaveBeenCalledWith('foreign-agent-id', {
+        name: 'New Name',
+      });
+      expect(result).toEqual({ success: false, error: 'Access denied' });
+    });
   });
 
   describe('agents:archive handler', () => {
@@ -386,6 +406,7 @@ describe('AgentIPCHandlers', () => {
       const result = await handler(mockEvent, { agentId: 'abc123xyz0' });
 
       expect(mockAgentManager.archive).toHaveBeenCalledWith('abc123xyz0');
+      expect(mockPipeline.clearAutoTitleCache).toHaveBeenCalledWith('abc123xyz0');
       expect(result).toEqual({ success: true });
     });
 

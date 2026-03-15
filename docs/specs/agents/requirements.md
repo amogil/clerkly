@@ -494,6 +494,9 @@
    - `agent_id TEXT NOT NULL` - ID агента
    - `timestamp TIMESTAMP NOT NULL` - время сообщения (ISO 8601 с timezone offset)
    - `kind TEXT NOT NULL` - тип сообщения (хранится в отдельной колонке, не в payload_json)
+   - `run_id TEXT` - идентификатор model-run (для `kind: llm`/`kind: tool_call`)
+   - `attempt_id INTEGER` - номер попытки внутри run (для `kind: llm`/`kind: tool_call`)
+   - `sequence INTEGER` - канонический порядковый номер шага внутри run/attempt (для `kind: llm`/`kind: tool_call`)
    - `hidden INTEGER NOT NULL DEFAULT 0` - флаг скрытия сообщения (скрытые сообщения не участвуют в UI и в расчёте статуса)
    - `done INTEGER NOT NULL DEFAULT 0` - флаг завершённости сообщения (`0` пока сообщение формируется/стримится, `1` после полного получения)
    - `reply_to_message_id INTEGER` - связь с сообщением, на которое даётся ответ (null для первого)
@@ -528,11 +531,13 @@
 
 7.4.2.1. Компонент `"Final Answer"` ДОЛЖЕН всегда отображаться в раскрытом виде и НЕ ДОЛЖЕН поддерживать сворачивание/разворачивание.
 
-7.4.2.2. КОГДА `summary_points` пустой (или отсутствует), ТО это состояние ДОЛЖНО считаться нарушением контракта `final_answer` (см. `llm-integration.9.5.*`).
+7.4.2.2. КОГДА `summary_points` пустой, отсутствует ИЛИ содержит пункт с пустым текстом (после `trim`), ТО это состояние ДОЛЖНО считаться нарушением контракта `final_answer` (см. `llm-integration.9.5.*`).
 
 7.4.2.3. Контракт и лимиты аргументов `final_answer` задаются в спецификации `llm-integration`; `agents` использует только persisted payload для отображения.
 
 7.4.2.4. В каждом checklist-пункте блока `"Final Answer"` зелёная иконка `Check` ДОЛЖНА быть выровнена по вертикальному центру первой строки текста пункта (а НЕ по центру всего многострочного блока).
+
+7.4.2.5. Текст каждого пункта `summary_points` в блоке `"Final Answer"` ДОЛЖЕН рендериться как Markdown (GFM) по тем же правилам, что и обычный `kind: llm` ответ.
 
 7.4.4. Для `tool_call(final_answer)` UI ДОЛЖЕН иметь отдельные тестовые идентификаторы:
   - `data-testid="message-final-answer-block"` для корневого блока,
@@ -594,6 +599,8 @@
 
 7.4.8.4. UI ДОЛЖЕН рендерить `tool_call`-блоки только из видимых persisted-сообщений (`hidden = false`), и НЕ ДОЛЖЕН показывать частично обработанные/промежуточные `tool_call`-артефакты, отсутствующие в видимой persisted-истории.
 
+7.4.8.5. Для вычисления persisted-порядка model-run UI ДОЛЖЕН использовать поля snapshot-сообщения `runId/attemptId/sequence` (проекция колонок `messages.run_id/attempt_id/sequence`) и НЕ ДОЛЖЕН читать порядок из `payload_json`.
+
 7.4.9. В явно выделенных text/code секциях tool-блоков (`Input`, `Output`, `JavaScript`, `stdout`, `stderr`) длинные строки НЕ ДОЛЖНЫ переноситься по ширине секции и ДОЛЖНЫ отображаться через горизонтальный скролл внутри соответствующего блока.
 
 7.5. Сообщение `user` ДОЛЖНО содержать:
@@ -645,6 +652,8 @@
 - `tests/functional/llm-chat.spec.ts` - "should render math when model returns escaped dollar delimiters"
 - `tests/functional/llm-chat.spec.ts` - "should avoid duplicate line breaks between markdown blocks"
 - `tests/functional/llm-chat.spec.ts` - "should render tool_call(final_answer) as checklist block"
+- `tests/functional/llm-chat.spec.ts` - "should render markdown inside tool_call(final_answer) checklist item"
+- `tests/functional/llm-chat.spec.ts` - "should render math inside tool_call(final_answer) checklist item"
 - `tests/functional/llm-chat.spec.ts` - "should keep tool_call(final_answer) checklist always expanded"
 - `tests/functional/llm-chat.spec.ts` - "should keep visual order pre-tool llm -> tool_call(running) -> post-tool llm with in-place terminal update"
 - `tests/functional/llm-chat.spec.ts` - "should create tool_call only after reasoning phase and start post-tool text without waiting terminal result"
@@ -906,6 +915,41 @@
 
 ---
 
+### 14. Автоматическое обновление имени агента в UI
+
+**ID:** agents.14
+
+**User Story:** Как пользователь, я хочу видеть релевантное имя чата автоматически, чтобы быстрее ориентироваться между агентами.
+
+**Зависимости:** llm-integration (извлечение title и решение о rename в runtime)
+
+#### Критерии Приемки
+
+14.1. КОГДА main process публикует `agent.updated` с новым `name`, ТО UI ДОЛЖЕН обновлять отображаемое имя агента без дополнительных запросов к БД/IPC.
+
+14.2. Обновлённое имя агента ДОЛЖНО синхронно отображаться во всех местах UI, где показывается имя:
+  - заголовок активного агента;
+  - список агентов в хедере (включая tooltip);
+  - страница `All Agents`.
+
+14.3. КОГДА пользователь отправляет сообщение и в интерфейсе остаётся прежнее имя агента, ТО это ДОЛЖНО считаться штатным поведением: UI продолжает показывать текущее имя и НЕ показывает отдельный диалог/уведомление ошибки только из-за отсутствия переименования.
+
+14.4. КОГДА за короткий интервал приходят несколько `agent.updated` без фактического изменения `name`, ТО UI НЕ ДОЛЖЕН визуально «дребезжать» и ДОЛЖЕН сохранять стабильное отображение имени.
+
+14.5. UI НЕ ДОЛЖЕН показывать служебные markdown-метаданные auto-title (HTML comment вида `<!-- clerkly:title-meta: ... -->`) как видимый текст сообщения.
+
+14.6. КОГДА текущий заголовок агента остаётся `New Agent`, НО в истории агента уже есть хотя бы одно meaningful user-message, ТО последующий `agent.updated` с новым `name` (в том числе после не-meaningful triggering turn) ДОЛЖЕН применяться и синхронно отображаться в UI по правилам 14.1 и 14.2.
+
+#### Функциональные Тесты
+
+- `tests/functional/llm-chat.spec.ts` - "should reflect auto-renamed title in header, agents list and all-agents view"
+- `tests/functional/llm-chat.spec.ts` - "should keep default name when first user message is non-meaningful"
+- `tests/functional/llm-chat.spec.ts` - "should apply deferred rename on non-meaningful turn when history already has meaningful user message"
+- `tests/functional/llm-chat.spec.ts` - "should keep current name when auto-title candidate is non-meaningful"
+- `tests/functional/llm-chat.spec.ts` - "should skip rename when rename_need_score is below threshold"
+
+---
+
 ## Нефункциональные Требования
 
 ### Производительность
@@ -961,7 +1005,7 @@
 
 Следующие элементы явно исключены из данной спецификации:
 
-- Редактирование названий агентов
+- Ручное редактирование названий агентов
 - Экспорт истории чатов
 - Поиск по сообщениям
 - Фильтрация агентов по статусу

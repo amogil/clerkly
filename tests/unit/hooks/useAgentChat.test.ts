@@ -81,8 +81,11 @@ const makeSnapshot = (
   agentId: 'agent-1',
   kind,
   timestamp: Date.now(),
+  runId: order?.runId ?? null,
+  attemptId: order?.attemptId ?? null,
+  sequence: order?.sequence ?? null,
   replyToMessageId: null,
-  payload: { data: { text: `msg ${id}`, order } },
+  payload: { data: { text: `msg ${id}` } },
   hidden,
   done: true,
 });
@@ -397,7 +400,7 @@ describe('useAgentChat hook', () => {
 
     /* Preconditions: Hook mounted, messages from one run/attempt arrive out of sequence
        Action: MESSAGE_CREATED emitted in order sequence 2 then 1
-       Assertions: rawMessages are sorted by payload.data.order.sequence
+       Assertions: rawMessages are sorted by runId/attemptId/sequence
        Requirements: agents.7.4.8 */
     it('should sort MESSAGE_CREATED snapshots by sequence within one run attempt', async () => {
       const { result } = renderHook(() => useAgentChat('agent-1'));
@@ -552,7 +555,7 @@ describe('useAgentChat hook', () => {
 
     /* Preconditions: Hook mounted, two updates for same run/attempt arrive in reverse sequence
        Action: MESSAGE_UPDATED events for sequence 2 then 1
-       Assertions: rawMessages order follows payload.data.order.sequence
+       Assertions: rawMessages order follows runId/attemptId/sequence
        Requirements: agents.7.4.8 */
     it('should sort MESSAGE_UPDATED snapshots by sequence within one run attempt', async () => {
       const { result } = renderHook(() => useAgentChat('agent-1'));

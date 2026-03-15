@@ -5,10 +5,11 @@ import { AgentAvatar } from './AgentAvatar';
 import { getStatusText, getStatusStyles } from '../../../shared/utils/agentStatus';
 import { DateTimeFormatter } from '../../../shared/utils/DateTimeFormatter';
 import type { AgentSnapshot } from '../../types/agent';
+import { DEFAULT_AGENT_TITLE } from '../../../shared/constants/agents';
 
 // Requirements: agents.2.1, agents.4.7, agents.1.4.4
 
-const getAgentName = (agent: AgentSnapshot): string => agent.name || 'New Agent';
+const getAgentName = (agent: AgentSnapshot): string => agent.name || DEFAULT_AGENT_TITLE;
 
 interface AgentHeaderProps {
   currentAgent: AgentSnapshot;

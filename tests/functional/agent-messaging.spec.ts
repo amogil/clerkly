@@ -283,7 +283,15 @@ test.describe('Agent Messaging', () => {
       await expect(window.locator('[data-testid="prompt-input-stop"]')).toBeVisible({
         timeout: 10000,
       });
-      await window.locator('[data-testid="prompt-input-stop"]').click();
+      const stopButton = window.locator('[data-testid="prompt-input-stop"]');
+      try {
+        await stopButton.click({ timeout: 5000 });
+      } catch {
+        // Stop/send can switch during click; if send is already back, this is expected.
+      }
+      await expect(window.locator('[data-testid="prompt-input-send"]')).toBeVisible({
+        timeout: 10000,
+      });
     }
 
     // Ensure we are back in send mode before the final message

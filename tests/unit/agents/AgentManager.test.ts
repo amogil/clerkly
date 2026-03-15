@@ -671,6 +671,23 @@ describe('AgentManager', () => {
       expect(publishedEvent.changedFields).toEqual(['name', 'updatedAt']);
       expect(typeof publishedEvent.timestamp).toBe('number');
     });
+
+    /* Preconditions: AgentManager initialized, repository rejects update due to access control
+       Action: Call update() with agentId from another user context
+       Assertions: Error is propagated and AGENT_UPDATED event is not published
+       Requirements: user-data-isolation.6.5, agents.10.4, agents.12.2 */
+    it('should not publish update event when repository denies rename access', () => {
+      mockDbManager.agents.update = jest.fn().mockImplementation(() => {
+        throw new Error('Access denied');
+      });
+
+      expect(() => {
+        agentManager.update('foreign-agent-id', { name: 'Renamed by auto-title' });
+      }).toThrow('Access denied');
+
+      expect(mockEventBus.publish).not.toHaveBeenCalled();
+      expect(mockDbManager.agents.findById).not.toHaveBeenCalled();
+    });
   });
 
   describe('archive', () => {

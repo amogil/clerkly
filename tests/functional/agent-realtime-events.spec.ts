@@ -8,7 +8,9 @@
 import { test, expect, ElectronApplication, Page } from '@playwright/test';
 import {
   completeOAuthFlow,
+  closeElectron,
   createMockOAuthServer,
+  ElectronTestContext,
   activeChat,
   launchElectronWithMockOAuth,
   expectAgentsVisible,
@@ -18,6 +20,7 @@ import type { MockOAuthServer } from './helpers/mock-oauth-server';
 let electronApp: ElectronApplication;
 let window: Page;
 let mockServer: MockOAuthServer;
+let context: ElectronTestContext | undefined;
 
 test.beforeAll(async () => {
   mockServer = await createMockOAuthServer();
@@ -30,7 +33,7 @@ test.afterAll(async () => {
 });
 
 test.beforeEach(async () => {
-  const context = await launchElectronWithMockOAuth(mockServer, {
+  context = await launchElectronWithMockOAuth(mockServer, {
     CLERKLY_OAUTH_CLIENT_ID: 'test-client-id',
     CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret',
   });
@@ -42,7 +45,10 @@ test.beforeEach(async () => {
 });
 
 test.afterEach(async () => {
-  await electronApp.close();
+  if (context) {
+    await closeElectron(context, true, false);
+  }
+  context = undefined;
 });
 
 test.describe('Agent Real-time Events', () => {

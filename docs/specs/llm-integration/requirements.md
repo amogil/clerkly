@@ -294,6 +294,17 @@
 
 6.6.1. Финальный текст ответа в chat-flow ДОЛЖЕН храниться в `payload.data.text`.
 
+6.7. Таблица `messages` ДОЛЖНА иметь отдельные колонки порядка model-run:
+  - `run_id TEXT`
+  - `attempt_id INTEGER`
+  - `sequence INTEGER`
+
+6.8. Данные порядка model-run (`run_id`, `attempt_id`, `sequence`) ДОЛЖНЫ храниться в одноимённых колонках таблицы `messages`.
+
+6.9. КОГДА сообщение относится к model-run шагу (`kind: llm` или `kind: tool_call`), ТО `run_id`, `attempt_id`, `sequence` ДОЛЖНЫ сохраняться в соответствующих колонках.
+
+6.10. КОГДА сообщение не относится к model-run шагу (`kind: user` или `kind: error`), ТО `run_id`, `attempt_id`, `sequence` МОГУТ оставаться `NULL`.
+
 ---
 
 ### 7. Семантика потока ответа
@@ -387,15 +398,23 @@
   - `final_answer` вызывается только когда модель уверена, что работа завершена;
   - ЕСЛИ работа не завершена и `final_answer` не вызывается, модель ДОЛЖНА явно запросить у пользователя недостающую информацию или подтверждение следующего шага;
   - `final_answer` вызывается только в одиночку в рамках одного model-turn; в том же turn НЕ ДОЛЖНЫ вызываться другие инструменты;
-  - `summary_points` соблюдает лимиты `llm-integration.9.5.2-9.5.3` и перечисляет решённые задачи.
+  - payload вызова инструмента НЕ ДОЛЖЕН дублироваться в plain-text ответе модели; модель НЕ ДОЛЖНА выводить сырой JSON, который зеркалирует `tool_call` (`summary_points`, `toolName`, `arguments`, `output`);
+  - КОГДА пункт `summary_points` содержит математическое выражение, модель ДОЛЖНА использовать KaTeX-совместимые markdown-делимитеры `$...$` (inline) или `$$...$$` (block);
+  - `summary_points` соблюдает лимиты `llm-integration.9.5.2-9.5.3.1` и перечисляет решённые задачи.
 
 9.5.2. `summary_points` ДОЛЖЕН содержать от 1 до 10 пунктов.
 
 9.5.3. КАЖДЫЙ пункт `summary_points` ДОЛЖЕН иметь длину не более 200 символов.
 
+9.5.3.1. КАЖДЫЙ пункт `summary_points` ДОЛЖЕН содержать непустой текст: после `trim` длина ДОЛЖНА быть не менее 1 символа.
+
 9.5.4. ЕСЛИ `final_answer` нарушает ограничения по `summary_points`, ТО система ДОЛЖНА считать такой `final_answer` невалидным и запустить retry/repair по правилам `llm-integration.12.*`.
 
 9.5.5. ОТСУТСТВИЕ `summary_points` (или пустой массив) НЕ ДОЛЖНО считаться успешным `completed`; такой `final_answer` ДОЛЖЕН обрабатываться как невалидный по правилам retry/repair (`llm-integration.12.*`).
+
+9.5.6. КОГДА в успешной попытке присутствует валидный `tool_call`, ТО система НЕ ДОЛЖНА сохранять отдельный пользовательский `kind: llm` ответ, если его текст является техническим сериализованным payload вызова инструмента (например, JSON с полями `summary_points`, `toolName`, `arguments`, `output`).
+
+9.5.6.1. Это правило ДОЛЖНО применяться к ответам провайдера, где в одном model-turn одновременно пришли `kind: llm` text-chunks/`output.text` и валидный `tool_call`; дублирование в UI в таком случае считается следствием персиста, а не отдельной ошибки renderer.
 
 9.6. В целевой модели невалидный `final_answer` НЕ ДОЛЖЕН фиксироваться как успешный `completed`; он ДОЛЖЕН либо быть исправлен через retry, либо завершиться `kind:error` при исчерпании retry-лимита.
 
@@ -506,6 +525,9 @@
 - `tests/functional/llm-chat.spec.ts` — "should retry tool call on invalid arguments, not persist tool_call, and show kind:error after retry limit"
 - `tests/functional/llm-chat.spec.ts` — "should continue to next model step after terminal code_exec tool result"
 - `tests/functional/llm-chat.spec.ts` — "should render final_answer tool_call as completed assistant response"
+- `tests/functional/llm-chat.spec.ts` — "should render math inside tool_call(final_answer) checklist item"
+- `tests/functional/llm-chat.spec.ts` — "should include no tool-payload duplication rule in system prompt"
+- `tests/functional/llm-chat.spec.ts` — "should not render raw final_answer JSON text when tool_call(final_answer) is present"
 
 ### 12. Надёжность chat-flow и обработка некорректных ответов
 
@@ -531,6 +553,7 @@
 
 - `tests/functional/llm-chat.spec.ts` — "should cancel active request via stop button without creating error message"
 - `tests/functional/llm-chat.spec.ts` — "should show error when invalid final_answer exhausts retry limit"
+- `tests/functional/llm-chat.spec.ts` — "should show error when final_answer contains blank summary point"
 
 ---
 
@@ -597,3 +620,73 @@
   - `code_exec`
 
 15.3. Другие спецификации (`agents`, `code_exec`, `realtime-events`) SHALL ссылаться на канонический список из `llm-integration` и SHALL NOT переопределять его независимо.
+
+---
+
+### 16. Извлечение auto-title из markdown-ответа модели
+
+**ID:** llm-integration.16
+
+**User Story:** Как разработчик, я хочу извлекать кандидат имени агента из того же model-turn, чтобы не делать отдельный LLM-запрос.
+
+#### Критерии Приемки
+
+16.1. Система ДОЛЖНА извлекать метаданные auto-title из markdown-ответа ассистента по контракту `<!-- clerkly:title-meta: ... -->` в рамках того же `MainPipeline.run(...)`.
+
+16.1.1. КОГДА текущий turn удовлетворяет guard-условиям auto-title, ТО система ДОЛЖНА добавлять в model input per-turn system instruction с контрактом генерации `<!-- clerkly:title-meta: ... -->` и контекстом текущего названия чата.
+
+16.1.2. КОГДА текущий turn удовлетворяет guard-условиям auto-title, ТО система ДОЛЖНА запрашивать у модели единый metadata-пакет в одном теге `<!-- clerkly:title-meta: ... -->`, который содержит:
+  - `title` (строка);
+  - `rename_need_score` (целое число `0..100`, где большее значение означает более сильную необходимость смены текущего названия).
+
+16.1.3. Payload тега `<!-- clerkly:title-meta: ... -->` ДОЛЖЕН быть JSON-объектом формата `{"title":"<short title>","rename_need_score":NN}`.
+
+16.2. Система НЕ ДОЛЖНА выполнять отдельный LLM-вызов для генерации названия агента.
+
+16.3. Parser ДОЛЖЕН обрабатывать stream инкрементально и искать первое вхождение префикса `<!-- clerkly:title-meta:`.
+
+16.4. КОГДА parser вошёл в режим захвата payload, ТО захват ДОЛЖЕН завершаться:
+  - при обнаружении закрывающего `-->`, ИЛИ
+  - при достижении лимита `TITLE_META_PAYLOAD_MAX_LENGTH = 260`.
+
+16.4.1. Лимит `TITLE_META_PAYLOAD_MAX_LENGTH` ДОЛЖЕН считаться в Unicode-символах (code points), а НЕ в байтах.
+
+16.5. ЕСЛИ захват достиг лимита 260 без `-->`, ТО comment ДОЛЖЕН считаться невалидным, а rename ДОЛЖЕН быть пропущен без влияния на основной ответ.
+
+16.6. За один model-turn система ДОЛЖНА обрабатывать не более одного валидного metadata comment (первое валидное вхождение).
+
+16.7. Система НЕ ДОЛЖНА модифицировать пользовательский output-stream ради извлечения title; извлечение выполняется параллельно с обычной доставкой контента.
+
+16.8. Candidate title ДОЛЖЕН нормализоваться (trim, single-line, collapse spaces, удаление краевой пунктуации) и валидироваться с ограничением `AGENT_TITLE_MAX_LENGTH = 200`.
+
+16.8.2. Лимит `AGENT_TITLE_MAX_LENGTH` ДОЛЖЕН считаться в Unicode-символах (code points), а НЕ в байтах.
+
+16.8.1. Candidate title ДОЛЖЕН стремиться к краткому формату `3-12` слов (target); при этом превышение 200 символов ДОЛЖНО приводить к пропуску rename.
+
+16.9. ЕСЛИ candidate title после нормализации пустой или превышает лимит, ТО rename ДОЛЖЕН быть пропущен.
+
+16.10. Перед применением rename система ДОЛЖНА выполнять anti-flapping guards:
+  - exact-match guard на нормализованных строках;
+  - score guard: rename ДОЛЖЕН применяться только при `rename_need_score >= 80`;
+  - cooldown guard: не чаще одного rename за 5 user-turns для одного агента;
+  - cooldown replay ДОЛЖЕН учитывать только успешно применённые rename (не просто наличие comment в тексте ответа);
+  - initial-rename guard: ПОКА текущий заголовок агента равен `New Agent`, ЕСЛИ в истории агента ещё нет meaningful user-message (>=3 буквенно-цифровых символов), auto-rename ДОЛЖЕН выполняться только на meaningful triggering user-message;
+  - ПОКА текущий заголовок агента равен `New Agent`, ЕСЛИ в истории агента уже есть meaningful user-message, auto-rename МОЖЕТ выполняться и на turn с не-meaningful triggering user-message.
+
+16.10.1. ЕСЛИ `rename_need_score` отсутствует, невалиден или вне диапазона `0..100`, ТО rename ДОЛЖЕН быть пропущен для текущего turn.
+
+16.11. Применение валидного candidate title ДОЛЖНО выполняться через существующий путь обновления агента (`AgentManager.update(...)`) с публикацией стандартного `agent.updated`.
+
+16.12. Ошибки parser/валидации/rename НЕ ДОЛЖНЫ прерывать `MainPipeline.run(...)` и НЕ ДОЛЖНЫ создавать блокирующее `kind:error` сообщение; для таких случаев ДОЛЖНО быть достаточно диагностического логирования.
+
+16.13. Логика auto-title ДОЛЖНА сохранять изоляцию данных пользователя: rename применяется только к агенту текущего user-context.
+
+#### Функциональные Тесты
+
+- `tests/functional/llm-chat.spec.ts` - "should extract agent title and rename_need_score from single metadata comment in the same model turn"
+- `tests/functional/llm-chat.spec.ts` - "should include auto-title metadata contract in system prompt"
+- `tests/functional/llm-chat.spec.ts` - "should ignore unterminated title metadata comment when payload exceeds 260 chars"
+- `tests/functional/llm-chat.spec.ts` - "should keep default name when first user message is non-meaningful"
+- `tests/functional/llm-chat.spec.ts` - "should skip rename when rename_need_score is below threshold"
+- `tests/functional/llm-chat.spec.ts` - "should skip rename when rename_need_score is invalid"
+- `tests/functional/llm-chat.spec.ts` - "should apply rename for new intent after 5-turn cooldown"

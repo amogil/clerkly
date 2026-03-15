@@ -251,7 +251,19 @@ const promptBuilder = new PromptBuilder(
   [new FinalAnswerFeature(), new CodeExecFeature(sandboxSessionManager)],
   new FullHistoryStrategy()
 );
-const mainPipeline = new MainPipeline(messageManager, aiAgentSettingsManager, promptBuilder);
+const mainPipeline = new MainPipeline(
+  messageManager,
+  aiAgentSettingsManager,
+  promptBuilder,
+  undefined,
+  undefined,
+  {
+    getCurrentTitle: (agentId) => agentManager.get(agentId)?.name ?? null,
+    rename: (agentId, name) => {
+      agentManager.update(agentId, { name });
+    },
+  }
+);
 const agentIPCHandlers = new AgentIPCHandlers(agentManager, messageManager, mainPipeline);
 const appCoordinator = new AppCoordinator(oauthClient);
 

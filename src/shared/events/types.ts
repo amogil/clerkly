@@ -97,6 +97,9 @@ export interface MessageSnapshot {
   kind: string;
   timestamp: number; // Unix timestamp in milliseconds
   payload: MessagePayload;
+  runId?: string | null;
+  attemptId?: number | null;
+  sequence?: number | null;
   replyToMessageId: number | null;
   /** Hidden messages are not shown in UI and excluded from LLM history */
   hidden: boolean;
