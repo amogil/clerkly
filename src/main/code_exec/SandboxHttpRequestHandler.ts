@@ -16,6 +16,7 @@ export const HTTP_REQUEST_LIMITS = {
   timeoutMsDefault: 10_000,
   timeoutMsMax: 180_000,
   redirectHopsMax: 10,
+  responseBytesHardCap: 256 * 1024,
 } as const;
 
 export type SandboxHttpRequestValidationErrorCode =
@@ -198,11 +199,12 @@ export class SandboxHttpRequestHandler {
       if (
         typeof rawMaxResponseBytes !== 'number' ||
         !Number.isInteger(rawMaxResponseBytes) ||
-        rawMaxResponseBytes < 0
+        rawMaxResponseBytes < 0 ||
+        rawMaxResponseBytes > HTTP_REQUEST_LIMITS.responseBytesHardCap
       ) {
         return this.validationError(
           'invalid_max_response_bytes',
-          'http_request.max_response_bytes must be a non-negative integer.'
+          `http_request.max_response_bytes must be an integer in range 0..${HTTP_REQUEST_LIMITS.responseBytesHardCap}.`
         );
       }
       maxResponseBytes = rawMaxResponseBytes;
@@ -225,31 +227,34 @@ export class SandboxHttpRequestHandler {
   ): Promise<SandboxHttpRequestResult> {
     const controller = new AbortController();
     const timeoutHandle = setTimeout(() => controller.abort(), input.timeoutMs);
+    const appliedLimitBytes = input.maxResponseBytes ?? HTTP_REQUEST_LIMITS.responseBytesHardCap;
 
     try {
       let currentUrl = input.url;
+      let currentMethod: HttpMethod = input.method;
+      let currentBody = input.body;
       let redirectHops = 0;
 
       for (;;) {
         const response = await this.fetchImpl(currentUrl, {
-          method: input.method,
+          method: currentMethod,
           headers: input.headers,
-          body: input.body,
+          body: currentBody,
           redirect: 'manual',
           signal: controller.signal,
         });
 
         if (!input.followRedirects) {
-          return await this.buildSuccessResult(currentUrl, response, input.maxResponseBytes);
+          return await this.buildSuccessResult(currentUrl, response, appliedLimitBytes);
         }
 
         if (!this.isRedirectResponse(response.status)) {
-          return await this.buildSuccessResult(currentUrl, response, input.maxResponseBytes);
+          return await this.buildSuccessResult(currentUrl, response, appliedLimitBytes);
         }
 
         const location = response.headers.get('location');
         if (!location) {
-          return await this.buildSuccessResult(currentUrl, response, input.maxResponseBytes);
+          return await this.buildSuccessResult(currentUrl, response, appliedLimitBytes);
         }
 
         redirectHops += 1;
@@ -263,6 +268,13 @@ export class SandboxHttpRequestHandler {
         }
 
         currentUrl = new URL(location, currentUrl).toString();
+        const nextRequest = this.getRedirectFollowRequest(
+          response.status,
+          currentMethod,
+          currentBody
+        );
+        currentMethod = nextRequest.method;
+        currentBody = nextRequest.body;
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -281,11 +293,11 @@ export class SandboxHttpRequestHandler {
   private async buildSuccessResult(
     requestUrl: string,
     response: Response,
-    maxResponseBytes?: number
+    appliedLimitBytes: number
   ): Promise<SandboxHttpRequestSuccess> {
     const contentType = response.headers.get('content-type') ?? '';
     const headers = Object.fromEntries(response.headers.entries());
-    const bodyBytesResult = await this.readBodyBytes(response, maxResponseBytes);
+    const bodyBytesResult = await this.readBodyBytes(response, appliedLimitBytes);
     const bodyEncoding = this.isTextualContentType(contentType) ? 'text' : 'base64';
     const body =
       bodyEncoding === 'text'
@@ -300,22 +312,17 @@ export class SandboxHttpRequestHandler {
       body_encoding: bodyEncoding,
       body,
       truncated: bodyBytesResult.truncated,
-      ...(maxResponseBytes !== undefined ? { applied_limit_bytes: maxResponseBytes } : {}),
+      applied_limit_bytes: appliedLimitBytes,
     };
   }
 
   // Requirements: sandbox-http-request.3.5
   private async readBodyBytes(
     response: Response,
-    maxResponseBytes?: number
+    appliedLimitBytes: number
   ): Promise<{ bytes: Uint8Array; truncated: boolean }> {
     if (response.body === null) {
       return { bytes: new Uint8Array(0), truncated: false };
-    }
-
-    if (maxResponseBytes === undefined) {
-      const bytes = new Uint8Array(await response.arrayBuffer());
-      return { bytes, truncated: false };
     }
 
     const reader = response.body.getReader();
@@ -330,7 +337,7 @@ export class SandboxHttpRequestHandler {
       }
 
       const chunk = value instanceof Uint8Array ? value : new Uint8Array(value);
-      const remaining = maxResponseBytes - totalBytes;
+      const remaining = appliedLimitBytes - totalBytes;
       if (remaining <= 0) {
         truncated = true;
         await reader.cancel();
@@ -368,6 +375,23 @@ export class SandboxHttpRequestHandler {
 
   private isRedirectResponse(status: number): boolean {
     return status >= 300 && status < 400;
+  }
+
+  // Requirements: sandbox-http-request.3.3
+  private getRedirectFollowRequest(
+    status: number,
+    method: HttpMethod,
+    body: string | undefined
+  ): { method: HttpMethod; body: string | undefined } {
+    if (status === 303) {
+      return { method: 'GET', body: undefined };
+    }
+
+    if ((status === 301 || status === 302) && method === 'POST') {
+      return { method: 'GET', body: undefined };
+    }
+
+    return { method, body };
   }
 
   private isTextualContentType(contentType: string): boolean {

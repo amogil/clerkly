@@ -68,6 +68,30 @@ async function getAllMessages(agentId: string): Promise<Array<Record<string, unk
   }, agentId);
 }
 
+// Requirements: sandbox-http-request.3, sandbox-http-request.4
+async function getCodeExecOutputByCallId(
+  agentId: string,
+  callId: string
+): Promise<Record<string, unknown> | undefined> {
+  const toolCalls = await getToolCallMessages(agentId);
+  const codeExecCall = toolCalls.find((entry) => {
+    const payload = entry.payload as {
+      data?: { callId?: string; toolName?: string };
+    };
+    return payload?.data?.toolName === 'code_exec' && payload?.data?.callId === callId;
+  }) as
+    | {
+        payload?: {
+          data?: {
+            output?: Record<string, unknown>;
+          };
+        };
+      }
+    | undefined;
+
+  return codeExecCall?.payload?.data?.output;
+}
+
 async function findCodeExecCallByCallId(
   agentId: string,
   callId: string
@@ -303,6 +327,50 @@ test.describe('code_exec tool_call rendering', () => {
     await expectNoToastError(window);
   });
 
+  /* Preconditions: authenticated app with one visible agent and historical code_exec payload without task_summary
+     Action: create persisted kind:tool_call with toolName=code_exec and terminal output
+     Assertions: legacy persisted payload falls back to title "Code" for backward compatibility
+     Exception Rationale (testing.3.13): this test validates renderer behavior for persisted historical
+     tool_call(code_exec) data created before the task_summary contract existed.
+     Requirements: agents.7.4.6.3, agents.7.4.6.3.1 */
+  test('should render fallback Code title for historical code_exec payload without task_summary', async () => {
+    await launchWithMockLLM();
+    const agentId = (await getAgentIdsFromApi(window))[0];
+    expect(agentId).toBeTruthy();
+
+    await window.evaluate(async (id) => {
+      const api = (window as unknown as { api: any }).api;
+      const result = await api.messages.create(id, 'tool_call', {
+        data: {
+          callId: 'code-legacy-1',
+          toolName: 'code_exec',
+          arguments: {
+            code: "console.log('legacy')",
+            timeout_ms: 10000,
+          },
+          output: {
+            status: 'success',
+            stdout: 'legacy\\n',
+            stderr: '',
+            stdout_truncated: false,
+            stderr_truncated: false,
+          },
+        },
+      });
+      if (!result?.success) {
+        throw new Error(result?.error || 'Failed to create historical code_exec tool_call');
+      }
+    }, agentId as string);
+
+    await expect(window.locator('[data-testid="message-code-exec-block"]').last()).toBeVisible({
+      timeout: 5000,
+    });
+    await expect(window.locator('[data-testid="message-code-exec-title"]').last()).toHaveText(
+      'Code'
+    );
+    await expectNoToastError(window);
+  });
+
   /* Preconditions: authenticated app with one visible agent
      Action: create persisted kind:tool_call with toolName=code_exec and JavaScript input, then expand collapsed block
      Assertions: JavaScript input renders as syntax-highlighted fenced javascript code block via shared message code component
@@ -485,6 +553,305 @@ test.describe('code_exec tool_call rendering', () => {
 });
 
 test.describe('code_exec tool loop execution', () => {
+  /* Preconditions: mock model emits code_exec that calls tools.http_request against a local JSON endpoint
+     Action: user sends a message that triggers sandbox http_request helper
+     Assertions: helper response is returned to sandbox code as structured metadata with textual body
+     Requirements: sandbox-http-request.1.1, sandbox-http-request.1.3, sandbox-http-request.2.1, sandbox-http-request.3.4 */
+  test('should allow sandbox code to execute async http_request helper', async () => {
+    const port = await getFreePort();
+    const requests: Array<{ method?: string; accept?: string }> = [];
+    const localServer = http.createServer((req, res) => {
+      requests.push({ method: req.method, accept: req.headers.accept });
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: true, source: 'local-server' }));
+    });
+    await new Promise<void>((resolve) => localServer.listen(port, '127.0.0.1', () => resolve()));
+
+    try {
+      mockLLMServer.setStreamingMode(true);
+      mockLLMServer.setOpenAIStreamScripts([
+        {
+          toolCalls: [
+            {
+              callId: 'http-ok-1',
+              toolName: 'code_exec',
+              arguments: {
+                task_summary: 'Fetch local JSON',
+                code: `const result = await tools.http_request({
+  url: "http://127.0.0.1:${port}/data",
+  method: "GET",
+  headers: { "accept": "application/json" },
+  timeout_ms: 10000
+});
+console.log(JSON.stringify(result));`,
+                timeout_ms: 10000,
+              },
+            },
+          ],
+        },
+        {
+          content: '{"action":{"type":"text","content":"http helper done"}}',
+        },
+      ]);
+
+      await launchWithMockLLM();
+      await sendUserMessage('Fetch local JSON via http helper');
+      await expect(window.locator('.message-llm-action-response').last()).toContainText(
+        'http helper done',
+        {
+          timeout: 15000,
+        }
+      );
+
+      const agentId = (await getAgentIdsFromApi(window))[0];
+      const output = await getCodeExecOutputByCallId(agentId, 'http-ok-1');
+      expect(output).toBeDefined();
+      expect(output?.status).toBe('success');
+      const stdout = typeof output?.stdout === 'string' ? output.stdout.trim() : '';
+      const payload = JSON.parse(stdout) as Record<string, unknown>;
+      expect(payload).toMatchObject({
+        status: 200,
+        final_url: `http://127.0.0.1:${port}/data`,
+        content_type: 'application/json; charset=utf-8',
+        body_encoding: 'text',
+        truncated: false,
+      });
+      expect(String(payload.body)).toContain('"ok":true');
+      expect(requests).toEqual([{ method: 'GET', accept: 'application/json' }]);
+      await expectNoToastError(window);
+    } finally {
+      await new Promise<void>((resolve) => localServer.close(() => resolve()));
+    }
+  });
+
+  /* Preconditions: mock model emits code_exec that calls tools.http_request with follow_redirects disabled
+     Action: user sends a message that triggers sandbox http_request helper
+     Assertions: helper returns the redirect response without following the Location target
+     Requirements: sandbox-http-request.2.8, sandbox-http-request.3.3.3 */
+  test('should return redirect response without following in http_request helper', async () => {
+    const port = await getFreePort();
+    let finalRequestCount = 0;
+    const localServer = http.createServer((req, res) => {
+      if (req.url === '/redirect') {
+        res.writeHead(302, { Location: `http://127.0.0.1:${port}/final` });
+        res.end('');
+        return;
+      }
+
+      if (req.url === '/final') {
+        finalRequestCount += 1;
+        res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('final');
+        return;
+      }
+
+      res.writeHead(404);
+      res.end('missing');
+    });
+    await new Promise<void>((resolve) => localServer.listen(port, '127.0.0.1', () => resolve()));
+
+    try {
+      mockLLMServer.setStreamingMode(true);
+      mockLLMServer.setOpenAIStreamScripts([
+        {
+          toolCalls: [
+            {
+              callId: 'http-redirect-1',
+              toolName: 'code_exec',
+              arguments: {
+                task_summary: 'Inspect redirect response',
+                code: `const result = await tools.http_request({
+  url: "http://127.0.0.1:${port}/redirect",
+  follow_redirects: false
+});
+console.log(JSON.stringify(result));`,
+                timeout_ms: 10000,
+              },
+            },
+          ],
+        },
+        {
+          content: '{"action":{"type":"text","content":"redirect helper done"}}',
+        },
+      ]);
+
+      await launchWithMockLLM();
+      await sendUserMessage('Fetch redirect without following');
+      await expect(window.locator('.message-llm-action-response').last()).toContainText(
+        'redirect helper done',
+        {
+          timeout: 15000,
+        }
+      );
+
+      const agentId = (await getAgentIdsFromApi(window))[0];
+      const output = await getCodeExecOutputByCallId(agentId, 'http-redirect-1');
+      const stdout = typeof output?.stdout === 'string' ? output.stdout.trim() : '';
+      const payload = JSON.parse(stdout) as Record<string, unknown>;
+      expect(payload).toMatchObject({
+        status: 302,
+        final_url: `http://127.0.0.1:${port}/redirect`,
+        truncated: false,
+      });
+      expect(finalRequestCount).toBe(0);
+      await expectNoToastError(window);
+    } finally {
+      await new Promise<void>((resolve) => localServer.close(() => resolve()));
+    }
+  });
+
+  /* Preconditions: mock model emits code_exec that calls tools.http_request against a binary endpoint with explicit byte limit
+     Action: user sends a message that triggers sandbox http_request helper
+     Assertions: helper truncates the binary response by bytes and returns base64-encoded body metadata
+     Requirements: sandbox-http-request.2.9, sandbox-http-request.2.10, sandbox-http-request.3.4.6, sandbox-http-request.3.5, sandbox-http-request.3.6 */
+  test('should enforce max_response_bytes and base64 encoding in http_request helper', async () => {
+    const port = await getFreePort();
+    const binaryBody = Buffer.from([0, 1, 2, 3, 4, 5]);
+    const localServer = http.createServer((_req, res) => {
+      res.writeHead(200, { 'Content-Type': 'application/octet-stream' });
+      res.end(binaryBody);
+    });
+    await new Promise<void>((resolve) => localServer.listen(port, '127.0.0.1', () => resolve()));
+
+    try {
+      mockLLMServer.setStreamingMode(true);
+      mockLLMServer.setOpenAIStreamScripts([
+        {
+          toolCalls: [
+            {
+              callId: 'http-bin-1',
+              toolName: 'code_exec',
+              arguments: {
+                task_summary: 'Fetch binary payload',
+                code: `const result = await tools.http_request({
+  url: "http://127.0.0.1:${port}/bin",
+  max_response_bytes: 4
+});
+console.log(JSON.stringify(result));`,
+                timeout_ms: 10000,
+              },
+            },
+          ],
+        },
+        {
+          content: '{"action":{"type":"text","content":"binary helper done"}}',
+        },
+      ]);
+
+      await launchWithMockLLM();
+      await sendUserMessage('Fetch binary content via http helper');
+      await expect(window.locator('.message-llm-action-response').last()).toContainText(
+        'binary helper done',
+        {
+          timeout: 15000,
+        }
+      );
+
+      const agentId = (await getAgentIdsFromApi(window))[0];
+      const output = await getCodeExecOutputByCallId(agentId, 'http-bin-1');
+      const stdout = typeof output?.stdout === 'string' ? output.stdout.trim() : '';
+      const payload = JSON.parse(stdout) as Record<string, unknown>;
+      expect(payload).toMatchObject({
+        status: 200,
+        body_encoding: 'base64',
+        truncated: true,
+        applied_limit_bytes: 4,
+      });
+      expect(payload.body).toBe(Buffer.from(binaryBody.subarray(0, 4)).toString('base64'));
+      await expectNoToastError(window);
+    } finally {
+      await new Promise<void>((resolve) => localServer.close(() => resolve()));
+    }
+  });
+
+  /* Preconditions: mock model emits code_exec that calls tools.http_request with invalid helper arguments and then with an unreachable target
+     Action: user sends two messages that trigger sandbox http_request helper
+     Assertions: helper returns structured validation and runtime errors to sandbox code without breaking the chat flow
+     Requirements: sandbox-http-request.4.1, sandbox-http-request.4.2 */
+  test('should return structured validation and runtime errors from http_request helper', async () => {
+    const unreachablePort = await getFreePort();
+
+    mockLLMServer.setStreamingMode(true);
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        toolCalls: [
+          {
+            callId: 'http-invalid-1',
+            toolName: 'code_exec',
+            arguments: {
+              task_summary: 'Validate helper input',
+              code: `const result = await tools.http_request({
+  url: "https://example.com",
+  method: "TRACE"
+});
+console.log(JSON.stringify(result));`,
+              timeout_ms: 10000,
+            },
+          },
+        ],
+      },
+      {
+        content: '{"action":{"type":"text","content":"invalid helper done"}}',
+      },
+      {
+        toolCalls: [
+          {
+            callId: 'http-runtime-1',
+            toolName: 'code_exec',
+            arguments: {
+              task_summary: 'Handle fetch failure',
+              code: `const result = await tools.http_request({
+  url: "http://127.0.0.1:${unreachablePort}/unreachable",
+  timeout_ms: 10000
+});
+console.log(JSON.stringify(result));`,
+              timeout_ms: 10000,
+            },
+          },
+        ],
+      },
+      {
+        content: '{"action":{"type":"text","content":"runtime helper done"}}',
+      },
+    ]);
+
+    await launchWithMockLLM();
+
+    await sendUserMessage('Return invalid helper error');
+    await expect(window.locator('.message-llm-action-response').last()).toContainText(
+      'invalid helper done',
+      {
+        timeout: 15000,
+      }
+    );
+
+    const agentId = (await getAgentIdsFromApi(window))[0];
+    const invalidOutput = await getCodeExecOutputByCallId(agentId, 'http-invalid-1');
+    const invalidStdout =
+      typeof invalidOutput?.stdout === 'string' ? invalidOutput.stdout.trim() : '';
+    const invalidPayload = JSON.parse(invalidStdout) as Record<string, unknown>;
+    expect(invalidPayload).toMatchObject({
+      error: { code: 'invalid_method' },
+    });
+
+    await sendUserMessage('Return runtime helper error');
+    await expect(window.locator('.message-llm-action-response').last()).toContainText(
+      'runtime helper done',
+      {
+        timeout: 15000,
+      }
+    );
+
+    const runtimeOutput = await getCodeExecOutputByCallId(agentId, 'http-runtime-1');
+    const runtimeStdout =
+      typeof runtimeOutput?.stdout === 'string' ? runtimeOutput.stdout.trim() : '';
+    const runtimePayload = JSON.parse(runtimeStdout) as Record<string, unknown>;
+    expect(runtimePayload).toMatchObject({
+      error: { code: 'fetch_failed' },
+    });
+    await expectNoToastError(window);
+  });
+
   /* Preconditions: mock model repeatedly emits invalid code_exec args
      Action: user sends a message that triggers code_exec calls
      Assertions: invalid call is not persisted as terminal code_exec result; turn ends with persisted kind:error for the same turn

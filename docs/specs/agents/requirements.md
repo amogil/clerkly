@@ -554,6 +554,8 @@
 
 7.4.6.3. Заголовок блока `tool_call(code_exec)` ДОЛЖЕН отображать краткое описание работы из `arguments.task_summary`.
 
+7.4.6.3.1. ЕСЛИ persisted historical payload `tool_call(code_exec)` не содержит `arguments.task_summary`, ТО заголовок блока ДОЛЖЕН использовать fallback-значение `"Code"` для backward compatibility с историческими записями.
+
 7.4.6.4. Статус выполнения `tool_call(code_exec)` ДОЛЖЕН отображаться в заголовке сразу после краткого описания работы.
 
 7.4.6.5. В блоке `tool_call(code_exec)` прозрачный фон (`transparent`) ДОЛЖЕН использоваться для:

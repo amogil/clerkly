@@ -180,6 +180,39 @@ describe('AgentMessage — tool_call', () => {
     expect(screen.getByTestId('message-code-exec-stderr')).toHaveClass('bg-transparent');
   });
 
+  /* Preconditions: persisted historical kind:tool_call for code_exec without task_summary
+     Action: render AgentMessage
+     Assertions: renderer falls back to "Code" title for backward compatibility
+     Requirements: agents.7.4.6.3, agents.7.4.6.3.1 */
+  it('should render fallback Code title for historical code_exec payload without task_summary', () => {
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'tool_call',
+          done: true,
+          payload: {
+            data: {
+              callId: 'call-code-legacy',
+              toolName: 'code_exec',
+              arguments: {
+                code: "console.log('legacy')",
+              },
+              output: {
+                status: 'success',
+                stdout: 'legacy\\n',
+                stderr: '',
+                stdout_truncated: false,
+                stderr_truncated: false,
+              },
+            },
+          },
+        })}
+      />
+    );
+
+    expect(screen.getByTestId('message-code-exec-title')).toHaveTextContent('Code');
+  });
+
   /* Preconditions: persisted kind:tool_call for final_answer with summary_points
      Action: render AgentMessage
      Assertions: renders Final Answer checklist items without title/header

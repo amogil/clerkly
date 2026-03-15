@@ -64,11 +64,11 @@ const HTTP_REQUEST_PROMPT_SPEC = {
     '`status`: final HTTP status code.',
     '`final_url`: final response URL after redirects.',
     '`headers`: response headers as a flat object.',
-    '`content_type`: response content type string or `null`.',
+    '`content_type`: response content type string; empty string when the header is absent.',
     '`body_encoding`: `text` for textual responses, `base64` for non-text responses.',
     '`body`: response body string encoded according to `body_encoding`.',
     '`truncated`: `true` if `max_response_bytes` cut the response body.',
-    '`applied_limit_bytes`: present only when `max_response_bytes` was provided.',
+    '`applied_limit_bytes`: actual byte limit applied to the response body.',
   ],
   requestExample: [
     '```js',

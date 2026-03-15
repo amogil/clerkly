@@ -1607,6 +1607,7 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 - Заголовок блока отображает иконку выполнения кода (`Code2`) и краткое описание работы из `arguments.task_summary`.
 - Сразу после краткого описания работы отображается badge со статусом выполнения.
 - UI использует `arguments.task_summary` из persisted payload как текст заголовка; валидация и ограничения этого поля определяются спецификацией `code_exec`.
+- Для persisted historical payload без `arguments.task_summary` UI использует fallback-заголовок `"Code"`; это compatibility path для записей, созданных до введения поля `task_summary`.
 - Badge статуса всегда содержит иконку, привязанную к persisted-статусу: `running -> Loader2 (spin)`, `success -> CircleCheck`, `error -> CircleX`, `timeout -> Clock3`, `cancelled -> CircleMinus`.
 - Иконки статусов в badge рендерятся цветными (например: `success` — зелёный, `error` — красный, `timeout` — янтарный, `running/cancelled` — нейтральные).
 - Блок отображает persisted-статус выполнения (`running | success | error | timeout | cancelled`).

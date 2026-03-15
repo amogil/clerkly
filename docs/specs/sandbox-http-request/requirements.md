@@ -81,12 +81,13 @@
 
 2.10. Значение `max_response_bytes` ДОЛЖНО интерпретироваться как лимит в байтах тела ответа
 
+2.10.1. ЕСЛИ поле `max_response_bytes` передано, ТО оно ДОЛЖНО быть integer в диапазоне `0..262144`
+
 #### Функциональные Тесты
 
-- `tests/functional/code_exec.spec.ts` - "should apply fetch-like request config in http_request helper"
-- `tests/functional/code_exec.spec.ts` - "should reject invalid method, headers and body in http_request helper"
-- `tests/functional/code_exec.spec.ts` - "should reject http_request when timeout_ms exceeds the allowed maximum"
-- `tests/functional/code_exec.spec.ts` - "should enforce max_response_bytes for http_request helper"
+- `tests/functional/code_exec.spec.ts` - "should allow sandbox code to execute async http_request helper"
+- `tests/functional/code_exec.spec.ts` - "should enforce max_response_bytes and base64 encoding in http_request helper"
+- `tests/functional/code_exec.spec.ts` - "should return structured validation and runtime errors from http_request helper"
 
 ### 3. Выполнение запроса и результат
 
@@ -118,6 +119,7 @@
   - `body_encoding`
   - `body`
   - `truncated`
+  - `applied_limit_bytes`
 
 3.4.2. Поле `body` ДОЛЖНО содержать тело HTTP-ответа
 
@@ -129,17 +131,19 @@
 
 3.4.6. КОГДА ответ имеет нетекстовый content type, ТО helper ДОЛЖЕН возвращать `body` в base64-представлении и `body_encoding = "base64"`
 
-3.5. ЕСЛИ передан `max_response_bytes`, ТО поле `body` ДОЛЖНО быть ограничено фактически применённым значением `max_response_bytes`
+3.5. Поле `body` ДОЛЖНО быть ограничено фактически применённым значением `applied_limit_bytes`
+
+3.5.1. ЕСЛИ передан `max_response_bytes`, ТО система ДОЛЖНА использовать его как `applied_limit_bytes`
+
+3.5.2. ЕСЛИ `max_response_bytes` не передан, ТО система ДОЛЖНА использовать внутренний safety cap `262144` bytes как `applied_limit_bytes`
 
 3.6. Результат ДОЛЖЕН явно сообщать, был ли `body` усечён
 
 #### Функциональные Тесты
 
-- `tests/functional/code_exec.spec.ts` - "should return response metadata from http_request helper"
-- `tests/functional/code_exec.spec.ts` - "should expose final resolved URL after redirect in http_request helper"
-- `tests/functional/code_exec.spec.ts` - "should return redirect response without following when follow_redirects is false"
-- `tests/functional/code_exec.spec.ts` - "should return base64 body for non-text response in http_request helper"
-- `tests/functional/code_exec.spec.ts` - "should fail http_request when redirect limit is exceeded"
+- `tests/functional/code_exec.spec.ts` - "should allow sandbox code to execute async http_request helper"
+- `tests/functional/code_exec.spec.ts` - "should return redirect response without following in http_request helper"
+- `tests/functional/code_exec.spec.ts` - "should enforce max_response_bytes and base64 encoding in http_request helper"
 
 ### 4. Ошибки и безопасность
 
@@ -159,5 +163,4 @@
 
 #### Функциональные Тесты
 
-- `tests/functional/code_exec.spec.ts` - "should return structured validation error for invalid http_request arguments"
-- `tests/functional/code_exec.spec.ts` - "should return structured runtime error for http_request failure"
+- `tests/functional/code_exec.spec.ts` - "should return structured validation and runtime errors from http_request helper"
