@@ -176,7 +176,8 @@ export const CODE_EXEC_TOOL_SCHEMA: Record<string, unknown> = {
   properties: {
     task_summary: {
       type: 'string',
-      description: 'Required short description of the work performed by this code execution (1..200 characters).',
+      description:
+        'Required short description of the work performed by this code execution (1..200 characters).',
       minLength: 1,
       maxLength: 200,
       pattern: '.*\\S.*',

@@ -27,7 +27,10 @@ export type SandboxHttpRequestValidationErrorCode =
   | 'invalid_follow_redirects'
   | 'invalid_max_response_bytes';
 
-export type SandboxHttpRequestRuntimeErrorCode = 'fetch_failed' | 'limit_exceeded' | 'internal_error';
+export type SandboxHttpRequestRuntimeErrorCode =
+  | 'fetch_failed'
+  | 'limit_exceeded'
+  | 'internal_error';
 
 export interface SandboxHttpRequestError {
   error: {
@@ -109,7 +112,10 @@ export class SandboxHttpRequestHandler {
     try {
       parsedUrl = new URL(url);
     } catch {
-      return this.validationError('invalid_url', 'http_request.url must be an absolute http/https URL.');
+      return this.validationError(
+        'invalid_url',
+        'http_request.url must be an absolute http/https URL.'
+      );
     }
 
     if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
@@ -214,7 +220,9 @@ export class SandboxHttpRequestHandler {
   }
 
   // Requirements: sandbox-http-request.3, sandbox-http-request.4.2
-  private async performRequest(input: ValidatedHttpRequestInput): Promise<SandboxHttpRequestResult> {
+  private async performRequest(
+    input: ValidatedHttpRequestInput
+  ): Promise<SandboxHttpRequestResult> {
     const controller = new AbortController();
     const timeoutHandle = setTimeout(() => controller.abort(), input.timeoutMs);
 
@@ -222,7 +230,7 @@ export class SandboxHttpRequestHandler {
       let currentUrl = input.url;
       let redirectHops = 0;
 
-      while (true) {
+      for (;;) {
         const response = await this.fetchImpl(currentUrl, {
           method: input.method,
           headers: input.headers,
@@ -315,7 +323,7 @@ export class SandboxHttpRequestHandler {
     let totalBytes = 0;
     let truncated = false;
 
-    while (true) {
+    for (;;) {
       const { done, value } = await reader.read();
       if (done) {
         break;

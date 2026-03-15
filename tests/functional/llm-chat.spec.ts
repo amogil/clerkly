@@ -1703,7 +1703,11 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
           {
             callId: 'code-loop-1',
             toolName: 'code_exec',
-            arguments: { task_summary: 'Run code', code: "fetch('https://example.com')", timeout_ms: 10000 },
+            arguments: {
+              task_summary: 'Run code',
+              code: "fetch('https://example.com')",
+              timeout_ms: 10000,
+            },
           },
         ],
       },

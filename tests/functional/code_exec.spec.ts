@@ -766,7 +766,11 @@ test.describe('code_exec tool loop execution', () => {
           {
             callId: 'audit-1',
             toolName: 'code_exec',
-            arguments: { task_summary: 'Run code', code: "console.log('audit')", timeout_ms: 10000 },
+            arguments: {
+              task_summary: 'Run code',
+              code: "console.log('audit')",
+              timeout_ms: 10000,
+            },
           },
         ],
       },
@@ -1047,7 +1051,11 @@ test.describe('code_exec tool loop execution', () => {
           {
             callId: 'hist-1',
             toolName: 'code_exec',
-            arguments: { task_summary: 'Run code', code: "console.log('history')", timeout_ms: 10000 },
+            arguments: {
+              task_summary: 'Run code',
+              code: "console.log('history')",
+              timeout_ms: 10000,
+            },
           },
         ],
       },
@@ -1166,7 +1174,10 @@ test.describe('code_exec tool loop execution', () => {
           {
             callId: 'memory-1',
             toolName: 'code_exec',
-            arguments: { task_summary: 'Run code', code: "const huge = 'x'.repeat(2 ** 31); console.log(huge.length);" },
+            arguments: {
+              task_summary: 'Run code',
+              code: "const huge = 'x'.repeat(2 ** 31); console.log(huge.length);",
+            },
           },
         ],
       },

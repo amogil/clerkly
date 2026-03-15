@@ -201,7 +201,7 @@ describe('PromptBuilder.build()', () => {
        Action: build() is called
        Assertions: system prompt explicitly states async context and top-level await support
        Requirements: code_exec.1, llm-integration.4 */
-  it('should include async execution guidance for code_exec', () => {
+    it('should include async execution guidance for code_exec', () => {
       const sandboxManager = {} as SandboxSessionManager;
       const feature = new CodeExecFeature(sandboxManager);
       const result = makeBuilder('Base.', [feature]).build();
