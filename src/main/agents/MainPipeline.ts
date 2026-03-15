@@ -956,14 +956,6 @@ export class MainPipeline {
     if (!state.sawAnyToolCall) {
       return false;
     }
-    const trimmed = outputText.trim();
-    if (
-      state.finalAnswerCall &&
-      (trimmed.startsWith('{') || trimmed.startsWith('```')) &&
-      trimmed.includes('"summary_points"')
-    ) {
-      return true;
-    }
     const parsedPayload = this.parseToolPayloadMirrorJson(outputText);
     if (!parsedPayload) {
       return false;
@@ -1051,19 +1043,16 @@ export class MainPipeline {
         ) {
           return true;
         }
-        if (summaryPoints.every((point) => typeof point === 'string')) {
-          return true;
-        }
       }
 
       if (hasEnvelopeKeys) {
-        const knownToolName =
-          toolName === 'final_answer' || toolName === 'code_exec';
         const matchingFinalCallId =
           typeof callId === 'string' &&
           state.finalAnswerCall !== null &&
           callId === state.finalAnswerCall.callId;
-        if (knownToolName || matchingFinalCallId) {
+        const matchingFinalAnswerEnvelope =
+          toolName === 'final_answer' && matchingFinalCallId;
+        if (matchingFinalAnswerEnvelope) {
           return true;
         }
       }

@@ -2713,6 +2713,293 @@ describe('MainPipeline.run()', () => {
     );
   });
 
+  /* Preconditions: Provider returns valid final_answer tool_call and output.text contains JSON with different summary_points
+     Action: Run pipeline for one user turn
+     Assertions: JSON text is persisted as kind:llm because it does not mirror current final_answer payload
+     Requirements: llm-integration.9.5.6, llm-integration.9.5.6.1 */
+  it('persists llm text when output.text JSON does not mirror final_answer payload', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-json-non-mirror',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['Done'] },
+        });
+        return { text: '{"summary_points":["Different payload"]}' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(1);
+    expect(llmCreates[0]?.[2]).toEqual(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          text: '{"summary_points":["Different payload"]}',
+        }),
+      })
+    );
+  });
+
+  /* Preconditions: Provider returns valid final_answer tool_call and output.text contains fenced JSON mirroring summary_points
+     Action: Run pipeline for one user turn
+     Assertions: Duplicate technical JSON text is suppressed and kind:llm is not persisted
+     Requirements: llm-integration.9.5.6, llm-integration.9.5.6.1 */
+  it('does not persist duplicate llm text when output.text fenced JSON mirrors final_answer payload', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-json-fenced',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['Done'] },
+        });
+        return { text: '```json\n{"summary_points":["Done"]}\n```' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(0);
+  });
+
+  /* Preconditions: Provider returns valid final_answer tool_call and output.text contains nested data.summary_points mirroring payload
+     Action: Run pipeline for one user turn
+     Assertions: Duplicate technical JSON text is suppressed and kind:llm is not persisted
+     Requirements: llm-integration.9.5.6, llm-integration.9.5.6.1 */
+  it('does not persist duplicate llm text when output.text nested JSON mirrors final_answer payload', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-json-nested',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['Done'] },
+        });
+        return { text: '{"data":{"summary_points":["Done"]}}' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(0);
+  });
+
+  /* Preconditions: Provider returns valid final_answer tool_call and output.text contains tool envelope with matching final_answer callId
+     Action: Run pipeline for one user turn
+     Assertions: Envelope mirror text is treated as duplicate technical payload and suppressed
+     Requirements: llm-integration.9.5.6, llm-integration.9.5.6.1 */
+  it('does not persist duplicate llm text when output.text mirrors final_answer envelope with matching callId', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-json-envelope',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['Done'] },
+        });
+        return {
+          text: '{"toolName":"final_answer","callId":"call-final-json-envelope","arguments":{"summary_points":["Other"]}}',
+        };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(0);
+  });
+
+  /* Preconditions: Provider returns valid final_answer tool_call and output.text contains final_answer envelope with different callId
+     Action: Run pipeline for one user turn
+     Assertions: Non-mirror envelope text is preserved as kind:llm
+     Requirements: llm-integration.9.5.6, llm-integration.9.5.6.1 */
+  it('persists llm text when output.text final_answer envelope has different callId', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-envelope-current',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['Done'] },
+        });
+        return {
+          text: '{"toolName":"final_answer","callId":"call-final-envelope-other","arguments":{"summary_points":["Done"]}}',
+        };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(1);
+  });
+
+  /* Preconditions: Provider returns valid final_answer tool_call and output.text contains envelope with matching callId but non-final toolName
+     Action: Run pipeline for one user turn
+     Assertions: Non-final-answer envelope text is preserved as kind:llm
+     Requirements: llm-integration.9.5.6, llm-integration.9.5.6.1 */
+  it('persists llm text when output.text envelope has matching callId but non-final toolName', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-envelope-same-id',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['Done'] },
+        });
+        return {
+          text: '{"toolName":"code_exec","callId":"call-final-envelope-same-id","arguments":{"summary_points":["Done"]}}',
+        };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(1);
+  });
+
+  /* Preconditions: Provider returns valid final_answer tool_call and output.text contains non-JSON textual payload
+     Action: Run pipeline for one user turn
+     Assertions: Non-JSON text is preserved as kind:llm
+     Requirements: llm-integration.9.5.6, llm-integration.9.5.6.1 */
+  it('persists llm text when output.text is non-JSON payload-like text', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-non-json',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['Done'] },
+        });
+        return { text: 'summary_points: ["Done"]' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(1);
+  });
+
+  /* Preconditions: Provider returns no tool_call and output.text contains JSON with summary_points
+     Action: Run pipeline for one user turn
+     Assertions: Text is preserved because suppression is disabled without any tool_call
+     Requirements: llm-integration.9.5.6, llm-integration.9.5.6.1 */
+  it('persists llm text when output.text looks like payload but turn has no tool_call', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockResolvedValue({ text: '{"summary_points":["Done"]}' });
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(1);
+  });
+
+  /* Preconditions: Provider streams final_answer tool_call and then streamed JSON chunks mirroring final payload
+     Action: Run pipeline for one user turn
+     Assertions: Streamed mirror text is suppressed and kind:llm is not persisted
+     Requirements: llm-integration.9.5.6, llm-integration.9.5.6.1 */
+  it('does not persist duplicate llm text when streamed JSON chunks mirror final_answer payload', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-stream-mirror',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['Done'] },
+        });
+        onChunk({ type: 'text', delta: '{"summary_points":' });
+        onChunk({ type: 'text', delta: '["Done"]}' });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(1);
+    expect(messageManager.hideAndMarkIncomplete).toHaveBeenCalledWith(2, 'agent-1');
+    const completedLlmCreates = llmCreates.filter((call: unknown[]) => call[4] === true);
+    expect(completedLlmCreates).toHaveLength(0);
+  });
+
+  /* Preconditions: Provider streams final_answer tool_call and then streamed JSON chunks with non-mirror payload
+     Action: Run pipeline for one user turn
+     Assertions: Streamed non-mirror text is preserved as kind:llm
+     Requirements: llm-integration.9.5.6, llm-integration.9.5.6.1 */
+  it('persists llm text when streamed JSON chunks do not mirror final_answer payload', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-stream-non-mirror',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['Done'] },
+        });
+        onChunk({ type: 'text', delta: '{"summary_points":' });
+        onChunk({ type: 'text', delta: '["Different payload"]}' });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(1);
+    expect(llmCreates[0]?.[2]).toEqual(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          text: '{"summary_points":["Different payload"]}',
+        }),
+      })
+    );
+  });
+
   it('creates kind:error when final_answer tool_result has missing required summary_points', async () => {
     const { pipeline, llmProvider, messageManager } = makeMocks();
 
