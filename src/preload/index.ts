@@ -39,6 +39,11 @@ export interface API {
       reason?: string;
     }>;
     setChatsReady: () => Promise<{ success: boolean; error?: string }>;
+    getRuntimeInfo?: () => Promise<{
+      success: boolean;
+      data?: { isPackaged: boolean };
+      error?: string;
+    }>;
   };
   // Requirements: realtime-events.4.5, realtime-events.4.6, realtime-events.4.7
   events?: {
@@ -201,6 +206,13 @@ const api: API = {
     },
     async setChatsReady(): Promise<{ success: boolean; error?: string }> {
       return await ipcRenderer.invoke('app:set-chats-ready');
+    },
+    async getRuntimeInfo(): Promise<{
+      success: boolean;
+      data?: { isPackaged: boolean };
+      error?: string;
+    }> {
+      return await ipcRenderer.invoke('app:get-runtime-info');
     },
   },
 

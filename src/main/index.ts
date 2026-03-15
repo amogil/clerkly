@@ -361,6 +361,12 @@ app.whenReady().then(async () => {
       appCoordinator.markChatsReady('renderer');
       return { success: true };
     });
+    ipcMain.handle('app:get-runtime-info', () => ({
+      success: true,
+      data: {
+        isPackaged: app.isPackaged,
+      },
+    }));
     logger.info('AppCoordinator state IPC handler registered');
 
     // Requirements: agents.2, agents.4, agents.10
@@ -431,6 +437,7 @@ app.on('before-quit', async (event) => {
   } finally {
     ipcMain.removeHandler('app:get-state');
     ipcMain.removeHandler('app:set-chats-ready');
+    ipcMain.removeHandler('app:get-runtime-info');
     appCoordinator.stop();
     lifecycleManager.handleWindowClose();
     app.quit();

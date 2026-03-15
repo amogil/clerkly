@@ -829,6 +829,18 @@ class DateTimeFormatter {
 
 React компонент для страницы настроек с секцией LLM Provider.
 
+### Production-only packaged UI lock
+
+- Renderer получает признак packaged production-режима через IPC `app:get-runtime-info`.
+- Компонент `"Settings"` применяет этот признак только для UI секции `LLM Provider`.
+- В packaged production-режиме `"Settings"`:
+  - фиксирует отображаемый provider как `openai`;
+  - переводит combobox в `disabled`;
+  - показывает helper text о временной доступности только OpenAI;
+  - загружает и сохраняет API key только для `openai`.
+- `Main Process`, `AIAgentSettingsManager`, `SettingsIPCHandlers` и runtime-выбор провайдера НЕ изменяются этим механизмом.
+- В `dev` и `test` packaged lock не активируется, поэтому существующие multi-provider сценарии остаются без изменений.
+
 ```typescript
 // Requirements: settings.1
 
@@ -840,9 +852,11 @@ type LLMProvider = 'openai' | 'anthropic' | 'google';
 export function AIAgentSettings() {
   const [llmProvider, setLLMProvider] = useState<LLMProvider>('openai');
   const [apiKey, setAPIKey] = useState('');
+  const [isProductionLLMProviderLocked, setIsProductionLLMProviderLocked] = useState(false);
   const [showAPIKey, setShowAPIKey] = useState(false); // Requirements: settings.1.2, settings.1.8
   const [loading, setLoading] = useState(true);
   const [saveTimeout, setSaveTimeout] = useState<NodeJS.Timeout | null>(null);
+  const effectiveLLMProvider = isProductionLLMProviderLocked ? 'openai' : llmProvider;
 
   // Load settings on mount
   useEffect(() => {
@@ -858,6 +872,17 @@ export function AIAgentSettings() {
 
   const loadSettings = async () => {
     try {
+      const runtimeInfo = await window.api.app.getRuntimeInfo?.();
+      const isPackaged = runtimeInfo?.success === true && runtimeInfo.data?.isPackaged === true;
+      setIsProductionLLMProviderLocked(isPackaged);
+
+      if (isPackaged) {
+        setLLMProvider('openai');
+        const openAIKey = await window.api.aiAgent.getAPIKey('openai');
+        setAPIKey(openAIKey || '');
+        return;
+      }
+
       const settings = await window.api.aiAgent.getSettings();
       setLLMProvider(settings.llmProvider);
       setAPIKey(settings.apiKeys[settings.llmProvider] || '');
@@ -880,6 +905,10 @@ export function AIAgentSettings() {
 
   // Requirements: settings.1.10 - Save provider immediately
   const handleProviderChange = async (provider: LLMProvider) => {
+    if (isProductionLLMProviderLocked) {
+      return;
+    }
+
     setLLMProvider(provider);
     try {
       await window.api.aiAgent.saveLLMProvider(provider);
@@ -939,13 +968,17 @@ export function AIAgentSettings() {
         <label htmlFor="llm-provider">LLM Provider</label>
         <select
           id="llm-provider"
-          value={llmProvider}
+          value={effectiveLLMProvider}
           onChange={(e) => handleProviderChange(e.target.value as LLMProvider)}
+          disabled={isProductionLLMProviderLocked}
         >
           <option value="openai">OpenAI (GPT)</option>
           <option value="anthropic">Anthropic (Claude)</option>
           <option value="google">Google (Gemini)</option>
         </select>
+        {isProductionLLMProviderLocked ? (
+          <p>Currently only one provider is available: OpenAI.</p>
+        ) : null}
       </div>
 
       {/* Requirements: settings.1.1, settings.1.2, settings.1.3 - API Key input with toggle */}
@@ -1082,9 +1115,15 @@ user_id: 'aB3xK9mNpQ'
 
 ### Property 1: Сохранение LLM провайдера
 
-*Для любого* выбранного LLM провайдера (openai, anthropic, google), изменение провайдера должно немедленно сохраниться в базу данных без debounce.
+*Для любого* выбранного LLM провайдера (openai, anthropic, google), в `dev/test` режиме изменение провайдера должно немедленно сохраниться в базу данных без debounce.
 
 **Validates: Requirements settings.1.10**
+
+### Property 1.1: Production-only packaged UI lock
+
+*Для любого* запуска packaged production-сборки, секция `"LLM Provider"` должна отображать disabled combobox со значением `OpenAI (GPT)`, показывать helper text о временной доступности только OpenAI и загружать API key для `openai` независимо от сохраненного `ai_agent_llm_provider`.
+
+**Validates: Requirements settings.1.1.1, settings.1.1.2, settings.1.20.1**
 
 ### Property 2: Сохранение API ключа с debounce
 
@@ -1493,6 +1532,8 @@ describe('Settings Functional Tests', () => {
 | Требование | Модульные Тесты | Функциональные Тесты |
 |------------|-----------------|----------------------|
 | settings.1.1 | ✓ | ✓ |
+| settings.1.1.1 | ✓ | - |
+| settings.1.1.2 | ✓ | - |
 | settings.1.2 | ✓ | ✓ |
 | settings.1.3 | ✓ | ✓ |
 | settings.1.4 | ✓ | ✓ |
@@ -1512,6 +1553,7 @@ describe('Settings Functional Tests', () => {
 | settings.1.18 | ✓ | - |
 | settings.1.19 | ✓ | ✓ |
 | settings.1.20 | ✓ | ✓ |
+| settings.1.20.1 | ✓ | - |
 | settings.1.21 | ✓ | ✓ |
 | settings.1.22 | ✓ | ✓ |
 | settings.1.23 | ✓ | - |

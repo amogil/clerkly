@@ -21,6 +21,7 @@ export function Settings({ onSignOut, onNavigate: _onNavigate }: SettingsProps) 
   const [llmProvider, setLlmProvider] = useState<LLMProvider>('openai');
   const [apiKey, setApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
+  const [isProductionLLMProviderLocked, setIsProductionLLMProviderLocked] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [profile, setProfile] = useState<{
     name: string;
@@ -34,6 +35,7 @@ export function Settings({ onSignOut, onNavigate: _onNavigate }: SettingsProps) 
 
   // Track if this is the first render to avoid saving on initial mount
   const isFirstRender = useRef(true);
+  const effectiveLLMProvider: LLMProvider = isProductionLLMProviderLocked ? 'openai' : llmProvider;
 
   // Load profile data
   const loadProfile = useCallback(async () => {
@@ -77,6 +79,34 @@ export function Settings({ onSignOut, onNavigate: _onNavigate }: SettingsProps) 
   // Requirements: settings.1.20, settings.1.21, error-notifications.2.1 - Load AI Agent settings on mount
   useEffect(() => {
     const loadAIAgentSettings = async () => {
+      let isPackaged = false;
+
+      try {
+        const runtimeInfo = await window.api.app.getRuntimeInfo?.();
+        isPackaged = runtimeInfo?.success === true && runtimeInfo.data?.isPackaged === true;
+      } catch (error) {
+        logger.warn(`Failed to load runtime info, falling back to non-packaged mode: ${error}`);
+      }
+
+      setIsProductionLLMProviderLocked(isPackaged);
+
+      if (isPackaged) {
+        setLlmProvider('openai');
+
+        const keyResult = await callApi<{ apiKey: string }>(
+          () =>
+            window.api.settings.loadAPIKey('openai') as Promise<{
+              success: boolean;
+              data?: { apiKey: string };
+              error?: string;
+            }>,
+          'Loading API key'
+        );
+
+        setApiKey(keyResult?.apiKey || '');
+        return;
+      }
+
       // Requirements: error-notifications.2.1 - Use callApi for automatic error handling
       // Load LLM provider
       const providerResult = await callApi<{ provider: LLMProvider }>(
@@ -120,6 +150,10 @@ export function Settings({ onSignOut, onNavigate: _onNavigate }: SettingsProps) 
 
   // Requirements: settings.1.10, settings.1.19, error-notifications.2.1 - Save provider immediately and load API key for new provider
   useEffect(() => {
+    if (isProductionLLMProviderLocked) {
+      return;
+    }
+
     // Skip on initial mount (initial load is handled by the load effect above)
     if (isFirstRender.current) {
       isFirstRender.current = false;
@@ -158,7 +192,7 @@ export function Settings({ onSignOut, onNavigate: _onNavigate }: SettingsProps) 
     };
 
     saveProviderAndLoadKey();
-  }, [llmProvider]);
+  }, [isProductionLLMProviderLocked, llmProvider]);
 
   // Requirements: settings.1.9, settings.1.11, settings.1.12, error-notifications.2.1 - Debounced save for API key (500ms)
   useEffect(() => {
@@ -169,7 +203,7 @@ export function Settings({ onSignOut, onNavigate: _onNavigate }: SettingsProps) 
         // Requirements: settings.1.11 - Delete API key when field is cleared
         await callApi<Record<string, never>>(
           () =>
-            window.api.settings.deleteAPIKey(llmProvider).then((r) => ({
+            window.api.settings.deleteAPIKey(effectiveLLMProvider).then((r) => ({
               ...r,
               data: r.success ? ({} as Record<string, never>) : undefined,
             })),
@@ -179,7 +213,7 @@ export function Settings({ onSignOut, onNavigate: _onNavigate }: SettingsProps) 
         // Save API key with debounce
         await callApi<Record<string, never>>(
           () =>
-            window.api.settings.saveAPIKey(llmProvider, apiKey).then((r) => ({
+            window.api.settings.saveAPIKey(effectiveLLMProvider, apiKey).then((r) => ({
               ...r,
               data: r.success ? ({} as Record<string, never>) : undefined,
             })),
@@ -191,7 +225,7 @@ export function Settings({ onSignOut, onNavigate: _onNavigate }: SettingsProps) 
 
     // Cleanup: cancel previous timeout
     return () => clearTimeout(timeoutId);
-  }, [apiKey, llmProvider]);
+  }, [apiKey, effectiveLLMProvider]);
 
   // Requirements: settings.2.4, error-notifications.2.1 - Handle test connection
   const handleTestConnection = async () => {
@@ -200,7 +234,7 @@ export function Settings({ onSignOut, onNavigate: _onNavigate }: SettingsProps) 
 
     // Requirements: error-notifications.2.1 - Handle test connection errors
     try {
-      const result = await (window.api.llm.testConnection(llmProvider, apiKey) as Promise<{
+      const result = await (window.api.llm.testConnection(effectiveLLMProvider, apiKey) as Promise<{
         success: boolean;
         data?: { success: boolean };
         error?: string;
@@ -212,7 +246,7 @@ export function Settings({ onSignOut, onNavigate: _onNavigate }: SettingsProps) 
       if (result.success) {
         // Requirements: settings.2.7 - Show success notification
         showSuccess('Connection successful! Your API key is valid.');
-        logger.info(`Connection test successful for ${llmProvider}`);
+        logger.info(`Connection test successful for ${effectiveLLMProvider}`);
       } else {
         // Requirements: settings.2.8 - Show error without context prefix
         toast.error(result.error || 'Connection test failed');
@@ -305,14 +339,20 @@ export function Settings({ onSignOut, onNavigate: _onNavigate }: SettingsProps) 
                   LLM Provider
                 </label>
                 <select
-                  value={llmProvider}
+                  value={effectiveLLMProvider}
                   onChange={(e) => setLlmProvider(e.target.value as LLMProvider)}
-                  className="w-full px-4 py-2 bg-input-background border border-border rounded-lg text-foreground"
+                  disabled={isProductionLLMProviderLocked}
+                  className="w-full px-4 py-2 bg-input-background border border-border rounded-lg text-foreground disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <option value="openai">OpenAI (GPT)</option>
                   <option value="anthropic">Anthropic (Claude)</option>
                   <option value="google">Google (Gemini)</option>
                 </select>
+                {isProductionLLMProviderLocked ? (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Currently only one provider is available: OpenAI.
+                  </p>
+                ) : null}
               </div>
 
               <div>

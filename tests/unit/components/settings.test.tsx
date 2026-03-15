@@ -59,9 +59,13 @@ const mockSaveAPIKey = jest.fn();
 const mockDeleteAPIKey = jest.fn();
 const mockGetUser = jest.fn();
 const mockOnProfileUpdated = jest.fn();
+const mockGetRuntimeInfo = jest.fn();
 
 (global as any).window = Object.create(window);
 (global as any).window.api = {
+  app: {
+    getRuntimeInfo: mockGetRuntimeInfo,
+  },
   llm: {
     testConnection: mockTestConnection,
   },
@@ -84,6 +88,7 @@ describe('Settings Component - Test Connection', () => {
     jest.useFakeTimers();
 
     // Default mocks - use correct data structure for callApi
+    mockGetRuntimeInfo.mockResolvedValue({ success: true, data: { isPackaged: false } });
     mockLoadLLMProvider.mockResolvedValue({ success: true, data: { provider: 'openai' } });
     mockLoadAPIKey.mockResolvedValue({ success: true, data: { apiKey: '' } });
     mockGetUser.mockResolvedValue({
@@ -420,6 +425,53 @@ describe('Settings Component - Test Connection', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Test Connection')).toBeInTheDocument();
   });
+
+  /* Preconditions: Settings component runs in packaged production mode
+     Action: Render settings screen
+     Assertions: Provider selector is disabled, fixed to OpenAI, and helper text is visible
+     Requirements: settings.1.1.1, settings.1.1.2, settings.1.20.1 */
+  it('should lock provider selector to OpenAI in packaged production mode', async () => {
+    mockGetRuntimeInfo.mockResolvedValue({ success: true, data: { isPackaged: true } });
+    mockLoadAPIKey.mockResolvedValue({ success: true, data: { apiKey: 'sk-openai-prod' } });
+
+    render(<Settings />);
+
+    await waitFor(() => {
+      expect(mockLoadAPIKey).toHaveBeenCalledWith('openai');
+    });
+
+    expect(mockLoadLLMProvider).not.toHaveBeenCalled();
+    expect(screen.getByDisplayValue('OpenAI (GPT)')).toBeDisabled();
+    expect(
+      screen.getByText('Currently only one provider is available: OpenAI.')
+    ).toBeInTheDocument();
+  });
+
+  /* Preconditions: Settings component runs in packaged production mode
+     Action: Enter API key and test connection
+     Assertions: Production-only UI continues to use OpenAI for connection checks
+     Requirements: settings.1.20.1, settings.2.4 */
+  it('should use OpenAI for connection test in packaged production mode', async () => {
+    mockGetRuntimeInfo.mockResolvedValue({ success: true, data: { isPackaged: true } });
+    mockLoadAPIKey.mockResolvedValue({ success: true, data: { apiKey: '' } });
+    mockTestConnection.mockResolvedValue({ success: true, data: { success: true } });
+
+    render(<Settings />);
+
+    await waitFor(() => {
+      expect(mockLoadAPIKey).toHaveBeenCalledWith('openai');
+    });
+
+    const apiKeyInput = screen.getByTestId('ai-agent-api-key');
+    fireEvent.change(apiKeyInput, { target: { value: 'sk-prod-openai' } });
+
+    const testButton = screen.getByText('Test Connection');
+    fireEvent.click(testButton);
+
+    await waitFor(() => {
+      expect(mockTestConnection).toHaveBeenCalledWith('openai', 'sk-prod-openai');
+    });
+  });
 });
 
 describe('Settings Component - Error Handling with callApi', () => {
@@ -428,6 +480,7 @@ describe('Settings Component - Error Handling with callApi', () => {
     jest.useFakeTimers();
 
     // Default mocks
+    mockGetRuntimeInfo.mockResolvedValue({ success: true, data: { isPackaged: false } });
     mockGetUser.mockResolvedValue({
       success: true,
       user: { name: 'Test User', email: 'test@example.com' },
