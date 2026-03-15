@@ -208,9 +208,19 @@ test.describe('Window State Persistence', () => {
 
     await context.window.waitForTimeout(500);
 
-    // Move window to a position relative to current bounds to stay on-screen in CI.
-    const newX = initialBounds.x + 40;
-    const newY = initialBounds.y + 40;
+    // Move window to a position that is guaranteed to fit current work area.
+    // In CI (small virtual displays), width=1000 can exceed available horizontal space
+    // after offset, so we clamp target coordinates to visible bounds.
+    const workArea = await context.app.evaluate(({ screen }) => {
+      const { x, y, width, height } = screen.getPrimaryDisplay().workArea;
+      return { x, y, width, height };
+    });
+    const targetX = initialBounds.x + 40;
+    const targetY = initialBounds.y + 40;
+    const maxVisibleX = workArea.x + Math.max(0, workArea.width - 1000);
+    const maxVisibleY = workArea.y + Math.max(0, workArea.height - 700);
+    const newX = Math.min(Math.max(targetX, workArea.x), maxVisibleX);
+    const newY = Math.min(Math.max(targetY, workArea.y), maxVisibleY);
 
     await setWindowPosition(context.app, newX, newY);
 
