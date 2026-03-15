@@ -3036,6 +3036,42 @@ describe('MainPipeline.run()', () => {
     );
   });
 
+  /* Preconditions: Provider returns final_answer tool_call and output.text contains mirrored JSON prefix plus regular assistant text
+     Action: Run pipeline for one user turn
+     Assertions: Mirrored JSON prefix is removed and only regular assistant text is persisted in kind:llm
+     Requirements: llm-integration.9.5.6, llm-integration.9.5.6.1 */
+  it('strips mirrored final_answer JSON prefix and preserves trailing assistant text', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-json-prefix-with-tail',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['Checklist item'] },
+        });
+        return {
+          text: '{"summary_points":["Checklist item"]}Hello! How can I help?',
+        };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(1);
+    expect(llmCreates[0]?.[2]).toEqual(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          text: 'Hello! How can I help?',
+        }),
+      })
+    );
+  });
+
   it('creates kind:error when final_answer tool_result has missing required summary_points', async () => {
     const { pipeline, llmProvider, messageManager } = makeMocks();
 

@@ -846,12 +846,21 @@ export class MainPipeline {
     attemptId: number
   ): StreamProcessingResult {
     const outputText = typeof output.text === 'string' ? output.text : '';
-    const toolPayloadCandidateText =
+    const rawToolPayloadCandidateText =
       outputText.trim().length > 0 ? outputText : state.currentSegment.text;
-    const suppressTechnicalToolPayloadText = this.shouldSuppressTechnicalToolPayloadText(
-      toolPayloadCandidateText,
+    const toolPayloadCandidateText = this.stripLeadingMirroredToolPayloadText(
+      rawToolPayloadCandidateText,
       state
     );
+    if (state.currentSegment.text) {
+      state.currentSegment.text = this.stripLeadingMirroredToolPayloadText(
+        state.currentSegment.text,
+        state
+      );
+    }
+    const suppressTechnicalToolPayloadText =
+      this.shouldSuppressTechnicalToolPayloadText(toolPayloadCandidateText, state) ||
+      toolPayloadCandidateText.trim().length === 0;
     if (suppressTechnicalToolPayloadText && state.currentSegment.id !== null) {
       this.hideIncompleteLlmMessage(state.currentSegment.id, agentId);
       state.currentSegment = { id: null, reasoning: '', text: '', order: null };
@@ -1000,6 +1009,86 @@ export class MainPipeline {
       return null;
     }
     return this.parseJsonObject(fencedMatch[1] ?? '');
+  }
+
+  // Requirements: llm-integration.9.5.6
+  private stripLeadingMirroredToolPayloadText(
+    text: string,
+    state: AttemptRuntimeState
+  ): string {
+    if (!state.sawAnyToolCall) {
+      return text;
+    }
+    const trimmedStart = text.trimStart();
+    if (!trimmedStart) {
+      return text;
+    }
+
+    const fencedPrefixMatch = trimmedStart.match(/^```(?:json)?\s*([\s\S]*?)\s*```/i);
+    if (fencedPrefixMatch) {
+      const fencedParsed = this.parseJsonObject(fencedPrefixMatch[1] ?? '');
+      if (fencedParsed && this.isToolPayloadMirror(fencedParsed, state)) {
+        return trimmedStart.slice(fencedPrefixMatch[0].length).trimStart();
+      }
+    }
+
+    if (!trimmedStart.startsWith('{')) {
+      return text;
+    }
+
+    const extracted = this.extractLeadingJsonObject(trimmedStart);
+    if (!extracted) {
+      return text;
+    }
+    const parsedPrefix = this.parseJsonObject(extracted.objectText);
+    if (!parsedPrefix || !this.isToolPayloadMirror(parsedPrefix, state)) {
+      return text;
+    }
+    return extracted.rest.trimStart();
+  }
+
+  // Requirements: llm-integration.9.5.6
+  private extractLeadingJsonObject(
+    text: string
+  ): { objectText: string; rest: string } | null {
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    for (let i = 0; i < text.length; i += 1) {
+      const char = text[i];
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+          continue;
+        }
+        if (char === '\\') {
+          escaped = true;
+          continue;
+        }
+        if (char === '"') {
+          inString = false;
+        }
+        continue;
+      }
+      if (char === '"') {
+        inString = true;
+        continue;
+      }
+      if (char === '{') {
+        depth += 1;
+        continue;
+      }
+      if (char === '}') {
+        depth -= 1;
+        if (depth === 0) {
+          return {
+            objectText: text.slice(0, i + 1),
+            rest: text.slice(i + 1),
+          };
+        }
+      }
+    }
+    return null;
   }
 
   // Requirements: llm-integration.9.5.6
