@@ -528,6 +528,51 @@ describe('Settings Component - Test Connection', () => {
 
     expect(mockDeleteAPIKey).not.toHaveBeenCalled();
   });
+
+  /* Preconditions: Settings component runs in packaged production mode and initial API key loading is delayed
+     Action: Render settings screen before load completes
+     Assertions: API key input and Test Connection stay disabled until initial settings are loaded
+     Requirements: settings.1.20.1, settings.2.2 */
+  it('should block API key editing and connection testing until packaged settings load completes', async () => {
+    let resolveAPIKey: ((value: { success: boolean; data: { apiKey: string } }) => void) | null =
+      null;
+
+    mockGetRuntimeInfo.mockResolvedValue({ success: true, data: { isPackaged: true } });
+    mockLoadAPIKey.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveAPIKey = resolve;
+        })
+    );
+
+    render(<Settings />);
+
+    const apiKeyInput = screen.getByTestId('ai-agent-api-key');
+    const testButton = screen.getByText('Test Connection');
+
+    expect(apiKeyInput).toBeDisabled();
+    expect(testButton).toBeDisabled();
+
+    fireEvent.change(apiKeyInput, { target: { value: 'sk-early-input' } });
+    jest.advanceTimersByTime(1000);
+
+    expect(mockSaveAPIKey).not.toHaveBeenCalled();
+    expect(mockDeleteAPIKey).not.toHaveBeenCalled();
+    expect(mockTestConnection).not.toHaveBeenCalled();
+
+    await waitFor(() => {
+      expect(mockLoadAPIKey).toHaveBeenCalledWith('openai');
+    });
+
+    expect(resolveAPIKey).not.toBeNull();
+    resolveAPIKey!({ success: true, data: { apiKey: 'sk-openai-loaded' } });
+
+    await waitFor(() => {
+      expect(apiKeyInput).not.toBeDisabled();
+    });
+
+    expect(screen.getByDisplayValue('sk-openai-loaded')).toBeInTheDocument();
+  });
 });
 
 describe('Settings Component - Error Handling with callApi', () => {

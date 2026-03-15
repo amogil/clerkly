@@ -72,6 +72,10 @@ export function Settings({ onSignOut, onNavigate: _onNavigate }: SettingsProps) 
 
   // Requirements: settings.1.9, settings.1.11, settings.1.12
   const handleAPIKeyChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!isSettingsLoaded) {
+      return;
+    }
+
     const nextApiKey = event.target.value;
     setApiKey(nextApiKey);
     scheduleAPIKeyPersist(effectiveLLMProvider, nextApiKey);
@@ -264,6 +268,10 @@ export function Settings({ onSignOut, onNavigate: _onNavigate }: SettingsProps) 
 
   // Requirements: settings.2.4, error-notifications.2.1 - Handle test connection
   const handleTestConnection = async () => {
+    if (!isSettingsLoaded || apiKey.trim() === '' || testingConnection) {
+      return;
+    }
+
     // Requirements: settings.2.4 - Set testing state
     setTestingConnection(true);
 
@@ -399,8 +407,9 @@ export function Settings({ onSignOut, onNavigate: _onNavigate }: SettingsProps) 
                     type={showApiKey ? 'text' : 'password'}
                     value={apiKey}
                     onChange={handleAPIKeyChange}
+                    disabled={!isSettingsLoaded}
                     placeholder="Enter your API key"
-                    className="w-full px-4 py-2 pr-12 bg-input-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground"
+                    className="w-full px-4 py-2 pr-12 bg-input-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-60"
                   />
                   <button
                     type="button"
@@ -424,7 +433,7 @@ export function Settings({ onSignOut, onNavigate: _onNavigate }: SettingsProps) 
               <div className="pt-4 border-t border-border">
                 <button
                   onClick={handleTestConnection}
-                  disabled={testingConnection || apiKey.trim() === ''}
+                  disabled={!isSettingsLoaded || testingConnection || apiKey.trim() === ''}
                   className="text-sm px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {testingConnection ? 'Testing...' : 'Test Connection'}
