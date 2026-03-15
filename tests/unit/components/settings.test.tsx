@@ -473,6 +473,27 @@ describe('Settings Component - Test Connection', () => {
     });
   });
 
+  /* Preconditions: Runtime info lookup fails before settings load
+     Action: Render settings screen
+     Assertions: Provider selector stays locked to OpenAI and non-OpenAI settings are not loaded
+     Requirements: settings.1.1.1, settings.1.1.2, settings.1.20.1 */
+  it('should keep provider selector locked to OpenAI when runtime info lookup fails', async () => {
+    mockGetRuntimeInfo.mockRejectedValue(new Error('IPC unavailable'));
+    mockLoadAPIKey.mockResolvedValue({ success: true, data: { apiKey: 'sk-openai-fallback' } });
+
+    render(<Settings />);
+
+    await waitFor(() => {
+      expect(mockLoadAPIKey).toHaveBeenCalledWith('openai');
+    });
+
+    expect(mockLoadLLMProvider).not.toHaveBeenCalled();
+    expect(screen.getByDisplayValue('OpenAI (GPT)')).toBeDisabled();
+    expect(
+      screen.getByText('Currently only one provider is available: OpenAI.')
+    ).toBeInTheDocument();
+  });
+
   /* Preconditions: Settings component runs in packaged production mode and API key loading is delayed
      Action: Render settings screen and advance debounce timer before loadAPIKey resolves
      Assertions: Initial autosave does not delete the persisted OpenAI key before the initial load finishes

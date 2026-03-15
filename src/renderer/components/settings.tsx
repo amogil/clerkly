@@ -21,7 +21,8 @@ export function Settings({ onSignOut, onNavigate: _onNavigate }: SettingsProps) 
   const [llmProvider, setLlmProvider] = useState<LLMProvider>('openai');
   const [apiKey, setApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
-  const [isProductionLLMProviderLocked, setIsProductionLLMProviderLocked] = useState(false);
+  const [isProductionLLMProviderLocked, setIsProductionLLMProviderLocked] = useState(true);
+  const [isSettingsLoaded, setIsSettingsLoaded] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [profile, setProfile] = useState<{
     name: string;
@@ -118,18 +119,25 @@ export function Settings({ onSignOut, onNavigate: _onNavigate }: SettingsProps) 
   // Requirements: settings.1.20, settings.1.21, error-notifications.2.1 - Load AI Agent settings on mount
   useEffect(() => {
     const loadAIAgentSettings = async () => {
-      let isPackaged = false;
+      let shouldLockToOpenAI = true;
 
       try {
-        const runtimeInfo = await window.api.app.getRuntimeInfo?.();
-        isPackaged = runtimeInfo?.success === true && runtimeInfo.data?.isPackaged === true;
+        const runtimeInfo = await window.api.app.getRuntimeInfo();
+        shouldLockToOpenAI =
+          runtimeInfo.success === true && runtimeInfo.data?.isPackaged === true;
+
+        if (!runtimeInfo.success) {
+          logger.warn(
+            `Runtime info unavailable, keeping OpenAI-only lock active: ${runtimeInfo.error || 'Unknown error'}`
+          );
+        }
       } catch (error) {
-        logger.warn(`Failed to load runtime info, falling back to non-packaged mode: ${error}`);
+        logger.error(`Failed to load runtime info, keeping OpenAI-only lock active: ${error}`);
       }
 
-      setIsProductionLLMProviderLocked(isPackaged);
+      setIsProductionLLMProviderLocked(shouldLockToOpenAI);
 
-      if (isPackaged) {
+      if (shouldLockToOpenAI) {
         setLlmProvider('openai');
 
         const keyResult = await callApi<{ apiKey: string }>(
@@ -143,6 +151,7 @@ export function Settings({ onSignOut, onNavigate: _onNavigate }: SettingsProps) 
         );
 
         setApiKey(keyResult?.apiKey || '');
+        setIsSettingsLoaded(true);
         return;
       }
 
@@ -182,6 +191,8 @@ export function Settings({ onSignOut, onNavigate: _onNavigate }: SettingsProps) 
         setLlmProvider('openai');
         setApiKey('');
       }
+
+      setIsSettingsLoaded(true);
     };
 
     loadAIAgentSettings();
@@ -365,14 +376,14 @@ export function Settings({ onSignOut, onNavigate: _onNavigate }: SettingsProps) 
                 <select
                   value={effectiveLLMProvider}
                   onChange={(e) => setLlmProvider(e.target.value as LLMProvider)}
-                  disabled={isProductionLLMProviderLocked}
+                  disabled={!isSettingsLoaded || isProductionLLMProviderLocked}
                   className="w-full px-4 py-2 bg-input-background border border-border rounded-lg text-foreground disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <option value="openai">OpenAI (GPT)</option>
                   <option value="anthropic">Anthropic (Claude)</option>
                   <option value="google">Google (Gemini)</option>
                 </select>
-                {isProductionLLMProviderLocked ? (
+                {isSettingsLoaded && isProductionLLMProviderLocked ? (
                   <p className="text-xs text-muted-foreground mt-2">
                     Currently only one provider is available: OpenAI.
                   </p>

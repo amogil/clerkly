@@ -39,7 +39,7 @@ export interface API {
       reason?: string;
     }>;
     setChatsReady: () => Promise<{ success: boolean; error?: string }>;
-    getRuntimeInfo?: () => Promise<{
+    getRuntimeInfo: () => Promise<{
       success: boolean;
       data?: { isPackaged: boolean };
       error?: string;
