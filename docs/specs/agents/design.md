@@ -1604,8 +1604,9 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 **Сообщения выполнения кода (`kind: 'tool_call'`, `toolName: 'code_exec'`):**
 - Используется отдельный блок выполнения кода, не являющийся обычным текстовым bubble.
 - Блок строится на AI Elements `Tool` (см. [https://elements.ai-sdk.dev/components/tool](https://elements.ai-sdk.dev/components/tool)).
-- Заголовок блока отображает иконку выполнения кода (`Code2`) и название `Code`.
-- Сразу после названия `Code` отображается badge со статусом выполнения.
+- Заголовок блока отображает иконку выполнения кода (`Code2`) и краткое описание работы из `arguments.task_summary`.
+- Сразу после краткого описания работы отображается badge со статусом выполнения.
+- UI использует `arguments.task_summary` из persisted payload как текст заголовка; валидация и ограничения этого поля определяются спецификацией `code_exec`.
 - Badge статуса всегда содержит иконку, привязанную к persisted-статусу: `running -> Loader2 (spin)`, `success -> CircleCheck`, `error -> CircleX`, `timeout -> Clock3`, `cancelled -> CircleMinus`.
 - Иконки статусов в badge рендерятся цветными (например: `success` — зелёный, `error` — красный, `timeout` — янтарный, `running/cancelled` — нейтральные).
 - Блок отображает persisted-статус выполнения (`running | success | error | timeout | cancelled`).

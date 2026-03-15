@@ -552,9 +552,9 @@
 
 7.4.6.2. Заголовок блока `tool_call(code_exec)` ДОЛЖЕН содержать иконку `Code2` (из набора `lucide-react`).
 
-7.4.6.3. Заголовок блока `tool_call(code_exec)` ДОЛЖЕН отображать название инструмента как `Code` (с заглавной буквы).
+7.4.6.3. Заголовок блока `tool_call(code_exec)` ДОЛЖЕН отображать краткое описание работы из `arguments.task_summary`.
 
-7.4.6.4. Статус выполнения `tool_call(code_exec)` ДОЛЖЕН отображаться сразу после названия `Code` в заголовке.
+7.4.6.4. Статус выполнения `tool_call(code_exec)` ДОЛЖЕН отображаться в заголовке сразу после краткого описания работы.
 
 7.4.6.5. В блоке `tool_call(code_exec)` прозрачный фон (`transparent`) ДОЛЖЕН использоваться для:
   - корневого контейнера блока,
@@ -582,7 +582,7 @@
   - `data-testid="message-code-exec-block"` для корневого блока,
   - `data-testid="message-code-exec-header"` для заголовка блока,
   - `data-testid="message-code-exec-icon"` для иконки в заголовке,
-  - `data-testid="message-code-exec-title"` для названия `Code`,
+  - `data-testid="message-code-exec-title"` для краткого описания работы,
   - `data-testid="message-code-exec-status"` для статуса,
   - `data-testid="message-code-exec-status-icon"` для иконки статуса,
   - `data-testid="message-code-exec-input"` для секции JavaScript,

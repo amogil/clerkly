@@ -136,6 +136,7 @@
 #### Критерии Приемки
 
 3.1. Система ДОЛЖНА документировать для модели контракт инструмента `code_exec`:
+  - обязательное поле `task_summary` (непустая краткая строка с описанием сути работы, выполняемой данным кодом);
   - обязательное поле `code` (JavaScript строка);
   - опциональное поле `timeout_ms`;
   - ожидаемый результат: `status`, `stdout`, `stderr`, `stdout_truncated`, `stderr_truncated`, `error`.
@@ -145,9 +146,18 @@
 3.1.1. Формальный входной контракт `code_exec` ДОЛЖЕН быть задокументирован как JSON schema:
   - `type: object`
   - `additionalProperties: false`
-  - `required: ["code"]`
+  - `required: ["task_summary", "code"]`
+  - `properties.task_summary: string`
   - `properties.code: string`
   - `properties.timeout_ms: integer`
+
+3.1.1.1. Поле `task_summary` ДОЛЖНО содержать краткое описание сути работы, выполняемой через данный вызов `code_exec`.
+
+3.1.1.2. ЕСЛИ `task_summary` отсутствует, не является строкой или после `trim()` пусто, ТО система ДОЛЖНА отклонять вызов контролируемой ошибкой валидации инструмента.
+
+3.1.1.3. Длина `task_summary` после `trim()` ДОЛЖНА быть от `1` до `200` символов включительно.
+
+3.1.1.4. ЕСЛИ длина `task_summary` после `trim()` превышает `200` символов, ТО система ДОЛЖНА отклонять вызов контролируемой ошибкой валидации инструмента.
 
 3.1.2. Формальный выходной контракт `code_exec` ДОЛЖЕН быть задокументирован как структура:
   - `status: "running" | "success" | "error" | "timeout" | "cancelled"`
@@ -191,6 +201,8 @@
 
 3.2.1. Разрешённые API консоли ДОЛЖНЫ быть перечислены явно: `console.log`, `console.info`, `console.warn`, `console.error`.
 
+3.2.2. КОГДА в allowlist sandbox runtime включён helper `http_request`, ТО система ДОЛЖНА документировать его для модели как разрешённый API `tools.http_request(...)`; детальный контракт данного helper-а ДОЛЖЕН определяться в `docs/specs/sandbox-http-request/*`.
+
 3.3. Система ДОЛЖНА содержать минимум один позитивный и один негативный пример использования API для модели.
 
 3.4. КОГДА модель использует только разрешённый API, ТО исполнение ДОЛЖНО завершаться без ошибки `error.code = "policy_denied"`.
@@ -232,6 +244,8 @@ return await window.api.saveData('x', 'y');
 #### Модульные Тесты
 
 - `tests/unit/code_exec/CodeExecToolSchema.test.ts` — "should validate code_exec input schema and timeout range/default"
+- `tests/unit/code_exec/CodeExecToolSchema.test.ts` — "should reject missing or empty task_summary in code_exec input"
+- `tests/unit/code_exec/CodeExecToolSchema.test.ts` — "should reject task_summary longer than 200 characters"
 - `tests/unit/agents/PromptBuilder.test.ts` — "should include allowed API, examples and console usage guidance for code_exec"
 
 ### 4. Контракт хранения и realtime-события

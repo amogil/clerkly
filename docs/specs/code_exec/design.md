@@ -23,6 +23,7 @@ UI-визуализация исполнения описывается в `docs
   - реализует timeout, cancel и гарантированную очистку после завершения вызова.
 - **"SandboxBridge" (Shared policy module)**
   - хранит централизованный allowlist/policy-правила sandbox tools;
+  - публикует разрешённые helper-ы sandbox runtime, включая `tools.http_request(...)`, когда он включён в allowlist;
   - используется runtime и unit-тестами как единый source of truth.
 - **"SandboxRuntime" (Sandbox Renderer)**
   - исполняет JavaScript-код;
@@ -43,6 +44,7 @@ UI-визуализация исполнения описывается в `docs
     "callId": "call-code-exec-1",
     "toolName": "code_exec",
     "arguments": {
+      "task_summary": "Calculate and print hello-world output",
       "code": "console.log('hello')",
       "timeout_ms": 10000
     },
@@ -171,6 +173,7 @@ Lifecycle:
 ### Закрытый список тулов sandbox runtime
 
 - JavaScript-код в sandbox runtime работает только через отдельный allowlist тулов (`SANDBOX_JS_TOOLS_ALLOWLIST`).
+- Helper `tools.http_request(...)`, если он включён в allowlist, является частью этого sandbox API и описывается профильной спецификацией `docs/specs/sandbox-http-request/*`.
 - Tool calls из основного pipeline потока (`MainPipeline` tool-loop) не прокидываются в sandbox bridge и недоступны для прямого вызова из JavaScript.
 - Любой вызов инструмента вне allowlist завершается `status=error` с `error.code='policy_denied'`.
 - Allowlist хранится централизованно и используется всеми проверками bridge/gateway.
@@ -234,13 +237,13 @@ Lifecycle:
 ### Модульные Тесты
 
 - `tests/unit/agents/MainPipeline.test.ts` — lifecycle `running -> terminal`, mapping `error.code`, cancel/timeout, дедупликация по `callId`, terminal-immutability.
-- `tests/unit/agents/PromptBuilder.test.ts` — наличие `code_exec` tool schema, лимитов и правил для модели (`timeout`, `code size`, `stdout/stderr`, CPU/RAM).
+- `tests/unit/agents/PromptBuilder.test.ts` — наличие `code_exec` tool schema, обязательного `task_summary` (1..200 символов) и правил для модели (`timeout`, `code size`, `stdout/stderr`, CPU/RAM).
 - `tests/unit/code_exec/SandboxSessionManager.test.ts` — one-call-one-sandbox, timeout, cancel, cleanup, shutdown timeout `15000`.
 - `tests/unit/code_exec/SandboxBridge.test.ts` — allowlist enforcement, запрет main-pipeline-only tools, `policy_denied`.
 - `tests/unit/code_exec/SandboxPolicy.test.ts` — browser/session policy hardening (`webRequest`, permissions, navigation, CSP/network deny).
 - `tests/unit/code_exec/SandboxSessionManager.test.ts` — capture `console.*`, раздельные `stdout/stderr`, запрет multithreading API.
 - `tests/unit/code_exec/OutputLimiter.test.ts` — лимиты `stdout/stderr`, truncation, флаги `stdout_truncated`/`stderr_truncated`.
-- `tests/unit/code_exec/CodeExecToolSchema.test.ts` — валидация `code`, `timeout_ms` диапазона и `additionalProperties=false`.
+- `tests/unit/code_exec/CodeExecToolSchema.test.ts` — валидация `task_summary` (1..200 символов), `code`, `timeout_ms` диапазона и `additionalProperties=false`.
 - `tests/unit/code_exec/CodeExecPersistenceMapper.test.ts` — запись `started_at`, `finished_at`, `duration_ms`, переход `done=false/true`.
 
 ### Функциональные Тесты
