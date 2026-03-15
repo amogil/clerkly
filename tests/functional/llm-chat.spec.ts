@@ -3018,9 +3018,9 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
 
   /* Preconditions: App uses mock provider and sends first chat request
      Action: User sends a message, test inspects provider request body
-     Assertions: System prompt forbids duplicating tool_call payload as plaintext JSON
-     Requirements: llm-integration.9.5.1.1 */
-  test('should include no tool-payload duplication rule in system prompt', async () => {
+     Assertions: System prompt forbids both raw payload mirroring and plain-text summary duplication before final_answer
+     Requirements: llm-integration.9.5.3.3, llm-integration.9.5.6 */
+  test('should include final_answer non-duplication rules in system prompt', async () => {
     mockLLMServer.setStreamingMode(true, {
       content: 'Simple answer',
       chunkDelayMs: 0,
@@ -3042,6 +3042,9 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
 
     expect(systemPrompt).toContain(
       'Do not duplicate tool payload as plain assistant text: never output raw JSON that mirrors `final_answer` arguments/output.'
+    );
+    expect(systemPrompt).toContain(
+      'do not first emit a normal assistant summary, bullet list, or checklist that repeats the same solved tasks'
     );
   });
 

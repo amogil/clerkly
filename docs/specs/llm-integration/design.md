@@ -547,6 +547,7 @@ class PromptBuilder {
 - если задача не завершена и `final_answer` не вызывается, модель явно запрашивает у пользователя недостающие данные или подтверждение следующего шага;
 - `final_answer` вызывается только в одиночку в одном model-turn (без других tool calls в этом же ответе модели);
 - payload инструмента не дублируется в plain-text ответе модели; модель не выводит сырой JSON, зеркалирующий `tool_call`;
+- при завершении через `final_answer` модель не публикует перед вызовом инструмента отдельный обычный markdown/text summary, буллеты или checklist с теми же solved-task пунктами;
 - математические выражения в `final_answer.summary_points` оформляются только через KaTeX-совместимые markdown-делимитеры `$...$`/`$$...$$`;
 - `final_answer.summary_points` перечисляет решённые задачи.
 
@@ -870,7 +871,7 @@ User отправляет сообщение
 - `tests/functional/llm-chat.spec.ts` — "should reject model response containing more than one tool_call and run repair"
 - `tests/functional/llm-chat.spec.ts` — "should render final_answer tool_call as completed assistant response"
 - `tests/functional/llm-chat.spec.ts` — "should render math inside tool_call(final_answer) checklist item"
-- `tests/functional/llm-chat.spec.ts` — "should include no tool-payload duplication rule in system prompt"
+- `tests/functional/llm-chat.spec.ts` — "should include final_answer non-duplication rules in system prompt"
 - `tests/functional/llm-chat.spec.ts` — "should not render raw final_answer JSON text when tool_call(final_answer) is present"
 - `tests/functional/llm-chat.spec.ts` — "should cancel active request via stop button without creating error message"
 - `tests/functional/llm-chat.spec.ts` — "should show error when invalid final_answer exhausts retry limit"

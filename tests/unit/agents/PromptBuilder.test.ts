@@ -169,6 +169,9 @@ describe('PromptBuilder.build()', () => {
       expect(result.systemPrompt).toContain(
         'Do not duplicate tool payload as plain assistant text'
       );
+      expect(result.systemPrompt).toContain(
+        'do not first emit a normal assistant summary, bullet list, or checklist that repeats the same solved tasks'
+      );
       expect(result.systemPrompt).toContain('list solved tasks');
       expect(result.systemPrompt).toContain('1 to 10 non-empty points');
       expect(result.systemPrompt).toContain(

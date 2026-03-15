@@ -419,6 +419,7 @@ export class FinalAnswerFeature implements AgentFeature {
       '- If the requested work is not complete and you are not calling `final_answer`, explicitly ask the user what information or confirmation you need next.',
       '- Call `final_answer` alone: do not combine it with any other tool call in the same turn.',
       '- Do not duplicate tool payload as plain assistant text: never output raw JSON that mirrors `final_answer` arguments/output.',
+      '- If you are about to call `final_answer`, do not first emit a normal assistant summary, bullet list, or checklist that repeats the same solved tasks; put that completion summary only in `final_answer.summary_points`.',
       '- Use `final_answer.summary_points` to list solved tasks (required: 1 to 10 non-empty points, each max 200 characters).',
       '- You MAY use Markdown (GFM) inside `final_answer.summary_points` when it improves clarity.',
       '- In `final_answer.summary_points`, mathematical expressions are optional; if used, format them with Markdown math delimiters: inline `$...$`, block `$$...$$`.',
