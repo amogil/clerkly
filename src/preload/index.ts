@@ -207,6 +207,7 @@ const api: API = {
     async setChatsReady(): Promise<{ success: boolean; error?: string }> {
       return await ipcRenderer.invoke('app:set-chats-ready');
     },
+    // Requirements: settings.1.1.1, settings.1.1.2, settings.1.20.1
     async getRuntimeInfo(): Promise<{
       success: boolean;
       data?: { isPackaged: boolean };

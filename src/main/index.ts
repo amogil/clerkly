@@ -361,6 +361,7 @@ app.whenReady().then(async () => {
       appCoordinator.markChatsReady('renderer');
       return { success: true };
     });
+    // Requirements: settings.1.1.1, settings.1.1.2, settings.1.20.1
     ipcMain.handle('app:get-runtime-info', () => ({
       success: true,
       data: {

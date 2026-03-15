@@ -182,6 +182,7 @@ export interface API {
       reason?: string;
     }>;
     setChatsReady: () => Promise<{ success: boolean; error?: string }>;
+    // Requirements: settings.1.1.1, settings.1.1.2, settings.1.20.1
     getRuntimeInfo: () => Promise<{
       success: boolean;
       data?: { isPackaged: boolean };
