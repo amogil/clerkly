@@ -509,6 +509,8 @@
 
 11.5.2. Система НЕ ДОЛЖНА использовать скрытый provider-level лимит числа шагов tool-loop, который завершает turn до `final_answer` или ошибки, если такой лимит не зафиксирован отдельным явным продуктовым требованием.
 
+11.5.3. КОГДА SDK-managed tool-loop выполняется внутри provider-layer, ТО semantic stop condition ДОЛЖЕН быть привязан к вызову `final_answer`, чтобы `Vercel AI SDK` продолжал шаги `model -> tool -> model` до `final_answer` или ошибки, а НЕ останавливался после первого tool-result.
+
 11.6. Runtime-поток tool-calling НЕ ДОЛЖЕН требовать отдельного realtime-сигнала; обработка ДОЛЖНА строиться по persisted `message.created`/`message.updated`.
 
 11.6.1. Система ДОЛЖНА гарантировать, что при завершении run/attempt не остаётся `tool_call` со статусом `running`: каждый такой вызов ДОЛЖЕН переходить в terminal-статус (`cancelled | error | timeout | success`) до завершения попытки.

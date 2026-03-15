@@ -60,7 +60,7 @@ export class GoogleProvider implements ILLMProvider {
 
   /**
    * Send a chat request with streaming reasoning/text and native tool-calling events.
-   * Requirements: llm-integration.5.1, llm-integration.5.4, llm-integration.5.5, llm-integration.5.7
+   * Requirements: llm-integration.5.1, llm-integration.5.4, llm-integration.5.5, llm-integration.5.7, llm-integration.11.5
    */
   async chat(
     messages: ChatMessage[],
@@ -91,7 +91,7 @@ export class GoogleProvider implements ILLMProvider {
         (globalThis as { ReadableStream?: unknown }).ReadableStream = webStreams.ReadableStream;
       }
 
-      const { streamText, tool, jsonSchema } = await import('ai');
+      const { streamText, tool, jsonSchema, hasToolCall } = await import('ai');
       const { createGoogleGenerativeAI } = await import('@ai-sdk/google');
 
       const google = createGoogleGenerativeAI({ apiKey: this.apiKey, baseURL });
@@ -106,6 +106,7 @@ export class GoogleProvider implements ILLMProvider {
         messages: messages as unknown as Parameters<typeof streamText>[0]['messages'],
         sendReasoning: true,
         tools,
+        stopWhen: hasToolCall('final_answer'),
         maxRetries: AI_SDK_MAX_RETRIES,
         abortSignal: controller.signal,
         onStepFinish: (event: Record<string, unknown>) => {

@@ -11,6 +11,7 @@ jest.mock('ai', () => ({
   streamText: jest.fn(),
   tool: jest.fn((definition) => ({ ...definition })),
   jsonSchema: jest.fn((schema) => schema),
+  hasToolCall: jest.fn((toolName) => ({ type: 'has-tool-call', toolName })),
 }));
 
 jest.mock('@ai-sdk/openai', () => ({
@@ -50,6 +51,7 @@ describe('OpenAIProvider.chat()', () => {
     (aiModule.streamText as unknown as jest.Mock).mockReset();
     (aiModule.tool as unknown as jest.Mock).mockClear();
     (aiModule.jsonSchema as unknown as jest.Mock).mockClear();
+    (aiModule.hasToolCall as unknown as jest.Mock).mockClear();
   });
 
   afterEach(() => {
@@ -86,9 +88,10 @@ describe('OpenAIProvider.chat()', () => {
     expect(chunks).toContainEqual({ type: 'reasoning', delta: 'Think ' });
     expect(chunks).toContainEqual({ type: 'text', delta: 'Hello' });
     expect(chunks).toContainEqual({ type: 'text', delta: ' world' });
+    expect(aiModule.hasToolCall).toHaveBeenCalledWith('final_answer');
     expect(aiModule.streamText).toHaveBeenCalledWith(
-      expect.not.objectContaining({
-        stopWhen: expect.anything(),
+      expect.objectContaining({
+        stopWhen: { type: 'has-tool-call', toolName: 'final_answer' },
       })
     );
   });

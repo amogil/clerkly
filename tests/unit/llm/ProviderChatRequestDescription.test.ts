@@ -9,6 +9,7 @@ jest.mock('ai', () => ({
   streamText: jest.fn(),
   tool: jest.fn((definition) => ({ ...definition })),
   jsonSchema: jest.fn((schema) => schema),
+  hasToolCall: jest.fn((toolName) => ({ type: 'has-tool-call', toolName })),
 }));
 
 jest.mock('@ai-sdk/openai', () => ({
