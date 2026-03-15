@@ -539,6 +539,9 @@ export class MainPipeline {
         state.pendingFirstType = 'text';
       }
       state.pendingTextDelta += chunk.delta;
+      if (this.shouldDeferToolPayloadTextFlush(state)) {
+        return;
+      }
       this.scheduleLlmFlush(context, agentId, runId, attemptId, setLastLlmMessageId, state);
       return;
     }
@@ -842,8 +845,20 @@ export class MainPipeline {
     setLastLlmMessageId: (messageId: number) => void,
     attemptId: number
   ): StreamProcessingResult {
-    if (!state.sawTextChunk && typeof output.text === 'string' && output.text.length > 0) {
-      state.titleParser.ingest(output.text);
+    const outputText = typeof output.text === 'string' ? output.text : '';
+    const toolPayloadCandidateText =
+      outputText.trim().length > 0 ? outputText : state.currentSegment.text;
+    const suppressTechnicalToolPayloadText = this.shouldSuppressTechnicalToolPayloadText(
+      toolPayloadCandidateText,
+      state
+    );
+    if (suppressTechnicalToolPayloadText && state.currentSegment.id !== null) {
+      this.hideIncompleteLlmMessage(state.currentSegment.id, agentId);
+      state.currentSegment = { id: null, reasoning: '', text: '', order: null };
+    }
+
+    if (!state.sawTextChunk && outputText.length > 0) {
+      state.titleParser.ingest(outputText);
     }
     state.titleParser.finalize();
     const titleMetadata = parseAgentTitleMetadataPayload(state.titleParser.getCandidate());
@@ -851,10 +866,10 @@ export class MainPipeline {
     if (
       state.currentSegment.id !== null &&
       !state.currentSegment.text &&
-      typeof output.text === 'string' &&
-      output.text.length > 0
+      outputText.length > 0 &&
+      !suppressTechnicalToolPayloadText
     ) {
-      state.currentSegment.text = output.text;
+      state.currentSegment.text = outputText;
     }
 
     let finalLlmPayload: Record<string, unknown> | null = null;
@@ -875,13 +890,13 @@ export class MainPipeline {
           text: state.currentSegment.text || undefined,
         },
       };
-    } else if (typeof output.text === 'string' && output.text.trim().length > 0) {
+    } else if (outputText.trim().length > 0 && !suppressTechnicalToolPayloadText) {
       const fallbackOrder = this.nextOrder(cycleState.runId, attemptId, state);
       const msg = this.createCompletedLlmMessage(
         agentId,
         context.replyToMessageId,
         context.options.model,
-        output.text,
+        outputText,
         fallbackOrder
       );
       state.attemptMessageIds.add(msg.id);
@@ -890,7 +905,7 @@ export class MainPipeline {
       finalLlmPayload = {
         data: {
           model: context.options.model,
-          text: output.text,
+          text: outputText,
         },
       };
     }
@@ -931,6 +946,141 @@ export class MainPipeline {
       finalAnswerOrder: state.finalAnswerOrder,
       titleMetadata,
     };
+  }
+
+  // Requirements: llm-integration.9.5.6, llm-integration.9.5.6.1
+  private shouldSuppressTechnicalToolPayloadText(
+    outputText: string,
+    state: AttemptRuntimeState
+  ): boolean {
+    if (!state.sawAnyToolCall) {
+      return false;
+    }
+    const trimmed = outputText.trim();
+    if (
+      state.finalAnswerCall &&
+      (trimmed.startsWith('{') || trimmed.startsWith('```')) &&
+      trimmed.includes('"summary_points"')
+    ) {
+      return true;
+    }
+    const parsedPayload = this.parseToolPayloadMirrorJson(outputText);
+    if (!parsedPayload) {
+      return false;
+    }
+    return this.isToolPayloadMirror(parsedPayload, state);
+  }
+
+  // Requirements: llm-integration.9.5.6, llm-integration.9.5.6.1
+  private shouldDeferToolPayloadTextFlush(state: AttemptRuntimeState): boolean {
+    if (!state.sawAnyToolCall) {
+      return false;
+    }
+    if (state.currentSegment.id !== null) {
+      return false;
+    }
+    const trimmed = state.currentSegment.text.trimStart();
+    if (!trimmed.startsWith('{') && !trimmed.startsWith('```')) {
+      return false;
+    }
+
+    const parsedPayload = this.parseToolPayloadMirrorJson(state.currentSegment.text);
+    if (!parsedPayload) {
+      return true;
+    }
+    return this.isToolPayloadMirror(parsedPayload, state);
+  }
+
+  // Requirements: llm-integration.9.5.6
+  private parseToolPayloadMirrorJson(text: string): Record<string, unknown> | null {
+    const trimmed = text.trim();
+    if (!trimmed) {
+      return null;
+    }
+
+    const directParsed = this.parseJsonObject(trimmed);
+    if (directParsed) {
+      return directParsed;
+    }
+
+    const fencedMatch = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+    if (!fencedMatch) {
+      return null;
+    }
+    return this.parseJsonObject(fencedMatch[1] ?? '');
+  }
+
+  // Requirements: llm-integration.9.5.6
+  private parseJsonObject(text: string): Record<string, unknown> | null {
+    try {
+      const parsed = JSON.parse(text);
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        return null;
+      }
+      return parsed as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }
+
+  // Requirements: llm-integration.9.5.6
+  private isToolPayloadMirror(
+    parsedPayload: Record<string, unknown>,
+    state: AttemptRuntimeState
+  ): boolean {
+    const containers: Record<string, unknown>[] = [parsedPayload];
+    const dataPayload = parsedPayload['data'];
+    if (dataPayload && typeof dataPayload === 'object' && !Array.isArray(dataPayload)) {
+      containers.push(dataPayload as Record<string, unknown>);
+    }
+
+    for (const container of containers) {
+      const summaryPoints = container['summary_points'];
+      const toolName = container['toolName'];
+      const callId = container['callId'];
+      const hasEnvelopeKeys =
+        Object.prototype.hasOwnProperty.call(container, 'toolName') ||
+        Object.prototype.hasOwnProperty.call(container, 'arguments') ||
+        Object.prototype.hasOwnProperty.call(container, 'output') ||
+        Object.prototype.hasOwnProperty.call(container, 'callId');
+
+      if (Array.isArray(summaryPoints)) {
+        if (
+          state.finalAnswerCall &&
+          this.areSummaryPointsEqual(summaryPoints, state.finalAnswerCall.args['summary_points'])
+        ) {
+          return true;
+        }
+        if (summaryPoints.every((point) => typeof point === 'string')) {
+          return true;
+        }
+      }
+
+      if (hasEnvelopeKeys) {
+        const knownToolName =
+          toolName === 'final_answer' || toolName === 'code_exec';
+        const matchingFinalCallId =
+          typeof callId === 'string' &&
+          state.finalAnswerCall !== null &&
+          callId === state.finalAnswerCall.callId;
+        if (knownToolName || matchingFinalCallId) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  // Requirements: llm-integration.9.5.6
+  private areSummaryPointsEqual(candidate: unknown[], expected: unknown): boolean {
+    if (!Array.isArray(expected)) {
+      return false;
+    }
+    if (candidate.length !== expected.length) {
+      return false;
+    }
+    return candidate.every((item, index) => item === expected[index]);
   }
 
   // Requirements: llm-integration.11.3.1, llm-integration.11.1.5

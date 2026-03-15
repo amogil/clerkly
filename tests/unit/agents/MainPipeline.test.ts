@@ -2674,6 +2674,45 @@ describe('MainPipeline.run()', () => {
     );
   });
 
+  /* Preconditions: Provider returns valid final_answer tool_call and output.text contains raw JSON mirroring summary_points
+     Action: Run pipeline for one user turn
+     Assertions: final_answer tool_call is persisted, but duplicate kind:llm text bubble is not persisted
+     Requirements: llm-integration.9.5.6, llm-integration.9.5.6.1 */
+  it('does not persist duplicate llm text when output.text mirrors final_answer payload JSON', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-json-dup',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['Done'] },
+        });
+        return { text: '{"summary_points":["Done"]}' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(0);
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'tool_call',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          toolName: 'final_answer',
+          arguments: { summary_points: ['Done'] },
+        }),
+      }),
+      1,
+      true
+    );
+  });
+
   it('creates kind:error when final_answer tool_result has missing required summary_points', async () => {
     const { pipeline, llmProvider, messageManager } = makeMocks();
 
