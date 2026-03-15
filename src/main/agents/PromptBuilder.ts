@@ -51,6 +51,10 @@ export function buildAutoTitleMetadataContractPrompt(currentTitle: string): stri
 const HTTP_REQUEST_PROMPT_SPEC = {
   title: 'Sandbox HTTP helper:',
   invocation: '`const result = await tools.http_request({ ... })`',
+  behaviorNotes: [
+    'If `max_response_bytes` is omitted, an internal safety cap of `262144` bytes still applies to the returned response body.',
+    'On cross-origin redirects, sensitive request headers (`authorization`, `proxy-authorization`, `cookie`, `cookie2`) are stripped before the next hop.',
+  ],
   inputFields: [
     '`url`: required absolute `http` or `https` URL string.',
     '`method`: optional HTTP method string; default `GET`; allowed: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`.',
@@ -58,7 +62,7 @@ const HTTP_REQUEST_PROMPT_SPEC = {
     '`body`: optional string request body; do not send `body` with `GET` or `HEAD`.',
     '`timeout_ms`: optional integer in milliseconds; default `10000`; maximum `180000`.',
     '`follow_redirects`: optional boolean; default `true`.',
-    '`max_response_bytes`: optional integer byte limit for the returned response body.',
+    '`max_response_bytes`: optional integer byte limit for the returned response body; allowed range `0..262144`.',
   ],
   responseFields: [
     '`status`: final HTTP status code.',
@@ -67,8 +71,8 @@ const HTTP_REQUEST_PROMPT_SPEC = {
     '`content_type`: response content type string; empty string when the header is absent.',
     '`body_encoding`: `text` for textual responses, `base64` for non-text responses.',
     '`body`: response body string encoded according to `body_encoding`.',
-    '`truncated`: `true` if `max_response_bytes` cut the response body.',
-    '`applied_limit_bytes`: actual byte limit applied to the response body.',
+    '`truncated`: `true` if the applied response body limit cut the body.',
+    '`applied_limit_bytes`: actual response body limit in bytes, either explicit `max_response_bytes` or the default internal cap `262144`.',
   ],
   requestExample: [
     '```js',
@@ -89,7 +93,8 @@ const HTTP_REQUEST_PROMPT_SPEC = {
     '  content_type: "application/json; charset=utf-8",',
     '  body_encoding: "text",',
     '  body: "{\\"items\\":[...]}",',
-    '  truncated: false',
+    '  truncated: false,',
+    '  applied_limit_bytes: 262144',
     '}',
     '```',
   ],
@@ -99,6 +104,8 @@ function buildHttpRequestPromptSection(): string {
   return [
     HTTP_REQUEST_PROMPT_SPEC.title,
     `- Call form: ${HTTP_REQUEST_PROMPT_SPEC.invocation}.`,
+    '- Behavior notes:',
+    ...HTTP_REQUEST_PROMPT_SPEC.behaviorNotes.map((note) => `  - ${note}`),
     '- Input fields:',
     ...HTTP_REQUEST_PROMPT_SPEC.inputFields.map((field) => `  - ${field}`),
     '- Response fields:',

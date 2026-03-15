@@ -279,6 +279,95 @@ describe('SandboxHttpRequestHandler', () => {
     });
   });
 
+  /* Preconditions: redirect chain crosses to a different origin with sensitive headers attached
+     Action: execute helper with follow_redirects enabled across origins
+     Assertions: next hop strips sensitive headers before issuing the redirected request
+     Requirements: sandbox-http-request.3.3.7, sandbox-http-request.4.4 */
+  it('strips sensitive headers on cross-origin redirects', async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(
+        makeResponse('', {
+          status: 302,
+          headers: { location: 'https://other.example.com/next' },
+        })
+      )
+      .mockResolvedValueOnce(
+        makeResponse('done', {
+          status: 200,
+          headers: { 'content-type': 'text/plain' },
+          url: 'https://other.example.com/next',
+        })
+      );
+    const handler = new SandboxHttpRequestHandler(fetchMock as unknown as typeof fetch);
+
+    const result = await handler.execute({
+      url: 'https://example.com/start',
+      headers: {
+        authorization: 'Bearer secret',
+        cookie: 'session=abc',
+        'proxy-authorization': 'Basic secret',
+        accept: 'text/plain',
+      },
+      follow_redirects: true,
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'https://other.example.com/next',
+      expect.objectContaining({
+        headers: { accept: 'text/plain' },
+      })
+    );
+    expect(result).toMatchObject({
+      status: 200,
+      body: 'done',
+    });
+  });
+
+  /* Preconditions: redirect chain stays on the same origin with caller-supplied headers
+     Action: execute helper with follow_redirects enabled on same-origin redirect
+     Assertions: next hop preserves request headers
+     Requirements: sandbox-http-request.3.3, sandbox-http-request.4.4 */
+  it('preserves headers on same-origin redirects', async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(
+        makeResponse('', {
+          status: 302,
+          headers: { location: '/next' },
+        })
+      )
+      .mockResolvedValueOnce(
+        makeResponse('done', {
+          status: 200,
+          headers: { 'content-type': 'text/plain' },
+          url: 'https://example.com/next',
+        })
+      );
+    const handler = new SandboxHttpRequestHandler(fetchMock as unknown as typeof fetch);
+
+    await handler.execute({
+      url: 'https://example.com/start',
+      headers: {
+        authorization: 'Bearer secret',
+        accept: 'text/plain',
+      },
+      follow_redirects: true,
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'https://example.com/next',
+      expect.objectContaining({
+        headers: {
+          authorization: 'Bearer secret',
+          accept: 'text/plain',
+        },
+      })
+    );
+  });
+
   /* Preconditions: handler receives redirect loop longer than the allowed hop count
      Action: execute helper with follow_redirects enabled
      Assertions: helper returns structured fetch_failed error after redirect limit is exceeded

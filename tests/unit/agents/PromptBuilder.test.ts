@@ -212,6 +212,12 @@ describe('PromptBuilder.build()', () => {
       expect(result.systemPrompt).toContain(
         '{ "accept": "application/json", "x-trace-id": "abc-123" }'
       );
+      expect(result.systemPrompt).toContain('internal safety cap of `262144` bytes');
+      expect(result.systemPrompt).toContain('applied_limit_bytes');
+      expect(result.systemPrompt).toContain('default internal cap `262144`');
+      expect(result.systemPrompt).toContain(
+        'sensitive request headers (`authorization`, `proxy-authorization`, `cookie`, `cookie2`)'
+      );
       expect(result.systemPrompt).toContain('Response example:');
     });
   });

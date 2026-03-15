@@ -64,6 +64,12 @@ interface ValidatedHttpRequestInput {
 }
 
 type FetchLike = typeof fetch;
+const CROSS_ORIGIN_STRIPPED_HEADERS = new Set([
+  'authorization',
+  'proxy-authorization',
+  'cookie',
+  'cookie2',
+]);
 
 function defaultFetch(...args: Parameters<FetchLike>): ReturnType<FetchLike> {
   if (typeof globalThis.fetch !== 'function') {
@@ -233,12 +239,13 @@ export class SandboxHttpRequestHandler {
       let currentUrl = input.url;
       let currentMethod: HttpMethod = input.method;
       let currentBody = input.body;
+      let currentHeaders = input.headers;
       let redirectHops = 0;
 
       for (;;) {
         const response = await this.fetchImpl(currentUrl, {
           method: currentMethod,
-          headers: input.headers,
+          headers: currentHeaders,
           body: currentBody,
           redirect: 'manual',
           signal: controller.signal,
@@ -267,12 +274,14 @@ export class SandboxHttpRequestHandler {
           };
         }
 
-        currentUrl = new URL(location, currentUrl).toString();
+        const nextUrl = new URL(location, currentUrl).toString();
         const nextRequest = this.getRedirectFollowRequest(
           response.status,
           currentMethod,
           currentBody
         );
+        currentHeaders = this.getRedirectFollowHeaders(currentUrl, nextUrl, currentHeaders);
+        currentUrl = nextUrl;
         currentMethod = nextRequest.method;
         currentBody = nextRequest.body;
       }
@@ -392,6 +401,33 @@ export class SandboxHttpRequestHandler {
     }
 
     return { method, body };
+  }
+
+  // Requirements: sandbox-http-request.3.3
+  private getRedirectFollowHeaders(
+    currentUrl: string,
+    nextUrl: string,
+    headers: Record<string, string> | undefined
+  ): Record<string, string> | undefined {
+    if (!headers) {
+      return headers;
+    }
+
+    if (!this.isCrossOriginRedirect(currentUrl, nextUrl)) {
+      return headers;
+    }
+
+    const filteredHeaders = Object.fromEntries(
+      Object.entries(headers).filter(
+        ([name]) => !CROSS_ORIGIN_STRIPPED_HEADERS.has(name.toLowerCase())
+      )
+    );
+
+    return Object.keys(filteredHeaders).length > 0 ? filteredHeaders : undefined;
+  }
+
+  private isCrossOriginRedirect(currentUrl: string, nextUrl: string): boolean {
+    return new URL(currentUrl).origin !== new URL(nextUrl).origin;
   }
 
   private isTextualContentType(contentType: string): boolean {
