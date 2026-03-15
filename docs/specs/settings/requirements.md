@@ -114,6 +114,8 @@
 
 1.20.1. ГДЕ приложение запущено в packaged production-сборке, КОГДА открывается страница Settings, ТО UI ДОЛЖЕН отображать `OpenAI (GPT)` и ДОЛЖЕН загружать API ключ `openai` независимо от сохраненного значения `ai_agent_llm_provider`
 
+1.20.2. ЕСЛИ runtime-контракт packaged-режима страницы Settings недоступен или возвращает ошибку, ТО UI ДОЛЖЕН fail-closed: оставить `LLM Provider` disabled, отобразить `OpenAI (GPT)` и загрузить API ключ `openai`
+
 1.21. КОГДА настройки не найдены в базе (первый запуск или после очистки), ТО значения по умолчанию ДОЛЖНЫ быть:
    - LLM Provider: `openai`
    - API Key: пустая строка с placeholder "Enter your API key"
