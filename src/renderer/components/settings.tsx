@@ -35,7 +35,46 @@ export function Settings({ onSignOut, onNavigate: _onNavigate }: SettingsProps) 
 
   // Track if this is the first render to avoid saving on initial mount
   const isFirstRender = useRef(true);
+  const apiKeyPersistTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const effectiveLLMProvider: LLMProvider = isProductionLLMProviderLocked ? 'openai' : llmProvider;
+
+  // Requirements: settings.1.9, settings.1.11, settings.1.12, error-notifications.2.1
+  const scheduleAPIKeyPersist = useCallback((provider: LLMProvider, nextApiKey: string) => {
+    if (apiKeyPersistTimeoutRef.current) {
+      clearTimeout(apiKeyPersistTimeoutRef.current);
+    }
+
+    apiKeyPersistTimeoutRef.current = setTimeout(async () => {
+      if (nextApiKey.trim() === '') {
+        await callApi<Record<string, never>>(
+          () =>
+            window.api.settings.deleteAPIKey(provider).then((r) => ({
+              ...r,
+              data: r.success ? ({} as Record<string, never>) : undefined,
+            })),
+          'Deleting API key'
+        );
+      } else {
+        await callApi<Record<string, never>>(
+          () =>
+            window.api.settings.saveAPIKey(provider, nextApiKey).then((r) => ({
+              ...r,
+              data: r.success ? ({} as Record<string, never>) : undefined,
+            })),
+          'Saving API key'
+        );
+      }
+
+      apiKeyPersistTimeoutRef.current = null;
+    }, 500);
+  }, []);
+
+  // Requirements: settings.1.9, settings.1.11, settings.1.12
+  const handleAPIKeyChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const nextApiKey = event.target.value;
+    setApiKey(nextApiKey);
+    scheduleAPIKeyPersist(effectiveLLMProvider, nextApiKey);
+  };
 
   // Load profile data
   const loadProfile = useCallback(async () => {
@@ -194,38 +233,23 @@ export function Settings({ onSignOut, onNavigate: _onNavigate }: SettingsProps) 
     saveProviderAndLoadKey();
   }, [isProductionLLMProviderLocked, llmProvider]);
 
-  // Requirements: settings.1.9, settings.1.11, settings.1.12, error-notifications.2.1 - Debounced save for API key (500ms)
+  // Requirements: settings.1.9, settings.1.11, settings.1.12 - Cancel pending API key save when provider changes
   useEffect(() => {
-    // Debounce API key save
-    const timeoutId = setTimeout(async () => {
-      // Requirements: error-notifications.2.1 - Use callApi for automatic error handling
-      if (apiKey.trim() === '') {
-        // Requirements: settings.1.11 - Delete API key when field is cleared
-        await callApi<Record<string, never>>(
-          () =>
-            window.api.settings.deleteAPIKey(effectiveLLMProvider).then((r) => ({
-              ...r,
-              data: r.success ? ({} as Record<string, never>) : undefined,
-            })),
-          'Deleting API key'
-        );
-      } else {
-        // Save API key with debounce
-        await callApi<Record<string, never>>(
-          () =>
-            window.api.settings.saveAPIKey(effectiveLLMProvider, apiKey).then((r) => ({
-              ...r,
-              data: r.success ? ({} as Record<string, never>) : undefined,
-            })),
-          'Saving API key'
-        );
-        // Requirements: settings.1.12 - No visual indicator for saving (silent save)
-      }
-    }, 500);
+    if (apiKeyPersistTimeoutRef.current) {
+      clearTimeout(apiKeyPersistTimeoutRef.current);
+      apiKeyPersistTimeoutRef.current = null;
+    }
+  }, [effectiveLLMProvider]);
 
-    // Cleanup: cancel previous timeout
-    return () => clearTimeout(timeoutId);
-  }, [apiKey, effectiveLLMProvider]);
+  // Requirements: settings.1.9, settings.1.11, settings.1.12 - Cancel pending API key save on unmount
+  useEffect(() => {
+    return () => {
+      if (apiKeyPersistTimeoutRef.current) {
+        clearTimeout(apiKeyPersistTimeoutRef.current);
+        apiKeyPersistTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   // Requirements: settings.2.4, error-notifications.2.1 - Handle test connection
   const handleTestConnection = async () => {
@@ -363,7 +387,7 @@ export function Settings({ onSignOut, onNavigate: _onNavigate }: SettingsProps) 
                     data-testid="ai-agent-api-key"
                     type={showApiKey ? 'text' : 'password'}
                     value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
+                    onChange={handleAPIKeyChange}
                     placeholder="Enter your API key"
                     className="w-full px-4 py-2 pr-12 bg-input-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground"
                   />

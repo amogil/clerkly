@@ -472,6 +472,41 @@ describe('Settings Component - Test Connection', () => {
       expect(mockTestConnection).toHaveBeenCalledWith('openai', 'sk-prod-openai');
     });
   });
+
+  /* Preconditions: Settings component runs in packaged production mode and API key loading is delayed
+     Action: Render settings screen and advance debounce timer before loadAPIKey resolves
+     Assertions: Initial autosave does not delete the persisted OpenAI key before the initial load finishes
+     Requirements: settings.1.9, settings.1.20.1 */
+  it('should not delete OpenAI key before delayed packaged settings load completes', async () => {
+    let resolveAPIKey: ((value: { success: boolean; data: { apiKey: string } }) => void) | null =
+      null;
+
+    mockGetRuntimeInfo.mockResolvedValue({ success: true, data: { isPackaged: true } });
+    mockLoadAPIKey.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveAPIKey = resolve;
+        })
+    );
+
+    render(<Settings />);
+
+    await waitFor(() => {
+      expect(mockLoadAPIKey).toHaveBeenCalledWith('openai');
+    });
+
+    jest.advanceTimersByTime(1000);
+    expect(mockDeleteAPIKey).not.toHaveBeenCalled();
+
+    expect(resolveAPIKey).not.toBeNull();
+    resolveAPIKey!({ success: true, data: { apiKey: 'sk-openai-delayed' } });
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('sk-openai-delayed')).toBeInTheDocument();
+    });
+
+    expect(mockDeleteAPIKey).not.toHaveBeenCalled();
+  });
 });
 
 describe('Settings Component - Error Handling with callApi', () => {
