@@ -116,6 +116,8 @@
 
 1.20.2. ЕСЛИ runtime-контракт packaged-режима страницы Settings недоступен или возвращает ошибку, ТО UI ДОЛЖЕН fail-closed: оставить `LLM Provider` disabled, отобразить `OpenAI (GPT)` и загрузить API ключ `openai`
 
+1.20.3. ПОКА initial snapshot настроек страницы Settings не загружен, ТО поле `API Key` и действие `Test Connection` ДОЛЖНЫ оставаться non-interactive
+
 1.21. КОГДА настройки не найдены в базе (первый запуск или после очистки), ТО значения по умолчанию ДОЛЖНЫ быть:
    - LLM Provider: `openai`
    - API Key: пустая строка с placeholder "Enter your API key"
