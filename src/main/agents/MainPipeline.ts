@@ -890,13 +890,13 @@ export class MainPipeline {
           text: state.currentSegment.text || undefined,
         },
       };
-    } else if (outputText.trim().length > 0 && !suppressTechnicalToolPayloadText) {
+    } else if (toolPayloadCandidateText.trim().length > 0 && !suppressTechnicalToolPayloadText) {
       const fallbackOrder = this.nextOrder(cycleState.runId, attemptId, state);
       const msg = this.createCompletedLlmMessage(
         agentId,
         context.replyToMessageId,
         context.options.model,
-        outputText,
+        toolPayloadCandidateText,
         fallbackOrder
       );
       state.attemptMessageIds.add(msg.id);
@@ -905,7 +905,7 @@ export class MainPipeline {
       finalLlmPayload = {
         data: {
           model: context.options.model,
-          text: outputText,
+          text: toolPayloadCandidateText,
         },
       };
     }

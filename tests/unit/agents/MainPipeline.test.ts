@@ -3000,6 +3000,42 @@ describe('MainPipeline.run()', () => {
     );
   });
 
+  /* Preconditions: Provider streams final_answer tool_call and then unfinished JSON-like text chunks that never become parseable
+     Action: Run pipeline for one user turn
+     Assertions: Non-mirror malformed streamed text is preserved as completed kind:llm
+     Requirements: llm-integration.9.5.6, llm-integration.9.5.6.1 */
+  it('persists llm text when streamed JSON-like text after tool_call remains malformed', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-stream-malformed',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['Done'] },
+        });
+        onChunk({ type: 'text', delta: '{"summary_points": ' });
+        onChunk({ type: 'text', delta: '"unterminated"' });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(1);
+    expect(llmCreates[0]?.[2]).toEqual(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          text: '{"summary_points": "unterminated"',
+        }),
+      })
+    );
+  });
+
   it('creates kind:error when final_answer tool_result has missing required summary_points', async () => {
     const { pipeline, llmProvider, messageManager } = makeMocks();
 
