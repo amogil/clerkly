@@ -2984,6 +2984,128 @@ describe('MainPipeline.run()', () => {
     expect(llmCreates).toHaveLength(1);
   });
 
+  /* Preconditions: Provider returns valid final_answer tool_call and output.text contains markdown bullet list matching summary_points
+     Action: Run pipeline for one user turn
+     Assertions: Duplicate markdown summary text is suppressed and kind:llm is not persisted
+     Requirements: llm-integration.9.5.3.3, llm-integration.9.5.6.2 */
+  it('does not persist duplicate llm text when markdown bullet list mirrors final_answer summary_points', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-bullet-dup',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['First done', 'Second done'] },
+        });
+        return { text: '- First done\n- Second done' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(0);
+  });
+
+  /* Preconditions: Provider returns valid final_answer tool_call and output.text contains numbered list matching summary_points with whitespace differences
+     Action: Run pipeline for one user turn
+     Assertions: Equivalent numbered summary text is suppressed and kind:llm is not persisted
+     Requirements: llm-integration.9.5.3.3, llm-integration.9.5.6.2 */
+  it('does not persist duplicate llm text when numbered list mirrors final_answer summary_points', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-numbered-dup',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['First done', 'Second done'] },
+        });
+        return { text: '1.  First done\n2) Second   done' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(0);
+  });
+
+  /* Preconditions: Provider returns valid final_answer tool_call and output.text contains markdown list that differs from summary_points
+     Action: Run pipeline for one user turn
+     Assertions: Non-equivalent markdown summary remains persisted as kind:llm
+     Requirements: llm-integration.9.5.6.2 */
+  it('persists llm text when markdown list does not mirror final_answer summary_points', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-bullet-non-mirror',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['First done', 'Second done'] },
+        });
+        return { text: '- First done\n- Different detail' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(1);
+    expect(llmCreates[0]?.[2]).toEqual(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          text: '- First done\n- Different detail',
+        }),
+      })
+    );
+  });
+
+  /* Preconditions: Provider returns valid final_answer tool_call and output.text starts with duplicate markdown summary followed by extra assistant text
+     Action: Run pipeline for one user turn
+     Assertions: Duplicate summary prefix is removed and only trailing non-duplicate text is persisted
+     Requirements: llm-integration.9.5.6.2 */
+  it('strips duplicate markdown summary prefix and preserves trailing assistant text', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-bullet-prefix-with-tail',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['Checklist item'] },
+        });
+        return { text: '- Checklist item\n\nHello! How can I help?' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(1);
+    expect(llmCreates[0]?.[2]).toEqual(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          text: 'Hello! How can I help?',
+        }),
+      })
+    );
+  });
+
   /* Preconditions: Provider streams final_answer tool_call and then streamed JSON chunks mirroring final payload
      Action: Run pipeline for one user turn
      Assertions: Streamed mirror text is suppressed and kind:llm is not persisted

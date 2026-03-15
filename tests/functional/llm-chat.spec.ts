@@ -1978,6 +1978,50 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expectNoToastError(context.window);
   });
 
+  /* Preconditions: MockLLMServer returns valid final_answer tool_call and duplicate markdown bullet summary in output text
+     Action: User sends a message
+     Assertions: UI renders only final_answer checklist block and does not show duplicate markdown summary llm bubble
+     Requirements: llm-integration.9.5.3.3, llm-integration.9.5.6.2 */
+  test('should not render duplicate markdown summary before final_answer checklist', async () => {
+    mockLLMServer.setStreamingMode(true);
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        toolCalls: [
+          {
+            callId: 'final-checklist-markdown-dup-1',
+            toolName: 'final_answer',
+            arguments: {
+              summary_points: ['Checklist item', 'Another item'],
+            },
+          },
+        ],
+        content: '- Checklist item\n- Another item',
+      },
+    ]);
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await messageInput.fill('Render tool call without duplicate markdown summary');
+    await messageInput.press('Enter');
+
+    const finalAnswerBlock = context.window
+      .locator('[data-testid="message-final-answer-block"]')
+      .last();
+    await expect(finalAnswerBlock).toBeVisible({ timeout: 15000 });
+    await expect(context.window.locator('[data-testid="message-final-answer-item"]')).toHaveCount(
+      2
+    );
+    await expect(finalAnswerBlock).toContainText('Checklist item');
+    await expect(finalAnswerBlock).toContainText('Another item');
+
+    await expect(
+      context.window.locator('.message-llm-action-response', {
+        hasText: 'Checklist item',
+      })
+    ).toHaveCount(0);
+    await expectNoToastError(context.window);
+  });
+
   /* Preconditions: MockLLMServer returns final_answer with markdown content in summary_points
      Action: User sends a message
      Assertions: markdown inside checklist item is normalized (no raw markdown markers) and code span is rendered

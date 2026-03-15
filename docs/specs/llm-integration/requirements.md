@@ -421,6 +421,8 @@
 
 9.5.6.1. Это правило ДОЛЖНО применяться к ответам провайдера, где в одном model-turn одновременно пришли `kind: llm` text-chunks/`output.text` и валидный `tool_call`; дублирование в UI в таком случае считается следствием персиста, а не отдельной ошибки renderer.
 
+9.5.6.2. КОГДА в успешной попытке присутствует валидный `final_answer`, ТО система НЕ ДОЛЖНА сохранять отдельный пользовательский `kind: llm` ответ, если его markdown/text контент эквивалентен `final_answer.summary_points` и отличается только списочной разметкой (`-`, `*`, `+`, `1.`, `1)`, checkbox-style prefixes) или пробельной нормализацией.
+
 9.6. В целевой модели невалидный `final_answer` НЕ ДОЛЖЕН фиксироваться как успешный `completed`; он ДОЛЖЕН либо быть исправлен через retry, либо завершиться `kind:error` при исчерпании retry-лимита.
 
 9.7. Контракт отображения `kind: tool_call` (в текущем scope: `final_answer`, `code_exec`) определяется только в спецификации `agents` (`agents.7.4.*`) и не дублируется в данном документе.
@@ -535,8 +537,9 @@
 - `tests/functional/llm-chat.spec.ts` — "should continue to next model step after terminal code_exec tool result"
 - `tests/functional/llm-chat.spec.ts` — "should render final_answer tool_call as completed assistant response"
 - `tests/functional/llm-chat.spec.ts` — "should render math inside tool_call(final_answer) checklist item"
-- `tests/functional/llm-chat.spec.ts` — "should include no tool-payload duplication rule in system prompt"
+- `tests/functional/llm-chat.spec.ts` — "should include final_answer non-duplication rules in system prompt"
 - `tests/functional/llm-chat.spec.ts` — "should not render raw final_answer JSON text when tool_call(final_answer) is present"
+- `tests/functional/llm-chat.spec.ts` — "should not render duplicate markdown summary before final_answer checklist"
 
 ### 12. Надёжность chat-flow и обработка некорректных ответов
 

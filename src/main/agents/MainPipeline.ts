@@ -849,20 +849,20 @@ export class MainPipeline {
     const outputText = typeof output.text === 'string' ? output.text : '';
     const rawToolPayloadCandidateText =
       outputText.trim().length > 0 ? outputText : state.currentSegment.text;
-    const toolPayloadCandidateText = this.stripLeadingMirroredToolPayloadText(
-      rawToolPayloadCandidateText,
+    const toolPayloadCandidateText = this.stripLeadingDuplicateToolPayloadText(
+      this.stripLeadingMirroredToolPayloadText(rawToolPayloadCandidateText, state),
       state
     );
     if (state.currentSegment.text) {
-      state.currentSegment.text = this.stripLeadingMirroredToolPayloadText(
-        state.currentSegment.text,
+      state.currentSegment.text = this.stripLeadingDuplicateToolPayloadText(
+        this.stripLeadingMirroredToolPayloadText(state.currentSegment.text, state),
         state
       );
     }
-    const suppressTechnicalToolPayloadText =
+    const suppressDuplicateToolPayloadText =
       this.shouldSuppressTechnicalToolPayloadText(toolPayloadCandidateText, state) ||
       toolPayloadCandidateText.trim().length === 0;
-    if (suppressTechnicalToolPayloadText && state.currentSegment.id !== null) {
+    if (suppressDuplicateToolPayloadText && state.currentSegment.id !== null) {
       this.hideIncompleteLlmMessage(state.currentSegment.id, agentId);
       state.currentSegment = { id: null, reasoning: '', text: '', order: null };
     }
@@ -877,7 +877,7 @@ export class MainPipeline {
       state.currentSegment.id !== null &&
       !state.currentSegment.text &&
       outputText.length > 0 &&
-      !suppressTechnicalToolPayloadText
+      !suppressDuplicateToolPayloadText
     ) {
       state.currentSegment.text = outputText;
     }
@@ -900,7 +900,7 @@ export class MainPipeline {
           text: state.currentSegment.text || undefined,
         },
       };
-    } else if (toolPayloadCandidateText.trim().length > 0 && !suppressTechnicalToolPayloadText) {
+    } else if (toolPayloadCandidateText.trim().length > 0 && !suppressDuplicateToolPayloadText) {
       const fallbackOrder = this.nextOrder(cycleState.runId, attemptId, state);
       const msg = this.createCompletedLlmMessage(
         agentId,
@@ -1045,6 +1045,32 @@ export class MainPipeline {
     return extracted.rest.trimStart();
   }
 
+  // Requirements: llm-integration.9.5.3.3, llm-integration.9.5.6
+  private stripLeadingDuplicateToolPayloadText(text: string, state: AttemptRuntimeState): string {
+    if (!state.finalAnswerCall) {
+      return text;
+    }
+
+    const summaryPoints = state.finalAnswerCall.args['summary_points'];
+    if (!Array.isArray(summaryPoints) || summaryPoints.length === 0) {
+      return text;
+    }
+
+    const extracted = this.extractLeadingMarkdownList(text);
+    if (!extracted) {
+      return text;
+    }
+
+    const expectedPoints = summaryPoints.filter(
+      (point): point is string => typeof point === 'string'
+    );
+    if (!this.areNormalizedSummaryPointsEqual(extracted.items, expectedPoints)) {
+      return text;
+    }
+
+    return extracted.rest.trimStart();
+  }
+
   // Requirements: llm-integration.9.5.6
   private extractLeadingJsonObject(text: string): { objectText: string; rest: string } | null {
     let depth = 0;
@@ -1098,6 +1124,75 @@ export class MainPipeline {
     } catch {
       return null;
     }
+  }
+
+  // Requirements: llm-integration.9.5.3.3, llm-integration.9.5.6
+  private extractLeadingMarkdownList(text: string): { items: string[]; rest: string } | null {
+    const trimmedStart = text.trimStart();
+    if (!trimmedStart) {
+      return null;
+    }
+
+    const lineBreakMatch = trimmedStart.match(/\r?\n/);
+    const newline = lineBreakMatch?.[0] ?? '\n';
+    const lines = trimmedStart.split(/\r?\n/);
+    const items: string[] = [];
+    let consumedChars = 0;
+    let sawListItem = false;
+
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index] ?? '';
+      const item = this.parseMarkdownListItem(line);
+      const lineLength = line.length;
+      const separatorLength = index < lines.length - 1 ? newline.length : 0;
+
+      if (item !== null) {
+        sawListItem = true;
+        items.push(item);
+        consumedChars += lineLength + separatorLength;
+        continue;
+      }
+
+      if (!sawListItem) {
+        if (line.trim().length === 0) {
+          consumedChars += lineLength + separatorLength;
+          continue;
+        }
+        return null;
+      }
+
+      if (line.trim().length === 0) {
+        consumedChars += lineLength + separatorLength;
+        const rest = trimmedStart.slice(consumedChars);
+        return { items, rest };
+      }
+
+      return { items, rest: trimmedStart.slice(consumedChars) };
+    }
+
+    if (!sawListItem) {
+      return null;
+    }
+
+    return {
+      items,
+      rest: trimmedStart.slice(consumedChars),
+    };
+  }
+
+  // Requirements: llm-integration.9.5.3.3, llm-integration.9.5.6
+  private parseMarkdownListItem(line: string): string | null {
+    const checkboxMatch = line.match(/^\s*[-*+]\s+\[(?: |x|X)\]\s+(.+?)\s*$/);
+    if (checkboxMatch) {
+      return checkboxMatch[1] ?? null;
+    }
+
+    const bulletMatch = line.match(/^\s*(?:[-*+]|(?:\d+|[A-Za-z])[.)])\s+(.+?)\s*$/);
+    if (bulletMatch) {
+      return bulletMatch[1] ?? null;
+    }
+
+    return null;
   }
 
   // Requirements: llm-integration.9.5.6
@@ -1154,6 +1249,23 @@ export class MainPipeline {
       return false;
     }
     return candidate.every((item, index) => item === expected[index]);
+  }
+
+  // Requirements: llm-integration.9.5.3.3, llm-integration.9.5.6
+  private areNormalizedSummaryPointsEqual(candidate: string[], expected: string[]): boolean {
+    if (candidate.length !== expected.length) {
+      return false;
+    }
+
+    return candidate.every((item, index) => {
+      const expectedItem = expected[index] ?? '';
+      return this.normalizeSummaryPointText(item) === this.normalizeSummaryPointText(expectedItem);
+    });
+  }
+
+  // Requirements: llm-integration.9.5.3.3, llm-integration.9.5.6
+  private normalizeSummaryPointText(text: string): string {
+    return text.replace(/\s+/g, ' ').trim();
   }
 
   // Requirements: llm-integration.11.3.1, llm-integration.11.1.5
