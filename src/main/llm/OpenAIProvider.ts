@@ -13,6 +13,7 @@ import { LLM_PROVIDERS, ERROR_MESSAGES, CHAT_TIMEOUT_MS } from './LLMConfig';
 import { LLMRequestAbortedError, isAbortLikeError } from './LLMErrors';
 
 const AI_SDK_MAX_RETRIES = 2;
+const AI_SDK_MAX_STEPS = 100000;
 
 /**
  * OpenAI LLM provider implementation
@@ -104,7 +105,7 @@ export class OpenAIProvider implements ILLMProvider {
         (globalThis as { ReadableStream?: unknown }).ReadableStream = webStreams.ReadableStream;
       }
 
-      const { streamText, tool, jsonSchema, hasToolCall } = await import('ai');
+      const { streamText, tool, jsonSchema, stepCountIs } = await import('ai');
       const { createOpenAI } = await import('@ai-sdk/openai');
       const openai = createOpenAI({ apiKey: this.apiKey, baseURL });
       const tools = this.buildToolSet(
@@ -119,7 +120,7 @@ export class OpenAIProvider implements ILLMProvider {
         messages: messages as unknown as Parameters<typeof streamText>[0]['messages'],
         sendReasoning: true,
         tools,
-        stopWhen: hasToolCall('final_answer'),
+        stopWhen: stepCountIs(AI_SDK_MAX_STEPS),
         maxRetries: AI_SDK_MAX_RETRIES,
         abortSignal: controller.signal,
         onStepFinish: (event: Record<string, unknown>) => {
