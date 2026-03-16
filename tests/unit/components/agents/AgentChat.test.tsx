@@ -134,6 +134,7 @@ jest.mock('../../../../src/renderer/components/ai-elements/prompt-input', () => 
 
   const PromptInputBody = ({ children }: { children: React.ReactNode }) => <div>{children}</div>;
   const PromptInputFooter = ({ children }: { children: React.ReactNode }) => <div>{children}</div>;
+  const PromptInputTools = ({ children }: { children?: React.ReactNode }) => <div>{children}</div>;
   const PromptInputSubmit = ({
     disabled,
     ...props
@@ -190,6 +191,7 @@ jest.mock('../../../../src/renderer/components/ai-elements/prompt-input', () => 
     PromptInput,
     PromptInputBody,
     PromptInputFooter,
+    PromptInputTools,
     PromptInputProvider,
     PromptInputSubmit,
     PromptInputTextarea,
@@ -599,6 +601,21 @@ describe('AgentChat — PromptInput rendered', () => {
     render(<AgentChat {...defaultProps} />);
 
     expect(screen.getByText('Press Enter to send, Shift+Enter for new line')).toBeInTheDocument();
+  });
+
+  /* Preconditions: component rendered
+     Action: render AgentChat
+     Assertions: input area wrapper uses the same horizontal inset as chat content
+     Requirements: agents.4.1, agents.4.3 */
+  it('should render input area with horizontal chat inset', () => {
+    render(<AgentChat {...defaultProps} />);
+
+    expect(screen.getByTestId('agent-chat-input-area')).toHaveClass(
+      'pl-6',
+      'pr-6',
+      'overflow-y-auto',
+      '[scrollbar-gutter:stable]'
+    );
   });
 
   /* Preconditions: agent status is not in-progress

@@ -1238,7 +1238,8 @@ function ActivityIndicator({ isActive }: { isActive: boolean }) {
 **Структура:**
 - `"PromptInput"` используется как корневой контейнер области ввода.
 - `"PromptInputTextarea"` отображает многострочное поле ввода сообщения.
-- Footer внутри `"PromptInput"` содержит только action-кнопку отправки/остановки.
+- Область ввода выровнена по той же визуальной ширине контентной колонки, что и `"ConversationContent"` с сообщениями; для сохранения правого visual inset используется такой же зарезервированный scrollbar gutter на wrapper области ввода.
+- Footer внутри `"PromptInput"` использует стандартную композицию `"PromptInputFooter"` с `"PromptInputTools"` слева и action-кнопкой `"PromptInputSubmit"` справа.
 - Shortcut hint `Press Enter to send, Shift+Enter for new line` отображается отдельной подписью под рамкой поля ввода.
 - Отправка сообщения и остановка активной генерации управляются из `AgentChat` через submit/stop mode.
 

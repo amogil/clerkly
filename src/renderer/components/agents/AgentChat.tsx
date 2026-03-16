@@ -21,6 +21,7 @@ import {
   type PromptInputMessage,
   PromptInputSubmit,
   PromptInputTextarea,
+  PromptInputTools,
 } from '../ai-elements/prompt-input';
 import { type StickToBottomContext } from 'use-stick-to-bottom';
 import type { AgentSnapshot } from '../../types/agent';
@@ -319,10 +320,14 @@ export function AgentChat({
         />
         <ConversationScrollButton data-testid="scroll-to-bottom" />
       </Conversation>
-      <div className="flex-shrink-0">
+      <div
+        className="flex-shrink-0 overflow-y-auto pl-6 pr-6 [scrollbar-gutter:stable]"
+        data-testid="agent-chat-input-area"
+      >
         <PromptInput className="mt-2" onSubmit={handleSubmit}>
           <PromptInputBody>
             <PromptInputTextarea
+              className="px-3"
               data-testid="auto-expanding-textarea"
               onChange={(event) => {
                 setHasText(event.currentTarget.value.trim().length > 0);
@@ -331,6 +336,7 @@ export function AgentChat({
             />
           </PromptInputBody>
           <PromptInputFooter>
+            <PromptInputTools />
             <PromptInputSubmit
               data-testid={isInProgress ? 'prompt-input-stop' : 'prompt-input-send'}
               disabled={!isInProgress && !hasText}
