@@ -1,10 +1,19 @@
 import React from 'react';
 // Requirements: llm-integration.7, llm-integration.3.4.1, llm-integration.3.4.4, agents.4.22, agents.4.9, agents.4.10.1, agents.4.10.2, agents.7.4
-import { Check } from 'lucide-react';
+import {
+  Check,
+  CheckCircleIcon,
+  ChevronDownIcon,
+  ClockAlert,
+  CircleSlash,
+  LoaderCircle,
+  XCircleIcon,
+} from 'lucide-react';
 import { Message, MessageContent, MessageResponse } from '../ai-elements/message';
 import { Reasoning, ReasoningContent } from '../ai-elements/reasoning';
 import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from '../ai-elements/tool';
 import { Queue, QueueItem } from '../ai-elements/queue';
+import { CollapsibleTrigger } from '../ui/collapsible';
 import { toUIMessage } from '../../lib/messageMapper';
 import {
   normalizeMathDelimiters,
@@ -40,16 +49,19 @@ function buildCodeFence(code: string, language: string): string {
   return `\`\`\`${language}\n${code}\n\`\`\``;
 }
 
-function getCodeExecToolHeaderState(
-  status: string
-): 'input-available' | 'output-available' | 'output-error' {
+// Requirements: agents.7.4.6.4
+function getCodeExecStatusIcon(status: string): React.ReactNode {
   switch (status) {
-    case 'running':
-      return 'input-available';
     case 'success':
-      return 'output-available';
+      return <CheckCircleIcon className="size-4 text-green-600" />;
+    case 'cancelled':
+      return <CircleSlash className="size-4 text-muted-foreground" />;
+    case 'running':
+      return <LoaderCircle className="size-4 animate-spin text-muted-foreground" />;
+    case 'timeout':
+      return <ClockAlert className="size-4 text-amber-600" />;
     default:
-      return 'output-error';
+      return <XCircleIcon className="size-4 text-red-600" />;
   }
 }
 
@@ -269,20 +281,28 @@ export function AgentMessage({
         toolData.arguments && typeof toolData.arguments.task_summary === 'string'
           ? sanitizeInlineToolText(toolData.arguments.task_summary) || 'Code'
           : 'Code';
-      const toolHeaderState = getCodeExecToolHeaderState(status);
       return (
         <Message from="assistant" className="w-full max-w-full">
           <Tool
             data-testid="message-code-exec-block"
             className="bg-transparent min-w-0 max-w-full overflow-hidden"
           >
-            <ToolHeader
+            <CollapsibleTrigger
               data-testid="message-code-exec-toggle"
-              title={taskSummary}
-              toolName="code_exec"
-              type="dynamic-tool"
-              state={toolHeaderState}
-            />
+              className="flex w-full items-center justify-between gap-4 p-3"
+            >
+              <div className="flex items-center gap-2">
+                <span
+                  data-testid="message-code-exec-status-icon"
+                  data-status={status}
+                  className="flex items-center"
+                >
+                  {getCodeExecStatusIcon(status)}
+                </span>
+                <span className="font-medium text-sm">{taskSummary}</span>
+              </div>
+              <ChevronDownIcon className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+            </CollapsibleTrigger>
             <ToolContent
               data-testid="message-code-exec-content"
               className="min-w-0 max-w-full grid-cols-1 overflow-hidden"

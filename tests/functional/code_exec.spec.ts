@@ -182,7 +182,7 @@ test.afterEach(async () => {
 test.describe('code_exec tool_call rendering', () => {
   /* Preconditions: authenticated app with one visible agent
      Action: create persisted kind:tool_call with toolName=code_exec and terminal output, then expand collapsed block by standard ToolHeader toggle
-     Assertions: dedicated code_exec block renders standard ToolHeader toggle with task summary and status badge, starts collapsed by default, and shows JavaScript input plus persisted sections after expand
+     Assertions: dedicated code_exec block renders standard ToolHeader toggle with task summary and status icon, starts collapsed by default, and shows JavaScript input plus persisted sections after expand
      Exception Rationale (testing.3.13): this test validates renderer behavior for an already persisted historical
      tool_call(code_exec) message and intentionally bypasses LLM transport; LLM+UI path coverage remains in
      code_exec tool-loop scenarios below.
@@ -223,9 +223,9 @@ test.describe('code_exec tool_call rendering', () => {
     await expect(window.locator('[data-testid="message-code-exec-toggle"]').last()).toContainText(
       'Print ok to stdout'
     );
-    await expect(window.locator('[data-testid="message-code-exec-toggle"]').last()).toContainText(
-      'Completed'
-    );
+    await expect(
+      window.locator('[data-testid="message-code-exec-status-icon"][data-status="success"]').last()
+    ).toBeVisible();
     await expect(window.locator('[data-testid="message-code-exec-input"]')).toHaveCount(0);
     await expect(window.locator('[data-testid="message-code-exec-stdout"]')).toHaveCount(0);
     await expect(window.locator('[data-testid="message-code-exec-stderr"]')).toHaveCount(0);
@@ -379,9 +379,9 @@ test.describe('code_exec tool_call rendering', () => {
 
     await window.locator('[data-testid="message-code-exec-toggle"]').last().click();
 
-    await expect(window.locator('[data-testid="message-code-exec-toggle"]').last()).toContainText(
-      'Error'
-    );
+    await expect(
+      window.locator('[data-testid="message-code-exec-status-icon"][data-status="error"]').last()
+    ).toBeVisible();
     const stderrSection = window.locator('[data-testid="message-code-exec-stderr"]').last();
     await expect(stderrSection.locator('[data-streamdown="code-block-header"]')).toContainText(
       'Output'
@@ -398,6 +398,103 @@ test.describe('code_exec tool_call rendering', () => {
       errorSection.locator('[data-streamdown="code-block-actions"]')
     ).toBeVisible();
 
+    await expectNoToastError(window);
+  });
+
+  /* Preconditions: authenticated app with one visible agent
+     Action: create persisted kind:tool_call with toolName=code_exec and cancelled terminal status
+     Assertions: code_exec header shows cancelled status icon without the wrench icon
+     Exception Rationale (testing.3.13): this test validates renderer behavior for persisted historical
+     tool_call(code_exec) message and intentionally bypasses LLM transport.
+     Requirements: agents.7.4.6.4, agents.7.4.6.4.1, agents.7.4.6.4.6 */
+  test('should render cancelled status icon in code_exec header', async () => {
+    await launchWithMockLLM();
+    const agentId = (await getAgentIdsFromApi(window))[0];
+    expect(agentId).toBeTruthy();
+
+    await window.evaluate(async (id) => {
+      const api = (window as unknown as { api: any }).api;
+      const result = await api.messages.create(id, 'tool_call', {
+        data: {
+          callId: 'code-cancelled-1',
+          toolName: 'code_exec',
+          arguments: {
+            task_summary: 'Cancelled request',
+            code: "console.log('cancelled')",
+            timeout_ms: 10000,
+          },
+          output: {
+            status: 'cancelled',
+            stdout: '',
+            stderr: '',
+            stdout_truncated: false,
+            stderr_truncated: false,
+          },
+        },
+      });
+      if (!result?.success) {
+        throw new Error(result?.error || 'Failed to create cancelled code_exec tool_call');
+      }
+    }, agentId as string);
+
+    const toggle = window.locator('[data-testid="message-code-exec-toggle"]').last();
+    await expect(toggle).toBeVisible({ timeout: 5000 });
+    await expect(
+      window.locator('[data-testid="message-code-exec-status-icon"][data-status="cancelled"]').last()
+    ).toBeVisible();
+    await expect(
+      toggle.locator('svg.lucide-wrench')
+    ).toHaveCount(0);
+    await expectNoToastError(window);
+  });
+
+  /* Preconditions: authenticated app with one visible agent
+     Action: create persisted kind:tool_call with toolName=code_exec and timeout terminal status
+     Assertions: code_exec header shows timeout status icon without the wrench icon
+     Exception Rationale (testing.3.13): this test validates renderer behavior for persisted historical
+     tool_call(code_exec) message and intentionally bypasses LLM transport.
+     Requirements: agents.7.4.6.4, agents.7.4.6.4.1, agents.7.4.6.4.5 */
+  test('should render timeout status icon in code_exec header', async () => {
+    await launchWithMockLLM();
+    const agentId = (await getAgentIdsFromApi(window))[0];
+    expect(agentId).toBeTruthy();
+
+    await window.evaluate(async (id) => {
+      const api = (window as unknown as { api: any }).api;
+      const result = await api.messages.create(id, 'tool_call', {
+        data: {
+          callId: 'code-timeout-1',
+          toolName: 'code_exec',
+          arguments: {
+            task_summary: 'Timed out request',
+            code: 'while (true) {}',
+            timeout_ms: 10000,
+          },
+          output: {
+            status: 'timeout',
+            stdout: '',
+            stderr: '',
+            stdout_truncated: false,
+            stderr_truncated: false,
+          },
+        },
+      });
+      if (!result?.success) {
+        throw new Error(result?.error || 'Failed to create timeout code_exec tool_call');
+      }
+    }, agentId as string);
+
+    const toggle = window.locator('[data-testid="message-code-exec-toggle"]').last();
+    await expect(toggle).toBeVisible({ timeout: 5000 });
+    await expect(
+      window.locator('[data-testid="message-code-exec-status-icon"][data-status="timeout"]').last()
+    ).toBeVisible();
+    await expect(
+      toggle.locator('svg.lucide-clock-alert')
+    ).toHaveCount(1);
+    await expect(
+      toggle.locator('svg.lucide-wrench')
+    ).toHaveCount(0);
     await expectNoToastError(window);
   });
 

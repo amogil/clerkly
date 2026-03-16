@@ -38,7 +38,7 @@
 - ✅ Фаза 3 завершена: renderer удаляет `<!-- clerkly:title-meta: ... -->` из persisted historical tool payload text перед отображением; добавлены unit-regressions для `code_exec` и `final_answer`.
 - ✅ Обновлённые AI Elements загружены через каноническую команду `npm run ai-elements:update-all`.
 - ✅ Generic `tool_call` renderer переведён на новый AI Elements `Tool` contract (`Tool` / `ToolHeader` / `ToolContent` / `ToolInput` / `ToolOutput`).
-- ✅ `code_exec` renderer переведён на стандартную композицию `Tool` / `ToolHeader` / `ToolContent`.
+- ✅ `code_exec` renderer переведён на композицию `Tool` / custom `code_exec` header trigger / `ToolContent` с сохранением стандартной toggle hit-area.
 - ✅ `PromptInput` интегрирован с текущим renderer-конфигом: test JSX runtime и unit tests адаптированы под свежую CLI-версию без ручной правки vendored файла.
 - ✅ В renderer root добавлен единый `TooltipProvider` для обновлённых AI Elements.
 - ✅ CLI-generated vendor scope (`src/renderer/components/ui/**`, `src/renderer/components/ai-elements/**`) исключён из локального ESLint/Prettier auto-rewrite.
@@ -76,14 +76,14 @@
 
 - [x] Перевести `code_exec` renderer на стандартный `Tool` usage.
   - [x] Убрать внешний ручной `Collapsible` вокруг `Tool` в `src/renderer/components/agents/AgentMessage.tsx`.
-  - [x] Использовать `Tool` как root, стандартный `ToolHeader` как toggle и `ToolContent` как content.
+  - [x] Использовать `Tool` как root и `ToolContent` как content, сохранив стандартную toggle hit-area для `code_exec`.
   - [x] Адаптировать generic `ToolHeader` на новый contract `type/state/toolName/title`.
   - [x] Адаптировать generic `ToolInput` на новый contract `input=...`.
   - [x] Адаптировать generic `ToolOutput` на новый contract `output=...` и `errorText=...`.
   - [x] Сохранить текущее UI-поведение `code_exec`: fallback title `"Code"`, отдельные секции `stdout` / `stderr` / `error`, прозрачные surfaces и historical compatibility.
   - [x] Перевести generic `tool_call` renderer на тот же новый `Tool` contract.
   - [x] Удалить временные workaround-правки, ставшие ненужными после миграции.
-  - [x] Убрать app-owned header composition и вернуть стандартный `ToolHeader` toggle/hit area для `code_exec`.
+  - [x] Упростить `code_exec` header до custom status-icon composition без внешнего overlay, сохранив стандартную toggle hit area.
 
 - [ ] Довести app-level интеграцию обновлённого `PromptInput` и shared providers.
   - [x] Устранить TS/JSX несовместимость свежего `src/renderer/components/ai-elements/prompt-input.tsx` с текущим renderer-конфигом TypeScript.

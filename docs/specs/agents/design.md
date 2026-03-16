@@ -1548,7 +1548,9 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 - Заголовок блока использует `arguments.task_summary` как `title` для стандартного `ToolHeader`.
 - UI использует `arguments.task_summary` из persisted payload как текст заголовка; валидация и ограничения этого поля определяются спецификацией `code_exec`.
 - Для persisted historical payload без `arguments.task_summary` UI использует fallback-заголовок `"Code"`; это compatibility path для записей, созданных до введения поля `task_summary`.
-- Блок отображает persisted-статус выполнения (`running | success | error | timeout | cancelled`) через стандартный status-badge `ToolHeader`.
+- Блок отображает persisted-статус выполнения (`running | success | error | timeout | cancelled`) через `code_exec`-specific header composition: leading status icon перед текстом заголовка.
+- Стандартная иконка `wrench` в заголовке `code_exec` не используется.
+- Для persisted-статуса `running` UI показывает крутилку; для `success` — зелёную галочку; для `error` — красный крестик; для `timeout` — иконку таймаута; для `cancelled` — иконку отмены.
 - Смена статуса `running -> terminal` выполняется в том же UI-блоке (без создания отдельной terminal-карточки).
 - Для security/policy отказов используется `status=error` с соответствующим `error.code` (например, `policy_denied`).
 - При наличии отображаются `stdout`, `stderr` и structured `output.error` из persisted payload.

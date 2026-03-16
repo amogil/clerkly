@@ -148,6 +148,11 @@ describe('AgentMessage — tool_call', () => {
     expect(screen.getByTestId('message-code-exec-block')).toHaveClass('overflow-hidden');
     expect(screen.getByTestId('message-code-exec-toggle')).toBeInTheDocument();
     expect(screen.getByTestId('message-code-exec-toggle')).toHaveTextContent('Print ok to stdout');
+    expect(screen.getByTestId('message-code-exec-status-icon')).toHaveAttribute(
+      'data-status',
+      'success'
+    );
+    expect(screen.getByTestId('message-code-exec-toggle').querySelector('.lucide-wrench')).toBeNull();
     expect(screen.queryByTestId('message-code-exec-input')).not.toBeInTheDocument();
     expect(screen.queryByTestId('message-code-exec-stdout')).not.toBeInTheDocument();
     expect(screen.queryByTestId('message-code-exec-stderr')).not.toBeInTheDocument();
@@ -219,6 +224,10 @@ describe('AgentMessage — tool_call', () => {
 
     fireEvent.click(screen.getByTestId('message-code-exec-toggle'));
 
+    expect(screen.getByTestId('message-code-exec-status-icon')).toHaveAttribute(
+      'data-status',
+      'error'
+    );
     expect(screen.getByTestId('message-code-exec-stderr')).toHaveTextContent(
       'console.error fallback'
     );
@@ -226,6 +235,121 @@ describe('AgentMessage — tool_call', () => {
       'policy_denied: Tool is not allowed in sandbox allowlist.'
     );
     expect(screen.getByTestId('message-code-exec-error')).toHaveTextContent('```Error');
+  });
+
+  /* Preconditions: persisted kind:tool_call for code_exec with running status
+     Action: render AgentMessage
+     Assertions: header shows running status icon without wrench icon
+     Requirements: agents.7.4.6.4, agents.7.4.6.4.1, agents.7.4.6.4.2 */
+  it('should render in-progress status icon for running code_exec block', () => {
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'tool_call',
+          done: false,
+          payload: {
+            data: {
+              callId: 'call-code-running',
+              toolName: 'code_exec',
+              arguments: {
+                task_summary: 'Still running',
+                code: "console.log('running')",
+              },
+              output: {
+                status: 'running',
+                stdout: '',
+                stderr: '',
+                stdout_truncated: false,
+                stderr_truncated: false,
+              },
+            },
+          },
+        })}
+      />
+    );
+
+    expect(screen.getByTestId('message-code-exec-status-icon')).toHaveAttribute(
+      'data-status',
+      'running'
+    );
+    expect(screen.getByTestId('message-code-exec-toggle').querySelector('.lucide-wrench')).toBeNull();
+  });
+
+  /* Preconditions: persisted kind:tool_call for code_exec with cancelled status
+     Action: render AgentMessage
+     Assertions: header shows cancelled status icon without wrench icon
+     Requirements: agents.7.4.6.4, agents.7.4.6.4.1, agents.7.4.6.4.6 */
+  it('should render cancelled status icon for cancelled code_exec block', () => {
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'tool_call',
+          done: true,
+          payload: {
+            data: {
+              callId: 'call-code-cancelled',
+              toolName: 'code_exec',
+              arguments: {
+                task_summary: 'Cancelled run',
+                code: "console.log('cancelled')",
+              },
+              output: {
+                status: 'cancelled',
+                stdout: '',
+                stderr: '',
+                stdout_truncated: false,
+                stderr_truncated: false,
+              },
+            },
+          },
+        })}
+      />
+    );
+
+    expect(screen.getByTestId('message-code-exec-status-icon')).toHaveAttribute(
+      'data-status',
+      'cancelled'
+    );
+    expect(screen.getByTestId('message-code-exec-toggle').querySelector('.lucide-wrench')).toBeNull();
+  });
+
+  /* Preconditions: persisted kind:tool_call for code_exec with timeout status
+     Action: render AgentMessage
+     Assertions: header shows timeout status icon without wrench icon
+     Requirements: agents.7.4.6.4, agents.7.4.6.4.1, agents.7.4.6.4.5 */
+  it('should render timeout status icon for timed out code_exec block', () => {
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'tool_call',
+          done: true,
+          payload: {
+            data: {
+              callId: 'call-code-timeout',
+              toolName: 'code_exec',
+              arguments: {
+                task_summary: 'Timed out run',
+                code: "while (true) {}",
+              },
+              output: {
+                status: 'timeout',
+                stdout: '',
+                stderr: '',
+                stdout_truncated: false,
+                stderr_truncated: false,
+              },
+            },
+          },
+        })}
+      />
+    );
+
+    expect(screen.getByTestId('message-code-exec-status-icon')).toHaveAttribute(
+      'data-status',
+      'timeout'
+    );
+    expect(screen.getByTestId('message-code-exec-toggle').querySelector('.lucide-wrench')).toBeNull();
+    expect(screen.getByTestId('message-code-exec-toggle').querySelector('.lucide-clock-alert')).not.toBeNull();
   });
 
   /* Preconditions: persisted historical kind:tool_call for code_exec without task_summary
