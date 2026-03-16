@@ -1238,10 +1238,10 @@ function ActivityIndicator({ isActive }: { isActive: boolean }) {
 **Структура:**
 - `"PromptInput"` используется как корневой контейнер области ввода.
 - `"PromptInputTextarea"` отображает многострочное поле ввода сообщения.
-- Область ввода выровнена по той же визуальной ширине контентной колонки, что и `"ConversationContent"` с сообщениями; для сохранения правого visual inset используется такой же зарезервированный scrollbar gutter на wrapper области ввода.
+- Область ввода выровнена по той же визуальной ширине контентной колонки, что и `"ConversationContent"` с сообщениями; для сохранения правого visual inset используется такой же зарезервированный scrollbar gutter на wrapper области ввода, а нижний отступ от края чат-области задаётся на wrapper области ввода.
 - Usage-layer `AgentChat` усиливает default visibility unfocused input-контейнера через более заметную рамку внутреннего `"InputGroup"`, не переопределяя built-in focus ring и не добавляя отдельный фон.
 - Footer внутри `"PromptInput"` использует стандартную композицию `"PromptInputFooter"` с `"PromptInputTools"` слева и action-кнопкой `"PromptInputSubmit"` справа.
-- Shortcut hint `Press Enter to send, Shift+Enter for new line` отображается внутри `"PromptInputFooter"` в составе `"PromptInputTools"`, а сама рамка `"PromptInput"` отделена от сообщений увеличенным верхним inset (`mt-4`).
+- Shortcut hint `Press Enter to send, Shift+Enter for new line` отображается внутри `"PromptInputFooter"` в составе `"PromptInputTools"`, выравнивается по той же левой колонке, что и текст `"PromptInputTextarea"` и использует менее акцентную уменьшенную типографику; сама рамка `"PromptInput"` отделена от сообщений увеличенным верхним inset (`mt-4`).
 - Отправка сообщения и остановка активной генерации управляются из `AgentChat` через submit/stop mode.
 - `"PromptInputTextarea"` используется как controlled поле; `AgentChat` очищает controlled `value` сразу после успешного старта submit-path и восстанавливает исходный текст только если `sendMessage(...)` возвращает ошибку до передачи запроса в чат.
 

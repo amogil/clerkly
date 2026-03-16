@@ -136,8 +136,28 @@ jest.mock('../../../../src/renderer/components/ai-elements/prompt-input', () => 
   };
 
   const PromptInputBody = ({ children }: { children: React.ReactNode }) => <div>{children}</div>;
-  const PromptInputFooter = ({ children }: { children: React.ReactNode }) => <div>{children}</div>;
-  const PromptInputTools = ({ children }: { children?: React.ReactNode }) => <div>{children}</div>;
+  const PromptInputFooter = ({
+    children,
+    className,
+  }: {
+    children: React.ReactNode;
+    className?: string;
+  }) => (
+    <div data-testid="prompt-input-footer" className={className}>
+      {children}
+    </div>
+  );
+  const PromptInputTools = ({
+    children,
+    className,
+  }: {
+    children?: React.ReactNode;
+    className?: string;
+  }) => (
+    <div data-testid="prompt-input-tools" className={className}>
+      {children}
+    </div>
+  );
   const PromptInputSubmit = ({
     disabled,
     ...props
@@ -625,10 +645,14 @@ describe('AgentChat — PromptInput rendered', () => {
     render(<AgentChat {...defaultProps} />);
 
     const promptInput = screen.getByTestId('agent-prompt-input');
+    const promptInputFooter = screen.getByTestId('prompt-input-footer');
+    const promptInputTools = screen.getByTestId('prompt-input-tools');
     const shortcutHint = screen.getByText('Press Enter to send, Shift+Enter for new line');
     expect(shortcutHint).toBeInTheDocument();
     expect(promptInput).toContainElement(shortcutHint);
-    expect(shortcutHint).toHaveClass('px-0.5', 'text-xs', 'text-muted-foreground');
+    expect(promptInputFooter).not.toHaveClass('pb-5');
+    expect(promptInputTools).not.toHaveClass('items-end');
+    expect(shortcutHint).toHaveClass('pl-3', 'text-[11px]', 'text-muted-foreground/80');
   });
 
   /* Preconditions: component rendered
@@ -639,8 +663,8 @@ describe('AgentChat — PromptInput rendered', () => {
     render(<AgentChat {...defaultProps} />);
 
     expect(screen.getByTestId('agent-chat-input-area')).toHaveClass(
-      'pl-6',
-      'pr-6',
+      'px-6',
+      'pb-6',
       'overflow-y-auto',
       '[scrollbar-gutter:stable]'
     );

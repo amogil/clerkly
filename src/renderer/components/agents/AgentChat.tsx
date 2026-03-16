@@ -360,7 +360,7 @@ export function AgentChat({
         <ConversationScrollButton data-testid="scroll-to-bottom" />
       </Conversation>
       <div
-        className="flex-shrink-0 overflow-y-auto pl-6 pr-6 [scrollbar-gutter:stable]"
+        className="flex-shrink-0 overflow-y-auto px-6 pb-6 [scrollbar-gutter:stable]"
         data-testid="agent-chat-input-area"
       >
         <PromptInput
@@ -388,7 +388,7 @@ export function AgentChat({
           </PromptInputBody>
           <PromptInputFooter>
             <PromptInputTools>
-              <span className="px-0.5 text-xs text-muted-foreground">
+              <span className="pl-3 text-[11px] text-muted-foreground/80">
                 Press Enter to send, Shift+Enter for new line
               </span>
             </PromptInputTools>
