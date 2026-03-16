@@ -171,6 +171,7 @@ describe('AgentMessage — tool_call', () => {
     expect(screen.queryByTestId('message-code-exec-input')).not.toBeInTheDocument();
     expect(screen.queryByTestId('message-code-exec-stdout')).not.toBeInTheDocument();
     expect(screen.queryByTestId('message-code-exec-stderr')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('message-code-exec-error')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('message-code-exec-toggle'));
 
@@ -191,6 +192,57 @@ describe('AgentMessage — tool_call', () => {
     expect(screen.getByTestId('message-code-exec-stderr')).toHaveTextContent('warn');
     expect(screen.getByTestId('message-code-exec-stderr')).toHaveClass('bg-transparent');
     expect(screen.getByTestId('message-code-exec-stderr')).toHaveClass(
+      'message-code-exec-text-section'
+    );
+  });
+
+  /* Preconditions: persisted kind:tool_call for code_exec with terminal error payload
+     Action: render AgentMessage, then expand by toggle
+     Assertions: renderer shows separate code_exec error section from structured output.error
+     Requirements: agents.7.4.6, agents.7.4.6.5.1, agents.7.4.6.5.2, agents.7.4.7, agents.7.4.9 */
+  it('should render separate code_exec error section from structured output.error', () => {
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'tool_call',
+          done: true,
+          payload: {
+            data: {
+              callId: 'call-code-error',
+              toolName: 'code_exec',
+              arguments: {
+                task_summary: 'Attempt forbidden request',
+                code: "window.open('https://example.com')",
+              },
+              output: {
+                status: 'error',
+                stdout: '',
+                stderr: 'console.error fallback\\n',
+                stdout_truncated: false,
+                stderr_truncated: false,
+                error: {
+                  code: 'policy_denied',
+                  message: 'Tool is not allowed in sandbox allowlist.',
+                },
+              },
+            },
+          },
+        })}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('message-code-exec-toggle'));
+
+    expect(screen.getByTestId('message-code-exec-status')).toHaveTextContent('error');
+    expect(screen.getByTestId('message-code-exec-status-icon')).toHaveClass('text-red-600');
+    expect(screen.getByTestId('message-code-exec-stderr')).toHaveTextContent(
+      'console.error fallback'
+    );
+    expect(screen.getByTestId('message-code-exec-error')).toHaveTextContent(
+      'policy_denied: Tool is not allowed in sandbox allowlist.'
+    );
+    expect(screen.getByTestId('message-code-exec-error')).toHaveClass('bg-transparent');
+    expect(screen.getByTestId('message-code-exec-error')).toHaveClass(
       'message-code-exec-text-section'
     );
   });

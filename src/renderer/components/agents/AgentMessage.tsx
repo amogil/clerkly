@@ -259,11 +259,22 @@ export function AgentMessage({
         status?: unknown;
         stdout?: unknown;
         stderr?: unknown;
+        error?: unknown;
       };
       const status =
         typeof output.status === 'string' ? output.status : message.done ? 'success' : 'running';
       const stdout = typeof output.stdout === 'string' ? output.stdout : '';
       const stderr = typeof output.stderr === 'string' ? output.stderr : '';
+      const errorData =
+        output.error && typeof output.error === 'object'
+          ? (output.error as { code?: unknown; message?: unknown })
+          : null;
+      const errorCode = typeof errorData?.code === 'string' ? errorData.code : null;
+      const errorMessage = typeof errorData?.message === 'string' ? errorData.message : null;
+      const errorText =
+        errorCode && errorMessage
+          ? `${errorCode}: ${errorMessage}`
+          : (errorMessage ?? errorCode ?? null);
       const codeInput =
         toolData.arguments && typeof toolData.arguments.code === 'string'
           ? toolData.arguments.code
@@ -354,6 +365,17 @@ export function AgentMessage({
                         className="bg-transparent message-code-exec-text-section"
                       >
                         {stderr}
+                      </ToolOutput>
+                    </div>
+                  ) : null}
+                  {errorText ? (
+                    <div className="min-w-0 max-w-full overflow-hidden">
+                      <div className="mb-1 text-xs font-medium text-muted-foreground">error</div>
+                      <ToolOutput
+                        data-testid="message-code-exec-error"
+                        className="bg-transparent message-code-exec-text-section"
+                      >
+                        {errorText}
                       </ToolOutput>
                     </div>
                   ) : null}

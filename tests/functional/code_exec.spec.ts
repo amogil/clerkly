@@ -327,6 +327,74 @@ test.describe('code_exec tool_call rendering', () => {
     await expectNoToastError(window);
   });
 
+  /* Preconditions: authenticated app with one visible agent
+     Action: create persisted kind:tool_call with toolName=code_exec and terminal structured output.error, then expand collapsed block
+     Assertions: code_exec block renders a separate error section in addition to stderr
+     Exception Rationale (testing.3.13): this test validates renderer behavior for persisted historical
+     tool_call(code_exec) message and intentionally bypasses LLM transport; LLM+UI path coverage remains in
+     code_exec tool-loop scenarios below.
+     Requirements: agents.7.4.6, agents.7.4.6.5.1, agents.7.4.6.5.2, agents.7.4.7, agents.7.4.9 */
+  test('should render code_exec error section from structured output.error', async () => {
+    await launchWithMockLLM();
+    const agentId = (await getAgentIdsFromApi(window))[0];
+    expect(agentId).toBeTruthy();
+
+    await window.evaluate(async (id) => {
+      const api = (window as unknown as { api: any }).api;
+      const result = await api.messages.create(id, 'tool_call', {
+        data: {
+          callId: 'code-error-1',
+          toolName: 'code_exec',
+          arguments: {
+            task_summary: 'Attempt forbidden request',
+            code: "window.open('https://example.com')",
+            timeout_ms: 10000,
+          },
+          output: {
+            status: 'error',
+            stdout: '',
+            stderr: 'console.error fallback\\n',
+            stdout_truncated: false,
+            stderr_truncated: false,
+            error: {
+              code: 'policy_denied',
+              message: 'Tool is not allowed in sandbox allowlist.',
+            },
+          },
+        },
+      });
+      if (!result?.success) {
+        throw new Error(result?.error || 'Failed to create code_exec tool_call with output.error');
+      }
+    }, agentId as string);
+
+    await expect(window.locator('[data-testid="message-code-exec-block"]').last()).toBeVisible({
+      timeout: 5000,
+    });
+    await expect(window.locator('[data-testid="message-code-exec-error"]')).toHaveCount(0);
+
+    await window.locator('[data-testid="message-code-exec-toggle"]').last().click();
+
+    await expect(window.locator('[data-testid="message-code-exec-status"]').last()).toHaveText(
+      'error'
+    );
+    await expect(window.locator('[data-testid="message-code-exec-stderr"]').last()).toContainText(
+      'console.error fallback'
+    );
+    await expect(window.locator('[data-testid="message-code-exec-error"]').last()).toContainText(
+      'policy_denied: Tool is not allowed in sandbox allowlist.'
+    );
+
+    const errorClassName = await window
+      .locator('[data-testid="message-code-exec-error"]')
+      .last()
+      .evaluate((el) => el.className);
+    expect(errorClassName).toContain('bg-transparent');
+    expect(errorClassName).toContain('message-code-exec-text-section');
+
+    await expectNoToastError(window);
+  });
+
   /* Preconditions: authenticated app with one visible agent and historical code_exec payload without task_summary
      Action: create persisted kind:tool_call with toolName=code_exec and terminal output
      Assertions: legacy persisted payload falls back to title "Code" for backward compatibility

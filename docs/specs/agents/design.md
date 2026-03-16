@@ -1613,13 +1613,15 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 - Блок отображает persisted-статус выполнения (`running | success | error | timeout | cancelled`).
 - Смена статуса `running -> terminal` выполняется в том же UI-блоке (без создания отдельной terminal-карточки).
 - Для security/policy отказов используется `status=error` с соответствующим `error.code` (например, `policy_denied`).
-- При наличии отображаются `stdout` и `stderr` из persisted payload.
-- Для явно выделенных text/code секций tool-блоков (`Input`, `Output`, `JavaScript`, `stdout`, `stderr`) применяется no-wrap + horizontal scroll (`white-space: pre`, `overflow-x: auto`).
+- При наличии отображаются `stdout`, `stderr` и structured `output.error` из persisted payload.
+- Structured `output.error` рендерится как отдельная секция `error` внутри того же `code_exec` блока; UI не смешивает это содержимое со `stderr`.
+- Содержимое секции `error` строится из persisted `output.error.code` и `output.error.message` в одном человекочитаемом diagnostic-text блоке.
+- Для явно выделенных text/code секций tool-блоков (`Input`, `Output`, `JavaScript`, `stdout`, `stderr`, `error`) применяется no-wrap + horizontal scroll (`white-space: pre`, `overflow-x: auto`).
 - Секция `JavaScript` рендерится через общий `"MessageResponse"` и fenced markdown блок `javascript`, чтобы использовать стандартный рендерер code block и его встроенную подсветку синтаксиса.
 - Для input-кода `code_exec` не рендерится отдельный верхний label `JavaScript` и не используется внешний wrapper-box; в UI остается только сам встроенный markdown code block.
 - Для input-кода `code_exec` используется тот же контейнер `"ToolInput"`, что и стандартные секции инструмента; CSS scope `message-response-code-exec-input` снимает внутренние рамки `data-streamdown='code-block'`, чтобы не было вложенной (двойной) геометрии.
 - Заголовок `tool_call(code_exec)` рендерится с `items-center`; отступ заголовка переключается по состоянию collapsible (`collapsed -> mb-0`, `expanded -> mb-2`), чтобы в свернутом виде контент оставался вертикально центрированным.
-- Для `tool_call(code_exec)` transparent-surface применяется ко всему блоку: корневой контейнер `Tool`, status-badge, секции `JavaScript`, `stdout`, `stderr`.
+- Для `tool_call(code_exec)` transparent-surface применяется ко всему блоку: корневой контейнер `Tool`, status-badge, секции `JavaScript`, `stdout`, `stderr`, `error`.
 - Рендер строится только по persisted snapshot (`message.created`/`message.updated`) без локальной реконструкции результата.
 
 ```tsx
@@ -2001,7 +2003,7 @@ import { Logo } from '../logo';
 | `tests/unit/agents/AgentTitleNormalization.test.ts` | llm-integration.16.8, llm-integration.16.9 |
 | `tests/unit/agents/AgentTitleAntiFlap.test.ts` | llm-integration.16.10 |
 | `tests/unit/components/ai-elements/prompt-input.test.tsx` | agents.4.2-4.7, agents.4.24 |
-| `tests/unit/components/agents/AgentMessage.test.tsx` | agents.4.10, agents.4.11.1, agents.4.11.3-4.11.5, agents.7.4.5-7.4.7, llm-integration.2, llm-integration.7 |
+| `tests/unit/components/agents/AgentMessage.test.tsx` | agents.4.10, agents.4.11.1, agents.4.11.3-4.11.5, agents.7.4.5-7.4.9, llm-integration.2, llm-integration.7 |
 | `tests/unit/components/agents/AgentReasoningTrigger.test.tsx` | agents.4.11, agents.4.11.2, llm-integration.2, llm-integration.7.2 |
 | `tests/unit/renderer/IPCChatTransport.test.ts` | llm-integration.2, llm-integration.7 |
 | `tests/unit/hooks/useAgentChat.test.ts` | agents.4.24, llm-integration.8.7 |
@@ -2024,7 +2026,7 @@ import { Logo } from '../logo';
 | `tests/functional/agent-status-indicators.spec.ts` | agents.6 | - |
 | `tests/functional/agent-status-all-places.spec.ts` | agents.6.1-6.5 | Проверка консистентного отображения каждого статуса (`new`, `in-progress`, `awaiting-response`, `error`, `completed`) в Header, Agent List tooltip и All Agents |
 | `tests/functional/message-format.spec.ts` | agents.7 | - |
-| `tests/functional/code_exec.spec.ts` | agents.7.4.5-7.4.9, agents.4.23 | Отдельные сценарии для `tool_call(code_exec)`: header/icon/status, вертикальное выравнивание в collapsed, JS highlighting, transparent sections и width/overflow |
+| `tests/functional/code_exec.spec.ts` | agents.7.4.5-7.4.9, agents.4.23 | Отдельные сценарии для `tool_call(code_exec)`: header/icon/status, отдельная `error` section из `output.error`, вертикальное выравнивание в collapsed, JS highlighting, transparent sections и width/overflow |
 | `tests/functional/llm-chat.spec.ts` | agents.4.11, agents.4.11.2, agents.7.7, agents.4.24, agents.14.1-14.6, llm-integration.2, llm-integration.7.2, llm-integration.8.7, llm-integration.16 | Включает сценарий deferred rename после non-meaningful triggering turn при наличии meaningful user-message в истории |
 | `tests/functional/agent-status-calculation.spec.ts` | agents.9 | - |
 | `tests/functional/agent-data-isolation.spec.ts` | agents.10 | - |

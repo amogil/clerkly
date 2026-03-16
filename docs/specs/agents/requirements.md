@@ -548,7 +548,7 @@
 
 7.4.5. `tool_call` с `toolName = "code_exec"` НЕ ДОЛЖЕН отображаться как обычный текстовый bubble (`user`/`llm`); для него ДОЛЖЕН использоваться специализированный блок выполнения кода.
 
-7.4.6. Блок `tool_call(code_exec)` ДОЛЖЕН отображать статус выполнения и детали результата (включая `stdout`/`stderr` при наличии) на основе persisted payload.
+7.4.6. Блок `tool_call(code_exec)` ДОЛЖЕН отображать статус выполнения и детали результата (включая `stdout`/`stderr` и structured `error` при наличии) на основе persisted payload.
 
 7.4.6.1. Для визуализации `tool_call(code_exec)` ДОЛЖЕН использоваться компонент AI Elements `Tool` (см. [https://elements.ai-sdk.dev/components/tool](https://elements.ai-sdk.dev/components/tool)).
 
@@ -563,7 +563,11 @@
 7.4.6.5. В блоке `tool_call(code_exec)` прозрачный фон (`transparent`) ДОЛЖЕН использоваться для:
   - корневого контейнера блока,
   - status-badge,
-  - секций `JavaScript`, `stdout` и `stderr`.
+  - секций `JavaScript`, `stdout`, `stderr` и `error`.
+
+7.4.6.5.1. ЕСЛИ persisted payload `tool_call(code_exec)` содержит `output.error`, ТО UI ДОЛЖЕН отображать отдельную секцию `error`, а НЕ скрывать structured-ошибку внутри badge статуса или смешивать её с `stderr`.
+
+7.4.6.5.2. Секция `error` в `tool_call(code_exec)` ДОЛЖНА отображать человекочитаемое диагностическое содержимое из persisted `output.error`.
 
 7.4.6.6. Статус-badge компонента `Tool` (включая блок `tool_call(code_exec)`) ДОЛЖЕН содержать иконку статуса, соответствующую persisted-статусу выполнения:
   - `running` → `Loader2` (с анимацией вращения),
@@ -591,7 +595,8 @@
   - `data-testid="message-code-exec-status-icon"` для иконки статуса,
   - `data-testid="message-code-exec-input"` для секции JavaScript,
   - `data-testid="message-code-exec-stdout"` для секции stdout,
-  - `data-testid="message-code-exec-stderr"` для секции stderr.
+  - `data-testid="message-code-exec-stderr"` для секции stderr,
+  - `data-testid="message-code-exec-error"` для секции error.
 
 7.4.8. КОГДА в одном run присутствуют и `kind: llm`, и `kind: tool_call`, UI ДОЛЖЕН отображать их по persisted-порядку шагов: pre-tool `kind: llm` (включая reasoning-фазу) -> `kind: tool_call` (`running`) -> post-tool `kind: llm`; terminal-обновление `tool_call` МОЖЕТ приходить позже и ДОЛЖНО применяться в том же блоке.
 
@@ -605,7 +610,7 @@
 
 7.4.8.5. Для вычисления persisted-порядка model-run UI ДОЛЖЕН использовать поля snapshot-сообщения `runId/attemptId/sequence` (проекция колонок `messages.run_id/attempt_id/sequence`) и НЕ ДОЛЖЕН читать порядок из `payload_json`.
 
-7.4.9. В явно выделенных text/code секциях tool-блоков (`Input`, `Output`, `JavaScript`, `stdout`, `stderr`) длинные строки НЕ ДОЛЖНЫ переноситься по ширине секции и ДОЛЖНЫ отображаться через горизонтальный скролл внутри соответствующего блока.
+7.4.9. В явно выделенных text/code секциях tool-блоков (`Input`, `Output`, `JavaScript`, `stdout`, `stderr`, `error`) длинные строки НЕ ДОЛЖНЫ переноситься по ширине секции и ДОЛЖНЫ отображаться через горизонтальный скролл внутри соответствующего блока.
 
 7.5. Сообщение `user` ДОЛЖНО содержать:
    ```json
@@ -665,6 +670,7 @@
 - `tests/functional/llm-chat.spec.ts` - "should reject model response containing more than one tool_call and run repair"
 - `tests/functional/llm-chat.spec.ts` - "should render final_answer after all non-final tool steps of successful attempt"
 - `tests/functional/code_exec.spec.ts` - "should render tool_call(code_exec) message block with Code header/icon/status and transparent streams"
+- `tests/functional/code_exec.spec.ts` - "should render code_exec error section from structured output.error"
 - `tests/functional/code_exec.spec.ts` - "should render JavaScript syntax highlighting in code_exec input section"
 - `tests/functional/code_exec.spec.ts` - "should keep code_exec block within chat width with internal horizontal scroll"
 
