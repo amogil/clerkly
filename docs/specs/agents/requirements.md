@@ -189,14 +189,6 @@
 
 4.7. КОГДА текст превышает максимальную высоту поля ввода, ТО внутри поля ввода ДОЛЖЕН использоваться вертикальный скролл; КОГДА текст не превышает этот предел, ТО вертикальный скролл НЕ ДОЛЖЕН отображаться.
 
-4.7.1. КОГДА активируется чат агента (выбор агента, возврат из AllAgents, первая загрузка), ТО фокус ввода ДОЛЖЕН автоматически устанавливаться на поле ввода сообщения
-
-4.7.2. Автофокус ДОЛЖЕН срабатывать при:
-   - Клике на иконку агента в списке
-   - Возврате из AllAgents после выбора агента
-   - Первой загрузке приложения (на автоматически созданном агенте)
-   - Создании нового агента через кнопку "+"
-
 4.8. Сообщения ДОЛЖНЫ отображаться в хронологическом порядке
 
 4.9. Сообщения пользователя ДОЛЖНЫ отображаться справа с серым полупрозрачным фоном (bg-secondary/70), тонкой серой рамкой (border border-border) и скругленными углами (rounded-2xl)
@@ -336,7 +328,6 @@
 - `tests/functional/auto-expanding-textarea.spec.ts` - "should show scrollbar when content exceeds max height"
 - `tests/functional/auto-expanding-textarea.spec.ts` - "should hide scrollbar for short content"
 - `tests/functional/auto-expanding-textarea.spec.ts` - "should restore short-content scrolling state after content is cleared"
-- `tests/functional/input-autofocus.spec.ts` - "Functional tests for input autofocus on agent activation"
 - `tests/functional/empty-state-placeholder.spec.ts` - "should display empty state for new agent"
 - `tests/functional/empty-state-placeholder.spec.ts` - "should show 4 prompt suggestions"
 - `tests/functional/empty-state-placeholder.spec.ts` - "should send message on prompt click"
@@ -1006,7 +997,7 @@
 ### React хуки
 - `useState` - управление состоянием компонента
 - `useRef` - ссылки на DOM элементы (chatListRef)
-- `useEffect` - побочные эффекты (resize listener, autofocus)
+- `useEffect` - побочные эффекты (resize listener)
 
 ## Ограничения
 

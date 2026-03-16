@@ -1252,35 +1252,6 @@ function ActivityIndicator({ isActive }: { isActive: boolean }) {
 - Режим `stop` (`agent.status === 'in-progress'`) — кнопка всегда активна, независимо от текста в поле ввода.
 - Режим `send` (любой статус кроме `in-progress`) — кнопка активна только если `taskInput.trim().length > 0`.
 
-#### Автофокус на поле ввода
-
-**Requirements:** agents.4.7.1, agents.4.7.2
-
-При активации чата агента фокус автоматически устанавливается на поле ввода для улучшения UX.
-
-**Реализация в Agents компоненте:**
-
-```typescript
-const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-
-// Auto-focus input when active agent changes
-// Requirements: agents.4.7.1, agents.4.7.2
-useEffect(() => {
-  if (activeAgent) {
-    // Small delay to ensure DOM is ready
-    setTimeout(() => {
-      textareaRef.current?.focus();
-    }, 100);
-  }
-}, [activeAgent?.agentId]);
-```
-
-**Сценарии автофокуса:**
-1. Клик на иконку агента в списке → меняется `activeAgent` → срабатывает `useEffect` → фокус
-2. Возврат из AllAgents → меняется `activeAgent` → срабатывает `useEffect` → фокус
-3. Первая загрузка → устанавливается первый агент → срабатывает `useEffect` → фокус
-4. Создание нового агента → новый агент становится активным → срабатывает `useEffect` → фокус
-
 #### Автоскролл к последнему сообщению
 
 **Requirements:** agents.4.13
@@ -2003,7 +1974,6 @@ import { Logo } from '../logo';
 | `tests/functional/agent-list-initial-animation.spec.ts` | agents.1.4.4 | - |
 | `tests/functional/agent-reordering.spec.ts` | agents.1.3, 1.4 | - |
 | `tests/functional/agent-date-update.spec.ts` | agents.1.4, 8.1 | - |
-| `tests/functional/input-autofocus.spec.ts` | agents.4.7.1, 4.7.2 | - |
 | `tests/functional/header-layout.spec.ts` | agents.8.3 | - |
 
 #### Статус покрытия функциональными тестами
@@ -2088,7 +2058,6 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 | agents.4.11 | ✓ | ✓ |
 | agents.4.11.1 | ✓ | ✓ |
 | agents.4.11.2 | ✓ | ✓ |
-| agents.4.7.1-4.7.2 (autofocus) | - | ✓ |
 | agents.4.13.1-4.13.6 (autoscroll) | ✓ | ✓ |
 | agents.4.13.4-4.13.6 (scrollbar) | - | Manual |
 | agents.4.14.1, agents.4.14.2, agents.4.14.3, agents.4.14.4, agents.4.14.5, agents.4.14.6 (scroll position) | ✓ | ✓ |

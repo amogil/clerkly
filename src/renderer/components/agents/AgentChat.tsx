@@ -123,21 +123,9 @@ export function AgentChat({
   const { rawMessages, sendMessage, cancelCurrentRequest, isLoading, isStreaming } = useAgentChat(
     agent.id
   );
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const stickContextRef = useRef<StickToBottomContext | null>(null);
   const hasReachedStartupSettledRef = useRef(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
-
-  // Autofocus textarea when this chat becomes active (agents.4.7.1)
-  useEffect(() => {
-    if (!isActive) return;
-    const timeouts = [0, 100, 300, 600].map((delay) =>
-      window.setTimeout(() => textareaRef.current?.focus(), delay)
-    );
-    return () => {
-      timeouts.forEach((timeoutId) => window.clearTimeout(timeoutId));
-    };
-  }, [isActive]);
 
   // Notify parent when loading state changes (agents.13.2, agents.13.10)
   useEffect(() => {
@@ -329,7 +317,6 @@ export function AgentChat({
         <PromptInput className="mt-2" onSubmit={handleSubmit}>
           <PromptInputBody>
             <PromptInputTextarea
-              ref={textareaRef}
               data-testid="auto-expanding-textarea"
               placeholder="Ask, reply, or give command..."
             />

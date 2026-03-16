@@ -1,7 +1,7 @@
 /**
  * @jest-environment jsdom
  */
-// Requirements: agents.4.3, agents.4.4, agents.4.5, agents.4.7.1
+// Requirements: agents.4.3, agents.4.4, agents.4.5, agents.4.6, agents.4.7
 import React, { createRef } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
@@ -127,7 +127,7 @@ describe('PromptInput', () => {
   /* Preconditions: PromptInputTextarea rendered with ref
      Action: inspect ref target
      Assertions: ref points to textarea element
-     Requirements: agents.4.7.1 */
+     Requirements: agents.4.5 */
   it('should forward textarea ref', () => {
     const ref = createRef<HTMLTextAreaElement>();
 
@@ -211,7 +211,7 @@ describe('PromptInput', () => {
   /* Preconditions: PromptInput rendered with empty textarea
      Action: focus textarea without typing
      Assertions: textarea gets baseline non-collapsed height
-     Requirements: agents.4.5, agents.4.7.1 */
+     Requirements: agents.4.5, agents.4.6 */
   it('should keep baseline height on focus before first input', () => {
     render(
       <PromptInput onSubmit={jest.fn()}>

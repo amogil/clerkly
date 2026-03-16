@@ -92,9 +92,9 @@
   - [x] Добавить единый `TooltipProvider` в renderer root приложения вместо локальных/дублирующих provider-обёрток.
   - [ ] Удалить app-owned textarea auto-resize из `AgentChat` и опереться на встроенный sizing/scroll contract `PromptInputTextarea`.
   - [ ] Убедиться, что после добавления глобального `TooltipProvider` существующие tooltip-потребители (включая sidebar и AI Elements) не конфликтуют между собой.
-  - [ ] Удалить кастомную runtime-логику автофокуса textarea при активации чата/переключении окна.
-  - [ ] Синхронизировать `docs/specs/agents/requirements.md` и `docs/specs/agents/design.md`, чтобы автофокус не оставался частью целевого UI-контракта.
-  - [ ] Обновить или удалить `tests/functional/input-autofocus.spec.ts` и связанные coverage-ссылки после удаления автофокуса.
+  - [x] Удалить кастомную runtime-логику автофокуса textarea при активации чата/переключении окна.
+  - [x] Синхронизировать `docs/specs/agents/requirements.md` и `docs/specs/agents/design.md`, чтобы автофокус не оставался частью целевого UI-контракта.
+  - [x] Обновить или удалить `tests/functional/input-autofocus.spec.ts` и связанные coverage-ссылки после удаления автофокуса.
   - [ ] Завершить cleanup renderer-layer после миграции `PromptInput`: убрать legacy hooks/таймеры в `AgentChat`, которые дублируют встроенный behavior библиотеки.
 
 - [x] Синхронизировать tests под новый `Tool` contract.
