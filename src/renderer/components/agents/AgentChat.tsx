@@ -387,8 +387,8 @@ export function AgentChat({
             />
           </PromptInputBody>
           <PromptInputFooter>
-            <PromptInputTools>
-              <span className="pl-3 text-[11px] text-muted-foreground/80">
+            <PromptInputTools className="items-end">
+              <span className="translate-y-3 text-[11px] text-muted-foreground/80">
                 Press Enter to send, Shift+Enter for new line
               </span>
             </PromptInputTools>

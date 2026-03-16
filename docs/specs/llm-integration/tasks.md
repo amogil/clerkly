@@ -43,6 +43,10 @@
 - ✅ В renderer root добавлен единый `TooltipProvider` для обновлённых AI Elements.
 - ✅ CLI-generated vendor scope (`src/renderer/components/ui/**`, `src/renderer/components/ai-elements/**`) исключён из локального ESLint/Prettier auto-rewrite.
 - ✅ User-facing contract textarea sizing возвращён на уровень требований без хрупких пиксельных значений; targeted functional regressions на current behavior обновлены.
+- ✅ Prompt input area приведена к итоговому UI-контракту: внешний horizontal/vertical inset задаётся wrapper `agent-chat-input-area`, hint `Press Enter to send, Shift+Enter for new line` живёт внутри `PromptInputFooter`, выровнен по колонке текста textarea и использует уменьшенную менее акцентную типографику.
+- ✅ Prompt input submit/reset contract доведён до целевого состояния: controlled textarea очищается сразу после успешного старта submit-path и восстанавливает исходный текст только если отправка не передана в чат.
+- ✅ `code_exec` header использует status-icon-first contract без `wrench`: иконка берётся напрямую из persisted source status (`running`, `success`, `error`, `timeout`, `cancelled`), при этом `running` использует тот же фиолетовый акцент, что и action buttons prompt area.
+- ✅ `code_exec` content renderer частично возвращён к целевому app-owned виду поверх standard `Tool`: секция исходного кода отображается как один `JavaScript` code block с видимой JS-подсветкой, а `Output`/`Error` секции используют standard text code-block control с внутренними заголовками.
 
 ### В работе
 - 🔄 Фаза 4: завершение migration-follow-up после обновления AI Elements, упрощение оставшегося custom UI слоя и точечная валидация.
@@ -72,7 +76,7 @@
   - [x] Синхронизировать `src/components/ai-elements/tool.tsx` с тем же contract.
   - [x] Зафиксировать policy для CLI-generated renderer vendor directories: `src/renderer/components/ui/**` и `src/renderer/components/ai-elements/**` не должны автоматически переписываться локальными ESLint/Prettier правилами репо.
   - [x] Зафиксировать в `docs/specs/agents/design.md`, что `code_exec` использует стандартный `Tool` collapsible pattern, а не внешний ручной wrapper.
-  - [ ] После массового CLI-обновления проверить build-интеграцию обновлённого `Tool` с текущим renderer usage и устранить contract drift до зелёного `npm run typecheck`.
+  - [x] После массового CLI-обновления проверить build-интеграцию обновлённого `Tool` с текущим renderer usage и устранить contract drift до зелёного `npm run typecheck`.
 
 - [x] Перевести `code_exec` renderer на стандартный `Tool` usage.
   - [x] Убрать внешний ручной `Collapsible` вокруг `Tool` в `src/renderer/components/agents/AgentMessage.tsx`.
@@ -89,15 +93,17 @@
   - [x] Устранить TS/JSX несовместимость свежего `src/renderer/components/ai-elements/prompt-input.tsx` с текущим renderer-конфигом TypeScript.
   - [x] Проверить и зафиксировать app-level setup, требуемый новым `PromptInput`/`Message` stack после CLI-обновления.
   - [x] Добавить единый `TooltipProvider` в renderer root приложения вместо локальных/дублирующих provider-обёрток.
-  - [ ] Убедиться, что после добавления глобального `TooltipProvider` существующие tooltip-потребители (включая sidebar и AI Elements) не конфликтуют между собой.
+  - [x] Убедиться, что после добавления глобального `TooltipProvider` существующие tooltip-потребители (включая sidebar и AI Elements) не конфликтуют между собой.
   - [x] Удалить кастомную runtime-логику автофокуса textarea при активации чата/переключении окна.
   - [x] Синхронизировать `docs/specs/agents/requirements.md` и `docs/specs/agents/design.md`, чтобы автофокус не оставался частью целевого UI-контракта.
   - [x] Обновить или удалить `tests/functional/input-autofocus.spec.ts` и связанные coverage-ссылки после удаления автофокуса.
   - [x] Выровнять input area по визуальной ширине контентной колонки сообщений и вынести shortcut hint под рамку поля ввода с симметричным вертикальным inset.
+  - [x] Перенести shortcut hint внутрь `PromptInputFooter` и довести его итоговый layout: hint выровнен по левой текстовой колонке, визуально менее акцентен и использует footer-level positioning вместо внешней подписи под рамкой.
   - [x] Зафиксировать продуктовый textarea sizing contract: две видимые строки по умолчанию, поэтапный рост до пяти строк и внутренний scroll начиная с шестой строки.
   - [x] Реализовать app-owned textarea sizing в `AgentChat`, не вмешиваясь в keyboard contract, submit/reset flow и остальное поведение `PromptInput`.
   - [x] Очистить controlled `PromptInputTextarea` сразу после успешного старта submit-path и восстанавливать текст только при ошибке отправки до передачи запроса в чат.
   - [x] Завершить cleanup renderer-layer после миграции `PromptInput`: убрать legacy hooks/таймеры в `AgentChat`, оставив только финальный sizing/layout слой и текущий controlled text state.
+  - [x] Вернуть prompt area видимый unfocused border и сохранить существующую фиолетовую focus-рамку без дополнительного фонового fill.
 
 - [x] Синхронизировать tests под новый `Tool` contract.
   - [x] Обновить `tests/unit/components/agents/AgentMessage.test.tsx`.
@@ -126,8 +132,8 @@
 
 #### Фаза 7: Валидация
 
-- [ ] Прогнать `npm run rebuild:node`.
-- [ ] Прогнать `npm run typecheck`.
-- [ ] Прогнать релевантные unit tests по `MainPipeline`, `AgentMessage`, `PromptInput`, провайдерам при необходимости.
-- [ ] Прогнать `npm run validate`.
+- [x] Прогнать `npm run rebuild:node`.
+- [x] Прогнать `npm run typecheck`.
+- [x] Прогнать релевантные unit tests по `MainPipeline`, `AgentMessage`, `PromptInput`, провайдерам при необходимости.
+- [x] Прогнать `npm run validate`.
 - [ ] После завершения запросить подтверждение на functional tests.

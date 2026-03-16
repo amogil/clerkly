@@ -651,8 +651,9 @@ describe('AgentChat — PromptInput rendered', () => {
     expect(shortcutHint).toBeInTheDocument();
     expect(promptInput).toContainElement(shortcutHint);
     expect(promptInputFooter).not.toHaveClass('pb-5');
-    expect(promptInputTools).not.toHaveClass('items-end');
-    expect(shortcutHint).toHaveClass('pl-3', 'text-[11px]', 'text-muted-foreground/80');
+    expect(promptInputTools).toHaveClass('items-end');
+    expect(shortcutHint).toHaveClass('translate-y-3', 'text-[11px]', 'text-muted-foreground/80');
+    expect(shortcutHint).not.toHaveClass('pl-3');
   });
 
   /* Preconditions: component rendered
