@@ -582,6 +582,8 @@
 
 7.4.6.9. КОГДА блок `tool_call(code_exec)` находится в свернутом состоянии, ТО контент заголовка (`Code`, status-badge и toggle) ДОЛЖЕН быть выровнен по вертикальному центру; при этом нижний отступ заголовка ДОЛЖЕН отсутствовать. КОГДА блок раскрыт, ТО нижний отступ заголовка ДОЛЖЕН быть восстановлен.
 
+7.4.6.9.1. КОГДА блок `tool_call(code_exec)` свернут, ТО скрытый контент (`JavaScript`, `stdout`, `stderr`, `error` и вложенные controls markdown code block) НЕ ДОЛЖЕН оставаться интерактивным и НЕ ДОЛЖЕН перехватывать pointer events, предназначенные для header/toggle.
+
 7.4.6.10. Для входного кода `tool_call(code_exec)` ДОЛЖЕН отображаться только встроенный markdown code block (с его собственным language-header); дополнительный верхний label `JavaScript` и отдельный внешний контейнер-рамка вокруг этого блока НЕ ДОЛЖНЫ рендериться.
 
 7.4.6.11. Для входного кода `tool_call(code_exec)` ДОЛЖЕН использоваться тот же контейнерный frame, что и у `stdout`/`stderr`; дополнительная внутренняя рамка встроенного markdown code block НЕ ДОЛЖНА рендериться.
@@ -671,6 +673,7 @@
 - `tests/functional/llm-chat.spec.ts` - "should render final_answer after all non-final tool steps of successful attempt"
 - `tests/functional/code_exec.spec.ts` - "should render tool_call(code_exec) message block with Code header/icon/status and transparent streams"
 - `tests/functional/code_exec.spec.ts` - "should render code_exec error section from structured output.error"
+- `tests/functional/code_exec.spec.ts` - "should keep collapsed code_exec content non-interactive after reopen cycle"
 - `tests/functional/code_exec.spec.ts` - "should render JavaScript syntax highlighting in code_exec input section"
 - `tests/functional/code_exec.spec.ts` - "should keep code_exec block within chat width with internal horizontal scroll"
 

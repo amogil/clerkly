@@ -2,16 +2,18 @@
 
 import React from 'react';
 import type { ComponentProps, HTMLAttributes } from 'react';
+import { Collapsible, CollapsibleContent } from '../ui/collapsible';
 import { cn } from '@/lib/utils';
 
-export type ToolProps = HTMLAttributes<HTMLDivElement>;
+export type ToolProps = ComponentProps<typeof Collapsible>;
 
-export const Tool = ({ className, ...props }: ToolProps) => (
-  <div
+export const Tool = ({ className, defaultOpen = true, ...props }: ToolProps) => (
+  <Collapsible
     className={cn(
       'w-full min-w-0 max-w-full rounded-xl border border-border/70 bg-muted/20 p-3 text-sm',
       className
     )}
+    defaultOpen={defaultOpen}
     {...props}
   />
 );
@@ -22,10 +24,10 @@ export const ToolHeader = ({ className, ...props }: ToolHeaderProps) => (
   <div className={cn('mb-2 flex items-center justify-between gap-3', className)} {...props} />
 );
 
-export type ToolContentProps = HTMLAttributes<HTMLDivElement>;
+export type ToolContentProps = ComponentProps<typeof CollapsibleContent>;
 
 export const ToolContent = ({ className, ...props }: ToolContentProps) => (
-  <div className={cn('grid min-w-0 gap-2', className)} {...props} />
+  <CollapsibleContent className={cn('grid min-w-0 gap-2', className)} {...props} />
 );
 
 export type ToolInputProps = ComponentProps<'pre'>;

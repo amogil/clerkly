@@ -335,7 +335,7 @@ export function AgentMessage({
               </ToolHeader>
               <CollapsibleContent
                 data-testid="message-code-exec-content"
-                className="min-w-0 max-w-full overflow-hidden"
+                className="min-w-0 max-w-full overflow-hidden data-[state=closed]:pointer-events-none"
               >
                 <ToolContent className="min-w-0 max-w-full grid-cols-1 overflow-hidden">
                   <ToolInput

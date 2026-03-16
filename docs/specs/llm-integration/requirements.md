@@ -514,9 +514,9 @@
 
 11.5.1. КОГДА `tool_call` завершён terminal-результатом с любым статусом (`success | error | timeout | cancelled`), ТО `MainPipeline` ДОЛЖЕН немедленно передать этот результат в следующий шаг модели.
 
-11.5.2. Система НЕ ДОЛЖНА использовать скрытый provider-level лимит числа шагов tool-loop, который завершает turn до `final_answer` или ошибки, если такой лимит не зафиксирован отдельным явным продуктовым требованием.
+11.5.2. Система НЕ ДОЛЖНА использовать скрытый provider-level лимит числа шагов tool-loop; любой guard на число шагов ДОЛЖЕН быть явно задокументирован в `llm-integration` как safety bound runtime-слоя.
 
-11.5.3. КОГДА SDK-managed tool-loop выполняется внутри provider-layer, ТО semantic stop condition ДОЛЖЕН быть привязан к вызову `final_answer`, чтобы `Vercel AI SDK` продолжал шаги `model -> tool -> model` до `final_answer` или ошибки, а НЕ останавливался после первого tool-result.
+11.5.3. КОГДА SDK-managed tool-loop выполняется внутри provider-layer, ТО provider-layer ДОЛЖЕН обеспечивать continuation после terminal `tool_result` до доменного завершения turn (`final_answer`, ошибка, abort/cancel`) в пределах явно задокументированного safety bound, а НЕ останавливаться после первого tool-result без такого задокументированного guard.
 
 11.6. Runtime-поток tool-calling НЕ ДОЛЖЕН требовать отдельного realtime-сигнала; обработка ДОЛЖНА строиться по persisted `message.created`/`message.updated`.
 

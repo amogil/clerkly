@@ -1621,6 +1621,7 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 - Для input-кода `code_exec` не рендерится отдельный верхний label `JavaScript` и не используется внешний wrapper-box; в UI остается только сам встроенный markdown code block.
 - Для input-кода `code_exec` используется тот же контейнер `"ToolInput"`, что и стандартные секции инструмента; CSS scope `message-response-code-exec-input` снимает внутренние рамки `data-streamdown='code-block'`, чтобы не было вложенной (двойной) геометрии.
 - Заголовок `tool_call(code_exec)` рендерится с `items-center`; отступ заголовка переключается по состоянию collapsible (`collapsed -> mb-0`, `expanded -> mb-2`), чтобы в свернутом виде контент оставался вертикально центрированным.
+- `CollapsibleContent` для `tool_call(code_exec)` получает closed-state guard: при `data-state='closed'` контент деинтерактивируется (`pointer-events: none`), чтобы скрытые внутренние controls не могли перехватывать клики по header/toggle после цикла `expand -> collapse`.
 - Для `tool_call(code_exec)` transparent-surface применяется ко всему блоку: корневой контейнер `Tool`, status-badge, секции `JavaScript`, `stdout`, `stderr`, `error`.
 - Рендер строится только по persisted snapshot (`message.created`/`message.updated`) без локальной реконструкции результата.
 
@@ -2003,7 +2004,7 @@ import { Logo } from '../logo';
 | `tests/unit/agents/AgentTitleNormalization.test.ts` | llm-integration.16.8, llm-integration.16.9 |
 | `tests/unit/agents/AgentTitleAntiFlap.test.ts` | llm-integration.16.10 |
 | `tests/unit/components/ai-elements/prompt-input.test.tsx` | agents.4.2-4.7, agents.4.24 |
-| `tests/unit/components/agents/AgentMessage.test.tsx` | agents.4.10, agents.4.11.1, agents.4.11.3-4.11.5, agents.7.4.5-7.4.9, llm-integration.2, llm-integration.7 |
+| `tests/unit/components/agents/AgentMessage.test.tsx` | agents.4.10, agents.4.11.1, agents.4.11.3-4.11.5, agents.7.4.5-7.4.9.1, llm-integration.2, llm-integration.7 |
 | `tests/unit/components/agents/AgentReasoningTrigger.test.tsx` | agents.4.11, agents.4.11.2, llm-integration.2, llm-integration.7.2 |
 | `tests/unit/renderer/IPCChatTransport.test.ts` | llm-integration.2, llm-integration.7 |
 | `tests/unit/hooks/useAgentChat.test.ts` | agents.4.24, llm-integration.8.7 |
@@ -2026,7 +2027,7 @@ import { Logo } from '../logo';
 | `tests/functional/agent-status-indicators.spec.ts` | agents.6 | - |
 | `tests/functional/agent-status-all-places.spec.ts` | agents.6.1-6.5 | Проверка консистентного отображения каждого статуса (`new`, `in-progress`, `awaiting-response`, `error`, `completed`) в Header, Agent List tooltip и All Agents |
 | `tests/functional/message-format.spec.ts` | agents.7 | - |
-| `tests/functional/code_exec.spec.ts` | agents.7.4.5-7.4.9, agents.4.23 | Отдельные сценарии для `tool_call(code_exec)`: header/icon/status, отдельная `error` section из `output.error`, вертикальное выравнивание в collapsed, JS highlighting, transparent sections и width/overflow |
+| `tests/functional/code_exec.spec.ts` | agents.7.4.5-7.4.9.1, agents.4.23 | Отдельные сценарии для `tool_call(code_exec)`: header/icon/status, отдельная `error` section из `output.error`, вертикальное выравнивание в collapsed, deactivated hidden content after collapse/reopen, JS highlighting, transparent sections и width/overflow |
 | `tests/functional/llm-chat.spec.ts` | agents.4.11, agents.4.11.2, agents.7.7, agents.4.24, agents.14.1-14.6, llm-integration.2, llm-integration.7.2, llm-integration.8.7, llm-integration.16 | Включает сценарий deferred rename после non-meaningful triggering turn при наличии meaningful user-message в истории |
 | `tests/functional/agent-status-calculation.spec.ts` | agents.9 | - |
 | `tests/functional/agent-data-isolation.spec.ts` | agents.10 | - |

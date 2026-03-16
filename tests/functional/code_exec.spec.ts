@@ -328,6 +328,71 @@ test.describe('code_exec tool_call rendering', () => {
   });
 
   /* Preconditions: authenticated app with one visible agent
+     Action: create persisted kind:tool_call with toolName=code_exec, expand it, collapse it, then reopen via the same toggle
+     Assertions: collapsed content is removed from hit-testable UI and toggle remains usable after reopen cycle
+     Exception Rationale (testing.3.13): this test validates renderer behavior for persisted historical
+     tool_call(code_exec) message and intentionally bypasses LLM transport; LLM+UI path coverage remains in
+     code_exec tool-loop scenarios below.
+     Requirements: agents.7.4.6.9, agents.7.4.6.9.1, agents.7.4.7 */
+  test('should keep collapsed code_exec content non-interactive after reopen cycle', async () => {
+    await launchWithMockLLM();
+    const agentId = (await getAgentIdsFromApi(window))[0];
+    expect(agentId).toBeTruthy();
+
+    await window.evaluate(async (id) => {
+      const api = (window as unknown as { api: any }).api;
+      const result = await api.messages.create(id, 'tool_call', {
+        data: {
+          callId: 'code-collapse-1',
+          toolName: 'code_exec',
+          arguments: {
+            task_summary: 'Print ok to stdout',
+            code: "console.log('ok')",
+            timeout_ms: 10000,
+          },
+          output: {
+            status: 'success',
+            stdout: 'ok\\n',
+            stderr: 'warn\\n',
+            stdout_truncated: false,
+            stderr_truncated: false,
+          },
+        },
+      });
+      if (!result?.success) {
+        throw new Error(result?.error || 'Failed to create code_exec tool_call for collapse test');
+      }
+    }, agentId as string);
+
+    const toggle = window.locator('[data-testid="message-code-exec-toggle"]').last();
+    await expect(toggle).toBeVisible({ timeout: 5000 });
+    await expect(window.locator('[data-testid="message-code-exec-input"]')).toHaveCount(0);
+
+    await toggle.click();
+    await expect(window.locator('[data-testid="message-code-exec-input"]').last()).toContainText(
+      "console.log('ok')"
+    );
+
+    await toggle.click();
+    await expect(window.locator('[data-testid="message-code-exec-input"]')).toHaveCount(0);
+    await expect(window.locator('[data-testid="message-code-exec-stdout"]')).toHaveCount(0);
+    await expect(window.locator('[data-testid="message-code-exec-stderr"]')).toHaveCount(0);
+
+    await toggle.click();
+    await expect(window.locator('[data-testid="message-code-exec-input"]').last()).toContainText(
+      "console.log('ok')"
+    );
+    await expect(window.locator('[data-testid="message-code-exec-stdout"]').last()).toContainText(
+      'ok'
+    );
+    await expect(window.locator('[data-testid="message-code-exec-stderr"]').last()).toContainText(
+      'warn'
+    );
+
+    await expectNoToastError(window);
+  });
+
+  /* Preconditions: authenticated app with one visible agent
      Action: create persisted kind:tool_call with toolName=code_exec and terminal structured output.error, then expand collapsed block
      Assertions: code_exec block renders a separate error section in addition to stderr
      Exception Rationale (testing.3.13): this test validates renderer behavior for persisted historical
