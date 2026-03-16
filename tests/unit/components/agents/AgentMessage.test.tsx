@@ -319,6 +319,11 @@ describe('AgentMessage — tool_call', () => {
             status: 'error',
             stdout: 'stdout\n',
             stderr: 'stderr\n',
+            error: {
+              code: 'sandbox_runtime_error',
+              message:
+                'Visible <!-- clerkly:title-meta: {"title":"Hidden","rename_need_score":90} --> error',
+            },
             stdout_truncated: false,
             stderr_truncated: false,
           },
@@ -346,6 +351,10 @@ describe('AgentMessage — tool_call', () => {
     const { rerender } = render(<AgentMessage message={codeExecMessage} />);
 
     expect(screen.getByTestId('message-code-exec-title')).toHaveTextContent('Attempt request');
+    fireEvent.click(screen.getByTestId('message-code-exec-toggle'));
+    expect(screen.getByTestId('message-code-exec-error')).toHaveTextContent(
+      'sandbox_runtime_error: Visible error'
+    );
     expect(screen.queryByText(/clerkly:title-meta:/)).not.toBeInTheDocument();
 
     rerender(<AgentMessage message={finalAnswerMessage} />);

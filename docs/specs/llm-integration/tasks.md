@@ -112,11 +112,11 @@
 
 #### Фаза 6: Тесты
 
-- [ ] Обновить unit tests для main/runtime слоя.
-  - [ ] Добавить кейсы в `tests/unit/agents/MainPipeline.test.ts` не только для `final_answer`, но и для других tool payloads с embedded `title-meta`.
-- [ ] Обновить renderer unit tests.
-  - [ ] Добавить кейсы в `tests/unit/components/agents/AgentMessage.test.tsx`.
-  - [ ] Проверить, что renderer не показывает служебный comment даже для уже persisted payload.
+- [x] Обновить unit tests для main/runtime слоя.
+  - [x] Добавить кейсы в `tests/unit/agents/MainPipeline.test.ts` не только для `final_answer`, но и для других tool payloads с embedded `title-meta`.
+- [x] Обновить renderer unit tests.
+  - [x] Добавить кейсы в `tests/unit/components/agents/AgentMessage.test.tsx`.
+  - [x] Проверить, что renderer не показывает служебный comment даже для уже persisted payload.
 - [ ] При изменении loop contract обновить provider tests в `tests/unit/llm/*`.
 - [ ] Добавить functional regression в `tests/functional/llm-chat.spec.ts`.
   - [ ] Сценарий, где metadata comment приходит внутри другого tool payload.
