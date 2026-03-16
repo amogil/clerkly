@@ -292,7 +292,6 @@ export function AgentMessage({
                   data-testid="message-code-exec-input"
                   className="message-code-exec-text-section"
                 >
-                  <div className="mb-1 text-xs font-medium text-muted-foreground">JavaScript</div>
                   <MessageResponse className="message-response-transparent-code-blocks text-sm leading-relaxed break-words">
                     {buildCodeFence(codeInput, 'javascript')}
                   </MessageResponse>

@@ -234,10 +234,6 @@
   background-color: transparent !important;
 }
 
-[data-testid='message-code-exec-input'] [data-streamdown='code-block-header'] {
-  display: none !important;
-}
-
 [data-testid='message-code-exec-input'] [data-language='javascript'] pre {
   background-color: transparent !important;
 }

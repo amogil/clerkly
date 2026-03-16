@@ -1557,7 +1557,7 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 - Секции `stdout`, `stderr` и `error` используют один и тот же standard text code-block control без цветовой подсветки синтаксиса.
 - Для секций `stdout` и `stderr` UI отображает пользовательский заголовок `Output`; для секции `error` UI отображает пользовательский заголовок `Error`.
 - Для явно выделенных text/code секций tool-блоков (`Input`, `Output`, `JavaScript`, `stdout`, `stderr`, `error`) применяется no-wrap + horizontal scroll (`white-space: pre`, `overflow-x: auto`).
-- Код, переданный для исполнения в `code_exec`, рендерится как app-owned секция `JavaScript` внутри стандартного `ToolContent`: label `JavaScript` и один markdown code block с подсветкой JavaScript без вложенного дублирующего code-frame; стандартный `ToolHeader` toggle при этом сохраняется.
+- Код, переданный для исполнения в `code_exec`, рендерится в одном стандартном code block с заголовком `javascript` и подсветкой JavaScript; стандартный `ToolHeader` toggle при этом сохраняется.
 - Для `tool_call(code_exec)` transparent-surface применяется только к корневому контейнеру `Tool` и к секции `JavaScript`.
 - Для секции `JavaScript` usage-level styling сохраняет прозрачный фон контейнера/header/code-body и видимую цветовую подсветку JavaScript.
 - Рендер строится только по persisted snapshot (`message.created`/`message.updated`) без локальной реконструкции результата.
