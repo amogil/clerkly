@@ -1554,10 +1554,11 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 - При наличии отображаются `stdout`, `stderr` и structured `output.error` из persisted payload.
 - Structured `output.error` рендерится как отдельная секция `error` внутри того же `code_exec` блока; UI не смешивает это содержимое со `stderr`.
 - Содержимое секции `error` строится из persisted `output.error.code` и `output.error.message` в одном человекочитаемом diagnostic-text блоке.
+- Секции `stdout`, `stderr` и `error` используют один и тот же standard text code-block control без цветовой подсветки синтаксиса.
+- Для секций `stdout` и `stderr` UI отображает пользовательский заголовок `Output`; для секции `error` UI отображает пользовательский заголовок `Error`.
 - Для явно выделенных text/code секций tool-блоков (`Input`, `Output`, `JavaScript`, `stdout`, `stderr`, `error`) применяется no-wrap + horizontal scroll (`white-space: pre`, `overflow-x: auto`).
 - Код, переданный для исполнения в `code_exec`, рендерится как app-owned секция `JavaScript` внутри стандартного `ToolContent`: label `JavaScript` и один markdown code block с подсветкой JavaScript без вложенного дублирующего code-frame; стандартный `ToolHeader` toggle при этом сохраняется.
-- Для `stdout`, `stderr` и `error` сохраняются app-owned text sections с классом `message-code-exec-text-section`.
-- Для `tool_call(code_exec)` transparent-surface применяется к корневому контейнеру `Tool` и к app-owned секциям `stdout`, `stderr`, `error`.
+- Для `tool_call(code_exec)` transparent-surface применяется только к корневому контейнеру `Tool` и к секции `JavaScript`.
 - Для секции `JavaScript` usage-level styling сохраняет прозрачный фон контейнера/header/code-body и видимую цветовую подсветку JavaScript.
 - Рендер строится только по persisted snapshot (`message.created`/`message.updated`) без локальной реконструкции результата.
 

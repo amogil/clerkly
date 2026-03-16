@@ -35,7 +35,7 @@ function sanitizeInlineToolText(text: string): string {
     .trim();
 }
 
-// Requirements: agents.7.4.6.6
+// Requirements: agents.7.4.6.5.2
 function buildCodeFence(code: string, language: string): string {
   return `\`\`\`${language}\n${code}\n\`\`\``;
 }
@@ -300,34 +300,31 @@ export function AgentMessage({
               </div>
               {stdout.length > 0 ? (
                 <div className="min-w-0 max-w-full overflow-hidden">
-                  <div className="mb-1 text-xs font-medium text-muted-foreground">stdout</div>
-                  <div
-                    data-testid="message-code-exec-stdout"
-                    className="bg-transparent rounded-md border border-border/60 p-2 message-code-exec-text-section"
-                  >
-                    {stripAutoTitleMetadataComments(stdout)}
+                  <div className="mb-1 text-xs font-medium text-muted-foreground">std out</div>
+                  <div data-testid="message-code-exec-stdout">
+                    <MessageResponse>
+                      {buildCodeFence(stripAutoTitleMetadataComments(stdout), '')}
+                    </MessageResponse>
                   </div>
                 </div>
               ) : null}
               {stderr.length > 0 ? (
                 <div className="min-w-0 max-w-full overflow-hidden">
-                  <div className="mb-1 text-xs font-medium text-muted-foreground">stderr</div>
-                  <div
-                    data-testid="message-code-exec-stderr"
-                    className="bg-transparent rounded-md border border-border/60 p-2 message-code-exec-text-section"
-                  >
-                    {stripAutoTitleMetadataComments(stderr)}
+                  <div className="mb-1 text-xs font-medium text-muted-foreground">std error</div>
+                  <div data-testid="message-code-exec-stderr">
+                    <MessageResponse>
+                      {buildCodeFence(stripAutoTitleMetadataComments(stderr), '')}
+                    </MessageResponse>
                   </div>
                 </div>
               ) : null}
               {errorText ? (
                 <div className="min-w-0 max-w-full overflow-hidden">
                   <div className="mb-1 text-xs font-medium text-muted-foreground">error</div>
-                  <div
-                    data-testid="message-code-exec-error"
-                    className="bg-transparent rounded-md border border-border/60 p-2 message-code-exec-text-section"
-                  >
-                    {stripAutoTitleMetadataComments(errorText)}
+                  <div data-testid="message-code-exec-error">
+                    <MessageResponse>
+                      {buildCodeFence(stripAutoTitleMetadataComments(errorText), '')}
+                    </MessageResponse>
                   </div>
                 </div>
               ) : null}

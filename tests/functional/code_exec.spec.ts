@@ -232,34 +232,29 @@ test.describe('code_exec tool_call rendering', () => {
 
     await window.locator('[data-testid="message-code-exec-toggle"]').last().click();
 
-    await expect(window.getByText('JavaScript').last()).toBeVisible();
-    await expect(window.locator('[data-testid="message-code-exec-input"]').last()).toContainText(
-      "console.log('ok')"
-    );
+    const inputSection = window.locator('[data-testid="message-code-exec-input"]').last();
+    await expect(inputSection.locator(':scope > div').first()).toHaveText('JavaScript');
+    await expect(inputSection).toContainText("console.log('ok')");
     await expect(window.locator('[data-testid="message-code-exec-stdout"]').last()).toContainText(
       'ok'
     );
+    await expect(window.getByText('std out').last()).toBeVisible();
     await expect(window.locator('[data-testid="message-code-exec-stderr"]').last()).toContainText(
       'warn'
     );
-    const blockClassName = await window
-      .locator('[data-testid="message-code-exec-block"]')
-      .last()
-      .evaluate((el) => el.className);
-    const stdoutClassName = await window
-      .locator('[data-testid="message-code-exec-stdout"]')
-      .last()
-      .evaluate((el) => el.className);
-    const stderrClassName = await window
-      .locator('[data-testid="message-code-exec-stderr"]')
-      .last()
-      .evaluate((el) => el.className);
-    expect(blockClassName).toContain('bg-transparent');
-    expect(stdoutClassName).toContain('rounded-md');
-    expect(stdoutClassName).toContain('border-border/60');
-    expect(stdoutClassName).toContain('p-2');
-    expect(stdoutClassName).toContain('bg-transparent');
-    expect(stderrClassName).toContain('bg-transparent');
+    await expect(window.getByText('std error').last()).toBeVisible();
+    await expect(
+      window
+        .locator('[data-testid="message-code-exec-stdout"]')
+        .last()
+        .locator('[data-streamdown="code-block-actions"]')
+    ).toBeVisible();
+    await expect(
+      window
+        .locator('[data-testid="message-code-exec-stderr"]')
+        .last()
+        .locator('[data-streamdown="code-block-actions"]')
+    ).toBeVisible();
 
     await expectNoToastError(window);
   });
@@ -334,7 +329,7 @@ test.describe('code_exec tool_call rendering', () => {
 
   /* Preconditions: authenticated app with one visible agent
      Action: create persisted kind:tool_call with toolName=code_exec and terminal structured output.error, then expand collapsed block
-     Assertions: code_exec block renders a separate error section in addition to stderr
+     Assertions: code_exec block renders a separate error section in addition to stderr and shows standard code-block actions
      Exception Rationale (testing.3.13): this test validates renderer behavior for persisted historical
      tool_call(code_exec) message and intentionally bypasses LLM transport; LLM+UI path coverage remains in
      code_exec tool-loop scenarios below.
@@ -389,13 +384,13 @@ test.describe('code_exec tool_call rendering', () => {
     await expect(window.locator('[data-testid="message-code-exec-error"]').last()).toContainText(
       'policy_denied: Tool is not allowed in sandbox allowlist.'
     );
-
-    const errorClassName = await window
-      .locator('[data-testid="message-code-exec-error"]')
-      .last()
-      .evaluate((el) => el.className);
-    expect(errorClassName).toContain('bg-transparent');
-    expect(errorClassName).toContain('message-code-exec-text-section');
+    await expect(window.getByText('error').last()).toBeVisible();
+    await expect(
+      window
+        .locator('[data-testid="message-code-exec-error"]')
+        .last()
+        .locator('[data-streamdown="code-block-actions"]')
+    ).toBeVisible();
 
     await expectNoToastError(window);
   });
@@ -446,7 +441,7 @@ test.describe('code_exec tool_call rendering', () => {
 
   /* Preconditions: authenticated app with one visible agent
      Action: create persisted kind:tool_call with toolName=code_exec and JavaScript input, then expand collapsed block
-     Assertions: code_exec input renders through JavaScript code block with syntax label
+     Assertions: code_exec input renders through a single JavaScript code block with syntax label
      Exception Rationale (testing.3.13): this test validates renderer behavior for persisted historical
      tool_call(code_exec) payload and intentionally bypasses LLM transport.
      Requirements: agents.7.4.6 */
@@ -485,7 +480,7 @@ test.describe('code_exec tool_call rendering', () => {
 
     const inputSection = window.locator('[data-testid="message-code-exec-input"]').last();
     await expect(inputSection).toBeVisible();
-    await expect(window.getByText('JavaScript').last()).toBeVisible();
+    await expect(inputSection.locator(':scope > div').first()).toHaveText('JavaScript');
     await expect(inputSection).toContainText('const answer = 42;');
     await expect(inputSection.locator('[data-streamdown="code-block"]')).toHaveCount(1);
 
