@@ -90,7 +90,7 @@
   - [x] Устранить TS/JSX несовместимость свежего `src/renderer/components/ai-elements/prompt-input.tsx` с текущим renderer-конфигом TypeScript.
   - [x] Проверить и зафиксировать app-level setup, требуемый новым `PromptInput`/`Message` stack после CLI-обновления.
   - [x] Добавить единый `TooltipProvider` в renderer root приложения вместо локальных/дублирующих provider-обёрток.
-  - [ ] Удалить app-owned textarea auto-resize из `AgentChat` и опереться на встроенный sizing/scroll contract `PromptInputTextarea`.
+  - [x] Удалить app-owned textarea auto-resize из `AgentChat` и опереться на встроенный sizing/scroll contract `PromptInputTextarea`.
   - [ ] Убедиться, что после добавления глобального `TooltipProvider` существующие tooltip-потребители (включая sidebar и AI Elements) не конфликтуют между собой.
   - [x] Удалить кастомную runtime-логику автофокуса textarea при активации чата/переключении окна.
   - [x] Синхронизировать `docs/specs/agents/requirements.md` и `docs/specs/agents/design.md`, чтобы автофокус не оставался частью целевого UI-контракта.
@@ -99,10 +99,10 @@
 
 - [x] Синхронизировать tests под новый `Tool` contract.
   - [x] Обновить `tests/unit/components/agents/AgentMessage.test.tsx`.
-  - [ ] Обновить `tests/functional/code_exec.spec.ts`.
+  - [x] Обновить `tests/functional/code_exec.spec.ts`.
   - [x] Проверить, что cycle `expand -> collapse -> reopen` стабильно работает без hidden interactive artifacts.
   - [x] Обновить/починить `tests/unit/components/ai-elements/prompt-input.test.tsx` под свежую CLI-версию `PromptInput`.
-  - [ ] Добавить regression на app-level `TooltipProvider`, если это покрывается renderer unit tests.
+  - [x] Добавить regression на app-level `TooltipProvider`, если это покрывается renderer unit tests.
 
 #### Фаза 5: Sandbox HTTP Request Follow-up
 
