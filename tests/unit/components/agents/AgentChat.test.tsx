@@ -612,6 +612,7 @@ describe('AgentChat — PromptInput rendered', () => {
     render(<AgentChat {...defaultProps} />);
 
     expect(screen.getByTestId('agent-prompt-input')).toHaveClass(
+      'mt-4',
       '[&_[data-slot=input-group]]:border-border/80'
     );
   });
@@ -625,7 +626,7 @@ describe('AgentChat — PromptInput rendered', () => {
 
     const shortcutHint = screen.getByText('Press Enter to send, Shift+Enter for new line');
     expect(shortcutHint).toBeInTheDocument();
-    expect(shortcutHint).toHaveClass('mt-2', 'mb-2');
+    expect(shortcutHint).toHaveClass('mt-4', 'mb-4');
   });
 
   /* Preconditions: component rendered

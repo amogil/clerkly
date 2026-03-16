@@ -364,7 +364,7 @@ export function AgentChat({
         data-testid="agent-chat-input-area"
       >
         <PromptInput
-          className="mt-2 [&_[data-slot=input-group]]:border-border/80"
+          className="mt-4 [&_[data-slot=input-group]]:border-border/80"
           onSubmit={handleSubmit}
         >
           <PromptInputBody>
@@ -402,7 +402,7 @@ export function AgentChat({
             </PromptInputSubmit>
           </PromptInputFooter>
         </PromptInput>
-        <p className="mt-2 mb-2 px-0.5 text-xs text-muted-foreground">
+        <p className="mt-4 mb-4 px-0.5 text-xs text-muted-foreground">
           Press Enter to send, Shift+Enter for new line
         </p>
       </div>
