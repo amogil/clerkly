@@ -6,3 +6,5 @@ release
 package-lock.json
 src/renderer/components/ui/**
 src/renderer/components/ai-elements/**
+src/components/ui/**
+src/components/ai-elements/**

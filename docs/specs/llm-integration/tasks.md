@@ -8,7 +8,7 @@
 - оставшимися follow-up задачами после Issue #65 (`sandbox-http-request`) в части LLM/code_exec интеграции;
 - миграцией `code_exec` renderer на стандартный AI Elements `Tool` contract.
 
-**Текущий статус:** Фаза 4 — Tool Contract Migration
+**Текущий статус:** Фаза 4 — Tool Contract Migration follow-up
 
 ---
 
@@ -36,9 +36,16 @@
 - ✅ Фаза 1 завершена: `llm-integration` requirements/design синхронизированы с текущим provider loop contract и явно фиксируют documented safety step cap вместо semantic stop по `final_answer`.
 - ✅ Фаза 2 завершена: `MainPipeline` блокирует `<!-- clerkly:title-meta: ... -->` в string-полях аргументов tool_call до persist; минимум покрыт `code_exec.task_summary`, а unit-regressions добавлены.
 - ✅ Фаза 3 завершена: renderer удаляет `<!-- clerkly:title-meta: ... -->` из persisted historical tool payload text перед отображением; добавлены unit-regressions для `code_exec` и `final_answer`.
+- ✅ Обновлённые AI Elements загружены через каноническую команду `npm run ai-elements:update-all`.
+- ✅ Generic `tool_call` renderer переведён на новый AI Elements `Tool` contract (`Tool` / `ToolHeader` / `ToolContent` / `ToolInput` / `ToolOutput`).
+- ✅ `code_exec` renderer переведён на `Tool` root + `ToolContent`; временно сохранена app-owned header composition поверх стандартного collapsible root.
+- ✅ `PromptInput` интегрирован с текущим renderer-конфигом: test JSX runtime и unit tests адаптированы под свежую CLI-версию без ручной правки vendored файла.
+- ✅ В renderer root добавлен единый `TooltipProvider` для обновлённых AI Elements.
+- ✅ CLI-generated vendor scope (`src/renderer/components/ui/**`, `src/renderer/components/ai-elements/**`) исключён из локального ESLint/Prettier auto-rewrite.
+- ✅ User-facing contract textarea sizing возвращён на уровень требований без хрупких пиксельных значений; targeted functional regressions на current behavior обновлены.
 
 ### В работе
-- 🔄 Фаза 4: миграция `code_exec` renderer на стандартный AI Elements `Tool` contract.
+- 🔄 Фаза 4: завершение migration-follow-up после обновления AI Elements, упрощение оставшегося custom UI слоя и точечная валидация.
 
 ### Запланировано
 
@@ -58,24 +65,44 @@
 
 #### Фаза 4: Tool Contract Migration
 
-- [ ] Привести локальный vendored `Tool` к официальному AI Elements `Tool` contract.
+- [x] Привести локальный vendored `Tool` к официальному AI Elements `Tool` contract.
   - [x] Обновлять AI Elements только через каноническую команду полного обновления `npm run ai-elements:update-all`, а не ручными правками vendored компонентов.
-  - [ ] После каждого CLI-обновления AI Elements проверять обязательные app-level интеграции, которые сообщает CLI/output (например, необходимость обернуть приложение в `TooltipProvider`).
-  - [ ] Синхронизировать `src/renderer/components/ai-elements/tool.tsx` с upstream API.
-  - [ ] Синхронизировать `src/components/ai-elements/tool.tsx` с тем же contract.
-  - [ ] Зафиксировать policy для CLI-generated renderer vendor directories: `src/renderer/components/ui/**` и `src/renderer/components/ai-elements/**` не должны автоматически переписываться локальными ESLint/Prettier правилами репо.
-  - [ ] Зафиксировать в `docs/specs/agents/design.md`, что `code_exec` использует стандартный `Tool` collapsible pattern, а не внешний ручной wrapper.
+  - [x] После каждого CLI-обновления AI Elements проверять обязательные app-level интеграции, которые сообщает CLI/output (например, необходимость обернуть приложение в `TooltipProvider`).
+  - [x] Синхронизировать `src/renderer/components/ai-elements/tool.tsx` с upstream API.
+  - [x] Синхронизировать `src/components/ai-elements/tool.tsx` с тем же contract.
+  - [x] Зафиксировать policy для CLI-generated renderer vendor directories: `src/renderer/components/ui/**` и `src/renderer/components/ai-elements/**` не должны автоматически переписываться локальными ESLint/Prettier правилами репо.
+  - [x] Зафиксировать в `docs/specs/agents/design.md`, что `code_exec` использует стандартный `Tool` collapsible pattern, а не внешний ручной wrapper.
+  - [ ] После массового CLI-обновления проверить build-интеграцию обновлённого `Tool` с текущим renderer usage и устранить contract drift до зелёного `npm run typecheck`.
 
-- [ ] Перевести `code_exec` renderer на стандартный `Tool` usage.
-  - [ ] Убрать внешний ручной `Collapsible` вокруг `Tool` в `src/renderer/components/agents/AgentMessage.tsx`.
-  - [ ] Использовать `Tool` как root, `ToolHeader` как trigger, `ToolContent` как content.
-  - [ ] Удалить временные workaround-правки, ставшие ненужными после миграции.
-  - [ ] Проверить, что hidden content больше не мешает toggle/header hit area в collapsed state.
+- [x] Перевести `code_exec` renderer на стандартный `Tool` usage.
+  - [x] Убрать внешний ручной `Collapsible` вокруг `Tool` в `src/renderer/components/agents/AgentMessage.tsx`.
+  - [x] Использовать `Tool` как root и `ToolContent` как content; для `code_exec` сохранить app-owned trigger/header composition поверх стандартного `Tool` collapsible root.
+  - [x] Адаптировать generic `ToolHeader` на новый contract `type/state/toolName/title`.
+  - [x] Адаптировать generic `ToolInput` на новый contract `input=...`.
+  - [x] Адаптировать generic `ToolOutput` на новый contract `output=...` и `errorText=...`.
+  - [x] Сохранить текущее UI-поведение `code_exec`: fallback title `"Code"`, status mapping, отдельные секции `stdout` / `stderr` / `error`, прозрачные surfaces и historical compatibility.
+  - [x] Перевести generic `tool_call` renderer на тот же новый `Tool` contract.
+  - [x] Удалить временные workaround-правки, ставшие ненужными после миграции.
+  - [x] Проверить, что hidden content больше не мешает toggle/header hit area в collapsed state.
+  - [x] Убрать лишнюю ручную `div`-композицию в header `code_exec` и максимально приблизить layout к стандартному `ToolHeader` contract без потери текущего UI-поведения.
 
-- [ ] Синхронизировать tests под новый `Tool` contract.
-  - [ ] Обновить `tests/unit/components/agents/AgentMessage.test.tsx`.
+- [ ] Довести app-level интеграцию обновлённого `PromptInput` и shared providers.
+  - [x] Устранить TS/JSX несовместимость свежего `src/renderer/components/ai-elements/prompt-input.tsx` с текущим renderer-конфигом TypeScript.
+  - [x] Проверить и зафиксировать app-level setup, требуемый новым `PromptInput`/`Message` stack после CLI-обновления.
+  - [x] Добавить единый `TooltipProvider` в renderer root приложения вместо локальных/дублирующих provider-обёрток.
+  - [ ] Удалить app-owned textarea auto-resize из `AgentChat` и опереться на встроенный sizing/scroll contract `PromptInputTextarea`.
+  - [ ] Убедиться, что после добавления глобального `TooltipProvider` существующие tooltip-потребители (включая sidebar и AI Elements) не конфликтуют между собой.
+  - [ ] Удалить кастомную runtime-логику автофокуса textarea при активации чата/переключении окна.
+  - [ ] Синхронизировать `docs/specs/agents/requirements.md` и `docs/specs/agents/design.md`, чтобы автофокус не оставался частью целевого UI-контракта.
+  - [ ] Обновить или удалить `tests/functional/input-autofocus.spec.ts` и связанные coverage-ссылки после удаления автофокуса.
+  - [ ] Завершить cleanup renderer-layer после миграции `PromptInput`: убрать legacy hooks/таймеры в `AgentChat`, которые дублируют встроенный behavior библиотеки.
+
+- [x] Синхронизировать tests под новый `Tool` contract.
+  - [x] Обновить `tests/unit/components/agents/AgentMessage.test.tsx`.
   - [ ] Обновить `tests/functional/code_exec.spec.ts`.
-  - [ ] Проверить, что cycle `expand -> collapse -> reopen` стабильно работает без hidden interactive artifacts.
+  - [x] Проверить, что cycle `expand -> collapse -> reopen` стабильно работает без hidden interactive artifacts.
+  - [x] Обновить/починить `tests/unit/components/ai-elements/prompt-input.test.tsx` под свежую CLI-версию `PromptInput`.
+  - [ ] Добавить regression на app-level `TooltipProvider`, если это покрывается renderer unit tests.
 
 #### Фаза 5: Sandbox HTTP Request Follow-up
 
@@ -98,6 +125,7 @@
 #### Фаза 7: Валидация
 
 - [ ] Прогнать `npm run rebuild:node`.
-- [ ] Прогнать релевантные unit tests по `MainPipeline`, `AgentMessage`, провайдерам при необходимости.
+- [ ] Прогнать `npm run typecheck`.
+- [ ] Прогнать релевантные unit tests по `MainPipeline`, `AgentMessage`, `PromptInput`, провайдерам при необходимости.
 - [ ] Прогнать `npm run validate`.
 - [ ] После завершения запросить подтверждение на functional tests.

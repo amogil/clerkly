@@ -43,6 +43,9 @@ describe('PromptInput', () => {
      Requirements: agents.4.3 */
   it('should submit on Enter without Shift', () => {
     const onSubmit = jest.fn();
+    const requestSubmitMock = jest.fn();
+    const originalRequestSubmit = HTMLFormElement.prototype.requestSubmit;
+    HTMLFormElement.prototype.requestSubmit = requestSubmitMock;
 
     const Wrapper = () => {
       const [value, setValue] = React.useState('Hello');
@@ -68,10 +71,9 @@ describe('PromptInput', () => {
       shiftKey: false,
     });
 
-    expect(onSubmit).toHaveBeenCalledWith(
-      { text: 'Hello' },
-      expect.objectContaining({ type: 'submit' })
-    );
+    expect(requestSubmitMock).toHaveBeenCalled();
+
+    HTMLFormElement.prototype.requestSubmit = originalRequestSubmit;
   });
 
   /* Preconditions: PromptInput rendered with non-empty text
@@ -166,15 +168,12 @@ describe('PromptInput', () => {
 
     render(<Wrapper />);
     const textarea = screen.getByTestId('auto-expanding-textarea') as HTMLTextAreaElement;
-    Object.defineProperty(textarea, 'scrollHeight', {
-      configurable: true,
-      value: 80,
-    });
 
     fireEvent.change(textarea, { target: { value: 'Line 1\nLine 2' } });
 
-    expect(textarea.style.height).toBe('80px');
-    expect(textarea.style.overflowY).toBe('hidden');
+    expect(textarea).toHaveClass('field-sizing-content');
+    expect(textarea).toHaveClass('max-h-48');
+    expect(textarea).toHaveClass('min-h-16');
   });
 
   /* Preconditions: PromptInput rendered with textarea max-height
@@ -202,15 +201,11 @@ describe('PromptInput', () => {
 
     render(<Wrapper />);
     const textarea = screen.getByTestId('auto-expanding-textarea') as HTMLTextAreaElement;
-    Object.defineProperty(textarea, 'scrollHeight', {
-      configurable: true,
-      value: 400,
-    });
 
     fireEvent.change(textarea, { target: { value: Array(20).fill('Line').join('\n') } });
 
-    expect(textarea.style.height).toBe('160px');
-    expect(textarea.style.overflowY).toBe('auto');
+    expect(textarea).toHaveClass('field-sizing-content');
+    expect(textarea).toHaveClass('max-h-48');
   });
 
   /* Preconditions: PromptInput rendered with empty textarea
@@ -232,15 +227,11 @@ describe('PromptInput', () => {
     );
 
     const textarea = screen.getByTestId('auto-expanding-textarea') as HTMLTextAreaElement;
-    Object.defineProperty(textarea, 'scrollHeight', {
-      configurable: true,
-      value: 0,
-    });
 
     fireEvent.focus(textarea);
 
-    expect(Number.parseFloat(textarea.style.height)).toBeGreaterThanOrEqual(20);
-    expect(textarea.style.overflowY).toBe('hidden');
+    expect(textarea).toHaveClass('min-h-16');
+    expect(textarea).toHaveAttribute('placeholder', 'What would you like to know?');
   });
 
   /* Preconditions: PromptInput rendered with textarea and long pasted text
@@ -268,23 +259,10 @@ describe('PromptInput', () => {
 
     render(<Wrapper />);
     const textarea = screen.getByTestId('auto-expanding-textarea') as HTMLTextAreaElement;
-    Object.defineProperty(textarea, 'scrollHeight', {
-      configurable: true,
-      value: 400,
-    });
-
-    const rafSpy = jest
-      .spyOn(window, 'requestAnimationFrame')
-      .mockImplementation((callback: FrameRequestCallback): number => {
-        callback(0);
-        return 0;
-      });
 
     fireEvent.paste(textarea, { target: { value: Array(20).fill('Line').join('\n') } });
 
-    expect(textarea.style.height).toBe('160px');
-    expect(textarea.style.overflowY).toBe('auto');
-
-    rafSpy.mockRestore();
+    expect(textarea).toHaveClass('field-sizing-content');
+    expect(textarea).toHaveClass('max-h-48');
   });
 });

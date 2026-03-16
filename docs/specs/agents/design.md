@@ -929,7 +929,7 @@ function AgentsComponent() {
 │  ┌────────────────────────────────────────────────────┐ │
 │  │              InputArea                             │ │
 │  │  - PromptInput (AI Elements)                       │ │
-│  │  - PromptInputTextarea (max 50% chat height)       │ │
+│  │  - PromptInputTextarea                             │ │
 │  │  - PromptInputSubmit                               │ │
 │  └────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────┘
@@ -1235,60 +1235,18 @@ function ActivityIndicator({ isActive }: { isActive: boolean }) {
 #### PromptInput (AI Elements)
 
 ```typescript
-// Requirements: agents.4.1, agents.4.2, agents.4.2.1, agents.4.2.2, agents.4.3, agents.4.4, agents.4.5, agents.4.6, agents.4.7, agents.4.24
-function ChatInput({
-  agent,
-  taskInput,
-  setTaskInput,
-  handleSend,
-  cancelCurrentRequest,
-  textareaRef,
-  chatAreaRef,
-}: ChatInputProps) {
-  // Auto-resize remains controlled by AgentChat to preserve existing UX contracts.
-  useEffect(() => {
-    const textarea = textareaRef.current;
-    const chatArea = chatAreaRef.current;
-    if (!textarea || !chatArea) return;
-    textarea.style.height = 'auto';
-    const maxHeight = chatArea.offsetHeight * 0.5;
-    textarea.style.height = `${Math.min(textarea.scrollHeight, maxHeight)}px`;
-    textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden';
-  }, [taskInput, textareaRef, chatAreaRef]);
+**Структура:**
+- `"PromptInput"` используется как корневой контейнер области ввода.
+- `"PromptInputTextarea"` отображает многострочное поле ввода сообщения.
+- Footer отображает shortcut hint: `Press Enter to send, Shift+Enter for new line`.
+- Отправка сообщения и остановка активной генерации управляются из `AgentChat` через submit/stop mode.
 
-  const isStopMode = agent.status === 'in-progress';
-  const canSend = taskInput.trim().length > 0;
+**Поведение:**
+- Клавиатурное поведение (`Enter` submit, `Shift+Enter` newline) обеспечивается самим input stack без отдельного app-owned `onKeyDown` слоя в `AgentChat`.
+- Рост поля ввода, ограничение видимой высоты, очистка после успешного submit и переключение внутреннего вертикального скролла определяются контрактом `"PromptInputTextarea"`.
+- `AgentChat` управляет только send/stop flow и не должен дублировать внутренний text-state или sizing-поведение input-компонента.
 
-  return (
-    <PromptInput onSubmit={(message) => handleSend(message.text)}>
-      <PromptInputBody>
-        <PromptInputTextarea
-          ref={textareaRef}
-          data-testid="auto-expanding-textarea"
-          placeholder="Ask, reply, or give command..."
-          value={taskInput}
-          onChange={(event) => setTaskInput(event.target.value)}
-        />
-        <Button
-          type={isStopMode ? 'button' : 'submit'}
-          disabled={isStopMode ? false : !canSend}
-          onClick={isStopMode ? () => cancelCurrentRequest() : undefined}
-          aria-label={isStopMode ? 'Stop generation' : 'Send message'}
-        >
-          {isStopMode ? <Square /> : <Send />}
-        </Button>
-      </PromptInputBody>
-      <PromptInputFooter>
-        <p>Press Enter to send, Shift+Enter for new line</p>
-      </PromptInputFooter>
-    </PromptInput>
-  );
-}
-```
-
-**Важно:** поведение клавиатуры (`Enter` submit, `Shift+Enter` newline) делегировано `PromptInputTextarea`, без дополнительного кастомного `onKeyDown` в `AgentChat`.
-
-**Техническое решение:** в текущей реализации поле ввода стандартизировано на AI Elements `PromptInput` и интегрировано с существующим chat send-flow.
+**App-level setup:** renderer root (`App`) содержит единый `TooltipProvider`, потому что `PromptInput` и другие AI Elements используют tooltip primitives на уровне приложения.
 
 **Алгоритм активности action-кнопки (agents.4.2, agents.4.2.1, agents.4.2.2):**
 - Режим `stop` (`agent.status === 'in-progress'`) — кнопка всегда активна, независимо от текста в поле ввода.
@@ -1604,7 +1562,8 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 
 **Сообщения выполнения кода (`kind: 'tool_call'`, `toolName: 'code_exec'`):**
 - Используется отдельный блок выполнения кода, не являющийся обычным текстовым bubble.
-- Блок строится на AI Elements `Tool` (см. [https://elements.ai-sdk.dev/components/tool](https://elements.ai-sdk.dev/components/tool)).
+- Блок строится на AI Elements `Tool` как `Collapsible` root; `ToolContent` используется как стандартный content-контейнер.
+- Заголовок для `code_exec` остаётся app-owned composition поверх `Tool` root: custom header содержит `Code2`, task summary, status-badge и `CollapsibleTrigger`, потому что стандартный `ToolHeader` не покрывает существующий UI-контракт `code_exec`.
 - Заголовок блока отображает иконку выполнения кода (`Code2`) и краткое описание работы из `arguments.task_summary`.
 - Сразу после краткого описания работы отображается badge со статусом выполнения.
 - UI использует `arguments.task_summary` из persisted payload как текст заголовка; валидация и ограничения этого поля определяются спецификацией `code_exec`.
@@ -1620,9 +1579,9 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 - Для явно выделенных text/code секций tool-блоков (`Input`, `Output`, `JavaScript`, `stdout`, `stderr`, `error`) применяется no-wrap + horizontal scroll (`white-space: pre`, `overflow-x: auto`).
 - Секция `JavaScript` рендерится через общий `"MessageResponse"` и fenced markdown блок `javascript`, чтобы использовать стандартный рендерер code block и его встроенную подсветку синтаксиса.
 - Для input-кода `code_exec` не рендерится отдельный верхний label `JavaScript` и не используется внешний wrapper-box; в UI остается только сам встроенный markdown code block.
-- Для input-кода `code_exec` используется тот же контейнер `"ToolInput"`, что и стандартные секции инструмента; CSS scope `message-response-code-exec-input` снимает внутренние рамки `data-streamdown='code-block'`, чтобы не было вложенной (двойной) геометрии.
+- Для input-кода `code_exec`, `stdout`, `stderr` и `error` используется app-owned frame с классом `message-code-exec-text-section`; CSS scope `message-response-code-exec-input` дополнительно снимает внутренние рамки `data-streamdown='code-block'`, чтобы не было вложенной (двойной) геометрии.
 - Заголовок `tool_call(code_exec)` рендерится с `items-center`; отступ заголовка переключается по состоянию collapsible (`collapsed -> mb-0`, `expanded -> mb-2`), чтобы в свернутом виде контент оставался вертикально центрированным.
-- `CollapsibleContent` для `tool_call(code_exec)` получает closed-state guard: при `data-state='closed'` контент деинтерактивируется (`pointer-events: none`), чтобы скрытые внутренние controls не могли перехватывать клики по header/toggle после цикла `expand -> collapse`.
+- `ToolContent` для `tool_call(code_exec)` получает closed-state guard: при `data-state='closed'` контент деинтерактивируется (`pointer-events: none`), чтобы скрытые внутренние controls не могли перехватывать клики по header/toggle после цикла `expand -> collapse`.
 - Для `tool_call(code_exec)` transparent-surface применяется ко всему блоку: корневой контейнер `Tool`, status-badge, секции `JavaScript`, `stdout`, `stderr`, `error`.
 - Рендер строится только по persisted snapshot (`message.created`/`message.updated`) без локальной реконструкции результата.
 
@@ -2421,7 +2380,7 @@ interface UseAgentChatResult {
 
 ## Установка и обновление AI Elements компонентов
 
-AI Elements использует **shadcn-подход**: CLI копирует исходники компонентов прямо в проект (`src/renderer/components/ai-elements/`). Нет npm-пакета для импорта — код живёт в репозитории и полностью кастомизируем.
+AI Elements использует **shadcn-подход**: CLI копирует исходники компонентов прямо в проект (`src/renderer/components/ai-elements/`). Vendor-файлы обновляются только официальным CLI, а не ручными правками.
 
 Документация: https://elements.ai-sdk.dev
 
@@ -2459,3 +2418,9 @@ npm run ai-elements:update-all
 - `streamdown` + `@streamdown/*` — markdown рендеринг в `MessageResponse` и `ReasoningContent`
 - `@radix-ui/react-use-controllable-state` — состояние в `Reasoning`
 - shadcn ui: `button`, `tooltip`, `collapsible`, `separator`, `button-group`
+
+### App-level интеграция после CLI-обновления
+
+- После каждого `npm run ai-elements:update-all` нужно проверять сообщения CLI про обязательный setup в приложении.
+- Для текущего набора компонентов renderer root обязан содержать единый `TooltipProvider`, потому что AI Elements используют tooltip primitives на уровне shared UI.
+- Директории `src/renderer/components/ui/**` и `src/renderer/components/ai-elements/**` считаются CLI-generated vendor scope и не должны автоматически переписываться локальными ESLint/Prettier правилами репозитория.

@@ -92,6 +92,7 @@ describe('AgentMessage — tool_call', () => {
 
     expect(screen.getByTestId('message-tool-call')).toBeInTheDocument();
     expect(screen.getByText('search_docs')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('message-tool-call-header'));
     expect(screen.getByTestId('message-tool-call-input')).toBeInTheDocument();
     expect(screen.queryByTestId('message-tool-call-output')).not.toBeInTheDocument();
   });
@@ -117,6 +118,8 @@ describe('AgentMessage — tool_call', () => {
         })}
       />
     );
+
+    fireEvent.click(screen.getByTestId('message-tool-call-header'));
 
     const output = screen.getByTestId('message-tool-call-output');
     expect(output).toBeInTheDocument();
@@ -166,7 +169,6 @@ describe('AgentMessage — tool_call', () => {
     expect(screen.getByTestId('message-code-exec-status-icon')).toBeInTheDocument();
     expect(screen.getByTestId('message-code-exec-status-icon')).toHaveClass('text-emerald-600');
     expect(screen.getByTestId('message-code-exec-header')).toHaveClass('mb-0');
-    expect(screen.getByTestId('message-code-exec-header')).toHaveClass('items-center');
     expect(screen.getByTestId('message-code-exec-toggle')).toBeInTheDocument();
     expect(screen.queryByTestId('message-code-exec-input')).not.toBeInTheDocument();
     expect(screen.queryByTestId('message-code-exec-stdout')).not.toBeInTheDocument();

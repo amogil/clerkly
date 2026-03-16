@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Toaster } from 'sonner';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ErrorProvider } from './contexts/error-context';
+import { TooltipProvider } from './components/ui/tooltip';
 import { TopNavigation } from './components/top-navigation';
 import { Agents } from './components/agents';
 import { Settings } from './components/settings';
@@ -73,11 +74,13 @@ function isBenignCancellationReason(reason: unknown): boolean {
 export default function App() {
   return (
     <ErrorProvider>
-      <ErrorBoundary>
-        <Toaster position="top-right" richColors closeButton duration={15000} />
-        <NotificationUI manager={errorNotificationManager} />
-        <AppContent />
-      </ErrorBoundary>
+      <TooltipProvider>
+        <ErrorBoundary>
+          <Toaster position="top-right" richColors closeButton duration={15000} />
+          <NotificationUI manager={errorNotificationManager} />
+          <AppContent />
+        </ErrorBoundary>
+      </TooltipProvider>
     </ErrorProvider>
   );
 }

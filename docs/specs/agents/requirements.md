@@ -183,11 +183,11 @@
 
 4.4. КОГДА пользователь нажимает Shift+Enter, ТО ДОЛЖНА добавляться новая строка
 
-4.5. Поле ввода ДОЛЖНО автоматически увеличивать высоту при вводе многострочного текста
+4.5. Поле ввода ДОЛЖНО поддерживать ввод многострочного текста и увеличивать свою высоту по мере роста контента до максимальной видимой высоты поля ввода.
 
-4.6. Максимальная высота поля ввода ДОЛЖНА быть ограничена 50% высоты области чата
+4.6. Поле ввода ДОЛЖНО иметь компактную минимальную визуальную высоту для короткого текста и НЕ ДОЛЖНО превышать максимальную видимую высоту поля ввода.
 
-4.7. КОГДА текст превышает максимальную высоту поля ввода, ТО ДОЛЖЕН появляться вертикальный скролл
+4.7. КОГДА текст превышает максимальную высоту поля ввода, ТО внутри поля ввода ДОЛЖЕН использоваться вертикальный скролл; КОГДА текст не превышает этот предел, ТО вертикальный скролл НЕ ДОЛЖЕН отображаться.
 
 4.7.1. КОГДА активируется чат агента (выбор агента, возврат из AllAgents, первая загрузка), ТО фокус ввода ДОЛЖЕН автоматически устанавливаться на поле ввода сообщения
 
@@ -330,7 +330,12 @@
 - `tests/functional/agent-messaging.spec.ts` - "should keep stop button enabled regardless of input text in in-progress status"
 - `tests/functional/agent-messaging.spec.ts` - "should display messages in chronological order"
 - `tests/functional/agent-messaging.spec.ts` - "should autoscroll to last message"
-- `tests/functional/auto-expanding-textarea.spec.ts` - "AutoExpandingTextarea - Functional Tests"
+- `tests/functional/auto-expanding-textarea.spec.ts` - "should have minimal height for single line text"
+- `tests/functional/auto-expanding-textarea.spec.ts` - "should preserve multiline content within textarea sizing contract"
+- `tests/functional/auto-expanding-textarea.spec.ts` - "should cap height at maximum visible size"
+- `tests/functional/auto-expanding-textarea.spec.ts` - "should show scrollbar when content exceeds max height"
+- `tests/functional/auto-expanding-textarea.spec.ts` - "should hide scrollbar for short content"
+- `tests/functional/auto-expanding-textarea.spec.ts` - "should restore short-content scrolling state after content is cleared"
 - `tests/functional/input-autofocus.spec.ts` - "Functional tests for input autofocus on agent activation"
 - `tests/functional/empty-state-placeholder.spec.ts` - "should display empty state for new agent"
 - `tests/functional/empty-state-placeholder.spec.ts` - "should show 4 prompt suggestions"

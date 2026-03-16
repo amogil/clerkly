@@ -2,7 +2,6 @@ import React from 'react';
 // Requirements: llm-integration.7, llm-integration.3.4.1, llm-integration.3.4.4, agents.4.22, agents.4.9, agents.4.10.1, agents.4.10.2, agents.7.4
 import {
   Check,
-  ChevronDownIcon,
   CircleCheck,
   CircleMinus,
   CircleX,
@@ -14,7 +13,6 @@ import { Message, MessageContent, MessageResponse } from '../ai-elements/message
 import { Reasoning, ReasoningContent } from '../ai-elements/reasoning';
 import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from '../ai-elements/tool';
 import { Queue, QueueItem } from '../ai-elements/queue';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
 import { toUIMessage } from '../../lib/messageMapper';
 import {
   normalizeMathDelimiters,
@@ -48,7 +46,9 @@ function stripAutoTitleMetadataComments(text: string): string {
 
 // Requirements: agents.7.4.2.2.1, agents.7.4.6.3, agents.14.5
 function sanitizeInlineToolText(text: string): string {
-  return stripAutoTitleMetadataComments(text).replace(/\s{2,}/g, ' ').trim();
+  return stripAutoTitleMetadataComments(text)
+    .replace(/\s{2,}/g, ' ')
+    .trim();
 }
 
 function getCodeExecStatusIcon(status: string) {
@@ -82,6 +82,19 @@ function getCodeExecStatusIconColorClass(status: string) {
       return 'text-zinc-500';
     default:
       return 'text-muted-foreground';
+  }
+}
+
+function getCodeExecToolHeaderState(
+  status: string
+): 'input-available' | 'output-available' | 'output-error' {
+  switch (status) {
+    case 'running':
+      return 'input-available';
+    case 'success':
+      return 'output-available';
+    default:
+      return 'output-error';
   }
 }
 
@@ -304,144 +317,126 @@ export function AgentMessage({
           : 'Code';
       const StatusIcon = getCodeExecStatusIcon(status);
       const statusIconColorClass = getCodeExecStatusIconColorClass(status);
+      const toolHeaderState = getCodeExecToolHeaderState(status);
 
       return (
         <Message from="assistant" className="w-full max-w-full">
-          <Collapsible
+          <Tool
             open={isCodeExecExpanded}
             onOpenChange={setIsCodeExecExpanded}
-            data-testid="message-code-exec-collapsible"
+            data-testid="message-code-exec-block"
+            className="bg-transparent min-w-0 max-w-full overflow-hidden"
           >
-            <Tool
-              data-testid="message-code-exec-block"
-              className="bg-transparent min-w-0 max-w-full overflow-hidden"
+            <div
+              data-testid="message-code-exec-header"
+              className={`relative ${isCodeExecExpanded ? 'mb-2' : 'mb-0'}`}
             >
               <ToolHeader
-                data-testid="message-code-exec-header"
-                className={`items-center justify-between ${isCodeExecExpanded ? 'mb-2' : 'mb-0'}`}
-              >
-                <div className="flex min-w-0 items-center gap-2">
-                  <Code2
-                    data-testid="message-code-exec-icon"
-                    className="h-4 w-4 shrink-0 text-muted-foreground"
+                data-testid="message-code-exec-toggle"
+                title={taskSummary}
+                toolName="code_exec"
+                type="dynamic-tool"
+                state={toolHeaderState}
+                className="bg-transparent pr-10 [&>div]:pointer-events-none [&>div]:invisible"
+              />
+              <div className="pointer-events-none absolute inset-y-0 left-3 right-10 flex min-w-0 items-center gap-2">
+                <Code2
+                  data-testid="message-code-exec-icon"
+                  className="h-4 w-4 shrink-0 text-muted-foreground"
+                />
+                <div
+                  data-testid="message-code-exec-title"
+                  className="min-w-0 truncate font-medium text-foreground"
+                >
+                  {taskSummary}
+                </div>
+                <div
+                  data-testid="message-code-exec-status"
+                  className="inline-flex shrink-0 items-center rounded-full border border-border/70 bg-transparent px-2 py-0.5 text-xs text-muted-foreground"
+                >
+                  <StatusIcon
+                    data-testid="message-code-exec-status-icon"
+                    className={`mr-1 h-3 w-3 shrink-0 ${statusIconColorClass} ${status === 'running' ? 'animate-spin' : ''}`}
                   />
+                  {status}
+                </div>
+              </div>
+            </div>
+            <ToolContent
+              data-testid="message-code-exec-content"
+              className="min-w-0 max-w-full grid-cols-1 overflow-hidden data-[state=closed]:pointer-events-none"
+            >
+              <div
+                data-testid="message-code-exec-input"
+                className="bg-transparent rounded-md border border-border/60 p-2 message-code-exec-text-section"
+              >
+                <MessageResponse className="message-response-transparent-code-blocks message-response-code-exec-input text-xs leading-relaxed">
+                  {buildJavaScriptFence(codeInput)}
+                </MessageResponse>
+              </div>
+              {stdout.length > 0 ? (
+                <div className="min-w-0 max-w-full overflow-hidden">
+                  <div className="mb-1 text-xs font-medium text-muted-foreground">stdout</div>
                   <div
-                    data-testid="message-code-exec-title"
-                    className="font-medium text-foreground"
+                    data-testid="message-code-exec-stdout"
+                    className="bg-transparent rounded-md border border-border/60 p-2 message-code-exec-text-section"
                   >
-                    {taskSummary}
-                  </div>
-                  <div
-                    data-testid="message-code-exec-status"
-                    className="inline-flex items-center rounded-full border border-border/70 bg-transparent px-2 py-0.5 text-xs text-muted-foreground"
-                  >
-                    <StatusIcon
-                      data-testid="message-code-exec-status-icon"
-                      className={`mr-1 h-3 w-3 shrink-0 ${statusIconColorClass} ${status === 'running' ? 'animate-spin' : ''}`}
-                    />
-                    {status}
+                    {stripAutoTitleMetadataComments(stdout)}
                   </div>
                 </div>
-                <CollapsibleTrigger asChild>
-                  <button
-                    data-testid="message-code-exec-toggle"
-                    type="button"
-                    className="group inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
+              ) : null}
+              {stderr.length > 0 ? (
+                <div className="min-w-0 max-w-full overflow-hidden">
+                  <div className="mb-1 text-xs font-medium text-muted-foreground">stderr</div>
+                  <div
+                    data-testid="message-code-exec-stderr"
+                    className="bg-transparent rounded-md border border-border/60 p-2 message-code-exec-text-section"
                   >
-                    <ChevronDownIcon className="h-4 w-4 transition-transform group-data-[state=closed]:-rotate-90" />
-                  </button>
-                </CollapsibleTrigger>
-              </ToolHeader>
-              <CollapsibleContent
-                data-testid="message-code-exec-content"
-                className="min-w-0 max-w-full overflow-hidden data-[state=closed]:pointer-events-none"
-              >
-                <ToolContent className="min-w-0 max-w-full grid-cols-1 overflow-hidden">
-                  <ToolInput
-                    data-testid="message-code-exec-input"
-                    className="bg-transparent message-code-exec-text-section"
+                    {stripAutoTitleMetadataComments(stderr)}
+                  </div>
+                </div>
+              ) : null}
+              {errorText ? (
+                <div className="min-w-0 max-w-full overflow-hidden">
+                  <div className="mb-1 text-xs font-medium text-muted-foreground">error</div>
+                  <div
+                    data-testid="message-code-exec-error"
+                    className="bg-transparent rounded-md border border-border/60 p-2 message-code-exec-text-section"
                   >
-                    <MessageResponse className="message-response-transparent-code-blocks message-response-code-exec-input text-xs leading-relaxed">
-                      {buildJavaScriptFence(codeInput)}
-                    </MessageResponse>
-                  </ToolInput>
-                  {stdout.length > 0 ? (
-                    <div className="min-w-0 max-w-full overflow-hidden">
-                      <div className="mb-1 text-xs font-medium text-muted-foreground">stdout</div>
-                      <ToolOutput
-                        data-testid="message-code-exec-stdout"
-                        className="bg-transparent message-code-exec-text-section"
-                      >
-                        {stripAutoTitleMetadataComments(stdout)}
-                      </ToolOutput>
-                    </div>
-                  ) : null}
-                  {stderr.length > 0 ? (
-                    <div className="min-w-0 max-w-full overflow-hidden">
-                      <div className="mb-1 text-xs font-medium text-muted-foreground">stderr</div>
-                      <ToolOutput
-                        data-testid="message-code-exec-stderr"
-                        className="bg-transparent message-code-exec-text-section"
-                      >
-                        {stripAutoTitleMetadataComments(stderr)}
-                      </ToolOutput>
-                    </div>
-                  ) : null}
-                  {errorText ? (
-                    <div className="min-w-0 max-w-full overflow-hidden">
-                      <div className="mb-1 text-xs font-medium text-muted-foreground">error</div>
-                      <ToolOutput
-                        data-testid="message-code-exec-error"
-                        className="bg-transparent message-code-exec-text-section"
-                      >
-                        {stripAutoTitleMetadataComments(errorText)}
-                      </ToolOutput>
-                    </div>
-                  ) : null}
-                </ToolContent>
-              </CollapsibleContent>
-            </Tool>
-          </Collapsible>
+                    {stripAutoTitleMetadataComments(errorText)}
+                  </div>
+                </div>
+              ) : null}
+            </ToolContent>
+          </Tool>
         </Message>
       );
     }
 
     const toolName = toolPart.toolName;
-    const callId = toolPart.toolCallId;
-    const toolInput = JSON.stringify(toolPart.input ?? {}, null, 2);
-    const toolStatus =
-      toolPart.state === 'output-error'
-        ? 'error'
-        : toolPart.state === 'output-available'
-          ? 'success'
-          : 'in-progress';
-
-    const toolOutput =
-      toolPart.state === 'output-error'
-        ? (toolPart.errorText ?? 'Tool execution failed')
-        : toolPart.state === 'output-available'
-          ? JSON.stringify(toolPart.output ?? {}, null, 2)
-          : '';
 
     return (
       <Message from="assistant" className="w-full max-w-full">
         <Tool data-testid="message-tool-call">
-          <ToolHeader data-testid="message-tool-call-header">
-            <div className="font-medium text-foreground">{toolName}</div>
-            <div className="text-xs text-muted-foreground">
-              {toolStatus} · {callId}
-            </div>
-          </ToolHeader>
+          <ToolHeader
+            data-testid="message-tool-call-header"
+            title={toolName}
+            toolName={toolName}
+            type="dynamic-tool"
+            state={toolPart.state}
+          />
           <ToolContent>
-            <div>
-              <div className="mb-1 text-xs font-medium text-muted-foreground">Input</div>
-              <ToolInput data-testid="message-tool-call-input">{toolInput}</ToolInput>
-            </div>
+            <ToolInput data-testid="message-tool-call-input" input={toolPart.input ?? {}} />
             {toolPart.state === 'output-available' || toolPart.state === 'output-error' ? (
-              <div>
-                <div className="mb-1 text-xs font-medium text-muted-foreground">Output</div>
-                <ToolOutput data-testid="message-tool-call-output">{toolOutput}</ToolOutput>
-              </div>
+              <ToolOutput
+                data-testid="message-tool-call-output"
+                output={toolPart.state === 'output-available' ? (toolPart.output ?? {}) : undefined}
+                errorText={
+                  toolPart.state === 'output-error'
+                    ? (toolPart.errorText ?? 'Tool execution failed')
+                    : undefined
+                }
+              />
             ) : null}
           </ToolContent>
         </Tool>
