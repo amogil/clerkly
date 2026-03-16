@@ -287,16 +287,22 @@ export function AgentChat({
     syncPromptTextareaHeight(textarea);
   }, [isActive, taskInput, syncPromptTextareaHeight]);
 
+  // Requirements: agents.4.2.2, agents.4.3
   const handleSubmit = useCallback(
     async (message: PromptInputMessage) => {
-      const messageText = message.text?.trim();
+      const submittedText = message.text ?? '';
+      const messageText = submittedText.trim();
       if (!messageText) {
         setTaskInput('');
         return;
       }
+
+      // Clear the controlled value as soon as the chat request is submitted.
+      setTaskInput('');
+
       const sent = await sendMessage(messageText);
-      if (sent) {
-        setTaskInput('');
+      if (!sent) {
+        setTaskInput(submittedText);
       }
     },
     [sendMessage]
@@ -357,7 +363,10 @@ export function AgentChat({
         className="flex-shrink-0 overflow-y-auto pl-6 pr-6 [scrollbar-gutter:stable]"
         data-testid="agent-chat-input-area"
       >
-        <PromptInput className="mt-2" onSubmit={handleSubmit}>
+        <PromptInput
+          className="mt-2 [&_[data-slot=input-group]]:border-border/80 [&_[data-slot=input-group]]:bg-background"
+          onSubmit={handleSubmit}
+        >
           <PromptInputBody>
             <PromptInputTextarea
               className="block flex-none max-h-32 px-3 [field-sizing:fixed]"

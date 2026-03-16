@@ -1239,9 +1239,11 @@ function ActivityIndicator({ isActive }: { isActive: boolean }) {
 - `"PromptInput"` используется как корневой контейнер области ввода.
 - `"PromptInputTextarea"` отображает многострочное поле ввода сообщения.
 - Область ввода выровнена по той же визуальной ширине контентной колонки, что и `"ConversationContent"` с сообщениями; для сохранения правого visual inset используется такой же зарезервированный scrollbar gutter на wrapper области ввода.
+- Usage-layer `AgentChat` усиливает default visibility unfocused input-контейнера через descendant styling на внутреннем `"InputGroup"`, не переопределяя built-in focus ring.
 - Footer внутри `"PromptInput"` использует стандартную композицию `"PromptInputFooter"` с `"PromptInputTools"` слева и action-кнопкой `"PromptInputSubmit"` справа.
 - Shortcut hint `Press Enter to send, Shift+Enter for new line` отображается отдельной подписью под рамкой поля ввода с одинаковым вертикальным inset сверху и снизу.
 - Отправка сообщения и остановка активной генерации управляются из `AgentChat` через submit/stop mode.
+- `"PromptInputTextarea"` используется как controlled поле; `AgentChat` очищает controlled `value` сразу после успешного старта submit-path и восстанавливает исходный текст только если `sendMessage(...)` возвращает ошибку до передачи запроса в чат.
 
 **Поведение:**
 - Клавиатурное поведение (`Enter` submit, `Shift+Enter` newline) обеспечивается самим input stack без отдельного app-owned `onKeyDown` слоя в `AgentChat`.
@@ -1251,8 +1253,9 @@ function ActivityIndicator({ isActive }: { isActive: boolean }) {
   - количество видимых строк вычисляется из числа явных строк в `value` и ограничивается диапазоном `2..5`;
   - inline `height` вычисляется из `line-height` и vertical inset textarea для текущего количества видимых строк;
   - начиная с шестой строки `overflowY` переключается в `auto`, а высота остаётся на уровне пяти видимых строк.
-- Этот sizing-layer SHALL NOT управлять keyboard contract, submit/reset flow или text-state вне controlled `value`/`onChange`.
+- Этот sizing-layer SHALL NOT управлять keyboard contract и SHALL NOT изменять submit/reset flow вне controlled `value`/`onChange`.
 - Usage-layer `AgentChat` задаёт placeholder, send/stop behavior, внешний horizontal inset области ввода и shortcut hint под рамкой поля ввода.
+- Unfocused input container использует более заметные border/background usage-level overrides, а focus-state остаётся встроенным `"InputGroup"` focus-visible ring.
 
 **App-level setup:** renderer root (`App`) содержит единый `TooltipProvider`, потому что `PromptInput` и другие AI Elements используют tooltip primitives на уровне приложения.
 

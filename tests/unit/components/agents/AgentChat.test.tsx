@@ -106,9 +106,11 @@ jest.mock('../../../../src/renderer/components/ai-elements/prompt-input', () => 
 
   const PromptInput = ({
     children,
+    className,
     onSubmit,
   }: {
     children: React.ReactNode;
+    className?: string;
     onSubmit?: (message: { text?: string }) => void | Promise<void>;
   }) => {
     const providerContext = React.useContext(PromptContext);
@@ -119,6 +121,7 @@ jest.mock('../../../../src/renderer/components/ai-elements/prompt-input', () => 
     return (
       <form
         data-testid="agent-prompt-input"
+        className={className}
         onSubmit={async (event) => {
           event.preventDefault();
           const result = onSubmit?.({ text });
@@ -463,10 +466,16 @@ describe('AgentChat — messages rendering', () => {
 describe('AgentChat — send message', () => {
   /* Preconditions: user types text and submits
      Action: change input value, click submit
-     Assertions: sendMessage called with trimmed text
-     Requirements: agents.4.3 */
+     Assertions: sendMessage called with trimmed text and input is cleared immediately after submit starts
+     Requirements: agents.4.3.1, agents.4.3.2 */
   it('should call sendMessage and clear input on submit', async () => {
-    mockSendMessage.mockResolvedValue(true);
+    let resolveSend: ((value: boolean) => void) | null = null;
+    mockSendMessage.mockImplementation(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveSend = resolve;
+        })
+    );
     render(<AgentChat {...defaultProps} />);
 
     // Type into the controlled input — triggers onChange → setTaskInput
@@ -480,6 +489,11 @@ describe('AgentChat — send message', () => {
     });
 
     expect(mockSendMessage).toHaveBeenCalledWith('Hello agent');
+    expect(screen.getByTestId('auto-expanding-textarea')).toHaveValue('');
+
+    await act(async () => {
+      resolveSend?.(true);
+    });
   });
 
   /* Preconditions: AgentWelcome prompt clicked
@@ -502,7 +516,7 @@ describe('AgentChat — send message', () => {
   /* Preconditions: sendMessage returns false (error)
      Action: submit message
      Assertions: input NOT cleared (message preserved for retry)
-     Requirements: agents.4.3 */
+     Requirements: agents.4.3.3 */
   it('should NOT clear input when sendMessage returns false', async () => {
     mockSendMessage.mockResolvedValue(false);
     render(<AgentChat {...defaultProps} />);
@@ -588,6 +602,19 @@ describe('AgentChat — PromptInput rendered', () => {
   it('should render PromptInput', () => {
     render(<AgentChat {...defaultProps} />);
     expect(screen.getByTestId('agent-prompt-input')).toBeInTheDocument();
+  });
+
+  /* Preconditions: component rendered with idle input
+     Action: inspect PromptInput root classes
+     Assertions: usage-level unfocused visibility styling is applied without replacing vendor focus ownership
+     Requirements: agents.4.7.4, agents.4.7.5 */
+  it('should apply usage-level unfocused input visibility styling', () => {
+    render(<AgentChat {...defaultProps} />);
+
+    expect(screen.getByTestId('agent-prompt-input')).toHaveClass(
+      '[&_[data-slot=input-group]]:border-border/80',
+      '[&_[data-slot=input-group]]:bg-background'
+    );
   });
 
   /* Preconditions: component rendered

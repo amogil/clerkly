@@ -70,6 +70,26 @@ test.describe('Agent Messaging', () => {
     await expect(sendButton).toBeDisabled();
   });
 
+  /* Preconditions: Agent is active, send mode is visible
+     Action: Type prompt text and click send button
+     Assertions: Textarea is cleared immediately after submit starts and message is sent
+     Requirements: agents.4.2.2, agents.4.3.1, agents.4.3.2 */
+  test('should clear input after clicking send button', async () => {
+    const messageInput = activeChat(window).textarea;
+    const sendButton = window.locator('[data-testid="prompt-input-send"]');
+
+    await expect(messageInput).toBeVisible();
+    await messageInput.fill('Click send message');
+    await expect(sendButton).toBeEnabled();
+
+    await sendButton.click();
+
+    await expect(messageInput).toHaveValue('', { timeout: 1000 });
+
+    const userMessage = activeChat(window).userMessages.filter({ hasText: 'Click send message' });
+    await expect(userMessage).toHaveCount(1, { timeout: 5000 });
+  });
+
   /* Preconditions: Last visible message is llm(done=false), so agent is in-progress and stop mode is visible
      Action: Change input text between empty and non-empty values
      Assertions: Stop button remains enabled regardless of input content

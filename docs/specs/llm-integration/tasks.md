@@ -97,6 +97,7 @@
   - [x] Выровнять input area по визуальной ширине контентной колонки сообщений и вынести shortcut hint под рамку поля ввода с симметричным вертикальным inset.
   - [x] Зафиксировать продуктовый textarea sizing contract: две видимые строки по умолчанию, поэтапный рост до пяти строк и внутренний scroll начиная с шестой строки.
   - [x] Реализовать app-owned textarea sizing в `AgentChat`, не вмешиваясь в keyboard contract, submit/reset flow и остальное поведение `PromptInput`.
+  - [x] Очистить controlled `PromptInputTextarea` сразу после успешного старта submit-path и восстанавливать текст только при ошибке отправки до передачи запроса в чат.
   - [x] Завершить cleanup renderer-layer после миграции `PromptInput`: убрать legacy hooks/таймеры в `AgentChat`, оставив только финальный sizing/layout слой и текущий controlled text state.
 
 - [x] Синхронизировать tests под новый `Tool` contract.
