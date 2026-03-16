@@ -59,7 +59,8 @@
 #### Фаза 4: Tool Contract Migration
 
 - [ ] Привести локальный vendored `Tool` к официальному AI Elements `Tool` contract.
-  - [x] Обновить `Tool` через официальный AI Elements CLI (`npx ai-elements@latest add tool`), а не ручными правками vendored компонента.
+  - [x] Обновлять AI Elements только через каноническую команду полного обновления `npm run ai-elements:update-all`, а не ручными правками vendored компонентов.
+  - [ ] После каждого CLI-обновления AI Elements проверять обязательные app-level интеграции, которые сообщает CLI/output (например, необходимость обернуть приложение в `TooltipProvider`).
   - [ ] Синхронизировать `src/renderer/components/ai-elements/tool.tsx` с upstream API.
   - [ ] Синхронизировать `src/components/ai-elements/tool.tsx` с тем же contract.
   - [ ] Зафиксировать policy для CLI-generated renderer vendor directories: `src/renderer/components/ui/**` и `src/renderer/components/ai-elements/**` не должны автоматически переписываться локальными ESLint/Prettier правилами репо.
