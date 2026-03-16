@@ -148,6 +148,8 @@ describe('AgentMessage — tool_call', () => {
     expect(screen.getByTestId('message-code-exec-block')).toHaveClass('overflow-hidden');
     expect(screen.getByTestId('message-code-exec-toggle')).toBeInTheDocument();
     expect(screen.getByTestId('message-code-exec-toggle')).toHaveTextContent('Print ok to stdout');
+    expect(screen.getByTestId('message-code-exec-toggle')).toHaveClass('relative');
+    expect(screen.getByTestId('message-code-exec-toggle')).toHaveClass('z-10');
     expect(screen.getByTestId('message-code-exec-status-icon')).toHaveAttribute(
       'data-status',
       'success'
@@ -165,6 +167,9 @@ describe('AgentMessage — tool_call', () => {
     expect(screen.getByTestId('message-code-exec-content')).toHaveClass('min-w-0');
     expect(screen.getByTestId('message-code-exec-content')).toHaveClass('max-w-full');
     expect(screen.getByTestId('message-code-exec-content')).toHaveClass('overflow-hidden');
+    expect(screen.getByTestId('message-code-exec-content')).toHaveClass(
+      'data-[state=closed]:pointer-events-none'
+    );
     expect(screen.getByTestId('message-code-exec-input')).toHaveTextContent("console.log('ok')");
     expect(screen.getByTestId('message-code-exec-input')).toHaveTextContent('```JavaScript');
     expect(

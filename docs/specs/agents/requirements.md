@@ -571,6 +571,7 @@
 7.4.6.1. Для визуализации `tool_call(code_exec)` ДОЛЖЕН использоваться компонент AI Elements `Tool` (см. [https://elements.ai-sdk.dev/components/tool](https://elements.ai-sdk.dev/components/tool)).
 
 7.4.6.2. Заголовок блока `tool_call(code_exec)` ДОЛЖЕН использовать стандартный toggle компонента `Tool` без дополнительного app-owned overlay поверх toggle hit area.
+7.4.6.2.1. Верхний правый угол заголовка `tool_call(code_exec)` (включая область chevron) ДОЛЖЕН оставаться hit-testable для стандартного toggle и ДОЛЖЕН быть свободен от перекрытия скрытыми интерактивными элементами секций `JavaScript`/`Output`/`Error`.
 
 7.4.6.3. Заголовок блока `tool_call(code_exec)` ДОЛЖЕН отображать краткое описание работы из `arguments.task_summary`.
 

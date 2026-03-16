@@ -1546,6 +1546,7 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 **Сообщения выполнения кода (`kind: 'tool_call'`, `toolName: 'code_exec'`):**
 - Используется отдельный блок выполнения кода, не являющийся обычным текстовым bubble.
 - Блок строится на стандартной композиции AI Elements `Tool`: `Tool` root, стандартный `ToolHeader` как единственный toggle и `ToolContent` как content-контейнер.
+- `code_exec`-header получает приоритет по слою (`z-index`) над `ToolContent`, а скрытый `ToolContent` в закрытом состоянии не участвует в hit-testing (`pointer-events: none`), чтобы верхний правый угол заголовка и chevron не перекрывались actions внутренних code block sections.
 - Заголовок блока использует `arguments.task_summary` как `title` для стандартного `ToolHeader`.
 - UI использует `arguments.task_summary` из persisted payload как текст заголовка; валидация и ограничения этого поля определяются спецификацией `code_exec`.
 - Для persisted historical payload без `arguments.task_summary` UI использует fallback-заголовок `"Code"`; это compatibility path для записей, созданных до введения поля `task_summary`.

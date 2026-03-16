@@ -289,7 +289,7 @@ export function AgentMessage({
           >
             <CollapsibleTrigger
               data-testid="message-code-exec-toggle"
-              className="flex w-full items-center justify-between gap-4 p-3"
+              className="relative z-10 flex w-full items-center justify-between gap-4 p-3"
             >
               <div className="flex items-center gap-2">
                 <span
@@ -305,7 +305,7 @@ export function AgentMessage({
             </CollapsibleTrigger>
             <ToolContent
               data-testid="message-code-exec-content"
-              className="min-w-0 max-w-full grid-cols-1 overflow-hidden"
+              className="relative z-0 min-w-0 max-w-full grid-cols-1 overflow-hidden data-[state=closed]:pointer-events-none"
             >
               <div className="min-w-0 max-w-full overflow-hidden">
                 <div
