@@ -1593,6 +1593,7 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 - Для model-run порядка используются поля snapshot `runId/attemptId/sequence` (поступают из колонок `messages.run_id/attempt_id/sequence`), без чтения `payload.data.order`.
 - UI рендерит только persisted `kind: tool_call` snapshots из видимой истории сообщений и не материализует отдельные промежуточные блоки вне persisted-потока.
 - Сообщения с `hidden = true` полностью исключаются из renderer-проекции перед построением порядка, чтобы failed-attempt артефакты не попадали в видимый поток.
+- Перед отображением user-visible persisted text renderer удаляет служебные comments вида `<!-- clerkly:title-meta: ... -->` как defense-in-depth для historical payloads и regressions, где metadata уже успела сохраниться.
 - Компонент не имеет отдельного заголовка; рендерится только checklist `summary_points`.
 - Каждый checklist-пункт рендерится с иконкой `Check` в зелёном круге.
 - Контент каждого checklist-пункта рендерится через общий markdown-рендерер `"MessageResponse"` (тот же markdown-контракт, что у `kind: llm`).

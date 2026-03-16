@@ -8,7 +8,7 @@
 - оставшимися follow-up задачами после Issue #65 (`sandbox-http-request`) в части LLM/code_exec интеграции;
 - миграцией `code_exec` renderer на стандартный AI Elements `Tool` contract.
 
-**Текущий статус:** Фаза 3 — renderer defense-in-depth
+**Текущий статус:** Фаза 4 — Tool Contract Migration
 
 ---
 
@@ -35,9 +35,10 @@
 - ✅ Выявлено, что текущий локальный `Tool` wrapper разошёлся с официальным AI Elements `Tool` collapsible contract.
 - ✅ Фаза 1 завершена: `llm-integration` requirements/design синхронизированы с текущим provider loop contract и явно фиксируют documented safety step cap вместо semantic stop по `final_answer`.
 - ✅ Фаза 2 завершена: `MainPipeline` блокирует `<!-- clerkly:title-meta: ... -->` в string-полях аргументов tool_call до persist; минимум покрыт `code_exec.task_summary`, а unit-regressions добавлены.
+- ✅ Фаза 3 завершена: renderer удаляет `<!-- clerkly:title-meta: ... -->` из persisted historical tool payload text перед отображением; добавлены unit-regressions для `code_exec` и `final_answer`.
 
 ### В работе
-- 🔄 Фаза 3: renderer-side защита для historical payloads и regressions, где metadata comment мог попасть в UI до runtime guard.
+- 🔄 Фаза 4: миграция `code_exec` renderer на стандартный AI Elements `Tool` contract.
 
 ### Запланировано
 
@@ -50,16 +51,18 @@
 
 #### Фаза 3: Renderer defense-in-depth
 
-- [ ] Добавить renderer-side защиту от служебных metadata comments.
-  - [ ] Обновить `src/renderer/components/agents/AgentMessage.tsx`.
-  - [ ] Скрывать/фильтровать `clerkly:title-meta` comments перед отображением user-visible tool text.
-  - [ ] Не полагаться только на renderer: использовать это как страховку для historical payloads и regressions.
+- [x] Добавить renderer-side защиту от служебных metadata comments.
+  - [x] Обновить `src/renderer/components/agents/AgentMessage.tsx`.
+  - [x] Скрывать/фильтровать `clerkly:title-meta` comments перед отображением user-visible tool text.
+  - [x] Не полагаться только на renderer: использовать это как страховку для historical payloads и regressions.
 
 #### Фаза 4: Tool Contract Migration
 
 - [ ] Привести локальный vendored `Tool` к официальному AI Elements `Tool` contract.
+  - [x] Обновить `Tool` через официальный AI Elements CLI (`npx ai-elements@latest add tool`), а не ручными правками vendored компонента.
   - [ ] Синхронизировать `src/renderer/components/ai-elements/tool.tsx` с upstream API.
   - [ ] Синхронизировать `src/components/ai-elements/tool.tsx` с тем же contract.
+  - [ ] Зафиксировать policy для CLI-generated renderer vendor directories: `src/renderer/components/ui/**` и `src/renderer/components/ai-elements/**` не должны автоматически переписываться локальными ESLint/Prettier правилами репо.
   - [ ] Зафиксировать в `docs/specs/agents/design.md`, что `code_exec` использует стандартный `Tool` collapsible pattern, а не внешний ручной wrapper.
 
 - [ ] Перевести `code_exec` renderer на стандартный `Tool` usage.

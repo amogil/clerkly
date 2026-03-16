@@ -4,3 +4,5 @@ coverage
 release
 *.md
 package-lock.json
+src/renderer/components/ui/**
+src/renderer/components/ai-elements/**

@@ -297,6 +297,62 @@ describe('AgentMessage — tool_call', () => {
     expect(screen.getByTestId('message-code-exec-title')).toHaveTextContent('Code');
   });
 
+  /* Preconditions: persisted historical tool_call payloads contain auto-title metadata comments in visible tool text fields
+     Action: render AgentMessage for code_exec header and final_answer checklist
+     Assertions: renderer strips metadata comments from persisted tool text before display
+     Requirements: agents.7.4.2.2.1, agents.7.4.6.3, agents.14.5 */
+  it('should strip auto-title metadata comments from persisted tool payload text', () => {
+    const codeExecMessage = baseMessage({
+      kind: 'tool_call',
+      done: true,
+      payload: {
+        data: {
+          callId: 'call-code-title-meta-render',
+          toolName: 'code_exec',
+          arguments: {
+            task_summary:
+              'Attempt <!-- clerkly:title-meta: {"title":"Hidden","rename_need_score":90} --> request',
+          },
+          output: {
+            status: 'error',
+            stdout: 'stdout\n',
+            stderr: 'stderr\n',
+            stdout_truncated: false,
+            stderr_truncated: false,
+          },
+        },
+      },
+    });
+
+    const finalAnswerMessage = baseMessage({
+      kind: 'tool_call',
+      done: true,
+      payload: {
+        data: {
+          callId: 'call-final-title-meta-render',
+          toolName: 'final_answer',
+          arguments: {
+            summary_points: [
+              'Visible <!-- clerkly:title-meta: {"title":"Hidden","rename_need_score":90} --> point',
+              '<!-- clerkly:title-meta: {"title":"Hidden","rename_need_score":90} -->',
+            ],
+          },
+        },
+      },
+    });
+
+    const { rerender } = render(<AgentMessage message={codeExecMessage} />);
+
+    expect(screen.getByTestId('message-code-exec-title')).toHaveTextContent('Attempt request');
+    expect(screen.queryByText(/clerkly:title-meta:/)).not.toBeInTheDocument();
+
+    rerender(<AgentMessage message={finalAnswerMessage} />);
+
+    expect(screen.getAllByTestId('message-final-answer-item')).toHaveLength(1);
+    expect(screen.getByTestId('message-final-answer-summary')).toHaveTextContent(/Visible\s+point/);
+    expect(screen.queryByText(/clerkly:title-meta:/)).not.toBeInTheDocument();
+  });
+
   /* Preconditions: persisted kind:tool_call for final_answer with summary_points
      Action: render AgentMessage
      Assertions: renders Final Answer checklist items without title/header

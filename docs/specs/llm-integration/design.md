@@ -850,6 +850,7 @@ User отправляет сообщение
 - `tests/unit/agents/MainPipeline.test.ts` — integration rename-flow: первое валидное вхождение, отсутствие модификации output-stream, fallback при invalid comment
 - `tests/unit/agents/MainPipeline.test.ts` — per-turn prompt injection: контракт auto-title добавляется только на eligible turn (cooldown/meaningful guards)
 - `tests/unit/agents/MainPipeline.test.ts` — runtime guard: `<!-- clerkly:title-meta: ... -->` отклоняется в аргументах tool_call до persist (`final_answer`, `code_exec.task_summary`)
+- `tests/unit/components/agents/AgentMessage.test.tsx` — renderer defense-in-depth: persisted historical `tool_call` payload с `<!-- clerkly:title-meta: ... -->` не показывает metadata comment в UI
 - `tests/unit/agents/AgentTitleNormalization.test.ts` — нормализация/валидация title (single-line, trim, punctuation, max 200)
 - `tests/unit/agents/AgentTitleAntiFlap.test.ts` — guards anti-flapping (exact match, `rename_need_score` threshold, cooldown)
 

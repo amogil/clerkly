@@ -25,6 +25,8 @@ import { AgentErrorDialog } from './AgentErrorDialog';
 import type { AgentDialogActionItem } from './AgentDialog';
 import { AgentReasoningTrigger } from './AgentReasoningTrigger';
 
+const TITLE_META_COMMENT_RENDER_PATTERN = /<!--\s*clerkly:title-meta:[\s\S]*?(?:-->|$)/g;
+
 interface AgentMessageProps {
   message: MessageSnapshot;
   isReasoningStreaming?: boolean;
@@ -37,6 +39,16 @@ export function buildJavaScriptFence(code: string): string {
   const fenceLength = Math.max(3, longestBacktickRun + 1);
   const fence = '`'.repeat(fenceLength);
   return `${fence}javascript\n${code}\n${fence}`;
+}
+
+// Requirements: agents.7.4.2.2.1, agents.14.5
+function stripAutoTitleMetadataComments(text: string): string {
+  return text.replace(TITLE_META_COMMENT_RENDER_PATTERN, '');
+}
+
+// Requirements: agents.7.4.2.2.1, agents.7.4.6.3, agents.14.5
+function sanitizeInlineToolText(text: string): string {
+  return stripAutoTitleMetadataComments(text).replace(/\s{2,}/g, ' ').trim();
 }
 
 function getCodeExecStatusIcon(status: string) {
@@ -89,9 +101,13 @@ export function AgentMessage({
   const llmReasoning = llmData?.['reasoning'] as { text?: string } | undefined;
   const llmTextRaw =
     typeof llmData?.['text'] === 'string' ? (llmData['text'] as string) : undefined;
-  const llmText = llmTextRaw ? normalizeMathDelimiters(llmTextRaw) : undefined;
+  const llmText = llmTextRaw
+    ? normalizeMathDelimiters(stripAutoTitleMetadataComments(llmTextRaw))
+    : undefined;
   const llmReasoningText = llmReasoning?.text
-    ? normalizeMathDelimiters(normalizeReasoningMarkdownSpacing(llmReasoning.text))
+    ? normalizeMathDelimiters(
+        normalizeReasoningMarkdownSpacing(stripAutoTitleMetadataComments(llmReasoning.text))
+      )
     : undefined;
 
   if (message.kind === 'user') {
@@ -208,7 +224,10 @@ export function AgentMessage({
           : undefined;
       const summaryPointsRaw = args?.['summary_points'];
       const summaryPoints = Array.isArray(summaryPointsRaw)
-        ? summaryPointsRaw.filter((point): point is string => typeof point === 'string')
+        ? summaryPointsRaw
+            .filter((point): point is string => typeof point === 'string')
+            .map((point) => stripAutoTitleMetadataComments(point))
+            .filter((point) => point.trim().length > 0)
         : [];
 
       return (
@@ -277,11 +296,11 @@ export function AgentMessage({
           : (errorMessage ?? errorCode ?? null);
       const codeInput =
         toolData.arguments && typeof toolData.arguments.code === 'string'
-          ? toolData.arguments.code
-          : JSON.stringify(toolData.arguments ?? {}, null, 2);
+          ? stripAutoTitleMetadataComments(toolData.arguments.code)
+          : stripAutoTitleMetadataComments(JSON.stringify(toolData.arguments ?? {}, null, 2));
       const taskSummary =
         toolData.arguments && typeof toolData.arguments.task_summary === 'string'
-          ? toolData.arguments.task_summary
+          ? sanitizeInlineToolText(toolData.arguments.task_summary) || 'Code'
           : 'Code';
       const StatusIcon = getCodeExecStatusIcon(status);
       const statusIconColorClass = getCodeExecStatusIconColorClass(status);
@@ -353,7 +372,7 @@ export function AgentMessage({
                         data-testid="message-code-exec-stdout"
                         className="bg-transparent message-code-exec-text-section"
                       >
-                        {stdout}
+                        {stripAutoTitleMetadataComments(stdout)}
                       </ToolOutput>
                     </div>
                   ) : null}
@@ -364,7 +383,7 @@ export function AgentMessage({
                         data-testid="message-code-exec-stderr"
                         className="bg-transparent message-code-exec-text-section"
                       >
-                        {stderr}
+                        {stripAutoTitleMetadataComments(stderr)}
                       </ToolOutput>
                     </div>
                   ) : null}
@@ -375,7 +394,7 @@ export function AgentMessage({
                         data-testid="message-code-exec-error"
                         className="bg-transparent message-code-exec-text-section"
                       >
-                        {errorText}
+                        {stripAutoTitleMetadataComments(errorText)}
                       </ToolOutput>
                     </div>
                   ) : null}
