@@ -25,8 +25,10 @@ describe('PromptInput', () => {
       <PromptInput onSubmit={jest.fn()}>
         <PromptInputBody>
           <PromptInputTextarea data-testid="auto-expanding-textarea" onChange={onChange} value="" />
-          <PromptInputSubmit />
         </PromptInputBody>
+        <PromptInputFooter>
+          <PromptInputSubmit />
+        </PromptInputFooter>
       </PromptInput>
     );
 
@@ -59,8 +61,10 @@ describe('PromptInput', () => {
               }
               value={value}
             />
-            <PromptInputSubmit />
           </PromptInputBody>
+          <PromptInputFooter>
+            <PromptInputSubmit />
+          </PromptInputFooter>
         </PromptInput>
       );
     };
@@ -91,8 +95,10 @@ describe('PromptInput', () => {
             onChange={jest.fn()}
             value="Hello"
           />
-          <PromptInputSubmit />
         </PromptInputBody>
+        <PromptInputFooter>
+          <PromptInputSubmit />
+        </PromptInputFooter>
       </PromptInput>
     );
 
@@ -113,10 +119,10 @@ describe('PromptInput', () => {
       <PromptInput onSubmit={jest.fn()}>
         <PromptInputBody>
           <PromptInputTextarea onChange={jest.fn()} value="" />
-          <PromptInputSubmit />
         </PromptInputBody>
         <PromptInputFooter>
           <p>Press Enter to send, Shift+Enter for new line</p>
+          <PromptInputSubmit />
         </PromptInputFooter>
       </PromptInput>
     );
@@ -135,8 +141,10 @@ describe('PromptInput', () => {
       <PromptInput onSubmit={jest.fn()}>
         <PromptInputBody>
           <PromptInputTextarea ref={ref} onChange={jest.fn()} value="" />
-          <PromptInputSubmit />
         </PromptInputBody>
+        <PromptInputFooter>
+          <PromptInputSubmit />
+        </PromptInputFooter>
       </PromptInput>
     );
 
@@ -160,8 +168,10 @@ describe('PromptInput', () => {
               }
               value={value}
             />
-            <PromptInputSubmit />
           </PromptInputBody>
+          <PromptInputFooter>
+            <PromptInputSubmit />
+          </PromptInputFooter>
         </PromptInput>
       );
     };
@@ -193,8 +203,10 @@ describe('PromptInput', () => {
               }
               value={value}
             />
-            <PromptInputSubmit />
           </PromptInputBody>
+          <PromptInputFooter>
+            <PromptInputSubmit />
+          </PromptInputFooter>
         </PromptInput>
       );
     };
@@ -221,8 +233,10 @@ describe('PromptInput', () => {
             onChange={jest.fn()}
             value=""
           />
-          <PromptInputSubmit />
         </PromptInputBody>
+        <PromptInputFooter>
+          <PromptInputSubmit />
+        </PromptInputFooter>
       </PromptInput>
     );
 
@@ -251,8 +265,10 @@ describe('PromptInput', () => {
               }
               value={value}
             />
-            <PromptInputSubmit />
           </PromptInputBody>
+          <PromptInputFooter>
+            <PromptInputSubmit />
+          </PromptInputFooter>
         </PromptInput>
       );
     };

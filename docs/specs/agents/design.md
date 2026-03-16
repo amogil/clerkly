@@ -1238,7 +1238,8 @@ function ActivityIndicator({ isActive }: { isActive: boolean }) {
 **Структура:**
 - `"PromptInput"` используется как корневой контейнер области ввода.
 - `"PromptInputTextarea"` отображает многострочное поле ввода сообщения.
-- Footer отображает shortcut hint: `Press Enter to send, Shift+Enter for new line`.
+- Footer внутри `"PromptInput"` содержит только action-кнопку отправки/остановки.
+- Shortcut hint `Press Enter to send, Shift+Enter for new line` отображается отдельной подписью под рамкой поля ввода.
 - Отправка сообщения и остановка активной генерации управляются из `AgentChat` через submit/stop mode.
 
 **Поведение:**
@@ -1250,7 +1251,7 @@ function ActivityIndicator({ isActive }: { isActive: boolean }) {
 
 **Алгоритм активности action-кнопки (agents.4.2, agents.4.2.1, agents.4.2.2):**
 - Режим `stop` (`agent.status === 'in-progress'`) — кнопка всегда активна, независимо от текста в поле ввода.
-- Режим `send` (любой статус кроме `in-progress`) — кнопка активна только если `taskInput.trim().length > 0`.
+- Режим `send` (любой статус кроме `in-progress`) — кнопка активна только если поле ввода содержит непустой текст.
 
 #### Автоскролл к последнему сообщению
 

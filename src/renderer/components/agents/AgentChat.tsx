@@ -2,14 +2,13 @@
 // Per-agent chat component — mounted at startup, stays mounted forever.
 // Scroll position is managed by Conversation (use-stick-to-bottom) — preserved automatically.
 
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { motion } from 'framer-motion';
 import { CornerDownLeft, Square } from 'lucide-react';
 import { useAgentChat } from '../../hooks/useAgentChat';
 import { AgentMessage } from './AgentMessage';
 import { AgentWelcome } from './AgentWelcome';
 import { RateLimitBanner } from './RateLimitBanner';
-import { Button } from '../ui/button';
 import {
   Conversation,
   ConversationContent,
@@ -123,6 +122,7 @@ export function AgentChat({
   const { rawMessages, sendMessage, cancelCurrentRequest, isLoading, isStreaming } = useAgentChat(
     agent.id
   );
+  const [hasText, setHasText] = useState(false);
   const stickContextRef = useRef<StickToBottomContext | null>(null);
   const hasReachedStartupSettledRef = useRef(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -256,8 +256,14 @@ export function AgentChat({
   const handleSubmit = useCallback(
     async (message: PromptInputMessage) => {
       const messageText = message.text?.trim();
-      if (!messageText) return;
-      await sendMessage(messageText);
+      if (!messageText) {
+        setHasText(false);
+        return;
+      }
+      const sent = await sendMessage(messageText);
+      if (sent) {
+        setHasText(false);
+      }
     },
     [sendMessage]
   );
@@ -318,30 +324,30 @@ export function AgentChat({
           <PromptInputBody>
             <PromptInputTextarea
               data-testid="auto-expanding-textarea"
+              onChange={(event) => {
+                setHasText(event.currentTarget.value.trim().length > 0);
+              }}
               placeholder="Ask, reply, or give command..."
             />
-            {isInProgress ? (
-              <Button
-                className="h-10 w-10 shrink-0 p-0"
-                data-testid="prompt-input-stop"
-                onClick={() => void handleStop()}
-                type="button"
-              >
-                <Square className="h-4 w-4 fill-current" />
-                <span className="sr-only">Stop generation</span>
-              </Button>
-            ) : (
-              <PromptInputSubmit data-testid="prompt-input-send">
-                <CornerDownLeft className="h-4 w-4" />
-              </PromptInputSubmit>
-            )}
           </PromptInputBody>
           <PromptInputFooter>
-            <p className="px-0.5 text-xs text-muted-foreground">
-              Press Enter to send, Shift+Enter for new line
-            </p>
+            <PromptInputSubmit
+              data-testid={isInProgress ? 'prompt-input-stop' : 'prompt-input-send'}
+              disabled={!isInProgress && !hasText}
+              onStop={isInProgress ? () => void handleStop() : undefined}
+              status={isInProgress ? 'streaming' : 'ready'}
+            >
+              {isInProgress ? (
+                <Square className="h-4 w-4 fill-current" />
+              ) : (
+                <CornerDownLeft className="h-4 w-4" />
+              )}
+            </PromptInputSubmit>
           </PromptInputFooter>
         </PromptInput>
+        <p className="mt-2 px-0.5 text-xs text-muted-foreground">
+          Press Enter to send, Shift+Enter for new line
+        </p>
       </div>
     </div>
   );

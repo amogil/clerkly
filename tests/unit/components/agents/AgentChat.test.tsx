@@ -99,26 +99,36 @@ jest.mock('../../../../src/renderer/components/ai-elements/prompt-input', () => 
     setText: React.Dispatch<React.SetStateAction<string>>;
   } | null>(null);
 
+  const PromptInputProvider = ({ children }: { children: React.ReactNode }) => {
+    const [text, setText] = React.useState('');
+    return <PromptContext.Provider value={{ text, setText }}>{children}</PromptContext.Provider>;
+  };
+
   const PromptInput = ({
     children,
     onSubmit,
   }: {
     children: React.ReactNode;
-    onSubmit?: (message: { text?: string }) => void;
+    onSubmit?: (message: { text?: string }) => void | Promise<void>;
   }) => {
-    const [text, setText] = React.useState('');
+    const providerContext = React.useContext(PromptContext);
+    const [localText, setLocalText] = React.useState('');
+    const text = providerContext?.text ?? localText;
+    const setText = providerContext?.setText ?? setLocalText;
+
     return (
-      <PromptContext.Provider value={{ text, setText }}>
-        <form
-          data-testid="agent-prompt-input"
-          onSubmit={(event) => {
-            event.preventDefault();
-            onSubmit?.({ text });
-          }}
-        >
-          {children}
-        </form>
-      </PromptContext.Provider>
+      <form
+        data-testid="agent-prompt-input"
+        onSubmit={async (event) => {
+          event.preventDefault();
+          const result = onSubmit?.({ text });
+          if (result instanceof Promise) {
+            await result;
+          }
+        }}
+      >
+        <PromptContext.Provider value={{ text, setText }}>{children}</PromptContext.Provider>
+      </form>
     );
   };
 
@@ -162,12 +172,28 @@ jest.mock('../../../../src/renderer/components/ai-elements/prompt-input', () => 
   });
   PromptInputTextarea.displayName = 'PromptInputTextarea';
 
+  const usePromptInputController = () => {
+    const context = React.useContext(PromptContext);
+    if (!context) {
+      throw new Error('Missing PromptInputProvider');
+    }
+    return {
+      textInput: {
+        value: context.text,
+        setInput: context.setText,
+        clear: () => context.setText(''),
+      },
+    };
+  };
+
   return {
     PromptInput,
     PromptInputBody,
     PromptInputFooter,
+    PromptInputProvider,
     PromptInputSubmit,
     PromptInputTextarea,
+    usePromptInputController,
   };
 });
 
@@ -563,6 +589,16 @@ describe('AgentChat — PromptInput rendered', () => {
   it('should render PromptInput', () => {
     render(<AgentChat {...defaultProps} />);
     expect(screen.getByTestId('agent-prompt-input')).toBeInTheDocument();
+  });
+
+  /* Preconditions: component rendered
+     Action: render AgentChat
+     Assertions: shortcut hint is rendered outside PromptInput footer content
+     Requirements: agents.4.3, agents.4.4 */
+  it('should render keyboard shortcut hint below PromptInput', () => {
+    render(<AgentChat {...defaultProps} />);
+
+    expect(screen.getByText('Press Enter to send, Shift+Enter for new line')).toBeInTheDocument();
   });
 
   /* Preconditions: agent status is not in-progress

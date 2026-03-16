@@ -54,7 +54,7 @@ test.describe('AutoExpandingTextarea - Functional Tests', () => {
      Assertions: Textarea height is minimal
      Requirements: agents.4.5 */
   test('should have minimal height for single line text', async () => {
-    const textarea = window.locator('[data-testid="auto-expanding-textarea"]');
+    const textarea = activeChat(window).textarea;
     await expect(textarea).toBeVisible();
 
     // Clear and type short text
@@ -74,7 +74,7 @@ test.describe('AutoExpandingTextarea - Functional Tests', () => {
      Assertions: Textarea keeps multiline content and remains within the visible sizing contract
      Requirements: agents.4.5, agents.4.6 */
   test('should preserve multiline content within textarea sizing contract', async () => {
-    const textarea = window.locator('[data-testid="auto-expanding-textarea"]');
+    const textarea = activeChat(window).textarea;
     await expect(textarea).toBeVisible();
 
     await textarea.fill('Line 1\nLine 2\nLine 3\nLine 4\nLine 5');
@@ -91,7 +91,7 @@ test.describe('AutoExpandingTextarea - Functional Tests', () => {
      Assertions: Textarea height is capped at maximum visible size
      Requirements: agents.4.5, agents.4.7 */
   test('should cap height at maximum visible size', async () => {
-    const textarea = window.locator('[data-testid="auto-expanding-textarea"]');
+    const textarea = activeChat(window).textarea;
 
     await expect(textarea).toBeVisible();
 
@@ -110,7 +110,7 @@ test.describe('AutoExpandingTextarea - Functional Tests', () => {
      Assertions: Scrollbar appears (overflow-y is auto)
      Requirements: agents.4.7 */
   test('should show scrollbar when content exceeds max height', async () => {
-    const textarea = window.locator('[data-testid="auto-expanding-textarea"]');
+    const textarea = activeChat(window).textarea;
     await expect(textarea).toBeVisible();
 
     // Fill with many lines
@@ -129,7 +129,7 @@ test.describe('AutoExpandingTextarea - Functional Tests', () => {
      Assertions: Short content does not create actual internal overflow
      Requirements: agents.4.7 */
   test('should hide scrollbar for short content', async () => {
-    const textarea = window.locator('[data-testid="auto-expanding-textarea"]');
+    const textarea = activeChat(window).textarea;
     await expect(textarea).toBeVisible();
 
     await textarea.fill('Short text');
@@ -148,7 +148,7 @@ test.describe('AutoExpandingTextarea - Functional Tests', () => {
      Assertions: Message is sent, textarea is cleared
      Requirements: agents.4.3 */
   test('should send message on Enter key', async () => {
-    const textarea = window.locator('[data-testid="auto-expanding-textarea"]');
+    const textarea = activeChat(window).textarea;
     await expect(textarea).toBeVisible();
 
     // Type a message
@@ -170,7 +170,7 @@ test.describe('AutoExpandingTextarea - Functional Tests', () => {
      Assertions: New line is added, message is NOT sent
      Requirements: agents.4.4 */
   test('should add new line on Shift+Enter', async () => {
-    const textarea = window.locator('[data-testid="auto-expanding-textarea"]');
+    const textarea = activeChat(window).textarea;
     await expect(textarea).toBeVisible();
 
     // Type first line and add newline without submit.
@@ -190,7 +190,7 @@ test.describe('AutoExpandingTextarea - Functional Tests', () => {
      Assertions: Short content again fits without actual internal overflow after clearing and retyping
      Requirements: agents.4.5, agents.4.7 */
   test('should restore short-content scrolling state after content is cleared', async () => {
-    const textarea = window.locator('[data-testid="auto-expanding-textarea"]');
+    const textarea = activeChat(window).textarea;
     await expect(textarea).toBeVisible();
 
     const manyLines = Array(50).fill('Line').join('\n');
@@ -220,7 +220,7 @@ test.describe('AutoExpandingTextarea - Functional Tests', () => {
      Assertions: Height updates smoothly without errors
      Requirements: agents.4.5 */
   test('should handle rapid content changes', async () => {
-    const textarea = window.locator('[data-testid="auto-expanding-textarea"]');
+    const textarea = activeChat(window).textarea;
     await expect(textarea).toBeVisible();
 
     // Rapidly change content
