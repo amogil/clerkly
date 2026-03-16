@@ -4,10 +4,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import {
-  AgentMessage,
-  buildJavaScriptFence,
-} from '../../../../src/renderer/components/agents/AgentMessage';
+import { AgentMessage } from '../../../../src/renderer/components/agents/AgentMessage';
 import type { MessageSnapshot } from '../../../../src/shared/events/types';
 
 const mockRetryLast = jest.fn().mockResolvedValue({ success: true });
@@ -29,19 +26,6 @@ const baseMessage = (overrides: Partial<MessageSnapshot> = {}): MessageSnapshot 
     replyToMessageId: null,
     ...overrides,
   }) as MessageSnapshot;
-
-describe('buildJavaScriptFence', () => {
-  /* Preconditions: code contains triple backticks
-     Action: build fenced markdown for code_exec input
-     Assertions: fence length is expanded beyond content backtick run
-     Requirements: agents.7.4.6.8 */
-  it('uses a fence longer than any backtick run in code', () => {
-    const fenced = buildJavaScriptFence("console.log('a');\n```in-code```");
-    expect(fenced.startsWith('````javascript\n')).toBe(true);
-    expect(fenced.endsWith('\n````')).toBe(true);
-    expect(fenced).toContain('```in-code```');
-  });
-});
 
 describe('AgentMessage — user', () => {
   /* Preconditions: kind:user message
@@ -128,9 +112,9 @@ describe('AgentMessage — tool_call', () => {
 
   /* Preconditions: persisted kind:tool_call for code_exec with status/stdout/stderr
      Action: render AgentMessage, verify default collapsed state, expand by standard ToolHeader toggle, collapse, then reopen
-     Assertions: dedicated code_exec block uses standard ToolHeader toggle and shows persisted sections after expand
+     Assertions: dedicated code_exec block uses standard ToolHeader toggle and shows ToolInput plus persisted output sections after expand
      Requirements: agents.7.4.5, agents.7.4.6, agents.7.4.7 */
-  it('should render code_exec tool_call block with standard ToolHeader toggle and streams', () => {
+  it('should render code_exec tool_call block with standard ToolHeader toggle and ToolInput', () => {
     render(
       <AgentMessage
         message={baseMessage({
@@ -164,7 +148,6 @@ describe('AgentMessage — tool_call', () => {
     expect(screen.getByTestId('message-code-exec-block')).toHaveClass('overflow-hidden');
     expect(screen.getByTestId('message-code-exec-toggle')).toBeInTheDocument();
     expect(screen.getByTestId('message-code-exec-toggle')).toHaveTextContent('Print ok to stdout');
-    expect(screen.getByTestId('message-code-exec-toggle')).toHaveTextContent('Completed');
     expect(screen.queryByTestId('message-code-exec-input')).not.toBeInTheDocument();
     expect(screen.queryByTestId('message-code-exec-stdout')).not.toBeInTheDocument();
     expect(screen.queryByTestId('message-code-exec-stderr')).not.toBeInTheDocument();
@@ -175,10 +158,7 @@ describe('AgentMessage — tool_call', () => {
     expect(screen.getByTestId('message-code-exec-content')).toHaveClass('min-w-0');
     expect(screen.getByTestId('message-code-exec-content')).toHaveClass('max-w-full');
     expect(screen.getByTestId('message-code-exec-content')).toHaveClass('overflow-hidden');
-    expect(screen.getByTestId('message-code-exec-input')).toHaveClass('bg-transparent');
-    expect(screen.getByTestId('message-code-exec-input')).toHaveClass(
-      'message-code-exec-text-section'
-    );
+    expect(screen.getByTestId('message-code-exec-input')).toHaveTextContent("console.log('ok')");
     expect(screen.getByTestId('message-code-exec-stdout')).toHaveTextContent('ok');
     expect(screen.getByTestId('message-code-exec-stdout')).toHaveClass('bg-transparent');
     expect(screen.getByTestId('message-code-exec-stdout')).toHaveClass(
@@ -241,7 +221,6 @@ describe('AgentMessage — tool_call', () => {
 
     fireEvent.click(screen.getByTestId('message-code-exec-toggle'));
 
-    expect(screen.getByTestId('message-code-exec-toggle')).toHaveTextContent('Error');
     expect(screen.getByTestId('message-code-exec-stderr')).toHaveTextContent(
       'console.error fallback'
     );

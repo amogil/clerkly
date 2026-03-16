@@ -564,49 +564,27 @@
 
 7.4.6.1. Для визуализации `tool_call(code_exec)` ДОЛЖЕН использоваться компонент AI Elements `Tool` (см. [https://elements.ai-sdk.dev/components/tool](https://elements.ai-sdk.dev/components/tool)).
 
-7.4.6.2. Заголовок блока `tool_call(code_exec)` ДОЛЖЕН содержать иконку `Code2` (из набора `lucide-react`).
+7.4.6.2. Заголовок блока `tool_call(code_exec)` ДОЛЖЕН использовать стандартный toggle компонента `Tool` без дополнительного app-owned overlay поверх toggle hit area.
 
 7.4.6.3. Заголовок блока `tool_call(code_exec)` ДОЛЖЕН отображать краткое описание работы из `arguments.task_summary`.
 
 7.4.6.3.1. ЕСЛИ persisted historical payload `tool_call(code_exec)` не содержит `arguments.task_summary`, ТО заголовок блока ДОЛЖЕН использовать fallback-значение `"Code"` для backward compatibility с историческими записями.
 
-7.4.6.4. Статус выполнения `tool_call(code_exec)` ДОЛЖЕН отображаться в заголовке сразу после краткого описания работы.
+7.4.6.4. Статус выполнения `tool_call(code_exec)` ДОЛЖЕН отображаться через стандартный status-badge `ToolHeader`.
 
 7.4.6.5. В блоке `tool_call(code_exec)` прозрачный фон (`transparent`) ДОЛЖЕН использоваться для:
   - корневого контейнера блока,
-  - status-badge,
-  - секций `JavaScript`, `stdout`, `stderr` и `error`.
+  - секций `stdout`, `stderr` и `error`.
 
 7.4.6.5.1. ЕСЛИ persisted payload `tool_call(code_exec)` содержит `output.error`, ТО UI ДОЛЖЕН отображать отдельную секцию `error`, а НЕ скрывать structured-ошибку внутри badge статуса или смешивать её с `stderr`.
 
 7.4.6.5.2. Секция `error` в `tool_call(code_exec)` ДОЛЖНА отображать человекочитаемое диагностическое содержимое из persisted `output.error`.
 
-7.4.6.6. Статус-badge компонента `Tool` (включая блок `tool_call(code_exec)`) ДОЛЖЕН содержать иконку статуса, соответствующую persisted-статусу выполнения:
-  - `running` → `Loader2` (с анимацией вращения),
-  - `success` → `CircleCheck`,
-  - `error` → `CircleX`,
-  - `timeout` → `Clock3`,
-  - `cancelled` → `CircleMinus`.
-
-7.4.6.7. Иконки статусов в status-badge `tool_call(code_exec)` ДОЛЖНЫ использовать цветовую кодировку (colorized icons), а не монохромный цвет.
-
-7.4.6.8. Секция `JavaScript` в `tool_call(code_exec)` ДОЛЖНА рендерить входной код через общий компонент markdown code block (fenced `javascript`) с встроенной JavaScript syntax highlighting, а НЕ как plain text.
-
-7.4.6.9. КОГДА блок `tool_call(code_exec)` находится в свернутом состоянии, ТО контент заголовка (`Code`, status-badge и toggle) ДОЛЖЕН быть выровнен по вертикальному центру; при этом нижний отступ заголовка ДОЛЖЕН отсутствовать. КОГДА блок раскрыт, ТО нижний отступ заголовка ДОЛЖЕН быть восстановлен.
-
-7.4.6.9.1. КОГДА блок `tool_call(code_exec)` свернут, ТО скрытый контент (`JavaScript`, `stdout`, `stderr`, `error` и вложенные controls markdown code block) НЕ ДОЛЖЕН оставаться интерактивным и НЕ ДОЛЖЕН перехватывать pointer events, предназначенные для header/toggle.
-
-7.4.6.10. Для входного кода `tool_call(code_exec)` ДОЛЖЕН отображаться только встроенный markdown code block (с его собственным language-header); дополнительный верхний label `JavaScript` и отдельный внешний контейнер-рамка вокруг этого блока НЕ ДОЛЖНЫ рендериться.
-
-7.4.6.11. Для входного кода `tool_call(code_exec)` ДОЛЖЕН использоваться тот же контейнерный frame, что и у `stdout`/`stderr`; дополнительная внутренняя рамка встроенного markdown code block НЕ ДОЛЖНА рендериться.
+7.4.6.6. Секция входных параметров `tool_call(code_exec)` ДОЛЖНА использовать стандартный `ToolInput` без app-owned markdown/code renderer внутри toggle/content области.
 
 7.4.7. Для `tool_call(code_exec)` UI ДОЛЖЕН иметь отдельные тестовые идентификаторы:
   - `data-testid="message-code-exec-block"` для корневого блока,
-  - `data-testid="message-code-exec-header"` для заголовка блока,
-  - `data-testid="message-code-exec-icon"` для иконки в заголовке,
-  - `data-testid="message-code-exec-title"` для краткого описания работы,
-  - `data-testid="message-code-exec-status"` для статуса,
-  - `data-testid="message-code-exec-status-icon"` для иконки статуса,
+  - `data-testid="message-code-exec-toggle"` для стандартного toggle заголовка,
   - `data-testid="message-code-exec-input"` для секции JavaScript,
   - `data-testid="message-code-exec-stdout"` для секции stdout,
   - `data-testid="message-code-exec-stderr"` для секции stderr,
@@ -683,10 +661,10 @@
 - `tests/functional/llm-chat.spec.ts` - "should show running code_exec before terminal when first model step has no post-tool text"
 - `tests/functional/llm-chat.spec.ts` - "should reject model response containing more than one tool_call and run repair"
 - `tests/functional/llm-chat.spec.ts` - "should render final_answer after all non-final tool steps of successful attempt"
-- `tests/functional/code_exec.spec.ts` - "should render tool_call(code_exec) message block with Code header/icon/status and transparent streams"
+- `tests/functional/code_exec.spec.ts` - "should render tool_call(code_exec) message block with standard ToolHeader toggle and ToolInput"
 - `tests/functional/code_exec.spec.ts` - "should render code_exec error section from structured output.error"
-- `tests/functional/code_exec.spec.ts` - "should keep collapsed code_exec content non-interactive after reopen cycle"
-- `tests/functional/code_exec.spec.ts` - "should render JavaScript syntax highlighting in code_exec input section"
+- `tests/functional/code_exec.spec.ts` - "should keep standard code_exec toggle usable after reopen cycle"
+- `tests/functional/code_exec.spec.ts` - "should render standard ToolInput code block in code_exec input section"
 - `tests/functional/code_exec.spec.ts` - "should keep code_exec block within chat width with internal horizontal scroll"
 
 ---

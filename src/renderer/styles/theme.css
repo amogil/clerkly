@@ -230,32 +230,3 @@
   max-width: 100% !important;
   overflow: hidden !important;
 }
-
-/* agents.7.4.6.11: remove outer frame for code_exec input code block, keep inner code frame */
-.message-response-code-exec-input [data-streamdown='code-block'],
-.message-response-code-exec-input [data-streamdown='code-block-header'],
-.message-response-code-exec-input [data-streamdown='code-block-body'],
-.message-response-code-exec-input [data-streamdown='code-block-body'] pre {
-  border: 0 !important;
-  box-shadow: none !important;
-  background-color: transparent !important;
-}
-
-/* agents.7.4.9: make Streamdown code block body the only horizontal scroll container in code_exec input */
-.message-response-code-exec-input [data-streamdown='code-block-body'] {
-  max-width: 100% !important;
-  overflow-x: auto !important;
-  overflow-y: hidden !important;
-}
-
-.message-response-code-exec-input [data-streamdown='code-block-body'] pre,
-.message-response-code-exec-input [data-streamdown='code-block-body'] code {
-  white-space: pre !important;
-  overflow-wrap: normal !important;
-  word-break: normal !important;
-}
-
-.message-response-code-exec-input [data-streamdown='code-block-body'] code {
-  display: block !important;
-  min-width: max-content !important;
-}

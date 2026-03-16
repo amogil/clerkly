@@ -23,14 +23,6 @@ interface AgentMessageProps {
   onNavigate?: (screen: string) => void;
 }
 
-// Requirements: agents.7.4.6.8
-export function buildJavaScriptFence(code: string): string {
-  const longestBacktickRun = Math.max(0, ...(code.match(/`+/g) ?? []).map((match) => match.length));
-  const fenceLength = Math.max(3, longestBacktickRun + 1);
-  const fence = '`'.repeat(fenceLength);
-  return `${fence}javascript\n${code}\n${fence}`;
-}
-
 // Requirements: agents.7.4.2.2.1, agents.14.5
 function stripAutoTitleMetadataComments(text: string): string {
   return text.replace(TITLE_META_COMMENT_RENDER_PATTERN, '');
@@ -273,6 +265,7 @@ export function AgentMessage({
           ? sanitizeInlineToolText(toolData.arguments.task_summary) || 'Code'
           : 'Code';
       const toolHeaderState = getCodeExecToolHeaderState(status);
+      const inputPayload = { code: codeInput };
 
       return (
         <Message from="assistant" className="w-full max-w-full">
@@ -291,14 +284,13 @@ export function AgentMessage({
               data-testid="message-code-exec-content"
               className="min-w-0 max-w-full grid-cols-1 overflow-hidden"
             >
-              <div
+              <ToolInput
                 data-testid="message-code-exec-input"
-                className="bg-transparent rounded-md border border-border/60 p-2 message-code-exec-text-section"
+                className="bg-transparent"
+                input={inputPayload}
               >
-                <MessageResponse className="message-response-transparent-code-blocks message-response-code-exec-input text-xs leading-relaxed">
-                  {buildJavaScriptFence(codeInput)}
-                </MessageResponse>
-              </div>
+                {undefined}
+              </ToolInput>
               {stdout.length > 0 ? (
                 <div className="min-w-0 max-w-full overflow-hidden">
                   <div className="mb-1 text-xs font-medium text-muted-foreground">stdout</div>

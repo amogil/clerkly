@@ -611,7 +611,9 @@ describe('AgentChat — PromptInput rendered', () => {
   it('should apply usage-level unfocused input visibility styling', () => {
     render(<AgentChat {...defaultProps} />);
 
-    expect(screen.getByTestId('agent-prompt-input')).toHaveClass('[&_[data-slot=input-group]]:border-border/80');
+    expect(screen.getByTestId('agent-prompt-input')).toHaveClass(
+      '[&_[data-slot=input-group]]:border-border/80'
+    );
   });
 
   /* Preconditions: component rendered

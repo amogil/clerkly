@@ -363,7 +363,10 @@ export function AgentChat({
         className="flex-shrink-0 overflow-y-auto pl-6 pr-6 [scrollbar-gutter:stable]"
         data-testid="agent-chat-input-area"
       >
-        <PromptInput className="mt-2 [&_[data-slot=input-group]]:border-border/80" onSubmit={handleSubmit}>
+        <PromptInput
+          className="mt-2 [&_[data-slot=input-group]]:border-border/80"
+          onSubmit={handleSubmit}
+        >
           <PromptInputBody>
             <PromptInputTextarea
               className="block flex-none max-h-32 px-3 [field-sizing:fixed]"

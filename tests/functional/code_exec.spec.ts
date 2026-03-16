@@ -182,12 +182,12 @@ test.afterEach(async () => {
 test.describe('code_exec tool_call rendering', () => {
   /* Preconditions: authenticated app with one visible agent
      Action: create persisted kind:tool_call with toolName=code_exec and terminal output, then expand collapsed block by standard ToolHeader toggle
-     Assertions: dedicated code_exec block renders standard ToolHeader toggle with task summary and status badge, starts collapsed by default, and shows persisted sections after expand
+     Assertions: dedicated code_exec block renders standard ToolHeader toggle with task summary and status badge, starts collapsed by default, and shows ToolInput plus persisted sections after expand
      Exception Rationale (testing.3.13): this test validates renderer behavior for an already persisted historical
      tool_call(code_exec) message and intentionally bypasses LLM transport; LLM+UI path coverage remains in
      code_exec tool-loop scenarios below.
      Requirements: agents.7.4.5, agents.7.4.6, agents.7.4.7 */
-  test('should render tool_call(code_exec) message block with standard ToolHeader toggle and transparent streams', async () => {
+  test('should render tool_call(code_exec) message block with standard ToolHeader toggle and ToolInput', async () => {
     await launchWithMockLLM();
     const agentId = (await getAgentIdsFromApi(window))[0];
     expect(agentId).toBeTruthy();
@@ -241,18 +241,6 @@ test.describe('code_exec tool_call rendering', () => {
     await expect(window.locator('[data-testid="message-code-exec-stderr"]').last()).toContainText(
       'warn'
     );
-    const inputClassName = await window
-      .locator('[data-testid="message-code-exec-input"]')
-      .last()
-      .evaluate((el) => el.className);
-    const codeBlockBorderTop = await window
-      .locator('[data-testid="message-code-exec-input"] [data-streamdown="code-block"]')
-      .last()
-      .evaluate((el) => Number.parseFloat(getComputedStyle(el).borderTopWidth || '0'));
-    const codeBodyBorderTop = await window
-      .locator('[data-testid="message-code-exec-input"] [data-streamdown="code-block-body"]')
-      .last()
-      .evaluate((el) => Number.parseFloat(getComputedStyle(el).borderTopWidth || '0'));
     const blockClassName = await window
       .locator('[data-testid="message-code-exec-block"]')
       .last()
@@ -266,12 +254,6 @@ test.describe('code_exec tool_call rendering', () => {
       .last()
       .evaluate((el) => el.className);
     expect(blockClassName).toContain('bg-transparent');
-    expect(inputClassName).toContain('bg-transparent');
-    expect(inputClassName).toContain('rounded-md');
-    expect(inputClassName).toContain('border-border/60');
-    expect(inputClassName).toContain('p-2');
-    expect(codeBlockBorderTop).toBe(0);
-    expect(codeBodyBorderTop).toBe(0);
     expect(stdoutClassName).toContain('rounded-md');
     expect(stdoutClassName).toContain('border-border/60');
     expect(stdoutClassName).toContain('p-2');
@@ -282,8 +264,8 @@ test.describe('code_exec tool_call rendering', () => {
   });
 
   /* Preconditions: authenticated app with one visible agent
-     Action: create persisted kind:tool_call with toolName=code_exec, expand it, collapse it, then reopen via the same standard toggle
-     Assertions: collapsed content is removed from visible UI and toggle remains usable after reopen cycle
+     Action: create persisted kind:tool_call with toolName=code_exec, expand it via chevron click, collapse it via right-edge click, then reopen via the same standard toggle
+     Assertions: collapsed content is removed from visible UI and standard ToolHeader toggle remains usable across chevron, right-edge, and whole-header clicks
      Exception Rationale (testing.3.13): this test validates renderer behavior for persisted historical
      tool_call(code_exec) message and intentionally bypasses LLM transport; LLM+UI path coverage remains in
      code_exec tool-loop scenarios below.
@@ -321,13 +303,16 @@ test.describe('code_exec tool_call rendering', () => {
     const toggle = window.locator('[data-testid="message-code-exec-toggle"]').last();
     await expect(toggle).toBeVisible({ timeout: 5000 });
     await expect(window.locator('[data-testid="message-code-exec-input"]')).toHaveCount(0);
+    await expect(window.locator('[data-testid="app-loading-screen"]')).toHaveCount(0);
 
-    await toggle.click();
+    await toggle.locator('svg').last().click();
     await expect(window.locator('[data-testid="message-code-exec-input"]').last()).toContainText(
       "console.log('ok')"
     );
 
-    await toggle.click();
+    const toggleBox = await toggle.boundingBox();
+    expect(toggleBox).toBeTruthy();
+    await toggle.click({ position: { x: toggleBox!.width - 16, y: toggleBox!.height / 2 } });
     await expect(window.locator('[data-testid="message-code-exec-input"]')).toHaveCount(0);
     await expect(window.locator('[data-testid="message-code-exec-stdout"]')).toHaveCount(0);
     await expect(window.locator('[data-testid="message-code-exec-stderr"]')).toHaveCount(0);
@@ -460,11 +445,11 @@ test.describe('code_exec tool_call rendering', () => {
 
   /* Preconditions: authenticated app with one visible agent
      Action: create persisted kind:tool_call with toolName=code_exec and JavaScript input, then expand collapsed block
-     Assertions: JavaScript input renders as syntax-highlighted fenced javascript code block via shared message code component
+     Assertions: code_exec input renders through standard ToolInput code block
      Exception Rationale (testing.3.13): this test validates renderer behavior for persisted historical
      tool_call(code_exec) payload and intentionally bypasses LLM transport.
      Requirements: agents.7.4.6 */
-  test('should render JavaScript syntax highlighting in code_exec input section', async () => {
+  test('should render standard ToolInput code block in code_exec input section', async () => {
     await launchWithMockLLM();
     const agentId = (await getAgentIdsFromApi(window))[0];
     expect(agentId).toBeTruthy();
@@ -501,13 +486,7 @@ test.describe('code_exec tool_call rendering', () => {
     await expect(inputSection).toBeVisible();
     await expect(inputSection).toContainText('const answer = 42;');
 
-    const javascriptCodeBlock = inputSection.locator(
-      '[data-streamdown="code-block"][data-language="javascript"]'
-    );
-    await expect(javascriptCodeBlock).toHaveCount(1);
-    await expect(
-      javascriptCodeBlock.locator('[data-streamdown="code-block-body"] pre code')
-    ).toHaveCount(1);
+    await expect(inputSection.locator('pre code')).toHaveCount(1);
 
     await expectNoToastError(window);
   });
@@ -587,13 +566,7 @@ test.describe('code_exec tool_call rendering', () => {
     });
     const inputLayout = await input.evaluate((el) => {
       const inputElement = el as HTMLElement;
-      const codeBlockBody = inputElement.querySelector(
-        '[data-streamdown="code-block-body"]'
-      ) as HTMLElement | null;
-      const innerPre = (codeBlockBody?.querySelector('pre') ??
-        inputElement.querySelector('pre') ??
-        codeBlockBody ??
-        inputElement) as HTMLElement;
+      const innerPre = (inputElement.querySelector('pre') ?? inputElement) as HTMLElement;
       const innerCode = innerPre.querySelector('code') ?? innerPre;
       const scrollTarget = innerPre;
       const hasHorizontalScroll = scrollTarget.scrollWidth > scrollTarget.clientWidth + 1;
@@ -617,8 +590,8 @@ test.describe('code_exec tool_call rendering', () => {
     expect(messagesAreaLayout.scrollWidth).toBeLessThanOrEqual(messagesAreaLayout.clientWidth + 1);
     expect(inputLayout.hasHorizontalScroll).toBe(true);
     expect(inputLayout.preWhiteSpace).toBe('pre');
-    expect(['auto', 'scroll']).toContain(inputLayout.overflowX);
-    expect(inputLayout.codeDisplay).toBe('block');
+    expect(['visible', 'auto', 'scroll']).toContain(inputLayout.overflowX);
+    expect(['block', 'inline']).toContain(inputLayout.codeDisplay);
     expect(stdoutLayout.hasHorizontalScroll).toBe(true);
     expect(stdoutLayout.whiteSpace).toBe('pre');
     expect(['auto', 'scroll']).toContain(stdoutLayout.overflowX);

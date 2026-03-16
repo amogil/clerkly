@@ -1544,27 +1544,20 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 
 **Сообщения выполнения кода (`kind: 'tool_call'`, `toolName: 'code_exec'`):**
 - Используется отдельный блок выполнения кода, не являющийся обычным текстовым bubble.
-- Блок строится на AI Elements `Tool` как `Collapsible` root; `ToolContent` используется как стандартный content-контейнер.
-- Заголовок для `code_exec` остаётся app-owned composition поверх `Tool` root: custom header содержит `Code2`, task summary, status-badge и `CollapsibleTrigger`, потому что стандартный `ToolHeader` не покрывает существующий UI-контракт `code_exec`.
-- Заголовок блока отображает иконку выполнения кода (`Code2`) и краткое описание работы из `arguments.task_summary`.
-- Сразу после краткого описания работы отображается badge со статусом выполнения.
+- Блок строится на стандартной композиции AI Elements `Tool`: `Tool` root, стандартный `ToolHeader` как единственный toggle и `ToolContent` как content-контейнер.
+- Заголовок блока использует `arguments.task_summary` как `title` для стандартного `ToolHeader`.
 - UI использует `arguments.task_summary` из persisted payload как текст заголовка; валидация и ограничения этого поля определяются спецификацией `code_exec`.
 - Для persisted historical payload без `arguments.task_summary` UI использует fallback-заголовок `"Code"`; это compatibility path для записей, созданных до введения поля `task_summary`.
-- Badge статуса всегда содержит иконку, привязанную к persisted-статусу: `running -> Loader2 (spin)`, `success -> CircleCheck`, `error -> CircleX`, `timeout -> Clock3`, `cancelled -> CircleMinus`.
-- Иконки статусов в badge рендерятся цветными (например: `success` — зелёный, `error` — красный, `timeout` — янтарный, `running/cancelled` — нейтральные).
-- Блок отображает persisted-статус выполнения (`running | success | error | timeout | cancelled`).
+- Блок отображает persisted-статус выполнения (`running | success | error | timeout | cancelled`) через стандартный status-badge `ToolHeader`.
 - Смена статуса `running -> terminal` выполняется в том же UI-блоке (без создания отдельной terminal-карточки).
 - Для security/policy отказов используется `status=error` с соответствующим `error.code` (например, `policy_denied`).
 - При наличии отображаются `stdout`, `stderr` и structured `output.error` из persisted payload.
 - Structured `output.error` рендерится как отдельная секция `error` внутри того же `code_exec` блока; UI не смешивает это содержимое со `stderr`.
 - Содержимое секции `error` строится из persisted `output.error.code` и `output.error.message` в одном человекочитаемом diagnostic-text блоке.
 - Для явно выделенных text/code секций tool-блоков (`Input`, `Output`, `JavaScript`, `stdout`, `stderr`, `error`) применяется no-wrap + horizontal scroll (`white-space: pre`, `overflow-x: auto`).
-- Секция `JavaScript` рендерится через общий `"MessageResponse"` и fenced markdown блок `javascript`, чтобы использовать стандартный рендерер code block и его встроенную подсветку синтаксиса.
-- Для input-кода `code_exec` не рендерится отдельный верхний label `JavaScript` и не используется внешний wrapper-box; в UI остается только сам встроенный markdown code block.
-- Для input-кода `code_exec`, `stdout`, `stderr` и `error` используется app-owned frame с классом `message-code-exec-text-section`; CSS scope `message-response-code-exec-input` дополнительно снимает внутренние рамки `data-streamdown='code-block'`, чтобы не было вложенной (двойной) геометрии.
-- Заголовок `tool_call(code_exec)` рендерится с `items-center`; отступ заголовка переключается по состоянию collapsible (`collapsed -> mb-0`, `expanded -> mb-2`), чтобы в свернутом виде контент оставался вертикально центрированным.
-- `ToolContent` для `tool_call(code_exec)` получает closed-state guard: при `data-state='closed'` контент деинтерактивируется (`pointer-events: none`), чтобы скрытые внутренние controls не могли перехватывать клики по header/toggle после цикла `expand -> collapse`.
-- Для `tool_call(code_exec)` transparent-surface применяется ко всему блоку: корневой контейнер `Tool`, status-badge, секции `JavaScript`, `stdout`, `stderr`, `error`.
+- Секция входных параметров `code_exec` рендерится через стандартный `ToolInput`; отдельный app-owned markdown renderer внутри `ToolContent` не используется.
+- Для `stdout`, `stderr` и `error` сохраняются app-owned text sections с классом `message-code-exec-text-section`.
+- Для `tool_call(code_exec)` transparent-surface применяется к корневому контейнеру `Tool` и к app-owned секциям `stdout`, `stderr`, `error`.
 - Рендер строится только по persisted snapshot (`message.created`/`message.updated`) без локальной реконструкции результата.
 
 ```tsx
@@ -1970,7 +1963,7 @@ import { Logo } from '../logo';
 | `tests/functional/agent-status-indicators.spec.ts` | agents.6 | - |
 | `tests/functional/agent-status-all-places.spec.ts` | agents.6.1-6.5 | Проверка консистентного отображения каждого статуса (`new`, `in-progress`, `awaiting-response`, `error`, `completed`) в Header, Agent List tooltip и All Agents |
 | `tests/functional/message-format.spec.ts` | agents.7 | - |
-| `tests/functional/code_exec.spec.ts` | agents.7.4.5-7.4.9.1, agents.4.23 | Отдельные сценарии для `tool_call(code_exec)`: header/icon/status, отдельная `error` section из `output.error`, вертикальное выравнивание в collapsed, deactivated hidden content after collapse/reopen, JS highlighting, transparent sections и width/overflow |
+| `tests/functional/code_exec.spec.ts` | agents.7.4.5-7.4.9, agents.4.23 | Отдельные сценарии для `tool_call(code_exec)`: стандартный `ToolHeader` toggle, `ToolInput`, отдельная `error` section из `output.error`, reopen cycle, width/overflow |
 | `tests/functional/llm-chat.spec.ts` | agents.4.11, agents.4.11.2, agents.7.7, agents.4.24, agents.14.1-14.6, llm-integration.2, llm-integration.7.2, llm-integration.8.7, llm-integration.16 | Включает сценарий deferred rename после non-meaningful triggering turn при наличии meaningful user-message в истории |
 | `tests/functional/agent-status-calculation.spec.ts` | agents.9 | - |
 | `tests/functional/agent-data-isolation.spec.ts` | agents.10 | - |

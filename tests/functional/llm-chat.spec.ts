@@ -1530,7 +1530,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expect(codeExecBlocks).toHaveCount(0);
 
     const codeExecStatus = context.window
-      .locator('[data-testid="message-code-exec-status"]')
+      .locator('[data-testid="message-code-exec-toggle"]')
       .last();
     await expect(codeExecStatus).toContainText('running', { timeout: 8000 });
 
@@ -1601,7 +1601,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     const codeExecBlocks = context.window.locator('[data-testid="message-code-exec-block"]');
     await expect(codeExecBlocks).toHaveCount(1);
     await expect(
-      context.window.locator('[data-testid="message-code-exec-status"]').last()
+      context.window.locator('[data-testid="message-code-exec-toggle"]').last()
     ).not.toContainText('running', { timeout: 15000 });
     await expect(codeExecBlocks).toHaveCount(1);
   });
@@ -1636,7 +1636,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await messageInput.press('Enter');
 
     const codeExecStatus = context.window
-      .locator('[data-testid="message-code-exec-status"]')
+      .locator('[data-testid="message-code-exec-toggle"]')
       .last();
     await expect(codeExecStatus).toContainText('running', { timeout: 8000 });
 
@@ -1729,7 +1729,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
       timeout: 5000,
     });
     await expect(
-      context.window.locator('[data-testid="message-code-exec-status"]').last()
+      context.window.locator('[data-testid="message-code-exec-toggle"]').last()
     ).not.toHaveText('running');
 
     const requestCount = mockLLMServer
