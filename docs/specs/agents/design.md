@@ -1493,6 +1493,7 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 - Исходники `src/renderer/components/ai-elements/reasoning.tsx` не модифицируются.
 - Иконка остаётся компактной и не ломает baseline строки trigger.
 - Замена иконки не меняет API AI Elements primitives и не влияет на логику toggling.
+- `AgentReasoningTrigger` получает тот же стартовый левый inset (`pl-3`), что и `ToolHeader`, чтобы Message Avatar reasoning-блока визуально выравнивался с ведущей иконкой в заголовке `tool_call(code_exec)`.
 
 **Сообщения об ошибке (kind: 'error'):**
 ```tsx

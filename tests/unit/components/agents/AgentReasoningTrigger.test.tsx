@@ -43,6 +43,7 @@ describe('AgentReasoningTrigger', () => {
 
     render(<AgentReasoningTrigger />);
 
+    expect(screen.getByTestId('message-llm-reasoning-trigger')).toHaveClass('pl-3');
     expect(screen.getByTestId('reasoning-trigger-logo')).toHaveAttribute('data-animated', 'true');
     expect(screen.getByText('Thinking...')).toBeInTheDocument();
     const chevron = document.querySelector('.lucide-chevron-down');
