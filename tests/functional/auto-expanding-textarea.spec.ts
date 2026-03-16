@@ -136,7 +136,9 @@ test.describe('AutoExpandingTextarea - Functional Tests', () => {
 
     await expect
       .poll(async () => {
-        return await textarea.evaluate((el: HTMLTextAreaElement) => el.scrollHeight <= el.clientHeight + 1);
+        return await textarea.evaluate(
+          (el: HTMLTextAreaElement) => el.scrollHeight <= el.clientHeight + 1
+        );
       })
       .toBe(true);
   });
@@ -206,7 +208,9 @@ test.describe('AutoExpandingTextarea - Functional Tests', () => {
     await expect(textarea).toHaveValue('Short');
     await expect
       .poll(async () => {
-        return await textarea.evaluate((el: HTMLTextAreaElement) => el.scrollHeight <= el.clientHeight + 1);
+        return await textarea.evaluate(
+          (el: HTMLTextAreaElement) => el.scrollHeight <= el.clientHeight + 1
+        );
       })
       .toBe(true);
   });

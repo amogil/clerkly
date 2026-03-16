@@ -1,14 +1,6 @@
 import React from 'react';
 // Requirements: llm-integration.7, llm-integration.3.4.1, llm-integration.3.4.4, agents.4.22, agents.4.9, agents.4.10.1, agents.4.10.2, agents.7.4
-import {
-  Check,
-  CircleCheck,
-  CircleMinus,
-  CircleX,
-  Clock3,
-  Code2,
-  Loader2,
-} from 'lucide-react';
+import { Check, CircleCheck, CircleMinus, CircleX, Clock3, Code2, Loader2 } from 'lucide-react';
 import { Message, MessageContent, MessageResponse } from '../ai-elements/message';
 import { Reasoning, ReasoningContent } from '../ai-elements/reasoning';
 import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from '../ai-elements/tool';
