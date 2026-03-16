@@ -156,6 +156,9 @@ describe('AgentMessage — tool_call', () => {
 
     expect(screen.getByTestId('message-code-exec-block')).toBeInTheDocument();
     expect(screen.getByTestId('message-code-exec-block')).toHaveClass('bg-transparent');
+    expect(screen.getByTestId('message-code-exec-block')).toHaveClass('min-w-0');
+    expect(screen.getByTestId('message-code-exec-block')).toHaveClass('max-w-full');
+    expect(screen.getByTestId('message-code-exec-block')).toHaveClass('overflow-hidden');
     expect(screen.getByTestId('message-code-exec-icon')).toBeInTheDocument();
     expect(screen.getByTestId('message-code-exec-title')).toHaveTextContent('Print ok to stdout');
     expect(screen.getByTestId('message-code-exec-status')).toHaveTextContent('success');
@@ -172,12 +175,24 @@ describe('AgentMessage — tool_call', () => {
     fireEvent.click(screen.getByTestId('message-code-exec-toggle'));
 
     expect(screen.getByTestId('message-code-exec-header')).toHaveClass('mb-2');
+    expect(screen.getByTestId('message-code-exec-content')).toHaveClass('min-w-0');
+    expect(screen.getByTestId('message-code-exec-content')).toHaveClass('max-w-full');
+    expect(screen.getByTestId('message-code-exec-content')).toHaveClass('overflow-hidden');
     expect(screen.queryByText('JavaScript')).not.toBeInTheDocument();
     expect(screen.getByTestId('message-code-exec-input')).toHaveClass('bg-transparent');
+    expect(screen.getByTestId('message-code-exec-input')).toHaveClass(
+      'message-code-exec-text-section'
+    );
     expect(screen.getByTestId('message-code-exec-stdout')).toHaveTextContent('ok');
     expect(screen.getByTestId('message-code-exec-stdout')).toHaveClass('bg-transparent');
+    expect(screen.getByTestId('message-code-exec-stdout')).toHaveClass(
+      'message-code-exec-text-section'
+    );
     expect(screen.getByTestId('message-code-exec-stderr')).toHaveTextContent('warn');
     expect(screen.getByTestId('message-code-exec-stderr')).toHaveClass('bg-transparent');
+    expect(screen.getByTestId('message-code-exec-stderr')).toHaveClass(
+      'message-code-exec-text-section'
+    );
   });
 
   /* Preconditions: persisted historical kind:tool_call for code_exec without task_summary

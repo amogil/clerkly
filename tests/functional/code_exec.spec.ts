@@ -426,7 +426,7 @@ test.describe('code_exec tool_call rendering', () => {
   });
 
   /* Preconditions: authenticated app with one visible agent
-     Action: create persisted kind:tool_call code_exec with long unbroken input/output lines
+     Action: create persisted kind:tool_call code_exec with long unbroken input/output lines and then create a following llm message
      Assertions: code_exec block stays within chat width and uses internal horizontal scroll for long lines
      Exception Rationale (testing.3.13): this validates renderer layout behavior for persisted historical
      code_exec payload and intentionally bypasses LLM transport.
@@ -463,6 +463,15 @@ test.describe('code_exec tool_call rendering', () => {
         if (!result?.success) {
           throw new Error(result?.error || 'Failed to create code_exec tool_call');
         }
+
+        const llmResult = await api.messages.create(id, 'llm', {
+          data: {
+            text: `This is a short reply after code_exec.\n\nThe link \`sponsr.ru/goblin/\` appears to show an author page and a publication list.`,
+          },
+        });
+        if (!llmResult?.success) {
+          throw new Error(llmResult?.error || 'Failed to create llm message after code_exec');
+        }
       },
       { id: agentId as string, code: longCode, stdout: longStdout }
     );
@@ -476,19 +485,35 @@ test.describe('code_exec tool_call rendering', () => {
 
     await expect(input).toBeVisible({ timeout: 5000 });
     await expect(stdout).toContainText(longToken.slice(0, 20));
+    await expect(window.locator('[data-testid="message-llm-action"]').last()).toBeVisible({
+      timeout: 5000,
+    });
 
     const messagesArea = window.locator('[data-testid="messages-area"]');
     const blockWidth = await codeExecBlock.evaluate((el) => (el as HTMLElement).offsetWidth);
-    const messagesAreaWidth = await messagesArea.evaluate((el) => (el as HTMLElement).clientWidth);
+    const messagesAreaLayout = await messagesArea.evaluate((el) => {
+      const area = el as HTMLElement;
+      return {
+        clientWidth: area.clientWidth,
+        scrollWidth: area.scrollWidth,
+      };
+    });
     const inputLayout = await input.evaluate((el) => {
       const inputElement = el as HTMLElement;
-      const innerPre =
-        inputElement.querySelector('[data-streamdown="code-block-body"] pre') ??
-        inputElement.querySelector('pre');
-      const scrollTarget = (innerPre as HTMLElement | null) ?? inputElement;
+      const codeBlockBody = inputElement.querySelector(
+        '[data-streamdown="code-block-body"]'
+      ) as HTMLElement | null;
+      const innerPre = (codeBlockBody?.querySelector('pre') ??
+        inputElement.querySelector('pre') ??
+        codeBlockBody ??
+        inputElement) as HTMLElement;
+      const innerCode = innerPre.querySelector('code') ?? innerPre;
+      const scrollTarget = innerPre;
       const hasHorizontalScroll = scrollTarget.scrollWidth > scrollTarget.clientWidth + 1;
-      const whiteSpace = window.getComputedStyle(scrollTarget).whiteSpace;
-      return { hasHorizontalScroll, whiteSpace };
+      const overflowX = window.getComputedStyle(scrollTarget).overflowX;
+      const preWhiteSpace = window.getComputedStyle(innerPre as HTMLElement).whiteSpace;
+      const codeDisplay = window.getComputedStyle(innerCode as HTMLElement).display;
+      return { hasHorizontalScroll, preWhiteSpace, overflowX, codeDisplay };
     });
     const stdoutLayout = await stdout.evaluate((el) => {
       const stdoutElement = el as HTMLElement;
@@ -501,15 +526,15 @@ test.describe('code_exec tool_call rendering', () => {
       const overflowX = window.getComputedStyle(scrollTarget).overflowX;
       return { hasHorizontalScroll, whiteSpace, overflowX };
     });
-
-    expect(blockWidth).toBeLessThanOrEqual(messagesAreaWidth + 1);
-    expect(inputLayout.hasHorizontalScroll || inputLayout.whiteSpace.includes('pre')).toBe(true);
-    expect(
-      stdoutLayout.hasHorizontalScroll ||
-        stdoutLayout.whiteSpace.includes('pre') ||
-        stdoutLayout.overflowX === 'auto' ||
-        stdoutLayout.overflowX === 'scroll'
-    ).toBe(true);
+    expect(blockWidth).toBeLessThanOrEqual(messagesAreaLayout.clientWidth + 1);
+    expect(messagesAreaLayout.scrollWidth).toBeLessThanOrEqual(messagesAreaLayout.clientWidth + 1);
+    expect(inputLayout.hasHorizontalScroll).toBe(true);
+    expect(inputLayout.preWhiteSpace).toBe('pre');
+    expect(['auto', 'scroll']).toContain(inputLayout.overflowX);
+    expect(inputLayout.codeDisplay).toBe('block');
+    expect(stdoutLayout.hasHorizontalScroll).toBe(true);
+    expect(stdoutLayout.whiteSpace).toBe('pre');
+    expect(['auto', 'scroll']).toContain(stdoutLayout.overflowX);
 
     await expectNoToastError(window);
   });

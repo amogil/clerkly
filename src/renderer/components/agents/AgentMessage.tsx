@@ -282,7 +282,10 @@ export function AgentMessage({
             onOpenChange={setIsCodeExecExpanded}
             data-testid="message-code-exec-collapsible"
           >
-            <Tool data-testid="message-code-exec-block" className="bg-transparent">
+            <Tool
+              data-testid="message-code-exec-block"
+              className="bg-transparent min-w-0 max-w-full overflow-hidden"
+            >
               <ToolHeader
                 data-testid="message-code-exec-header"
                 className={`items-center justify-between ${isCodeExecExpanded ? 'mb-2' : 'mb-0'}`}
@@ -319,25 +322,37 @@ export function AgentMessage({
                   </button>
                 </CollapsibleTrigger>
               </ToolHeader>
-              <CollapsibleContent data-testid="message-code-exec-content">
-                <ToolContent>
-                  <ToolInput data-testid="message-code-exec-input" className="bg-transparent">
-                    <MessageResponse className="message-response-transparent-code-blocks message-response-code-exec-input text-xs leading-relaxed break-words">
+              <CollapsibleContent
+                data-testid="message-code-exec-content"
+                className="min-w-0 max-w-full overflow-hidden"
+              >
+                <ToolContent className="min-w-0 max-w-full grid-cols-1 overflow-hidden">
+                  <ToolInput
+                    data-testid="message-code-exec-input"
+                    className="bg-transparent message-code-exec-text-section"
+                  >
+                    <MessageResponse className="message-response-transparent-code-blocks message-response-code-exec-input text-xs leading-relaxed">
                       {buildJavaScriptFence(codeInput)}
                     </MessageResponse>
                   </ToolInput>
                   {stdout.length > 0 ? (
-                    <div>
+                    <div className="min-w-0 max-w-full overflow-hidden">
                       <div className="mb-1 text-xs font-medium text-muted-foreground">stdout</div>
-                      <ToolOutput data-testid="message-code-exec-stdout" className="bg-transparent">
+                      <ToolOutput
+                        data-testid="message-code-exec-stdout"
+                        className="bg-transparent message-code-exec-text-section"
+                      >
                         {stdout}
                       </ToolOutput>
                     </div>
                   ) : null}
                   {stderr.length > 0 ? (
-                    <div>
+                    <div className="min-w-0 max-w-full overflow-hidden">
                       <div className="mb-1 text-xs font-medium text-muted-foreground">stderr</div>
-                      <ToolOutput data-testid="message-code-exec-stderr" className="bg-transparent">
+                      <ToolOutput
+                        data-testid="message-code-exec-stderr"
+                        className="bg-transparent message-code-exec-text-section"
+                      >
                         {stderr}
                       </ToolOutput>
                     </div>
