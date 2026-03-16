@@ -127,10 +127,10 @@ describe('AgentMessage — tool_call', () => {
   });
 
   /* Preconditions: persisted kind:tool_call for code_exec with status/stdout/stderr
-     Action: render AgentMessage, verify default collapsed state, expand by toggle, collapse, then reopen
-     Assertions: dedicated code_exec block renders Code header with icon/status, starts collapsed with centered header spacing, deactivates hidden content when closed, and reopens successfully
-     Requirements: agents.7.4.5, agents.7.4.6, agents.7.4.6.9, agents.7.4.6.9.1, agents.7.4.7 */
-  it('should render code_exec tool_call block with Code header, icon, status, and streams', () => {
+     Action: render AgentMessage, verify default collapsed state, expand by standard ToolHeader toggle, collapse, then reopen
+     Assertions: dedicated code_exec block uses standard ToolHeader toggle and shows persisted sections after expand
+     Requirements: agents.7.4.5, agents.7.4.6, agents.7.4.7 */
+  it('should render code_exec tool_call block with standard ToolHeader toggle and streams', () => {
     render(
       <AgentMessage
         message={baseMessage({
@@ -162,14 +162,9 @@ describe('AgentMessage — tool_call', () => {
     expect(screen.getByTestId('message-code-exec-block')).toHaveClass('min-w-0');
     expect(screen.getByTestId('message-code-exec-block')).toHaveClass('max-w-full');
     expect(screen.getByTestId('message-code-exec-block')).toHaveClass('overflow-hidden');
-    expect(screen.getByTestId('message-code-exec-icon')).toBeInTheDocument();
-    expect(screen.getByTestId('message-code-exec-title')).toHaveTextContent('Print ok to stdout');
-    expect(screen.getByTestId('message-code-exec-status')).toHaveTextContent('success');
-    expect(screen.getByTestId('message-code-exec-status')).toHaveClass('bg-transparent');
-    expect(screen.getByTestId('message-code-exec-status-icon')).toBeInTheDocument();
-    expect(screen.getByTestId('message-code-exec-status-icon')).toHaveClass('text-emerald-600');
-    expect(screen.getByTestId('message-code-exec-header')).toHaveClass('mb-0');
     expect(screen.getByTestId('message-code-exec-toggle')).toBeInTheDocument();
+    expect(screen.getByTestId('message-code-exec-toggle')).toHaveTextContent('Print ok to stdout');
+    expect(screen.getByTestId('message-code-exec-toggle')).toHaveTextContent('Completed');
     expect(screen.queryByTestId('message-code-exec-input')).not.toBeInTheDocument();
     expect(screen.queryByTestId('message-code-exec-stdout')).not.toBeInTheDocument();
     expect(screen.queryByTestId('message-code-exec-stderr')).not.toBeInTheDocument();
@@ -177,14 +172,9 @@ describe('AgentMessage — tool_call', () => {
 
     fireEvent.click(screen.getByTestId('message-code-exec-toggle'));
 
-    expect(screen.getByTestId('message-code-exec-header')).toHaveClass('mb-2');
     expect(screen.getByTestId('message-code-exec-content')).toHaveClass('min-w-0');
     expect(screen.getByTestId('message-code-exec-content')).toHaveClass('max-w-full');
     expect(screen.getByTestId('message-code-exec-content')).toHaveClass('overflow-hidden');
-    expect(screen.getByTestId('message-code-exec-content')).toHaveClass(
-      'data-[state=closed]:pointer-events-none'
-    );
-    expect(screen.queryByText('JavaScript')).not.toBeInTheDocument();
     expect(screen.getByTestId('message-code-exec-input')).toHaveClass('bg-transparent');
     expect(screen.getByTestId('message-code-exec-input')).toHaveClass(
       'message-code-exec-text-section'
@@ -206,7 +196,6 @@ describe('AgentMessage — tool_call', () => {
     expect(screen.queryByTestId('message-code-exec-stdout')).not.toBeInTheDocument();
     expect(screen.queryByTestId('message-code-exec-stderr')).not.toBeInTheDocument();
     expect(screen.queryByTestId('message-code-exec-error')).not.toBeInTheDocument();
-    expect(screen.getByTestId('message-code-exec-header')).toHaveClass('mb-0');
 
     fireEvent.click(screen.getByTestId('message-code-exec-toggle'));
 
@@ -218,7 +207,7 @@ describe('AgentMessage — tool_call', () => {
   /* Preconditions: persisted kind:tool_call for code_exec with terminal error payload
      Action: render AgentMessage, then expand by toggle
      Assertions: renderer shows separate code_exec error section from structured output.error
-     Requirements: agents.7.4.6, agents.7.4.6.5.1, agents.7.4.6.5.2, agents.7.4.7, agents.7.4.9 */
+     Requirements: agents.7.4.6, agents.7.4.6.5.1, agents.7.4.6.5.2, agents.7.4.7 */
   it('should render separate code_exec error section from structured output.error', () => {
     render(
       <AgentMessage
@@ -252,8 +241,7 @@ describe('AgentMessage — tool_call', () => {
 
     fireEvent.click(screen.getByTestId('message-code-exec-toggle'));
 
-    expect(screen.getByTestId('message-code-exec-status')).toHaveTextContent('error');
-    expect(screen.getByTestId('message-code-exec-status-icon')).toHaveClass('text-red-600');
+    expect(screen.getByTestId('message-code-exec-toggle')).toHaveTextContent('Error');
     expect(screen.getByTestId('message-code-exec-stderr')).toHaveTextContent(
       'console.error fallback'
     );
@@ -296,7 +284,7 @@ describe('AgentMessage — tool_call', () => {
       />
     );
 
-    expect(screen.getByTestId('message-code-exec-title')).toHaveTextContent('Code');
+    expect(screen.getByTestId('message-code-exec-toggle')).toHaveTextContent('Code');
   });
 
   /* Preconditions: persisted historical tool_call payloads contain auto-title metadata comments in visible tool text fields
@@ -350,7 +338,7 @@ describe('AgentMessage — tool_call', () => {
 
     const { rerender } = render(<AgentMessage message={codeExecMessage} />);
 
-    expect(screen.getByTestId('message-code-exec-title')).toHaveTextContent('Attempt request');
+    expect(screen.getByTestId('message-code-exec-toggle')).toHaveTextContent('Attempt request');
     fireEvent.click(screen.getByTestId('message-code-exec-toggle'));
     expect(screen.getByTestId('message-code-exec-error')).toHaveTextContent(
       'sandbox_runtime_error: Visible error'

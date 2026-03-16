@@ -1,6 +1,6 @@
 import React from 'react';
 // Requirements: llm-integration.7, llm-integration.3.4.1, llm-integration.3.4.4, agents.4.22, agents.4.9, agents.4.10.1, agents.4.10.2, agents.7.4
-import { Check, CircleCheck, CircleMinus, CircleX, Clock3, Code2, Loader2 } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { Message, MessageContent, MessageResponse } from '../ai-elements/message';
 import { Reasoning, ReasoningContent } from '../ai-elements/reasoning';
 import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from '../ai-elements/tool';
@@ -43,40 +43,6 @@ function sanitizeInlineToolText(text: string): string {
     .trim();
 }
 
-function getCodeExecStatusIcon(status: string) {
-  switch (status) {
-    case 'success':
-      return CircleCheck;
-    case 'running':
-      return Loader2;
-    case 'error':
-      return CircleX;
-    case 'timeout':
-      return Clock3;
-    case 'cancelled':
-      return CircleMinus;
-    default:
-      return Loader2;
-  }
-}
-
-function getCodeExecStatusIconColorClass(status: string) {
-  switch (status) {
-    case 'success':
-      return 'text-emerald-600';
-    case 'running':
-      return 'text-muted-foreground';
-    case 'error':
-      return 'text-red-600';
-    case 'timeout':
-      return 'text-amber-600';
-    case 'cancelled':
-      return 'text-zinc-500';
-    default:
-      return 'text-muted-foreground';
-  }
-}
-
 function getCodeExecToolHeaderState(
   status: string
 ): 'input-available' | 'output-available' | 'output-error' {
@@ -97,7 +63,6 @@ export function AgentMessage({
   onNavigate,
 }: AgentMessageProps) {
   const [isDismissed, setIsDismissed] = React.useState(false);
-  const [isCodeExecExpanded, setIsCodeExecExpanded] = React.useState(false);
 
   const isLlmMessage = message.kind === 'llm';
   const llmData = isLlmMessage
@@ -307,56 +272,24 @@ export function AgentMessage({
         toolData.arguments && typeof toolData.arguments.task_summary === 'string'
           ? sanitizeInlineToolText(toolData.arguments.task_summary) || 'Code'
           : 'Code';
-      const StatusIcon = getCodeExecStatusIcon(status);
-      const statusIconColorClass = getCodeExecStatusIconColorClass(status);
       const toolHeaderState = getCodeExecToolHeaderState(status);
 
       return (
         <Message from="assistant" className="w-full max-w-full">
           <Tool
-            open={isCodeExecExpanded}
-            onOpenChange={setIsCodeExecExpanded}
             data-testid="message-code-exec-block"
             className="bg-transparent min-w-0 max-w-full overflow-hidden"
           >
-            <div
-              data-testid="message-code-exec-header"
-              className={`relative ${isCodeExecExpanded ? 'mb-2' : 'mb-0'}`}
-            >
-              <ToolHeader
-                data-testid="message-code-exec-toggle"
-                title={taskSummary}
-                toolName="code_exec"
-                type="dynamic-tool"
-                state={toolHeaderState}
-                className="bg-transparent pr-10 [&>div]:pointer-events-none [&>div]:invisible"
-              />
-              <div className="pointer-events-none absolute inset-y-0 left-3 right-10 flex min-w-0 items-center gap-2">
-                <Code2
-                  data-testid="message-code-exec-icon"
-                  className="h-4 w-4 shrink-0 text-muted-foreground"
-                />
-                <div
-                  data-testid="message-code-exec-title"
-                  className="min-w-0 truncate font-medium text-foreground"
-                >
-                  {taskSummary}
-                </div>
-                <div
-                  data-testid="message-code-exec-status"
-                  className="inline-flex shrink-0 items-center rounded-full border border-border/70 bg-transparent px-2 py-0.5 text-xs text-muted-foreground"
-                >
-                  <StatusIcon
-                    data-testid="message-code-exec-status-icon"
-                    className={`mr-1 h-3 w-3 shrink-0 ${statusIconColorClass} ${status === 'running' ? 'animate-spin' : ''}`}
-                  />
-                  {status}
-                </div>
-              </div>
-            </div>
+            <ToolHeader
+              data-testid="message-code-exec-toggle"
+              title={taskSummary}
+              toolName="code_exec"
+              type="dynamic-tool"
+              state={toolHeaderState}
+            />
             <ToolContent
               data-testid="message-code-exec-content"
-              className="min-w-0 max-w-full grid-cols-1 overflow-hidden data-[state=closed]:pointer-events-none"
+              className="min-w-0 max-w-full grid-cols-1 overflow-hidden"
             >
               <div
                 data-testid="message-code-exec-input"

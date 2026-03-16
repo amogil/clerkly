@@ -181,13 +181,13 @@ test.afterEach(async () => {
 
 test.describe('code_exec tool_call rendering', () => {
   /* Preconditions: authenticated app with one visible agent
-     Action: create persisted kind:tool_call with toolName=code_exec and terminal output, then expand collapsed block by toggle
-     Assertions: dedicated code_exec block renders task summary header/icon/status, starts collapsed by default with vertically centered header content, and shows transparent sections after expand
+     Action: create persisted kind:tool_call with toolName=code_exec and terminal output, then expand collapsed block by standard ToolHeader toggle
+     Assertions: dedicated code_exec block renders standard ToolHeader toggle with task summary and status badge, starts collapsed by default, and shows persisted sections after expand
      Exception Rationale (testing.3.13): this test validates renderer behavior for an already persisted historical
      tool_call(code_exec) message and intentionally bypasses LLM transport; LLM+UI path coverage remains in
      code_exec tool-loop scenarios below.
-     Requirements: agents.7.4.5, agents.7.4.6, agents.7.4.6.9, agents.7.4.7 */
-  test('should render tool_call(code_exec) message block with task summary header/icon/status and transparent streams', async () => {
+     Requirements: agents.7.4.5, agents.7.4.6, agents.7.4.7 */
+  test('should render tool_call(code_exec) message block with standard ToolHeader toggle and transparent streams', async () => {
     await launchWithMockLLM();
     const agentId = (await getAgentIdsFromApi(window))[0];
     expect(agentId).toBeTruthy();
@@ -220,58 +220,17 @@ test.describe('code_exec tool_call rendering', () => {
     await expect(window.locator('[data-testid="message-code-exec-block"]').last()).toBeVisible({
       timeout: 5000,
     });
-    await expect(window.locator('[data-testid="message-code-exec-icon"]').last()).toBeVisible();
-    await expect(window.locator('[data-testid="message-code-exec-title"]').last()).toHaveText(
+    await expect(window.locator('[data-testid="message-code-exec-toggle"]').last()).toContainText(
       'Print ok to stdout'
     );
-    await expect(window.locator('[data-testid="message-code-exec-status"]').last()).toHaveText(
-      'success'
+    await expect(window.locator('[data-testid="message-code-exec-toggle"]').last()).toContainText(
+      'Completed'
     );
-    await expect(
-      window.locator('[data-testid="message-code-exec-status-icon"]').last()
-    ).toBeVisible();
-    await expect(window.locator('[data-testid="message-code-exec-toggle"]').last()).toBeVisible();
     await expect(window.locator('[data-testid="message-code-exec-input"]')).toHaveCount(0);
     await expect(window.locator('[data-testid="message-code-exec-stdout"]')).toHaveCount(0);
     await expect(window.locator('[data-testid="message-code-exec-stderr"]')).toHaveCount(0);
 
-    const collapsedHeaderMetrics = await window
-      .locator('[data-testid="message-code-exec-header"]')
-      .last()
-      .evaluate((header) => {
-        const title = header.querySelector('[data-testid="message-code-exec-title"]');
-        const status = header.querySelector('[data-testid="message-code-exec-status"]');
-        if (!(title instanceof HTMLElement) || !(status instanceof HTMLElement)) {
-          return null;
-        }
-
-        const headerRect = header.getBoundingClientRect();
-        const titleRect = title.getBoundingClientRect();
-        const statusRect = status.getBoundingClientRect();
-
-        return {
-          headerClassName: header.className,
-          headerCenterY: headerRect.top + headerRect.height / 2,
-          titleCenterY: titleRect.top + titleRect.height / 2,
-          statusCenterY: statusRect.top + statusRect.height / 2,
-        };
-      });
-    expect(collapsedHeaderMetrics).not.toBeNull();
-    expect(collapsedHeaderMetrics!.headerClassName).toContain('mb-0');
-    expect(
-      Math.abs(collapsedHeaderMetrics!.headerCenterY - collapsedHeaderMetrics!.titleCenterY)
-    ).toBeLessThanOrEqual(2);
-    expect(
-      Math.abs(collapsedHeaderMetrics!.headerCenterY - collapsedHeaderMetrics!.statusCenterY)
-    ).toBeLessThanOrEqual(2);
-
     await window.locator('[data-testid="message-code-exec-toggle"]').last().click();
-
-    const expandedHeaderClassName = await window
-      .locator('[data-testid="message-code-exec-header"]')
-      .last()
-      .evaluate((el) => el.className);
-    expect(expandedHeaderClassName).toContain('mb-2');
 
     await expect(window.locator('[data-testid="message-code-exec-input"]').last()).toContainText(
       "console.log('ok')"
@@ -298,10 +257,6 @@ test.describe('code_exec tool_call rendering', () => {
       .locator('[data-testid="message-code-exec-block"]')
       .last()
       .evaluate((el) => el.className);
-    const statusClassName = await window
-      .locator('[data-testid="message-code-exec-status"]')
-      .last()
-      .evaluate((el) => el.className);
     const stdoutClassName = await window
       .locator('[data-testid="message-code-exec-stdout"]')
       .last()
@@ -311,7 +266,6 @@ test.describe('code_exec tool_call rendering', () => {
       .last()
       .evaluate((el) => el.className);
     expect(blockClassName).toContain('bg-transparent');
-    expect(statusClassName).toContain('bg-transparent');
     expect(inputClassName).toContain('bg-transparent');
     expect(inputClassName).toContain('rounded-md');
     expect(inputClassName).toContain('border-border/60');
@@ -328,13 +282,13 @@ test.describe('code_exec tool_call rendering', () => {
   });
 
   /* Preconditions: authenticated app with one visible agent
-     Action: create persisted kind:tool_call with toolName=code_exec, expand it, collapse it, then reopen via the same toggle
-     Assertions: collapsed content is removed from hit-testable UI and toggle remains usable after reopen cycle
+     Action: create persisted kind:tool_call with toolName=code_exec, expand it, collapse it, then reopen via the same standard toggle
+     Assertions: collapsed content is removed from visible UI and toggle remains usable after reopen cycle
      Exception Rationale (testing.3.13): this test validates renderer behavior for persisted historical
      tool_call(code_exec) message and intentionally bypasses LLM transport; LLM+UI path coverage remains in
      code_exec tool-loop scenarios below.
-     Requirements: agents.7.4.6.9, agents.7.4.6.9.1, agents.7.4.7 */
-  test('should keep collapsed code_exec content non-interactive after reopen cycle', async () => {
+     Requirements: agents.7.4.7 */
+  test('should keep standard code_exec toggle usable after reopen cycle', async () => {
     await launchWithMockLLM();
     const agentId = (await getAgentIdsFromApi(window))[0];
     expect(agentId).toBeTruthy();
@@ -440,8 +394,8 @@ test.describe('code_exec tool_call rendering', () => {
 
     await window.locator('[data-testid="message-code-exec-toggle"]').last().click();
 
-    await expect(window.locator('[data-testid="message-code-exec-status"]').last()).toHaveText(
-      'error'
+    await expect(window.locator('[data-testid="message-code-exec-toggle"]').last()).toContainText(
+      'Error'
     );
     await expect(window.locator('[data-testid="message-code-exec-stderr"]').last()).toContainText(
       'console.error fallback'
@@ -498,7 +452,7 @@ test.describe('code_exec tool_call rendering', () => {
     await expect(window.locator('[data-testid="message-code-exec-block"]').last()).toBeVisible({
       timeout: 5000,
     });
-    await expect(window.locator('[data-testid="message-code-exec-title"]').last()).toHaveText(
+    await expect(window.locator('[data-testid="message-code-exec-toggle"]').last()).toContainText(
       'Code'
     );
     await expectNoToastError(window);
@@ -1973,7 +1927,7 @@ console.log(JSON.stringify(result));`,
 
     try {
       await sendUserMessage('Emit lifecycle events');
-      await expect(window.locator('[data-testid="message-code-exec-status"]').last()).toContainText(
+      await expect(window.locator('[data-testid="message-code-exec-toggle"]').last()).toContainText(
         'running',
         { timeout: 8000 }
       );
@@ -1984,7 +1938,7 @@ console.log(JSON.stringify(result));`,
         }
       );
       await expect(
-        window.locator('[data-testid="message-code-exec-status"]').last()
+        window.locator('[data-testid="message-code-exec-toggle"]').last()
       ).not.toContainText('running', { timeout: 8000 });
 
       await expect
