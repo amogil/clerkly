@@ -8,7 +8,7 @@
 - оставшимися follow-up задачами после Issue #65 (`sandbox-http-request`) в части LLM/code_exec интеграции;
 - миграцией `code_exec` renderer на стандартный AI Elements `Tool` contract.
 
-**Текущий статус:** Фаза 2 — runtime защита metadata comments
+**Текущий статус:** Фаза 3 — renderer defense-in-depth
 
 ---
 
@@ -34,18 +34,19 @@
 - ✅ Для `tool_call(code_exec)` добавлен отдельный renderer block `error` для structured `output.error`.
 - ✅ Выявлено, что текущий локальный `Tool` wrapper разошёлся с официальным AI Elements `Tool` collapsible contract.
 - ✅ Фаза 1 завершена: `llm-integration` requirements/design синхронизированы с текущим provider loop contract и явно фиксируют documented safety step cap вместо semantic stop по `final_answer`.
+- ✅ Фаза 2 завершена: `MainPipeline` блокирует `<!-- clerkly:title-meta: ... -->` в string-полях аргументов tool_call до persist; минимум покрыт `code_exec.task_summary`, а unit-regressions добавлены.
 
 ### В работе
-- 🔄 Фаза 2: доведение runtime-защиты metadata comments до всех user-visible tool payloads.
+- 🔄 Фаза 3: renderer-side защита для historical payloads и regressions, где metadata comment мог попасть в UI до runtime guard.
 
 ### Запланировано
 
 #### Фаза 2: Runtime защита metadata comments
 
-- [ ] Довести runtime до правила про metadata comments во всех user-visible tool payloads.
-  - [ ] Расширить валидацию в `src/main/agents/MainPipeline.ts`.
-  - [ ] Блокировать служебный `<!-- clerkly:title-meta: ... -->` не только в `final_answer.summary_points`, но и в других tool payload fields, попадающих в чат.
-  - [ ] Минимум покрыть `code_exec.task_summary`, который сейчас рендерится напрямую.
+- [x] Довести runtime до правила про metadata comments во всех user-visible tool payloads.
+  - [x] Расширить валидацию в `src/main/agents/MainPipeline.ts`.
+  - [x] Блокировать служебный `<!-- clerkly:title-meta: ... -->` не только в `final_answer.summary_points`, но и в других tool payload fields, попадающих в чат.
+  - [x] Минимум покрыть `code_exec.task_summary`, который сейчас рендерится напрямую.
 
 #### Фаза 3: Renderer defense-in-depth
 

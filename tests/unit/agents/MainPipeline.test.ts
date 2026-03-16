@@ -1459,6 +1459,58 @@ describe('MainPipeline.run()', () => {
     );
   });
 
+  /* Preconditions: provider returns code_exec tool_call with auto-title metadata comment embedded in task_summary
+     Action: run pipeline once
+     Assertions: invalid tool arguments are surfaced as provider error and code_exec tool_call is not persisted
+     Requirements: llm-integration.9.5.3.2, llm-integration.11.3, llm-integration.16.1.4 */
+  it('creates kind:error when code_exec task_summary contains auto-title metadata comment', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-code-exec-title-meta',
+          toolName: 'code_exec',
+          arguments: {
+            task_summary:
+              'Run check <!-- clerkly:title-meta: {"title":"Bad title","rename_need_score":90} -->',
+            code: "console.log('ok')",
+          },
+        });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'error',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          error: expect.objectContaining({
+            type: 'provider',
+            message: expect.stringContaining('invalid tool call arguments'),
+          }),
+        }),
+      }),
+      1,
+      true
+    );
+    expect(messageManager.create).not.toHaveBeenCalledWith(
+      'agent-1',
+      'tool_call',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          toolName: 'code_exec',
+        }),
+      }),
+      1,
+      expect.anything()
+    );
+  });
+
   it('accepts plain text on retry after initial empty turn without completion marker', async () => {
     const { pipeline, llmProvider, messageManager } = makeMocks();
     let attempt = 0;

@@ -1668,6 +1668,35 @@ export class MainPipeline {
     return messages.some((message) => !message.hidden && this.isMeaningfulUserMessage(message));
   }
 
+  // Requirements: llm-integration.9.5.3.2, llm-integration.16.1.4
+  private assertToolPayloadHasNoAutoTitleMetadata(
+    value: unknown,
+    path: string,
+    createError: (message: string) => Error
+  ): void {
+    if (typeof value === 'string') {
+      if (value.includes(TITLE_META_COMMENT_PREFIX)) {
+        throw createError(`${path} must not contain auto-title metadata comments`);
+      }
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      value.forEach((item, index) => {
+        this.assertToolPayloadHasNoAutoTitleMetadata(item, `${path}[${index}]`, createError);
+      });
+      return;
+    }
+
+    if (!value || typeof value !== 'object') {
+      return;
+    }
+
+    Object.entries(value).forEach(([key, nestedValue]) => {
+      this.assertToolPayloadHasNoAutoTitleMetadata(nestedValue, `${path}.${key}`, createError);
+    });
+  }
+
   private validateToolCallArguments(toolName: string, args: Record<string, unknown>): void {
     if (toolName === 'code_exec') {
       const validated = validateCodeExecInput(args);
@@ -1676,6 +1705,11 @@ export class MainPipeline {
           validated.error?.message ?? 'Invalid code_exec arguments.'
         );
       }
+      this.assertToolPayloadHasNoAutoTitleMetadata(
+        args,
+        toolName,
+        (message) => new InvalidToolArgumentsError(message)
+      );
       return;
     }
 
@@ -1705,17 +1739,18 @@ export class MainPipeline {
           'final_answer.summary_points items must be non-empty'
         );
       }
-      if (point.includes(TITLE_META_COMMENT_PREFIX)) {
-        throw new InvalidFinalAnswerContractError(
-          'final_answer.summary_points items must not contain auto-title metadata comments'
-        );
-      }
       if (point.length > 200) {
         throw new InvalidFinalAnswerContractError(
           'final_answer.summary_points item length must be <= 200'
         );
       }
     }
+
+    this.assertToolPayloadHasNoAutoTitleMetadata(
+      args,
+      toolName,
+      (message) => new InvalidFinalAnswerContractError(message)
+    );
   }
 
   private persistFinalAnswerToolCall(
