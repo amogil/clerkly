@@ -234,7 +234,7 @@ test.describe('code_exec tool_call rendering', () => {
 
     const inputSection = window.locator('[data-testid="message-code-exec-input"]').last();
     await expect(inputSection.locator('[data-streamdown="code-block-header"]')).toContainText(
-      'javascript'
+      'JavaScript'
     );
     await expect(inputSection).toContainText("console.log('ok')");
     await expect(window.locator('[data-testid="message-code-exec-stdout"]').last()).toContainText(
@@ -483,7 +483,7 @@ test.describe('code_exec tool_call rendering', () => {
     const inputSection = window.locator('[data-testid="message-code-exec-input"]').last();
     await expect(inputSection).toBeVisible();
     await expect(inputSection.locator('[data-streamdown="code-block-header"]')).toContainText(
-      'javascript'
+      'JavaScript'
     );
     await expect(inputSection).toContainText('const answer = 42;');
     await expect(inputSection.locator('[data-streamdown="code-block"]')).toHaveCount(1);

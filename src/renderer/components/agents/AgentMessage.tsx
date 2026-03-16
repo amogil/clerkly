@@ -293,7 +293,7 @@ export function AgentMessage({
                   className="message-code-exec-text-section"
                 >
                   <MessageResponse className="message-response-transparent-code-blocks text-sm leading-relaxed break-words">
-                    {buildCodeFence(codeInput, 'javascript')}
+                    {buildCodeFence(codeInput, 'JavaScript')}
                   </MessageResponse>
                 </div>
               </div>

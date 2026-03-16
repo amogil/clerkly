@@ -159,7 +159,7 @@ describe('AgentMessage — tool_call', () => {
     expect(screen.getByTestId('message-code-exec-content')).toHaveClass('max-w-full');
     expect(screen.getByTestId('message-code-exec-content')).toHaveClass('overflow-hidden');
     expect(screen.getByTestId('message-code-exec-input')).toHaveTextContent("console.log('ok')");
-    expect(screen.getByTestId('message-code-exec-input')).toHaveTextContent('```javascript');
+    expect(screen.getByTestId('message-code-exec-input')).toHaveTextContent('```JavaScript');
     expect(
       screen.getByTestId('message-code-exec-input').querySelectorAll('[data-testid="mock-code-block"]')
     ).toHaveLength(0);
