@@ -163,16 +163,10 @@ describe('AgentMessage — tool_call', () => {
     expect(
       screen.getByTestId('message-code-exec-input').querySelectorAll('[data-testid="mock-code-block"]')
     ).toHaveLength(0);
-    expect(screen.getByText('std out')).toBeInTheDocument();
     expect(screen.getByTestId('message-code-exec-stdout')).toHaveTextContent('ok');
-    expect(screen.getByTestId('message-code-exec-stdout')).not.toHaveClass(
-      'message-code-exec-text-section'
-    );
-    expect(screen.getByText('std error')).toBeInTheDocument();
+    expect(screen.getByTestId('message-code-exec-stdout')).toHaveTextContent('```Output');
     expect(screen.getByTestId('message-code-exec-stderr')).toHaveTextContent('warn');
-    expect(screen.getByTestId('message-code-exec-stderr')).not.toHaveClass(
-      'message-code-exec-text-section'
-    );
+    expect(screen.getByTestId('message-code-exec-stderr')).toHaveTextContent('```Output');
 
     fireEvent.click(screen.getByTestId('message-code-exec-toggle'));
 
@@ -231,10 +225,7 @@ describe('AgentMessage — tool_call', () => {
     expect(screen.getByTestId('message-code-exec-error')).toHaveTextContent(
       'policy_denied: Tool is not allowed in sandbox allowlist.'
     );
-    expect(screen.getByText('error')).toBeInTheDocument();
-    expect(screen.getByTestId('message-code-exec-error')).not.toHaveClass(
-      'message-code-exec-text-section'
-    );
+    expect(screen.getByTestId('message-code-exec-error')).toHaveTextContent('```Error');
   });
 
   /* Preconditions: persisted historical kind:tool_call for code_exec without task_summary

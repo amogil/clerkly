@@ -237,14 +237,16 @@ test.describe('code_exec tool_call rendering', () => {
       'JavaScript'
     );
     await expect(inputSection).toContainText("console.log('ok')");
-    await expect(window.locator('[data-testid="message-code-exec-stdout"]').last()).toContainText(
-      'ok'
+    const stdoutSection = window.locator('[data-testid="message-code-exec-stdout"]').last();
+    await expect(stdoutSection.locator('[data-streamdown="code-block-header"]')).toContainText(
+      'Output'
     );
-    await expect(window.getByText('std out').last()).toBeVisible();
-    await expect(window.locator('[data-testid="message-code-exec-stderr"]').last()).toContainText(
-      'warn'
+    await expect(stdoutSection).toContainText('ok');
+    const stderrSection = window.locator('[data-testid="message-code-exec-stderr"]').last();
+    await expect(stderrSection.locator('[data-streamdown="code-block-header"]')).toContainText(
+      'Output'
     );
-    await expect(window.getByText('std error').last()).toBeVisible();
+    await expect(stderrSection).toContainText('warn');
     await expect(
       window
         .locator('[data-testid="message-code-exec-stdout"]')
@@ -380,18 +382,20 @@ test.describe('code_exec tool_call rendering', () => {
     await expect(window.locator('[data-testid="message-code-exec-toggle"]').last()).toContainText(
       'Error'
     );
-    await expect(window.locator('[data-testid="message-code-exec-stderr"]').last()).toContainText(
-      'console.error fallback'
+    const stderrSection = window.locator('[data-testid="message-code-exec-stderr"]').last();
+    await expect(stderrSection.locator('[data-streamdown="code-block-header"]')).toContainText(
+      'Output'
     );
-    await expect(window.locator('[data-testid="message-code-exec-error"]').last()).toContainText(
+    await expect(stderrSection).toContainText('console.error fallback');
+    const errorSection = window.locator('[data-testid="message-code-exec-error"]').last();
+    await expect(errorSection.locator('[data-streamdown="code-block-header"]')).toContainText(
+      'Error'
+    );
+    await expect(errorSection).toContainText(
       'policy_denied: Tool is not allowed in sandbox allowlist.'
     );
-    await expect(window.getByText('error').last()).toBeVisible();
     await expect(
-      window
-        .locator('[data-testid="message-code-exec-error"]')
-        .last()
-        .locator('[data-streamdown="code-block-actions"]')
+      errorSection.locator('[data-streamdown="code-block-actions"]')
     ).toBeVisible();
 
     await expectNoToastError(window);
