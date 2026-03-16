@@ -1555,9 +1555,10 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 - Structured `output.error` рендерится как отдельная секция `error` внутри того же `code_exec` блока; UI не смешивает это содержимое со `stderr`.
 - Содержимое секции `error` строится из persisted `output.error.code` и `output.error.message` в одном человекочитаемом diagnostic-text блоке.
 - Для явно выделенных text/code секций tool-блоков (`Input`, `Output`, `JavaScript`, `stdout`, `stderr`, `error`) применяется no-wrap + horizontal scroll (`white-space: pre`, `overflow-x: auto`).
-- Секция входных параметров `code_exec` рендерится через стандартный `ToolInput`; отдельный app-owned markdown renderer внутри `ToolContent` не используется.
+- Код, переданный для исполнения в `code_exec`, рендерится как app-owned секция `JavaScript` внутри стандартного `ToolContent`: label `JavaScript` и один markdown code block с подсветкой JavaScript без вложенного дублирующего code-frame; стандартный `ToolHeader` toggle при этом сохраняется.
 - Для `stdout`, `stderr` и `error` сохраняются app-owned text sections с классом `message-code-exec-text-section`.
 - Для `tool_call(code_exec)` transparent-surface применяется к корневому контейнеру `Tool` и к app-owned секциям `stdout`, `stderr`, `error`.
+- Для секции `JavaScript` usage-level styling сохраняет прозрачный фон контейнера/header/code-body и видимую цветовую подсветку JavaScript.
 - Рендер строится только по persisted snapshot (`message.created`/`message.updated`) без локальной реконструкции результата.
 
 ```tsx
@@ -1963,7 +1964,7 @@ import { Logo } from '../logo';
 | `tests/functional/agent-status-indicators.spec.ts` | agents.6 | - |
 | `tests/functional/agent-status-all-places.spec.ts` | agents.6.1-6.5 | Проверка консистентного отображения каждого статуса (`new`, `in-progress`, `awaiting-response`, `error`, `completed`) в Header, Agent List tooltip и All Agents |
 | `tests/functional/message-format.spec.ts` | agents.7 | - |
-| `tests/functional/code_exec.spec.ts` | agents.7.4.5-7.4.9, agents.4.23 | Отдельные сценарии для `tool_call(code_exec)`: стандартный `ToolHeader` toggle, `ToolInput`, отдельная `error` section из `output.error`, reopen cycle, width/overflow |
+| `tests/functional/code_exec.spec.ts` | agents.7.4.5-7.4.9, agents.4.23 | Отдельные сценарии для `tool_call(code_exec)`: стандартный `ToolHeader` toggle, секция `JavaScript` с подсветкой, отдельная `error` section из `output.error`, reopen cycle, width/overflow |
 | `tests/functional/llm-chat.spec.ts` | agents.4.11, agents.4.11.2, agents.7.7, agents.4.24, agents.14.1-14.6, llm-integration.2, llm-integration.7.2, llm-integration.8.7, llm-integration.16 | Включает сценарий deferred rename после non-meaningful triggering turn при наличии meaningful user-message в истории |
 | `tests/functional/agent-status-calculation.spec.ts` | agents.9 | - |
 | `tests/functional/agent-data-isolation.spec.ts` | agents.10 | - |

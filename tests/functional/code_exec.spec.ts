@@ -182,12 +182,12 @@ test.afterEach(async () => {
 test.describe('code_exec tool_call rendering', () => {
   /* Preconditions: authenticated app with one visible agent
      Action: create persisted kind:tool_call with toolName=code_exec and terminal output, then expand collapsed block by standard ToolHeader toggle
-     Assertions: dedicated code_exec block renders standard ToolHeader toggle with task summary and status badge, starts collapsed by default, and shows ToolInput plus persisted sections after expand
+     Assertions: dedicated code_exec block renders standard ToolHeader toggle with task summary and status badge, starts collapsed by default, and shows JavaScript input plus persisted sections after expand
      Exception Rationale (testing.3.13): this test validates renderer behavior for an already persisted historical
      tool_call(code_exec) message and intentionally bypasses LLM transport; LLM+UI path coverage remains in
      code_exec tool-loop scenarios below.
      Requirements: agents.7.4.5, agents.7.4.6, agents.7.4.7 */
-  test('should render tool_call(code_exec) message block with standard ToolHeader toggle and ToolInput', async () => {
+  test('should render tool_call(code_exec) message block with standard ToolHeader toggle and JavaScript input', async () => {
     await launchWithMockLLM();
     const agentId = (await getAgentIdsFromApi(window))[0];
     expect(agentId).toBeTruthy();
@@ -232,6 +232,7 @@ test.describe('code_exec tool_call rendering', () => {
 
     await window.locator('[data-testid="message-code-exec-toggle"]').last().click();
 
+    await expect(window.getByText('JavaScript').last()).toBeVisible();
     await expect(window.locator('[data-testid="message-code-exec-input"]').last()).toContainText(
       "console.log('ok')"
     );
@@ -445,11 +446,11 @@ test.describe('code_exec tool_call rendering', () => {
 
   /* Preconditions: authenticated app with one visible agent
      Action: create persisted kind:tool_call with toolName=code_exec and JavaScript input, then expand collapsed block
-     Assertions: code_exec input renders through standard ToolInput code block
+     Assertions: code_exec input renders through JavaScript code block with syntax label
      Exception Rationale (testing.3.13): this test validates renderer behavior for persisted historical
      tool_call(code_exec) payload and intentionally bypasses LLM transport.
      Requirements: agents.7.4.6 */
-  test('should render standard ToolInput code block in code_exec input section', async () => {
+  test('should render JavaScript code block in code_exec input section', async () => {
     await launchWithMockLLM();
     const agentId = (await getAgentIdsFromApi(window))[0];
     expect(agentId).toBeTruthy();
@@ -484,9 +485,41 @@ test.describe('code_exec tool_call rendering', () => {
 
     const inputSection = window.locator('[data-testid="message-code-exec-input"]').last();
     await expect(inputSection).toBeVisible();
+    await expect(window.getByText('JavaScript').last()).toBeVisible();
     await expect(inputSection).toContainText('const answer = 42;');
+    await expect(inputSection.locator('[data-streamdown="code-block"]')).toHaveCount(1);
 
     await expect(inputSection.locator('pre code')).toHaveCount(1);
+    await expect(inputSection.locator('pre code')).toContainText('function run()');
+    await expect
+      .poll(async () =>
+        inputSection.evaluate((element) => {
+          const tokenSpans = Array.from(element.querySelectorAll('pre code span'));
+          return tokenSpans.some((span) => {
+            if (!(span instanceof HTMLElement)) {
+              return false;
+            }
+            const computedColor = getComputedStyle(span).color;
+            return computedColor !== '' && computedColor !== 'rgb(0, 0, 0)';
+          });
+        })
+      )
+      .toBe(true);
+    expect(
+      await inputSection.evaluate((element) => {
+        const codeBlocks = element.querySelectorAll('[data-streamdown="code-block"]');
+        const codeBlock = codeBlocks.item(0) as HTMLElement | null;
+        if (!codeBlock) {
+          return null;
+        }
+        if (codeBlocks.length !== 1) {
+          return 'multiple';
+        }
+        const computed = getComputedStyle(element);
+        return computed.backgroundColor;
+      })
+    ).toBe('rgba(0, 0, 0, 0)');
+    await expect(inputSection.locator('[data-streamdown="code-block"]')).toHaveCount(1);
 
     await expectNoToastError(window);
   });

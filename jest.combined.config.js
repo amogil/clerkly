@@ -18,6 +18,7 @@ module.exports = {
     '^use-stick-to-bottom$': '<rootDir>/tests/__mocks__/use-stick-to-bottom.tsx',
     // Mock AI Elements components that use ESM-only deps (use-stick-to-bottom, streamdown)
     '^.*/ai-elements/conversation$': '<rootDir>/tests/__mocks__/ai-elements/conversation.tsx',
+    '^.*/ai-elements/code-block$': '<rootDir>/tests/__mocks__/ai-elements/code-block.tsx',
     '^.*/ai-elements/message$': '<rootDir>/tests/__mocks__/ai-elements/message.tsx',
     '^.*/ai-elements/reasoning$': '<rootDir>/tests/__mocks__/ai-elements/reasoning.tsx',
     '^.*/ai-elements/tool$': '<rootDir>/tests/__mocks__/ai-elements/tool.tsx',

@@ -112,9 +112,9 @@ describe('AgentMessage — tool_call', () => {
 
   /* Preconditions: persisted kind:tool_call for code_exec with status/stdout/stderr
      Action: render AgentMessage, verify default collapsed state, expand by standard ToolHeader toggle, collapse, then reopen
-     Assertions: dedicated code_exec block uses standard ToolHeader toggle and shows ToolInput plus persisted output sections after expand
+     Assertions: dedicated code_exec block uses standard ToolHeader toggle and shows JavaScript input plus persisted output sections after expand
      Requirements: agents.7.4.5, agents.7.4.6, agents.7.4.7 */
-  it('should render code_exec tool_call block with standard ToolHeader toggle and ToolInput', () => {
+  it('should render code_exec tool_call block with standard ToolHeader toggle and JavaScript input section', () => {
     render(
       <AgentMessage
         message={baseMessage({
@@ -158,7 +158,11 @@ describe('AgentMessage — tool_call', () => {
     expect(screen.getByTestId('message-code-exec-content')).toHaveClass('min-w-0');
     expect(screen.getByTestId('message-code-exec-content')).toHaveClass('max-w-full');
     expect(screen.getByTestId('message-code-exec-content')).toHaveClass('overflow-hidden');
+    expect(screen.getByText('JavaScript')).toBeInTheDocument();
     expect(screen.getByTestId('message-code-exec-input')).toHaveTextContent("console.log('ok')");
+    expect(
+      screen.getByTestId('message-code-exec-input').querySelectorAll('[data-testid="mock-code-block"]')
+    ).toHaveLength(0);
     expect(screen.getByTestId('message-code-exec-stdout')).toHaveTextContent('ok');
     expect(screen.getByTestId('message-code-exec-stdout')).toHaveClass('bg-transparent');
     expect(screen.getByTestId('message-code-exec-stdout')).toHaveClass(

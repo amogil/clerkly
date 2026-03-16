@@ -35,6 +35,11 @@ function sanitizeInlineToolText(text: string): string {
     .trim();
 }
 
+// Requirements: agents.7.4.6.6
+function buildCodeFence(code: string, language: string): string {
+  return `\`\`\`${language}\n${code}\n\`\`\``;
+}
+
 function getCodeExecToolHeaderState(
   status: string
 ): 'input-available' | 'output-available' | 'output-error' {
@@ -265,8 +270,6 @@ export function AgentMessage({
           ? sanitizeInlineToolText(toolData.arguments.task_summary) || 'Code'
           : 'Code';
       const toolHeaderState = getCodeExecToolHeaderState(status);
-      const inputPayload = { code: codeInput };
-
       return (
         <Message from="assistant" className="w-full max-w-full">
           <Tool
@@ -284,13 +287,17 @@ export function AgentMessage({
               data-testid="message-code-exec-content"
               className="min-w-0 max-w-full grid-cols-1 overflow-hidden"
             >
-              <ToolInput
-                data-testid="message-code-exec-input"
-                className="bg-transparent"
-                input={inputPayload}
-              >
-                {undefined}
-              </ToolInput>
+              <div className="min-w-0 max-w-full overflow-hidden">
+                <div
+                  data-testid="message-code-exec-input"
+                  className="message-code-exec-text-section"
+                >
+                  <div className="mb-1 text-xs font-medium text-muted-foreground">JavaScript</div>
+                  <MessageResponse className="message-response-transparent-code-blocks text-sm leading-relaxed break-words">
+                    {buildCodeFence(codeInput, 'javascript')}
+                  </MessageResponse>
+                </div>
+              </div>
               {stdout.length > 0 ? (
                 <div className="min-w-0 max-w-full overflow-hidden">
                   <div className="mb-1 text-xs font-medium text-muted-foreground">stdout</div>

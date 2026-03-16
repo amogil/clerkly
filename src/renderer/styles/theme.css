@@ -224,6 +224,20 @@
   word-break: normal !important;
 }
 
+[data-testid='message-code-exec-input'] [data-language='javascript'],
+[data-testid='message-code-exec-input'] [data-testid='mock-code-block'] {
+  background-color: transparent !important;
+}
+
+[data-testid='message-code-exec-input'] [data-language='javascript'] > div:first-child,
+[data-testid='message-code-exec-input'] [data-testid='mock-code-block-header'] {
+  background-color: transparent !important;
+}
+
+[data-testid='message-code-exec-input'] [data-language='javascript'] pre {
+  background-color: transparent !important;
+}
+
 [data-testid='message-code-exec-block'],
 [data-testid='message-code-exec-content'] {
   min-width: 0 !important;

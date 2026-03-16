@@ -580,7 +580,8 @@
 
 7.4.6.5.2. Секция `error` в `tool_call(code_exec)` ДОЛЖНА отображать человекочитаемое диагностическое содержимое из persisted `output.error`.
 
-7.4.6.6. Секция входных параметров `tool_call(code_exec)` ДОЛЖНА использовать стандартный `ToolInput` без app-owned markdown/code renderer внутри toggle/content области.
+7.4.6.6. Код, переданный для исполнения в `tool_call(code_exec)`, ДОЛЖЕН отображаться как отдельная секция `JavaScript` с подсветкой синтаксиса JavaScript в одном code block без вложенного дублирующего code-frame.
+7.4.6.6.1. Секция `JavaScript` в `tool_call(code_exec)` ДОЛЖНА использовать прозрачный фон, при этом цветовая подсветка синтаксиса JavaScript ДОЛЖНА оставаться видимой.
 
 7.4.7. Для `tool_call(code_exec)` UI ДОЛЖЕН иметь отдельные тестовые идентификаторы:
   - `data-testid="message-code-exec-block"` для корневого блока,
@@ -661,10 +662,10 @@
 - `tests/functional/llm-chat.spec.ts` - "should show running code_exec before terminal when first model step has no post-tool text"
 - `tests/functional/llm-chat.spec.ts` - "should reject model response containing more than one tool_call and run repair"
 - `tests/functional/llm-chat.spec.ts` - "should render final_answer after all non-final tool steps of successful attempt"
-- `tests/functional/code_exec.spec.ts` - "should render tool_call(code_exec) message block with standard ToolHeader toggle and ToolInput"
+- `tests/functional/code_exec.spec.ts` - "should render tool_call(code_exec) message block with standard ToolHeader toggle and JavaScript input"
 - `tests/functional/code_exec.spec.ts` - "should render code_exec error section from structured output.error"
 - `tests/functional/code_exec.spec.ts` - "should keep standard code_exec toggle usable after reopen cycle"
-- `tests/functional/code_exec.spec.ts` - "should render standard ToolInput code block in code_exec input section"
+- `tests/functional/code_exec.spec.ts` - "should render JavaScript code block in code_exec input section"
 - `tests/functional/code_exec.spec.ts` - "should keep code_exec block within chat width with internal horizontal scroll"
 
 ---
