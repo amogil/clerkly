@@ -394,9 +394,7 @@ test.describe('code_exec tool_call rendering', () => {
     await expect(errorSection).toContainText(
       'policy_denied: Tool is not allowed in sandbox allowlist.'
     );
-    await expect(
-      errorSection.locator('[data-streamdown="code-block-actions"]')
-    ).toBeVisible();
+    await expect(errorSection.locator('[data-streamdown="code-block-actions"]')).toBeVisible();
 
     await expectNoToastError(window);
   });
@@ -440,11 +438,11 @@ test.describe('code_exec tool_call rendering', () => {
     const toggle = window.locator('[data-testid="message-code-exec-toggle"]').last();
     await expect(toggle).toBeVisible({ timeout: 5000 });
     await expect(
-      window.locator('[data-testid="message-code-exec-status-icon"][data-status="cancelled"]').last()
+      window
+        .locator('[data-testid="message-code-exec-status-icon"][data-status="cancelled"]')
+        .last()
     ).toBeVisible();
-    await expect(
-      toggle.locator('svg.lucide-wrench')
-    ).toHaveCount(0);
+    await expect(toggle.locator('svg.lucide-wrench')).toHaveCount(0);
     await expectNoToastError(window);
   });
 
@@ -489,12 +487,8 @@ test.describe('code_exec tool_call rendering', () => {
     await expect(
       window.locator('[data-testid="message-code-exec-status-icon"][data-status="timeout"]').last()
     ).toBeVisible();
-    await expect(
-      toggle.locator('svg.lucide-clock-alert')
-    ).toHaveCount(1);
-    await expect(
-      toggle.locator('svg.lucide-wrench')
-    ).toHaveCount(0);
+    await expect(toggle.locator('svg.lucide-clock-alert')).toHaveCount(1);
+    await expect(toggle.locator('svg.lucide-wrench')).toHaveCount(0);
     await expectNoToastError(window);
   });
 

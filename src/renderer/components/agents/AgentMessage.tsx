@@ -57,7 +57,7 @@ function getCodeExecStatusIcon(status: string): React.ReactNode {
     case 'cancelled':
       return <CircleSlash className="size-4 text-muted-foreground" />;
     case 'running':
-      return <LoaderCircle className="size-4 animate-spin text-muted-foreground" />;
+      return <LoaderCircle className="size-4 animate-spin text-primary" />;
     case 'timeout':
       return <ClockAlert className="size-4 text-amber-600" />;
     default:

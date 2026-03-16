@@ -619,14 +619,16 @@ describe('AgentChat — PromptInput rendered', () => {
 
   /* Preconditions: component rendered
      Action: render AgentChat
-     Assertions: shortcut hint is rendered outside PromptInput footer content
-     Requirements: agents.4.3, agents.4.4 */
-  it('should render keyboard shortcut hint below PromptInput', () => {
+     Assertions: shortcut hint is rendered inside PromptInput footer content
+     Requirements: agents.4.3, agents.4.4, agents.4.7.3 */
+  it('should render keyboard shortcut hint inside PromptInput footer', () => {
     render(<AgentChat {...defaultProps} />);
 
+    const promptInput = screen.getByTestId('agent-prompt-input');
     const shortcutHint = screen.getByText('Press Enter to send, Shift+Enter for new line');
     expect(shortcutHint).toBeInTheDocument();
-    expect(shortcutHint).toHaveClass('mt-4', 'mb-4');
+    expect(promptInput).toContainElement(shortcutHint);
+    expect(shortcutHint).toHaveClass('px-0.5', 'text-xs', 'text-muted-foreground');
   });
 
   /* Preconditions: component rendered

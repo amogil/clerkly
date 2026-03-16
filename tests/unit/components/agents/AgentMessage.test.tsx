@@ -152,7 +152,9 @@ describe('AgentMessage — tool_call', () => {
       'data-status',
       'success'
     );
-    expect(screen.getByTestId('message-code-exec-toggle').querySelector('.lucide-wrench')).toBeNull();
+    expect(
+      screen.getByTestId('message-code-exec-toggle').querySelector('.lucide-wrench')
+    ).toBeNull();
     expect(screen.queryByTestId('message-code-exec-input')).not.toBeInTheDocument();
     expect(screen.queryByTestId('message-code-exec-stdout')).not.toBeInTheDocument();
     expect(screen.queryByTestId('message-code-exec-stderr')).not.toBeInTheDocument();
@@ -166,7 +168,9 @@ describe('AgentMessage — tool_call', () => {
     expect(screen.getByTestId('message-code-exec-input')).toHaveTextContent("console.log('ok')");
     expect(screen.getByTestId('message-code-exec-input')).toHaveTextContent('```JavaScript');
     expect(
-      screen.getByTestId('message-code-exec-input').querySelectorAll('[data-testid="mock-code-block"]')
+      screen
+        .getByTestId('message-code-exec-input')
+        .querySelectorAll('[data-testid="mock-code-block"]')
     ).toHaveLength(0);
     expect(screen.getByTestId('message-code-exec-stdout')).toHaveTextContent('ok');
     expect(screen.getByTestId('message-code-exec-stdout')).toHaveTextContent('```Output');
@@ -272,7 +276,9 @@ describe('AgentMessage — tool_call', () => {
       'data-status',
       'running'
     );
-    expect(screen.getByTestId('message-code-exec-toggle').querySelector('.lucide-wrench')).toBeNull();
+    expect(
+      screen.getByTestId('message-code-exec-toggle').querySelector('.lucide-wrench')
+    ).toBeNull();
   });
 
   /* Preconditions: persisted kind:tool_call for code_exec with cancelled status
@@ -310,7 +316,9 @@ describe('AgentMessage — tool_call', () => {
       'data-status',
       'cancelled'
     );
-    expect(screen.getByTestId('message-code-exec-toggle').querySelector('.lucide-wrench')).toBeNull();
+    expect(
+      screen.getByTestId('message-code-exec-toggle').querySelector('.lucide-wrench')
+    ).toBeNull();
   });
 
   /* Preconditions: persisted kind:tool_call for code_exec with timeout status
@@ -329,7 +337,7 @@ describe('AgentMessage — tool_call', () => {
               toolName: 'code_exec',
               arguments: {
                 task_summary: 'Timed out run',
-                code: "while (true) {}",
+                code: 'while (true) {}',
               },
               output: {
                 status: 'timeout',
@@ -348,8 +356,12 @@ describe('AgentMessage — tool_call', () => {
       'data-status',
       'timeout'
     );
-    expect(screen.getByTestId('message-code-exec-toggle').querySelector('.lucide-wrench')).toBeNull();
-    expect(screen.getByTestId('message-code-exec-toggle').querySelector('.lucide-clock-alert')).not.toBeNull();
+    expect(
+      screen.getByTestId('message-code-exec-toggle').querySelector('.lucide-wrench')
+    ).toBeNull();
+    expect(
+      screen.getByTestId('message-code-exec-toggle').querySelector('.lucide-clock-alert')
+    ).not.toBeNull();
   });
 
   /* Preconditions: persisted historical kind:tool_call for code_exec without task_summary

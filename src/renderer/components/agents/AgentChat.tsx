@@ -387,7 +387,11 @@ export function AgentChat({
             />
           </PromptInputBody>
           <PromptInputFooter>
-            <PromptInputTools />
+            <PromptInputTools>
+              <span className="px-0.5 text-xs text-muted-foreground">
+                Press Enter to send, Shift+Enter for new line
+              </span>
+            </PromptInputTools>
             <PromptInputSubmit
               data-testid={isInProgress ? 'prompt-input-stop' : 'prompt-input-send'}
               disabled={!isInProgress && !taskInput.trim()}
@@ -402,9 +406,6 @@ export function AgentChat({
             </PromptInputSubmit>
           </PromptInputFooter>
         </PromptInput>
-        <p className="mt-4 mb-4 px-0.5 text-xs text-muted-foreground">
-          Press Enter to send, Shift+Enter for new line
-        </p>
       </div>
     </div>
   );

@@ -36,6 +36,8 @@
 
 1.4.3. Prompt/tool-инструкция ДОЛЖНА явно описывать shape успешного результата и shape structured error с полями `error.code` и `error.message`
 
+1.4.4. Prompt/tool-инструкция ДОЛЖНА явно сообщать модели, что через `code_exec` и `await tools.http_request(...)` она МОЖЕТ открывать и читать публичные веб-сайты, веб-страницы и другие HTTP-ресурсы, а НЕ только API
+
 #### Функциональные Тесты
 
 - `tests/functional/code_exec.spec.ts` - "should allow sandbox code to execute async http_request helper"

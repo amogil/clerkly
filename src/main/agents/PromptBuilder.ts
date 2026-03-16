@@ -54,6 +54,7 @@ const HTTP_REQUEST_PROMPT_SPEC = {
   invocation: '`const result = await tools.http_request({ ... })`',
   behaviorNotes: [
     'When sandbox code needs external HTTP interaction, call `await tools.http_request(...)` to send requests to pages, APIs, feeds, files, or other HTTP resources for retrieval, submission, inspection, extraction, transformation, or verification.',
+    'Use this helper when you need to open or read a public website or web page from `code_exec`; it is not limited to JSON APIs.',
     'If `max_response_bytes` is omitted, an internal safety cap of `262144` bytes still applies to the returned response body.',
     'When `follow_redirects` is `true`, redirects are followed for up to `10` hops.',
     '`303` becomes `GET` without `body`; `301/302` change `POST` to `GET` without `body`; `307/308` preserve `method` and `body`.',

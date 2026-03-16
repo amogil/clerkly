@@ -1241,7 +1241,7 @@ function ActivityIndicator({ isActive }: { isActive: boolean }) {
 - Область ввода выровнена по той же визуальной ширине контентной колонки, что и `"ConversationContent"` с сообщениями; для сохранения правого visual inset используется такой же зарезервированный scrollbar gutter на wrapper области ввода.
 - Usage-layer `AgentChat` усиливает default visibility unfocused input-контейнера через более заметную рамку внутреннего `"InputGroup"`, не переопределяя built-in focus ring и не добавляя отдельный фон.
 - Footer внутри `"PromptInput"` использует стандартную композицию `"PromptInputFooter"` с `"PromptInputTools"` слева и action-кнопкой `"PromptInputSubmit"` справа.
-- Shortcut hint `Press Enter to send, Shift+Enter for new line` отображается отдельной подписью под рамкой поля ввода с увеличенным и одинаковым vertical inset сверху и снизу (`mt-4/mb-4`), а сама рамка `"PromptInput"` отделена от сообщений увеличенным верхним inset (`mt-4`).
+- Shortcut hint `Press Enter to send, Shift+Enter for new line` отображается внутри `"PromptInputFooter"` в составе `"PromptInputTools"`, а сама рамка `"PromptInput"` отделена от сообщений увеличенным верхним inset (`mt-4`).
 - Отправка сообщения и остановка активной генерации управляются из `AgentChat` через submit/stop mode.
 - `"PromptInputTextarea"` используется как controlled поле; `AgentChat` очищает controlled `value` сразу после успешного старта submit-path и восстанавливает исходный текст только если `sendMessage(...)` возвращает ошибку до передачи запроса в чат.
 
@@ -1550,7 +1550,7 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 - Для persisted historical payload без `arguments.task_summary` UI использует fallback-заголовок `"Code"`; это compatibility path для записей, созданных до введения поля `task_summary`.
 - Блок отображает persisted-статус выполнения (`running | success | error | timeout | cancelled`) через `code_exec`-specific header composition: leading status icon перед текстом заголовка.
 - Стандартная иконка `wrench` в заголовке `code_exec` не используется.
-- Для persisted-статуса `running` UI показывает крутилку; для `success` — зелёную галочку; для `error` — красный крестик; для `timeout` — иконку таймаута; для `cancelled` — иконку отмены.
+- Для persisted-статуса `running` UI показывает крутилку того же фиолетового акцентного цвета, что и кнопки действия в области ввода; для `success` — зелёную галочку; для `error` — красный крестик; для `timeout` — иконку таймаута; для `cancelled` — иконку отмены.
 - Смена статуса `running -> terminal` выполняется в том же UI-блоке (без создания отдельной terminal-карточки).
 - Для security/policy отказов используется `status=error` с соответствующим `error.code` (например, `policy_denied`).
 - При наличии отображаются `stdout`, `stderr` и structured `output.error` из persisted payload.

@@ -235,6 +235,9 @@ describe('PromptBuilder.build()', () => {
         'When sandbox code needs external HTTP interaction, call `await tools.http_request(...)` to send requests to pages, APIs, feeds, files, or other HTTP resources'
       );
       expect(result.systemPrompt).toContain(
+        'Use this helper when you need to open or read a public website or web page from `code_exec`; it is not limited to JSON APIs.'
+      );
+      expect(result.systemPrompt).toContain(
         'fetch an HTTP resource with `await tools.http_request({...})`, then parse, validate, transform, or summarize the returned body inside `code_exec`'
       );
       expect(result.systemPrompt).toContain(
