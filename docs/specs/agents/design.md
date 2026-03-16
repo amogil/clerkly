@@ -1240,13 +1240,19 @@ function ActivityIndicator({ isActive }: { isActive: boolean }) {
 - `"PromptInputTextarea"` отображает многострочное поле ввода сообщения.
 - Область ввода выровнена по той же визуальной ширине контентной колонки, что и `"ConversationContent"` с сообщениями; для сохранения правого visual inset используется такой же зарезервированный scrollbar gutter на wrapper области ввода.
 - Footer внутри `"PromptInput"` использует стандартную композицию `"PromptInputFooter"` с `"PromptInputTools"` слева и action-кнопкой `"PromptInputSubmit"` справа.
-- Shortcut hint `Press Enter to send, Shift+Enter for new line` отображается отдельной подписью под рамкой поля ввода.
+- Shortcut hint `Press Enter to send, Shift+Enter for new line` отображается отдельной подписью под рамкой поля ввода с одинаковым вертикальным inset сверху и снизу.
 - Отправка сообщения и остановка активной генерации управляются из `AgentChat` через submit/stop mode.
 
 **Поведение:**
 - Клавиатурное поведение (`Enter` submit, `Shift+Enter` newline) обеспечивается самим input stack без отдельного app-owned `onKeyDown` слоя в `AgentChat`.
-- Рост поля ввода, ограничение видимой высоты, очистка после успешного submit и переключение внутреннего вертикального скролла определяются контрактом `"PromptInputTextarea"`.
-- `AgentChat` управляет только send/stop flow и не должен дублировать внутренний text-state или sizing-поведение input-компонента.
+- `"PromptInputTextarea"` используется с controlled text state в `AgentChat`, usage-level visible height cap `max-h-32` и usage-level overrides `block` + `flex-none` + `[field-sizing:fixed]`, чтобы app-owned inline `height` управлял реальной высотой textarea в текущем Electron runtime и не переопределялся flex sizing внутри `"InputGroup"`.
+- Для стабильного поведения в текущем Electron runtime `AgentChat` управляет только sizing конкретного textarea-элемента через `useLayoutEffect`:
+  - baseline height clamp'ится к computed `min-height`, что даёт две видимые строки по умолчанию;
+  - количество видимых строк вычисляется из числа явных строк в `value` и ограничивается диапазоном `2..5`;
+  - inline `height` вычисляется из `line-height` и vertical inset textarea для текущего количества видимых строк;
+  - начиная с шестой строки `overflowY` переключается в `auto`, а высота остаётся на уровне пяти видимых строк.
+- Этот sizing-layer SHALL NOT управлять keyboard contract, submit/reset flow или text-state вне controlled `value`/`onChange`.
+- Usage-layer `AgentChat` задаёт placeholder, send/stop behavior, внешний horizontal inset области ввода и shortcut hint под рамкой поля ввода.
 
 **App-level setup:** renderer root (`App`) содержит единый `TooltipProvider`, потому что `PromptInput` и другие AI Elements используют tooltip primitives на уровне приложения.
 
@@ -1937,6 +1943,7 @@ import { Logo } from '../logo';
 | `tests/unit/agents/AgentTitleNormalization.test.ts` | llm-integration.16.8, llm-integration.16.9 |
 | `tests/unit/agents/AgentTitleAntiFlap.test.ts` | llm-integration.16.10 |
 | `tests/unit/components/ai-elements/prompt-input.test.tsx` | agents.4.2-4.7, agents.4.24 |
+| `tests/unit/components/agents/AgentChat.test.tsx` | agents.4.1-4.7.3, agents.4.24, agents.13 |
 | `tests/unit/components/agents/AgentMessage.test.tsx` | agents.4.10, agents.4.11.1, agents.4.11.3-4.11.5, agents.7.4.5-7.4.9.1, llm-integration.2, llm-integration.7 |
 | `tests/unit/components/agents/AgentReasoningTrigger.test.tsx` | agents.4.11, agents.4.11.2, llm-integration.2, llm-integration.7.2 |
 | `tests/unit/renderer/IPCChatTransport.test.ts` | llm-integration.2, llm-integration.7 |
@@ -1969,7 +1976,7 @@ import { Logo } from '../logo';
 | `tests/functional/agent-list-responsive.spec.ts` | agents.1.7, 1.8, 1.9 | - |
 | `tests/functional/agents-always-one.spec.ts` | agents.2.7-2.11 | Сценарии: auto-create первого агента, отсутствие empty state, скрытие startup loader с сохранением видимости и интерактивности стандартного UI после `startupSettled` |
 | `tests/functional/agents-error-messages.spec.ts` | agents.5.5, 5.6, 5.7 | - |
-| `tests/functional/auto-expanding-textarea.spec.ts` | agents.4.5-4.7 | - |
+| `tests/functional/auto-expanding-textarea.spec.ts` | agents.4.5-4.7.3 | - |
 | `tests/functional/empty-state-placeholder.spec.ts` | agents.4.15-4.19 | - |
 | `tests/functional/message-text-wrapping.spec.ts` | agents.4.23 | - |
 | `tests/functional/agent-activation-animation.spec.ts` | agents.6.7 | - |

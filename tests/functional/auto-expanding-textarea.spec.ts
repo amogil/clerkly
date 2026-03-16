@@ -3,7 +3,7 @@ import { createMockOAuthServer, activeChat, launchElectronWithMockOAuth } from '
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 import { completeOAuthFlow } from './helpers/electron';
 
-// Requirements: agents.4.3, agents.4.4, agents.4.5, agents.4.7
+// Requirements: agents.4.3, agents.4.4, agents.4.5, agents.4.6, agents.4.7, agents.4.7.1
 
 let mockServer: MockOAuthServer;
 
@@ -18,7 +18,6 @@ test.afterAll(async () => {
 });
 
 test.describe('AutoExpandingTextarea - Functional Tests', () => {
-  const PROMPT_TEXTAREA_MAX_HEIGHT_PX = 160;
   let electronApp: ElectronApplication;
   let window: Page;
 
@@ -50,84 +49,105 @@ test.describe('AutoExpandingTextarea - Functional Tests', () => {
   });
 
   /* Preconditions: User is on agents page with textarea visible
-     Action: Type single line of text
-     Assertions: Textarea height is minimal
-     Requirements: agents.4.5 */
-  test('should have minimal height for single line text', async () => {
+     Action: Enter one line and then two lines of text
+     Assertions: Textarea keeps the same baseline visible height and does not overflow
+     Requirements: agents.4.5, agents.4.7.1 */
+  test('should keep two-line baseline height before overflow threshold', async () => {
     const textarea = activeChat(window).textarea;
     await expect(textarea).toBeVisible();
 
-    // Clear and type short text
-    await textarea.fill('Short message');
+    await textarea.fill('Line 1');
+    const singleLineHeight = await textarea.evaluate((el: HTMLTextAreaElement) => el.offsetHeight);
 
-    // Get initial height
-    const initialHeight = await textarea.evaluate((el: HTMLTextAreaElement) => {
-      return el.offsetHeight;
-    });
+    await textarea.fill('Line 1\nLine 2');
+    const twoLineHeight = await textarea.evaluate((el: HTMLTextAreaElement) => el.offsetHeight);
 
-    // Height should be relatively small for single line
-    expect(initialHeight).toBeLessThan(100);
+    expect(twoLineHeight).toBe(singleLineHeight);
+
+    await expect
+      .poll(async () => {
+        return await textarea.evaluate(
+          (el: HTMLTextAreaElement) => el.scrollHeight <= el.clientHeight + 1
+        );
+      })
+      .toBe(true);
   });
 
   /* Preconditions: User is on agents page with textarea visible
-     Action: Type multiple lines of text
-     Assertions: Textarea keeps multiline content and remains within the visible sizing contract
-     Requirements: agents.4.5, agents.4.6 */
-  test('should preserve multiline content within textarea sizing contract', async () => {
+     Action: Add third, fourth and fifth lines
+     Assertions: Textarea grows step-by-step for each new line
+     Requirements: agents.4.6 */
+  test('should grow height when third fourth and fifth lines are added', async () => {
+    const textarea = activeChat(window).textarea;
+    await expect(textarea).toBeVisible();
+
+    await textarea.fill('Line 1\nLine 2');
+    const twoLineHeight = await textarea.evaluate((el: HTMLTextAreaElement) => el.offsetHeight);
+
+    await textarea.fill('Line 1\nLine 2\nLine 3');
+    await expect
+      .poll(async () => {
+        return await textarea.evaluate((el: HTMLTextAreaElement) => el.offsetHeight);
+      })
+      .toBeGreaterThan(twoLineHeight);
+    const threeLineHeight = await textarea.evaluate((el: HTMLTextAreaElement) => el.offsetHeight);
+
+    await textarea.fill('Line 1\nLine 2\nLine 3\nLine 4');
+    await expect
+      .poll(async () => {
+        return await textarea.evaluate((el: HTMLTextAreaElement) => el.offsetHeight);
+      })
+      .toBeGreaterThan(threeLineHeight);
+    const fourLineHeight = await textarea.evaluate((el: HTMLTextAreaElement) => el.offsetHeight);
+
+    await textarea.fill('Line 1\nLine 2\nLine 3\nLine 4\nLine 5');
+    await expect
+      .poll(async () => {
+        return await textarea.evaluate((el: HTMLTextAreaElement) => el.offsetHeight);
+      })
+      .toBeGreaterThan(fourLineHeight);
+    const fiveLineHeight = await textarea.evaluate((el: HTMLTextAreaElement) => el.offsetHeight);
+
+    expect(threeLineHeight).toBeGreaterThan(twoLineHeight);
+    expect(fourLineHeight).toBeGreaterThan(threeLineHeight);
+    expect(fiveLineHeight).toBeGreaterThan(fourLineHeight);
+  });
+
+  /* Preconditions: User is on agents page with textarea visible
+     Action: Add sixth line after five visible lines
+     Assertions: Height stops growing and internal scroll is used
+     Requirements: agents.4.7, agents.4.7.1 */
+  test('should stop growing and enable internal scroll at sixth line', async () => {
     const textarea = activeChat(window).textarea;
     await expect(textarea).toBeVisible();
 
     await textarea.fill('Line 1\nLine 2\nLine 3\nLine 4\nLine 5');
-    await expect(textarea).toHaveValue('Line 1\nLine 2\nLine 3\nLine 4\nLine 5');
-    await expect
-      .poll(async () => {
-        return await textarea.evaluate((el: HTMLTextAreaElement) => el.offsetHeight);
-      })
-      .toBeLessThanOrEqual(PROMPT_TEXTAREA_MAX_HEIGHT_PX + 2);
-  });
+    const fiveLineHeight = await textarea.evaluate((el: HTMLTextAreaElement) => el.offsetHeight);
 
-  /* Preconditions: User is on agents page with textarea visible
-     Action: Type many lines to exceed textarea max height
-     Assertions: Textarea height is capped at maximum visible size
-     Requirements: agents.4.5, agents.4.7 */
-  test('should cap height at maximum visible size', async () => {
-    const textarea = activeChat(window).textarea;
+    await textarea.fill('Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6');
+    const sixLineHeight = await textarea.evaluate((el: HTMLTextAreaElement) => el.offsetHeight);
 
-    await expect(textarea).toBeVisible();
-
-    // Fill with many lines to exceed max height
-    const manyLines = Array(50).fill('Line').join('\n');
-    await textarea.fill(manyLines);
-    await expect
-      .poll(async () => {
-        return await textarea.evaluate((el: HTMLTextAreaElement) => el.offsetHeight);
-      })
-      .toBeLessThanOrEqual(PROMPT_TEXTAREA_MAX_HEIGHT_PX + 2);
-  });
-
-  /* Preconditions: User is on agents page with textarea visible
-     Action: Type many lines to exceed max height
-     Assertions: Scrollbar appears (overflow-y is auto)
-     Requirements: agents.4.7 */
-  test('should show scrollbar when content exceeds max height', async () => {
-    const textarea = activeChat(window).textarea;
-    await expect(textarea).toBeVisible();
-
-    // Fill with many lines
-    const manyLines = Array(50).fill('Line').join('\n');
-    await textarea.fill(manyLines);
+    expect(sixLineHeight).toBe(fiveLineHeight);
 
     await expect
       .poll(async () => {
         return await textarea.evaluate((el: HTMLTextAreaElement) => getComputedStyle(el).overflowY);
       })
       .toBe('auto');
+
+    await expect
+      .poll(async () => {
+        return await textarea.evaluate(
+          (el: HTMLTextAreaElement) => el.scrollHeight > el.clientHeight
+        );
+      })
+      .toBe(true);
   });
 
   /* Preconditions: User is on agents page with textarea visible
      Action: Type short text
      Assertions: Short content does not create actual internal overflow
-     Requirements: agents.4.7 */
+     Requirements: agents.4.7.1 */
   test('should hide scrollbar for short content', async () => {
     const textarea = activeChat(window).textarea;
     await expect(textarea).toBeVisible();
@@ -188,7 +208,7 @@ test.describe('AutoExpandingTextarea - Functional Tests', () => {
   /* Preconditions: User is on agents page with textarea visible
      Action: Type enough text to enable internal scrolling, then clear content and type a short value again
      Assertions: Short content again fits without actual internal overflow after clearing and retyping
-     Requirements: agents.4.5, agents.4.7 */
+     Requirements: agents.4.5, agents.4.7, agents.4.7.1 */
   test('should restore short-content scrolling state after content is cleared', async () => {
     const textarea = activeChat(window).textarea;
     await expect(textarea).toBeVisible();

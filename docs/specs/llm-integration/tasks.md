@@ -90,12 +90,14 @@
   - [x] Устранить TS/JSX несовместимость свежего `src/renderer/components/ai-elements/prompt-input.tsx` с текущим renderer-конфигом TypeScript.
   - [x] Проверить и зафиксировать app-level setup, требуемый новым `PromptInput`/`Message` stack после CLI-обновления.
   - [x] Добавить единый `TooltipProvider` в renderer root приложения вместо локальных/дублирующих provider-обёрток.
-  - [x] Удалить app-owned textarea auto-resize из `AgentChat` и опереться на встроенный sizing/scroll contract `PromptInputTextarea`.
   - [ ] Убедиться, что после добавления глобального `TooltipProvider` существующие tooltip-потребители (включая sidebar и AI Elements) не конфликтуют между собой.
   - [x] Удалить кастомную runtime-логику автофокуса textarea при активации чата/переключении окна.
   - [x] Синхронизировать `docs/specs/agents/requirements.md` и `docs/specs/agents/design.md`, чтобы автофокус не оставался частью целевого UI-контракта.
   - [x] Обновить или удалить `tests/functional/input-autofocus.spec.ts` и связанные coverage-ссылки после удаления автофокуса.
-  - [ ] Завершить cleanup renderer-layer после миграции `PromptInput`: убрать legacy hooks/таймеры в `AgentChat`, которые дублируют встроенный behavior библиотеки.
+  - [x] Выровнять input area по визуальной ширине контентной колонки сообщений и вынести shortcut hint под рамку поля ввода с симметричным вертикальным inset.
+  - [x] Зафиксировать продуктовый textarea sizing contract: две видимые строки по умолчанию, поэтапный рост до пяти строк и внутренний scroll начиная с шестой строки.
+  - [x] Реализовать app-owned textarea sizing в `AgentChat`, не вмешиваясь в keyboard contract, submit/reset flow и остальное поведение `PromptInput`.
+  - [x] Завершить cleanup renderer-layer после миграции `PromptInput`: убрать legacy hooks/таймеры в `AgentChat`, оставив только финальный sizing/layout слой и текущий controlled text state.
 
 - [x] Синхронизировать tests под новый `Tool` contract.
   - [x] Обновить `tests/unit/components/agents/AgentMessage.test.tsx`.

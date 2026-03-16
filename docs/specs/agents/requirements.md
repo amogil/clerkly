@@ -183,11 +183,17 @@
 
 4.4. КОГДА пользователь нажимает Shift+Enter, ТО ДОЛЖНА добавляться новая строка
 
-4.5. Поле ввода ДОЛЖНО поддерживать ввод многострочного текста и увеличивать свою высоту по мере роста контента до максимальной видимой высоты поля ввода.
+4.5. Поле ввода ДОЛЖНО поддерживать ввод многострочного текста и по умолчанию отображать две строки текста без внутреннего вертикального скролла.
 
-4.6. Поле ввода ДОЛЖНО иметь компактную минимальную визуальную высоту для короткого текста и НЕ ДОЛЖНО превышать максимальную видимую высоту поля ввода.
+4.6. КОГДА пользователь добавляет третью, четвёртую и пятую строки, ТО поле ввода ДОЛЖНО поэтапно увеличивать свою видимую высоту на каждой новой строке.
 
-4.7. КОГДА текст превышает максимальную высоту поля ввода, ТО внутри поля ввода ДОЛЖЕН использоваться вертикальный скролл; КОГДА текст не превышает этот предел, ТО вертикальный скролл НЕ ДОЛЖЕН отображаться.
+4.7. КОГДА пользователь добавляет шестую строку и последующие строки, ТО дальнейший рост высоты поля ввода ДОЛЖЕН прекращаться, а внутри поля ввода ДОЛЖЕН использоваться внутренний вертикальный скролл.
+
+4.7.1. КОГДА содержимое поля ввода снова помещается в пять строк или меньше, ТО внутренний вертикальный скролл НЕ ДОЛЖЕН отображаться.
+
+4.7.2. Область ввода ДОЛЖНА быть выровнена по той же визуальной ширине контентной колонки сообщений.
+
+4.7.3. Подсказка `Press Enter to send, Shift+Enter for new line` ДОЛЖНА отображаться под рамкой поля ввода с одинаковым вертикальным отступом сверху и снизу.
 
 4.8. Сообщения ДОЛЖНЫ отображаться в хронологическом порядке
 
@@ -322,10 +328,9 @@
 - `tests/functional/agent-messaging.spec.ts` - "should keep stop button enabled regardless of input text in in-progress status"
 - `tests/functional/agent-messaging.spec.ts` - "should display messages in chronological order"
 - `tests/functional/agent-messaging.spec.ts` - "should autoscroll to last message"
-- `tests/functional/auto-expanding-textarea.spec.ts` - "should have minimal height for single line text"
-- `tests/functional/auto-expanding-textarea.spec.ts` - "should preserve multiline content within textarea sizing contract"
-- `tests/functional/auto-expanding-textarea.spec.ts` - "should cap height at maximum visible size"
-- `tests/functional/auto-expanding-textarea.spec.ts` - "should show scrollbar when content exceeds max height"
+- `tests/functional/auto-expanding-textarea.spec.ts` - "should keep two-line baseline height before overflow threshold"
+- `tests/functional/auto-expanding-textarea.spec.ts` - "should grow height when third fourth and fifth lines are added"
+- `tests/functional/auto-expanding-textarea.spec.ts` - "should stop growing and enable internal scroll at sixth line"
 - `tests/functional/auto-expanding-textarea.spec.ts` - "should hide scrollbar for short content"
 - `tests/functional/auto-expanding-textarea.spec.ts` - "should restore short-content scrolling state after content is cleared"
 - `tests/functional/empty-state-placeholder.spec.ts` - "should display empty state for new agent"
