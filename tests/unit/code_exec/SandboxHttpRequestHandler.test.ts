@@ -255,6 +255,33 @@ describe('SandboxHttpRequestHandler', () => {
     });
   });
 
+  /* Preconditions: helper receives a direct public literal IP destination
+     Action: execute helper against the public IP URL
+     Assertions: helper allows the request to proceed without hostname lookup and returns the fetch result
+     Requirements: sandbox-http-request.2.3.1, sandbox-http-request.3.2 */
+  it('allows direct public literal IP destinations', async () => {
+    const fetchMock = jest.fn(async () =>
+      makeResponse('ok', {
+        status: 200,
+        headers: { 'content-type': 'text/plain; charset=utf-8' },
+        url: 'http://93.184.216.34/data',
+      })
+    ) as unknown as typeof fetch;
+    const lookupMock = jest.fn();
+    const handler = new SandboxHttpRequestHandler(fetchMock, lookupMock);
+
+    const result = await handler.execute({
+      url: 'http://93.184.216.34/data',
+    });
+
+    expect(lookupMock).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      status: 200,
+      final_url: 'http://93.184.216.34/data',
+    });
+  });
+
   /* Preconditions: helper receives multiple reserved or internal literal IP targets
      Action: execute helper against loopback, CGNAT, documentation, multicast, broadcast, and IPv6-reserved destinations
      Assertions: helper rejects each target as forbidden_destination before any network call
@@ -514,6 +541,28 @@ describe('SandboxHttpRequestHandler', () => {
     });
   });
 
+  /* Preconditions: helper resolves a public hostname via DNS lookup but resolver returns no addresses
+     Action: execute helper before any network request is sent
+     Assertions: helper returns fetch_failed with a no-addresses message and does not call fetch
+     Requirements: sandbox-http-request.2.3.1, sandbox-http-request.4.2.2 */
+  it('returns fetch_failed when hostname lookup returns no addresses', async () => {
+    const fetchMock = jest.fn() as unknown as typeof fetch;
+    const lookupMock = jest.fn(async () => []);
+    const handler = new SandboxHttpRequestHandler(fetchMock, lookupMock);
+
+    const result = await handler.execute({
+      url: 'https://example.com/data',
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      error: {
+        code: 'fetch_failed',
+        message: 'dns lookup returned no addresses for example.com',
+      },
+    });
+  });
+
   /* Preconditions: handler runs without injected fetch and receives a public hostname that resolves to one concrete address
      Action: execute helper through the default bound transport path
      Assertions: the runtime transport uses the preflight-validated address as the actual connection target
@@ -575,6 +624,83 @@ describe('SandboxHttpRequestHandler', () => {
     expect(result).toMatchObject({
       status: 200,
       body: 'ok',
+    });
+  });
+
+  /* Preconditions: hostname lookup resolves multiple validated public addresses in resolver order and the first connection attempt fails before any response is established
+     Action: execute helper through the bound transport path
+     Assertions: handler retries the next validated address in resolver order and succeeds on the second address
+     Requirements: sandbox-http-request.3.2.1, sandbox-http-request.3.2.2 */
+  it('retries the next validated public address when the first bound transport attempt fails', async () => {
+    const lookupMock = makeLookup([
+      { address: '2606:2800:220:1:248:1893:25c8:1946', family: 6 },
+      { address: '93.184.216.34', family: 4 },
+    ]);
+    const transportMock = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('connect ECONNREFUSED 2606:2800:220:1:248:1893:25c8:1946'))
+      .mockResolvedValueOnce(
+        makeResponse('ok', {
+          status: 200,
+          headers: { 'content-type': 'text/plain; charset=utf-8' },
+          url: 'https://example.com/data',
+        })
+      );
+    const handler = makeTransportHandler(transportMock, lookupMock);
+
+    const result = await handler.execute({
+      url: 'https://example.com/data',
+    });
+
+    expect(transportMock).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        hostname: 'example.com',
+        address: '2606:2800:220:1:248:1893:25c8:1946',
+        family: 6,
+      }),
+      expect.any(Object)
+    );
+    expect(transportMock).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        hostname: 'example.com',
+        address: '93.184.216.34',
+        family: 4,
+      }),
+      expect.any(Object)
+    );
+    expect(result).toMatchObject({
+      status: 200,
+      body: 'ok',
+    });
+  });
+
+  /* Preconditions: hostname lookup resolves multiple validated public addresses and every bound transport attempt fails before any response is established
+     Action: execute helper through the bound transport path
+     Assertions: handler exhausts the validated addresses in resolver order and returns fetch_failed from the final connection error
+     Requirements: sandbox-http-request.3.2.1, sandbox-http-request.3.2.2, sandbox-http-request.4.2.2 */
+  it('returns fetch_failed after all validated public addresses fail to connect', async () => {
+    const lookupMock = makeLookup([
+      { address: '2606:2800:220:1:248:1893:25c8:1946', family: 6 },
+      { address: '93.184.216.34', family: 4 },
+    ]);
+    const transportMock = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('connect ECONNREFUSED 2606:2800:220:1:248:1893:25c8:1946'))
+      .mockRejectedValueOnce(new Error('connect ECONNREFUSED 93.184.216.34'));
+    const handler = makeTransportHandler(transportMock, lookupMock);
+
+    const result = await handler.execute({
+      url: 'https://example.com/data',
+    });
+
+    expect(transportMock).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({
+      error: {
+        code: 'fetch_failed',
+        message: 'connect ECONNREFUSED 93.184.216.34',
+      },
     });
   });
 

@@ -83,6 +83,12 @@ interface ValidatedDestination {
   address: string;
   family: number;
 }
+
+interface ValidatedDestinationPlan {
+  url: string;
+  hostname: string;
+  addresses: HostLookupResult[];
+}
 const CROSS_ORIGIN_STRIPPED_HEADERS = new Set([
   'authorization',
   'proxy-authorization',
@@ -343,7 +349,7 @@ export class SandboxHttpRequestHandler {
               redirect: 'manual',
               signal: controller.signal,
             })
-          : await this.transportImpl(destinationPolicy, {
+          : await this.executeBoundRequest(destinationPolicy, {
               method: currentMethod,
               headers: currentHeaders,
               body: currentBody,
@@ -491,6 +497,44 @@ export class SandboxHttpRequestHandler {
     return status >= 300 && status < 400;
   }
 
+  // Requirements: sandbox-http-request.3.2.1, sandbox-http-request.3.2.2
+  private async executeBoundRequest(
+    destinationPlan: ValidatedDestinationPlan,
+    init: {
+      method: HttpMethod;
+      headers?: Record<string, string>;
+      body?: string;
+      signal: AbortSignal;
+    }
+  ): Promise<Response> {
+    let lastError: unknown;
+
+    for (const addressEntry of destinationPlan.addresses) {
+      try {
+        return await this.transportImpl(
+          {
+            url: destinationPlan.url,
+            hostname: destinationPlan.hostname,
+            address: addressEntry.address,
+            family: addressEntry.family,
+          },
+          init
+        );
+      } catch (error) {
+        lastError = error;
+        if (init.signal.aborted) {
+          throw error;
+        }
+      }
+    }
+
+    if (lastError) {
+      throw lastError;
+    }
+
+    throw new Error(`dns lookup returned no addresses for ${destinationPlan.hostname}`);
+  }
+
   // Requirements: sandbox-http-request.3.3
   private getRedirectFollowRequest(
     status: number,
@@ -560,10 +604,10 @@ export class SandboxHttpRequestHandler {
     );
   }
 
-  // Requirements: sandbox-http-request.2.3.1, sandbox-http-request.3.3.8, sandbox-http-request.4.2.2
+  // Requirements: sandbox-http-request.2.3.1, sandbox-http-request.3.2.1, sandbox-http-request.3.2.2, sandbox-http-request.3.3.8, sandbox-http-request.4.2.2
   private async validateDestination(
     url: string
-  ): Promise<SandboxHttpRequestError | ValidatedDestination> {
+  ): Promise<SandboxHttpRequestError | ValidatedDestinationPlan> {
     const parsed = new URL(url);
     const hostname = parsed.hostname.toLowerCase();
     const normalizedHostname =
@@ -573,8 +617,12 @@ export class SandboxHttpRequestHandler {
       return {
         url,
         hostname: normalizedHostname,
-        address: normalizedHostname,
-        family: isIP(normalizedHostname),
+        addresses: [
+          {
+            address: normalizedHostname,
+            family: isIP(normalizedHostname),
+          },
+        ],
       };
     }
 
@@ -589,8 +637,12 @@ export class SandboxHttpRequestHandler {
         : {
             url,
             hostname: normalizedHostname,
-            address: normalizedHostname,
-            family: ipFamily,
+            addresses: [
+              {
+                address: normalizedHostname,
+                family: ipFamily,
+              },
+            ],
           };
     }
 
@@ -606,8 +658,7 @@ export class SandboxHttpRequestHandler {
       return this.runtimeError('forbidden_destination', FORBIDDEN_DESTINATION_MESSAGE);
     }
 
-    const selectedAddress = resolved[0];
-    if (!selectedAddress) {
+    if (resolved.length === 0) {
       return this.runtimeError(
         'fetch_failed',
         `dns lookup returned no addresses for ${normalizedHostname}`
@@ -617,8 +668,10 @@ export class SandboxHttpRequestHandler {
     return {
       url,
       hostname: normalizedHostname,
-      address: selectedAddress.address,
-      family: selectedAddress.family,
+      addresses: resolved.map((entry) => ({
+        address: entry.address,
+        family: entry.family,
+      })),
     };
   }
 

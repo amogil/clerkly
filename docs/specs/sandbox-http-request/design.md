@@ -124,24 +124,25 @@ Model-facing prompt section для `http_request` строится как ком
    - literal `localhost` и `.localhost` отклоняются сразу;
    - literal IP сравнивается с forbidden address classes;
    - hostname при необходимости резолвится, и все полученные адреса проверяются на forbidden classes.
-6. Handler фиксирует один проверенный destination address для текущего hop и привязывает реальное исходящее соединение именно к этому адресу.
-7. Handler НЕ ДОЛЖЕН полагаться только на preflight lookup с последующим независимым `fetch(hostname)`, потому что это оставляет lookup/connect mismatch и DNS-rebinding gap.
-8. Handler вычисляет фактически применённый лимит ответа: `max_response_bytes`, если он передан, иначе внутренний safety cap `262144`.
-9. Handler выполняет ограниченный HTTP(S)-запрос с timeout и redirects не более `10` переходов.
-10. ЕСЛИ `follow_redirects = false`, handler возвращает первый полученный redirect-ответ без перехода по `Location`.
-11. ЕСЛИ redirect-follow включён, handler следует fetch-compatible policy:
+6. Handler фиксирует для текущего hop упорядоченный список проверенных destination addresses и привязывает реальное исходящее соединение только к адресам из этого списка.
+7. ЕСЛИ список содержит несколько проверенных публичных адресов, handler пытается использовать их в resolver order до первого успешного соединения; connect/setup failure одного адреса не завершает helper, пока не исчерпаны остальные проверенные адреса этого hop.
+8. Handler НЕ ДОЛЖЕН полагаться только на preflight lookup с последующим независимым `fetch(hostname)`, потому что это оставляет lookup/connect mismatch и DNS-rebinding gap.
+9. Handler вычисляет фактически применённый лимит ответа: `max_response_bytes`, если он передан, иначе внутренний safety cap `262144`.
+10. Handler выполняет ограниченный HTTP(S)-запрос с timeout и redirects не более `10` переходов.
+11. ЕСЛИ `follow_redirects = false`, handler возвращает первый полученный redirect-ответ без перехода по `Location`.
+12. ЕСЛИ redirect-follow включён, handler следует fetch-compatible policy:
    - `303` всегда переписывается в `GET` без body;
    - `301/302` переписывают `POST` в `GET` без body;
    - `307/308` сохраняют исходные method/body.
-12. Перед каждым redirect hop handler повторно классифицирует next destination, фиксирует новый проверенный address для этого hop и завершает helper с `forbidden_destination`, если hop указывает на `localhost`, loopback, private, link-local или reserved/internal target.
-13. ЕСЛИ redirect policy переписывает следующий hop в `GET` без body, handler удаляет body-specific headers `content-type`, `content-length`, `content-encoding` и `transfer-encoding`.
-14. ЕСЛИ redirect переводит запрос на другой origin, handler удаляет чувствительные request headers `authorization`, `proxy-authorization`, `cookie` и `cookie2` перед следующим hop.
-15. Handler определяет формат тела ответа:
+13. Перед каждым redirect hop handler повторно классифицирует next destination, фиксирует новый упорядоченный список проверенных addresses для этого hop и завершает helper с `forbidden_destination`, если hop указывает на `localhost`, loopback, private, link-local или reserved/internal target.
+14. ЕСЛИ redirect policy переписывает следующий hop в `GET` без body, handler удаляет body-specific headers `content-type`, `content-length`, `content-encoding` и `transfer-encoding`.
+15. ЕСЛИ redirect переводит запрос на другой origin, handler удаляет чувствительные request headers `authorization`, `proxy-authorization`, `cookie` и `cookie2` перед следующим hop.
+16. Handler определяет формат тела ответа:
    - text/*, application/json, application/xml и другие текстовые content types -> `body_encoding = "text"`;
    - остальные content types -> `body_encoding = "base64"`.
-16. Handler формирует структурированный результат.
-17. Handler усекает итоговый `body` по применённому лимиту и выставляет `truncated`.
-18. Handler возвращает structured result обратно в sandbox-код.
+17. Handler формирует структурированный результат.
+18. Handler усекает итоговый `body` по применённому лимиту и выставляет `truncated`.
+19. Handler возвращает structured result обратно в sandbox-код.
 
 ### 2. Ограничение результата
 
@@ -159,7 +160,7 @@ Model-facing prompt section для `http_request` строится как ком
 
 - `tests/unit/code_exec/SandboxBridge.test.ts` - проверяет allowlist доступность helper-а
 - `tests/unit/code_exec/SandboxHttpRequestHandler.test.ts` - проверяет request validation, timeout, redirects, fetch-compatible redirect rewriting, body-header cleanup on rewritten GET redirects, cross-origin header stripping, truncation, error mapping
-- `tests/unit/code_exec/SandboxHttpRequestHandler.test.ts` - проверяет request validation, timeout, redirects, fetch-compatible redirect rewriting, body-header cleanup on rewritten GET redirects, cross-origin header stripping, forbidden destination rejection, connection-boundary address pinning, truncation, error mapping
+- `tests/unit/code_exec/SandboxHttpRequestHandler.test.ts` - проверяет request validation, timeout, redirects, fetch-compatible redirect rewriting, body-header cleanup on rewritten GET redirects, cross-origin header stripping, forbidden destination rejection, connection-boundary address pinning, multi-address fallback order, truncation, error mapping
 - `tests/unit/code_exec/SandboxHttpRequestHandler.test.ts` - проверяет возврат redirect-ответа при `follow_redirects = false`
 - `tests/unit/code_exec/SandboxHttpRequestHandler.test.ts` - проверяет `body_encoding = "text"` для текстовых ответов и `body_encoding = "base64"` для нетекстовых
 - `tests/unit/code_exec/SandboxSessionManager.test.ts` - проверяет preload bridge bootstrap и доступность `window.tools.http_request(...)` внутри sandbox runtime
@@ -179,5 +180,7 @@ Model-facing prompt section для `http_request` строится как ком
 |------------|-----------------|----------------------|
 | sandbox-http-request.1.1-1.4.5 | `tests/unit/code_exec/SandboxBridge.test.ts`, `tests/unit/code_exec/SandboxSessionManager.test.ts`, `tests/unit/agents/PromptBuilder.test.ts` | `tests/functional/code_exec.spec.ts` - "should allow sandbox code to execute async http_request helper" |
 | sandbox-http-request.2.1-2.10.1 | `tests/unit/code_exec/SandboxHttpRequestHandler.test.ts` | `tests/functional/code_exec.spec.ts` - "should allow sandbox code to execute async http_request helper", "should enforce max_response_bytes and base64 encoding in http_request helper", "should return structured validation and runtime errors from http_request helper", "should reject localhost http_request target before any request is sent" |
-| sandbox-http-request.3.1-3.6 | `tests/unit/code_exec/SandboxHttpRequestHandler.test.ts` | `tests/functional/code_exec.spec.ts` - "should allow sandbox code to execute async http_request helper", "should return redirect response without following in http_request helper", "should enforce max_response_bytes and base64 encoding in http_request helper", "should reject localhost http_request target before any request is sent" |
+| sandbox-http-request.3.1-3.2 | `tests/unit/code_exec/SandboxHttpRequestHandler.test.ts` | `tests/functional/code_exec.spec.ts` - "should allow sandbox code to execute async http_request helper", "should return redirect response without following in http_request helper", "should enforce max_response_bytes and base64 encoding in http_request helper", "should reject localhost http_request target before any request is sent" |
+| sandbox-http-request.3.2.1-3.2.2 | `tests/unit/code_exec/SandboxHttpRequestHandler.test.ts` | - |
+| sandbox-http-request.3.3-3.6 | `tests/unit/code_exec/SandboxHttpRequestHandler.test.ts` | `tests/functional/code_exec.spec.ts` - "should allow sandbox code to execute async http_request helper", "should return redirect response without following in http_request helper", "should enforce max_response_bytes and base64 encoding in http_request helper", "should reject localhost http_request target before any request is sent" |
 | sandbox-http-request.4.1-4.4 | `tests/unit/code_exec/SandboxHttpRequestHandler.test.ts`, `tests/unit/code_exec/SandboxBridge.test.ts` | `tests/functional/code_exec.spec.ts` - "should return structured validation and runtime errors from http_request helper", "should reject localhost http_request target before any request is sent" |
