@@ -65,6 +65,14 @@ function makeHandler(
   return new SandboxHttpRequestHandler(fetchImpl, lookupImpl);
 }
 
+// Requirements: sandbox-http-request.2.3.1, sandbox-http-request.3.2, sandbox-http-request.3.3.8
+function makeTransportHandler(
+  transportImpl: ConstructorParameters<typeof SandboxHttpRequestHandler>[3],
+  lookupImpl = makePublicLookup()
+): SandboxHttpRequestHandler {
+  return new SandboxHttpRequestHandler(undefined, lookupImpl, new Set<string>(), transportImpl);
+}
+
 describe('SandboxHttpRequestHandler', () => {
   /* Preconditions: handler receives malformed argument shapes and unsupported destination scheme
      Action: execute helper with non-object args, non-string url, ftp protocol, non-object headers, and non-string body
@@ -506,30 +514,68 @@ describe('SandboxHttpRequestHandler', () => {
     });
   });
 
-  /* Preconditions: the runtime does not expose global fetch and the handler uses the default fetch implementation
-     Action: execute helper against a public URL without providing a custom fetch implementation
-     Assertions: helper fails with internal_error rather than crashing the process
-     Requirements: sandbox-http-request.2, sandbox-http-request.4.2 */
-  it('returns internal_error when default fetch is unavailable in the runtime', async () => {
-    const originalFetch = globalThis.fetch;
-    // @ts-expect-error test intentionally removes runtime fetch
-    delete globalThis.fetch;
-    const handler = new SandboxHttpRequestHandler(undefined, makePublicLookup());
+  /* Preconditions: handler runs without injected fetch and receives a public hostname that resolves to one concrete address
+     Action: execute helper through the default bound transport path
+     Assertions: the runtime transport uses the preflight-validated address as the actual connection target
+     Requirements: sandbox-http-request.2.3.1, sandbox-http-request.3.2, sandbox-http-request.4.2.2 */
+  it('pins the actual outbound request to the validated address returned by lookup', async () => {
+    const lookupMock = makeLookup([{ address: '93.184.216.34', family: 4 }]);
+    const transportMock = jest.fn(async (_destination: { address: string }) =>
+      makeResponse('ok', {
+        status: 200,
+        headers: { 'content-type': 'text/plain; charset=utf-8' },
+        url: 'https://example.com/data',
+      })
+    );
+    const handler = makeTransportHandler(transportMock, lookupMock);
 
-    try {
-      const result = await handler.execute({
+    const result = await handler.execute({
+      url: 'https://example.com/data',
+    });
+
+    expect(lookupMock).toHaveBeenCalledWith('example.com');
+    expect(transportMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: 'https://example.com/data',
+        hostname: 'example.com',
+        address: '93.184.216.34',
+        family: 4,
+      }),
+      expect.objectContaining({
+        method: 'GET',
+      })
+    );
+    expect(result).toMatchObject({
+      status: 200,
+      body: 'ok',
+    });
+  });
+
+  /* Preconditions: preflight lookup resolves a public address, but the transport would connect to a different internal address if left unchecked
+     Action: execute helper through the bound transport path
+     Assertions: the handler passes only the preflight-validated public address to the transport, closing lookup/connect mismatch
+     Requirements: sandbox-http-request.2.3.1, sandbox-http-request.3.2.1, sandbox-http-request.4.2.2 */
+  it('prevents lookup-connect mismatch by binding transport to the validated public address', async () => {
+    const lookupMock = makeLookup([{ address: '93.184.216.34', family: 4 }]);
+    const transportMock = jest.fn(async (destination: { address: string }) => {
+      expect(destination.address).toBe('93.184.216.34');
+      return makeResponse('ok', {
+        status: 200,
+        headers: { 'content-type': 'text/plain; charset=utf-8' },
         url: 'https://example.com/data',
       });
+    });
+    const handler = makeTransportHandler(transportMock, lookupMock);
 
-      expect(result).toMatchObject({
-        error: {
-          code: 'fetch_failed',
-          message: 'fetch is not available in this runtime.',
-        },
-      });
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
+    const result = await handler.execute({
+      url: 'https://example.com/data',
+    });
+
+    expect(transportMock).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      status: 200,
+      body: 'ok',
+    });
   });
 
   /* Preconditions: redirecting POST request receives 301 before final response

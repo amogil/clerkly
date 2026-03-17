@@ -1,7 +1,10 @@
 // Requirements: sandbox-http-request.2, sandbox-http-request.3, sandbox-http-request.4
 
 import { lookup as dnsLookup } from 'node:dns/promises';
+import http from 'node:http';
+import https from 'node:https';
 import { isIP } from 'node:net';
+import { Readable } from 'node:stream';
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS';
 
@@ -69,6 +72,17 @@ interface ValidatedHttpRequestInput {
 type FetchLike = typeof fetch;
 type HostLookupResult = { address: string; family: number };
 type HostLookup = (hostname: string) => Promise<HostLookupResult[]>;
+type BoundTransport = (
+  destination: ValidatedDestination,
+  init: { method: HttpMethod; headers?: Record<string, string>; body?: string; signal: AbortSignal }
+) => Promise<Response>;
+
+interface ValidatedDestination {
+  url: string;
+  hostname: string;
+  address: string;
+  family: number;
+}
 const CROSS_ORIGIN_STRIPPED_HEADERS = new Set([
   'authorization',
   'proxy-authorization',
@@ -89,20 +103,71 @@ function defaultLookup(hostname: string): Promise<HostLookupResult[]> {
   return dnsLookup(hostname, { all: true, verbatim: true });
 }
 
-function defaultFetch(...args: Parameters<FetchLike>): ReturnType<FetchLike> {
-  if (typeof globalThis.fetch !== 'function') {
-    throw new Error('fetch is not available in this runtime.');
+// Requirements: sandbox-http-request.2.3.1, sandbox-http-request.3.2, sandbox-http-request.3.3.8
+function defaultBoundTransport(
+  destination: ValidatedDestination,
+  init: { method: HttpMethod; headers?: Record<string, string>; body?: string; signal: AbortSignal }
+): Promise<Response> {
+  const parsed = new URL(destination.url);
+  const isHttps = parsed.protocol === 'https:';
+  const requestImpl = isHttps ? https.request : http.request;
+  const headers = new Headers(init.headers);
+
+  if (!headers.has('host')) {
+    headers.set('host', parsed.host);
   }
 
-  return globalThis.fetch(...args);
+  return new Promise<Response>((resolve, reject) => {
+    const request = requestImpl(
+      {
+        protocol: parsed.protocol,
+        hostname: destination.address,
+        port: parsed.port ? Number(parsed.port) : undefined,
+        method: init.method,
+        path: `${parsed.pathname}${parsed.search}`,
+        headers: Object.fromEntries(headers.entries()),
+        signal: init.signal,
+        servername: isHttps ? destination.hostname : undefined,
+        family: destination.family,
+      },
+      (response) => {
+        const responseHeaders = new Headers();
+        for (const [name, value] of Object.entries(response.headers)) {
+          if (Array.isArray(value)) {
+            for (const entry of value) {
+              responseHeaders.append(name, entry);
+            }
+            continue;
+          }
+          if (typeof value === 'string') {
+            responseHeaders.set(name, value);
+          }
+        }
+
+        resolve(
+          new Response(Readable.toWeb(response) as ReadableStream<Uint8Array>, {
+            status: response.statusCode ?? 0,
+            headers: responseHeaders,
+          })
+        );
+      }
+    );
+
+    request.on('error', reject);
+    if (typeof init.body === 'string' && init.body.length > 0) {
+      request.write(init.body);
+    }
+    request.end();
+  });
 }
 
 // Requirements: sandbox-http-request.2, sandbox-http-request.3, sandbox-http-request.4
 export class SandboxHttpRequestHandler {
   constructor(
-    private readonly fetchImpl: FetchLike = defaultFetch as FetchLike,
+    private readonly fetchImpl?: FetchLike,
     private readonly lookupImpl: HostLookup = defaultLookup,
-    private readonly allowedLoopbackHosts = new Set<string>()
+    private readonly allowedLoopbackHosts = new Set<string>(),
+    private readonly transportImpl: BoundTransport = defaultBoundTransport
   ) {}
 
   // Requirements: sandbox-http-request.2, sandbox-http-request.3, sandbox-http-request.4
@@ -266,17 +331,24 @@ export class SandboxHttpRequestHandler {
 
       for (;;) {
         const destinationPolicy = await this.validateDestination(currentUrl);
-        if (destinationPolicy) {
+        if ('error' in destinationPolicy) {
           return destinationPolicy;
         }
 
-        const response = await this.fetchImpl(currentUrl, {
-          method: currentMethod,
-          headers: currentHeaders,
-          body: currentBody,
-          redirect: 'manual',
-          signal: controller.signal,
-        });
+        const response = this.fetchImpl
+          ? await this.fetchImpl(currentUrl, {
+              method: currentMethod,
+              headers: currentHeaders,
+              body: currentBody,
+              redirect: 'manual',
+              signal: controller.signal,
+            })
+          : await this.transportImpl(destinationPolicy, {
+              method: currentMethod,
+              headers: currentHeaders,
+              body: currentBody,
+              signal: controller.signal,
+            });
 
         if (!input.followRedirects) {
           return await this.buildSuccessResult(currentUrl, response, appliedLimitBytes);
@@ -489,14 +561,21 @@ export class SandboxHttpRequestHandler {
   }
 
   // Requirements: sandbox-http-request.2.3.1, sandbox-http-request.3.3.8, sandbox-http-request.4.2.2
-  private async validateDestination(url: string): Promise<SandboxHttpRequestError | null> {
+  private async validateDestination(
+    url: string
+  ): Promise<SandboxHttpRequestError | ValidatedDestination> {
     const parsed = new URL(url);
     const hostname = parsed.hostname.toLowerCase();
     const normalizedHostname =
       hostname.startsWith('[') && hostname.endsWith(']') ? hostname.slice(1, -1) : hostname;
 
     if (this.isAllowedLoopbackHost(normalizedHostname)) {
-      return null;
+      return {
+        url,
+        hostname: normalizedHostname,
+        address: normalizedHostname,
+        family: isIP(normalizedHostname),
+      };
     }
 
     if (normalizedHostname === 'localhost' || normalizedHostname.endsWith('.localhost')) {
@@ -507,7 +586,12 @@ export class SandboxHttpRequestHandler {
     if (ipFamily > 0) {
       return this.isForbiddenIpAddress(normalizedHostname)
         ? this.runtimeError('forbidden_destination', FORBIDDEN_DESTINATION_MESSAGE)
-        : null;
+        : {
+            url,
+            hostname: normalizedHostname,
+            address: normalizedHostname,
+            family: ipFamily,
+          };
     }
 
     let resolved: HostLookupResult[];
@@ -522,7 +606,20 @@ export class SandboxHttpRequestHandler {
       return this.runtimeError('forbidden_destination', FORBIDDEN_DESTINATION_MESSAGE);
     }
 
-    return null;
+    const selectedAddress = resolved[0];
+    if (!selectedAddress) {
+      return this.runtimeError(
+        'fetch_failed',
+        `dns lookup returned no addresses for ${normalizedHostname}`
+      );
+    }
+
+    return {
+      url,
+      hostname: normalizedHostname,
+      address: selectedAddress.address,
+      family: selectedAddress.family,
+    };
   }
 
   // Requirements: sandbox-http-request.4.2.1-4.2.2

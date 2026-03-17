@@ -116,7 +116,7 @@
 
 - [ ] Закрыть оставшийся follow-up по `sandbox-http-request`.
   - [x] Синхронизировать traceability и prompt/spec contract по `http_request` после фактических runtime-изменений ветки.
-  - [x] Зафиксировать SSRF boundary для `http_request` на уровне requirements/design/runtime/tests, включая direct target rejection и redirect hop rejection.
+  - [x] Зафиксировать SSRF boundary для `http_request` на уровне requirements/design/runtime/tests, включая direct target rejection, redirect hop rejection и connection-boundary address pinning для фактического outbound transport.
   - [ ] После завершения релевантных runtime/UI изменений запросить подтверждение пользователя на полный `npm run test:functional`.
 
 #### Фаза 6: Тесты
