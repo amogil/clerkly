@@ -1,24 +1,19 @@
 // Requirements: code_exec.1.5, code_exec.2, code_exec.3.7
 
+const mockAppPath = '/mock/clerkly';
+const mockPreloadPath = `${mockAppPath}/dist/preload/preload/codeExecSandbox.js`;
+
 jest.mock('node:fs', () => ({
   __esModule: true,
   default: {
-    existsSync: jest.fn(
-      (targetPath: string) =>
-        targetPath ===
-        '/Users/amogil/Documents/projects/clerkly/dist/preload/preload/codeExecSandbox.js'
-    ),
+    existsSync: jest.fn((targetPath: string) => targetPath === mockPreloadPath),
   },
-  existsSync: jest.fn(
-    (targetPath: string) =>
-      targetPath ===
-      '/Users/amogil/Documents/projects/clerkly/dist/preload/preload/codeExecSandbox.js'
-  ),
+  existsSync: jest.fn((targetPath: string) => targetPath === mockPreloadPath),
 }));
 
 jest.mock('electron', () => {
   const getAppMetrics = jest.fn(() => []);
-  const getAppPath = jest.fn(() => '/Users/amogil/Documents/projects/clerkly');
+  const getAppPath = jest.fn(() => mockAppPath);
   const sandboxBridgeInvokeTool = jest.fn(async (toolName: string, input: unknown) => {
     if (toolName !== 'http_request') {
       return {
@@ -62,8 +57,7 @@ jest.mock('electron', () => {
         }
         const nodeVm = require('node:vm') as typeof import('node:vm');
         const hasSandboxBridge =
-          this.options.webPreferences?.preload ===
-            `${getAppPath()}/dist/preload/preload/codeExecSandbox.js` &&
+          this.options.webPreferences?.preload === mockPreloadPath &&
           this.options.webPreferences?.additionalArguments?.some((arg) =>
             arg.startsWith('--code-exec-session-id=')
           );
@@ -145,11 +139,7 @@ describe('SandboxSessionManager.execute', () => {
   afterEach(() => {
     jest.clearAllMocks();
     electronMocks.browserWindowInstances.length = 0;
-    fsExistsSyncMock.mockImplementation(
-      (targetPath: fs.PathLike) =>
-        String(targetPath) ===
-        '/Users/amogil/Documents/projects/clerkly/dist/preload/preload/codeExecSandbox.js'
-    );
+    fsExistsSyncMock.mockImplementation((targetPath: fs.PathLike) => String(targetPath) === mockPreloadPath);
   });
 
   /* Preconditions: Sandbox session manager uses Electron app path to configure preload and runtime exposes sandbox bridge when preload/session args are correct
@@ -164,9 +154,7 @@ describe('SandboxSessionManager.execute', () => {
     });
 
     const lastInstance = electronMocks.browserWindowInstances.at(-1);
-    expect(lastInstance?.options.webPreferences?.preload).toBe(
-      '/Users/amogil/Documents/projects/clerkly/dist/preload/preload/codeExecSandbox.js'
-    );
+    expect(lastInstance?.options.webPreferences?.preload).toBe(mockPreloadPath);
     expect(lastInstance?.options.webPreferences?.additionalArguments).toContainEqual(
       expect.stringMatching(/^--code-exec-session-id=/)
     );
@@ -430,33 +418,19 @@ describe('code_exec helpers', () => {
      Assertions: Returned path points to dist/preload/preload/codeExecSandbox.js under app.getAppPath()
      Requirements: code_exec.1.5, code_exec.2.2 */
   it('resolves preload path from Electron app path', () => {
-    expect(resolveCodeExecSandboxPreloadPath()).toBe(
-      '/Users/amogil/Documents/projects/clerkly/dist/preload/preload/codeExecSandbox.js'
-    );
+    expect(resolveCodeExecSandboxPreloadPath()).toBe(mockPreloadPath);
   });
 
   it('prefers file-relative preload path when the current bundle layout provides it', () => {
-    fsExistsSyncMock.mockImplementation(
-      (targetPath: fs.PathLike) =>
-        String(targetPath) ===
-        '/Users/amogil/Documents/projects/clerkly/dist/preload/preload/codeExecSandbox.js'
-    );
+    fsExistsSyncMock.mockImplementation((targetPath: fs.PathLike) => String(targetPath) === mockPreloadPath);
 
-    expect(
-      resolveCodeExecSandboxPreloadPath('/Users/amogil/Documents/projects/clerkly/dist/main')
-    ).toBe('/Users/amogil/Documents/projects/clerkly/dist/preload/preload/codeExecSandbox.js');
+    expect(resolveCodeExecSandboxPreloadPath(`${mockAppPath}/dist/main`)).toBe(mockPreloadPath);
   });
 
   it('prefers file-relative preload path when the functional bundle layout provides it', () => {
-    fsExistsSyncMock.mockImplementation(
-      (targetPath: fs.PathLike) =>
-        String(targetPath) ===
-        '/Users/amogil/Documents/projects/clerkly/dist/preload/preload/codeExecSandbox.js'
-    );
+    fsExistsSyncMock.mockImplementation((targetPath: fs.PathLike) => String(targetPath) === mockPreloadPath);
 
-    expect(
-      resolveCodeExecSandboxPreloadPath('/Users/amogil/Documents/projects/clerkly/dist/main/main')
-    ).toBe('/Users/amogil/Documents/projects/clerkly/dist/preload/preload/codeExecSandbox.js');
+    expect(resolveCodeExecSandboxPreloadPath(`${mockAppPath}/dist/main/main`)).toBe(mockPreloadPath);
   });
 
   it('normalizes invalid output into internal_error', () => {
