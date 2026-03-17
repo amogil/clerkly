@@ -101,6 +101,18 @@ const REWRITTEN_GET_STRIPPED_HEADERS = new Set([
   'content-encoding',
   'transfer-encoding',
 ]);
+const FORBIDDEN_REQUEST_HEADERS = new Set([
+  'host',
+  'content-length',
+  'connection',
+  'proxy-connection',
+  'transfer-encoding',
+  'upgrade',
+  'keep-alive',
+  'te',
+  'trailer',
+  'expect',
+]);
 const FORBIDDEN_DESTINATION_MESSAGE =
   'http_request cannot access localhost, loopback, private, link-local, or reserved internal network targets.';
 const RETRYABLE_CONNECTION_ERROR_CODES = new Set([
@@ -264,6 +276,12 @@ export class SandboxHttpRequestHandler {
           return this.validationError(
             'invalid_headers',
             'http_request.headers must contain only string values.'
+          );
+        }
+        if (FORBIDDEN_REQUEST_HEADERS.has(key.toLowerCase())) {
+          return this.validationError(
+            'invalid_headers',
+            `http_request.headers must not contain forbidden request-control header "${key}".`
           );
         }
         headers[key] = value;
@@ -713,6 +731,39 @@ export class SandboxHttpRequestHandler {
     return this.isForbiddenIpv4(address) || this.isForbiddenIpv6(address);
   }
 
+  private getIpv4MappedIpv6Address(address: string): string | null {
+    const normalized = address.toLowerCase();
+    const prefix = '::ffff:';
+    if (!normalized.startsWith(prefix)) {
+      return null;
+    }
+
+    const suffix = normalized.slice(prefix.length);
+    if (isIP(suffix) === 4) {
+      return suffix;
+    }
+
+    const segments = suffix.split(':');
+    if (segments.length !== 2) {
+      return null;
+    }
+
+    const high = Number.parseInt(segments[0] ?? '', 16);
+    const low = Number.parseInt(segments[1] ?? '', 16);
+    if (
+      Number.isNaN(high) ||
+      Number.isNaN(low) ||
+      high < 0 ||
+      high > 0xffff ||
+      low < 0 ||
+      low > 0xffff
+    ) {
+      return null;
+    }
+
+    return [(high >> 8) & 0xff, high & 0xff, (low >> 8) & 0xff, low & 0xff].join('.');
+  }
+
   // Requirements: sandbox-http-request.2.3.1, sandbox-http-request.3.3.8
   private isForbiddenIpv4(address: string): boolean {
     const parts = address.split('.').map((part) => Number.parseInt(part, 10));
@@ -762,6 +813,10 @@ export class SandboxHttpRequestHandler {
   // Requirements: sandbox-http-request.2.3.1, sandbox-http-request.3.3.8
   private isForbiddenIpv6(address: string): boolean {
     const normalized = address.toLowerCase();
+    const mappedIpv4 = this.getIpv4MappedIpv6Address(normalized);
+    if (mappedIpv4) {
+      return this.isForbiddenIpv4(mappedIpv4);
+    }
     return (
       normalized === '::' ||
       normalized === '::1' ||

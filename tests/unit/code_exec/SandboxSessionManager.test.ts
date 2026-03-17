@@ -167,6 +167,36 @@ describe('SandboxSessionManager.execute', () => {
     expect(result.stdout).toContain('200');
   });
 
+  /* Preconditions: Sandbox session manager exposes http_request bridge during one sandbox execution
+     Action: Execute sandbox code that performs multiple helper calls, including independent concurrent calls via Promise.all
+     Assertions: All helper calls succeed and the bridge is invoked once per request within the same execution
+     Requirements: sandbox-http-request.1.3, sandbox-http-request.1.3.1, sandbox-http-request.1.3.2 */
+  it('supports multiple http_request calls within one sandbox execution', async () => {
+    const manager = new SandboxSessionManager();
+    const result = await manager.execute('agent-1', 'call-multi', {
+      task_summary: 'Fetch multiple URLs through bridge',
+      code: `const [first, second] = await Promise.all([
+  window.tools.http_request({ url: "https://example.com/one" }),
+  window.tools.http_request({ url: "https://example.com/two" })
+]);
+console.log(first.status, second.status);`,
+    });
+
+    expect(electronMocks.sandboxBridgeInvokeTool).toHaveBeenCalledTimes(2);
+    expect(electronMocks.sandboxBridgeInvokeTool).toHaveBeenNthCalledWith(1, 'http_request', {
+      url: 'https://example.com/one',
+    });
+    expect(electronMocks.sandboxBridgeInvokeTool).toHaveBeenNthCalledWith(2, 'http_request', {
+      url: 'https://example.com/two',
+    });
+    expect(result.status).toBe('success');
+    expect(result.stdout).toContain('200 200');
+  });
+
+  /* Preconditions: Sandbox session manager receives valid code that writes to stdout
+     Action: Execute code that logs a line
+     Assertions: Execution succeeds, stdout contains the message, and stderr stays empty
+     Requirements: code_exec.3.7 */
   it('executes code and captures stdout', async () => {
     const manager = new SandboxSessionManager();
     const result = await manager.execute('agent-1', 'call-1', {
@@ -179,6 +209,10 @@ describe('SandboxSessionManager.execute', () => {
     expect(result.stderr).toBe('');
   });
 
+  /* Preconditions: Sandbox session manager receives sandbox code that tries to use forbidden browser networking API
+     Action: Execute code that calls fetch directly
+     Assertions: Execution fails with policy_denied
+     Requirements: code_exec.2.2 */
   it('returns policy_denied for forbidden browser network API', async () => {
     const manager = new SandboxSessionManager();
     const result = await manager.execute('agent-1', 'call-1', {
@@ -190,6 +224,10 @@ describe('SandboxSessionManager.execute', () => {
     expect(result.error?.code).toBe('policy_denied');
   });
 
+  /* Preconditions: Sandbox session manager receives sandbox code that accesses browser networking API through globalThis
+     Action: Execute code that calls globalThis.fetch
+     Assertions: Execution fails with policy_denied
+     Requirements: code_exec.2.2 */
   it('returns policy_denied for globalThis browser network API access', async () => {
     const manager = new SandboxSessionManager();
     const result = await manager.execute('agent-1', 'call-1', {
@@ -201,6 +239,10 @@ describe('SandboxSessionManager.execute', () => {
     expect(result.error?.code).toBe('policy_denied');
   });
 
+  /* Preconditions: Sandbox session manager receives sandbox code that tries to create a worker
+     Action: Execute code that constructs Worker
+     Assertions: Execution fails with policy_denied
+     Requirements: code_exec.2.2 */
   it('returns policy_denied for multithreading API', async () => {
     const manager = new SandboxSessionManager();
     const result = await manager.execute('agent-1', 'call-1', {
@@ -212,6 +254,10 @@ describe('SandboxSessionManager.execute', () => {
     expect(result.error?.code).toBe('policy_denied');
   });
 
+  /* Preconditions: Abort signal is already aborted before execution starts
+     Action: Execute sandbox code with the aborted signal
+     Assertions: Execution returns cancelled without running user code
+     Requirements: code_exec.3.7 */
   it('returns cancelled when aborted', async () => {
     const manager = new SandboxSessionManager();
     const controller = new AbortController();
@@ -230,6 +276,10 @@ describe('SandboxSessionManager.execute', () => {
     expect(result.status).toBe('cancelled');
   });
 
+  /* Preconditions: Tool arguments are missing required code_exec fields
+     Action: Execute sandbox session with invalid raw args
+     Assertions: Execution returns invalid_tool_arguments
+     Requirements: code_exec.1.5 */
   it('returns invalid_tool_arguments when args are invalid', async () => {
     const manager = new SandboxSessionManager();
     const result = await manager.execute('agent-1', 'call-1', {} as Record<string, unknown>);
@@ -238,6 +288,10 @@ describe('SandboxSessionManager.execute', () => {
     expect(result.error?.code).toBe('invalid_tool_arguments');
   });
 
+  /* Preconditions: Sandbox code writes to console.warn and console.error
+     Action: Execute code that emits warning and error lines
+     Assertions: Execution succeeds and stderr contains both lines
+     Requirements: code_exec.3.7 */
   it('captures stderr from console.warn and console.error', async () => {
     const manager = new SandboxSessionManager();
     const result = await manager.execute('agent-1', 'call-1', {
@@ -250,6 +304,10 @@ describe('SandboxSessionManager.execute', () => {
     expect(result.stderr).toContain('e');
   });
 
+  /* Preconditions: Sandbox code tries to call a helper outside the allowlist
+     Action: Execute code that accesses unknown tool on window.tools
+     Assertions: Execution fails with policy_denied
+     Requirements: code_exec.2.2 */
   it('returns policy_denied for forbidden tools allowlist access', async () => {
     const manager = new SandboxSessionManager();
     const result = await manager.execute('agent-1', 'call-1', {
@@ -261,6 +319,10 @@ describe('SandboxSessionManager.execute', () => {
     expect(result.error?.code).toBe('policy_denied');
   });
 
+  /* Preconditions: VM execution path exceeds the configured execution limit
+     Action: Invoke executeInOneSandbox with an infinite loop and very low timeout
+     Assertions: Internal execution result is timeout with limit_exceeded
+     Requirements: code_exec.3.7 */
   it('returns timeout with limit_exceeded when vm timeout error is thrown', async () => {
     const manager = new SandboxSessionManager();
     const result = await (
@@ -279,6 +341,10 @@ describe('SandboxSessionManager.execute', () => {
     expect(result.error?.code).toBe('limit_exceeded');
   });
 
+  /* Preconditions: Sandbox code attempts an allocation that exceeds the runtime safety limit
+     Action: Execute code that creates a very large string
+     Assertions: Execution fails with limit_exceeded and explanatory message
+     Requirements: code_exec.3.7 */
   it('maps memory allocation failures to limit_exceeded', async () => {
     const manager = new SandboxSessionManager();
     const result = await manager.execute('agent-1', 'call-1', {
@@ -291,6 +357,10 @@ describe('SandboxSessionManager.execute', () => {
     expect(result.error?.message ?? '').toContain('2 GiB');
   });
 
+  /* Preconditions: Sandbox code throws an ordinary runtime exception
+     Action: Execute code that throws Error("boom")
+     Assertions: Execution fails with sandbox_runtime_error and surfaces the message
+     Requirements: code_exec.3.7 */
   it('returns sandbox_runtime_error for generic runtime exceptions', async () => {
     const manager = new SandboxSessionManager();
     const result = await manager.execute('agent-1', 'call-1', {
@@ -303,6 +373,10 @@ describe('SandboxSessionManager.execute', () => {
     expect(result.error?.message).toContain('boom');
   });
 
+  /* Preconditions: http_request bridge returns a structured forbidden_destination helper result
+     Action: Execute sandbox code that logs the helper result JSON to stdout
+     Assertions: Sandbox execution stays successful and preserves the structured helper result in stdout instead of remapping it
+     Requirements: sandbox-http-request.4.2.2, code_exec.3.7 */
   it('keeps structured forbidden_destination helper results inside stdout instead of remapping them', async () => {
     electronMocks.sandboxBridgeInvokeTool.mockResolvedValueOnce({
       error: {
@@ -330,6 +404,10 @@ console.log(JSON.stringify(result));`,
     );
   });
 
+  /* Preconditions: Abort signal is triggered while sandbox code is still running
+     Action: Start execution of delayed code and abort shortly after launch
+     Assertions: Execution resolves as cancelled
+     Requirements: code_exec.3.7 */
   it('returns cancelled when aborted during execution', async () => {
     const manager = new SandboxSessionManager();
     const controller = new AbortController();
@@ -349,6 +427,10 @@ console.log(JSON.stringify(result));`,
     expect(result.status).toBe('cancelled');
   });
 
+  /* Preconditions: Resource monitor reports near-limit state during otherwise successful execution
+     Action: Execute delayed code while mocked app metrics exceed near-limit threshold
+     Assertions: Execution succeeds and stderr includes degraded mode diagnostic
+     Requirements: code_exec.3.7 */
   it('adds degraded-mode diagnostic to stderr when near resource limits', async () => {
     const getAppMetricsMock = app.getAppMetrics as jest.Mock;
     getAppMetricsMock.mockReturnValue([
@@ -369,6 +451,10 @@ console.log(JSON.stringify(result));`,
     expect(result.stderr).toContain('degraded mode');
   });
 
+  /* Preconditions: Resource monitor reports hard CPU limit breach during execution
+     Action: Execute delayed code while mocked app metrics exceed hard limit threshold
+     Assertions: Execution fails with limit_exceeded and CPU message
+     Requirements: code_exec.3.7 */
   it('returns limit_exceeded when hard CPU limit is exceeded', async () => {
     const getAppMetricsMock = app.getAppMetrics as jest.Mock;
     getAppMetricsMock.mockReturnValue([
@@ -393,11 +479,19 @@ console.log(JSON.stringify(result));`,
 });
 
 describe('SandboxSessionManager.shutdown', () => {
+  /* Preconditions: No sandbox sessions are active
+     Action: Call shutdown on the manager
+     Assertions: Shutdown resolves without side effects
+     Requirements: code_exec.3.7 */
   it('returns immediately when there are no active sessions', async () => {
     const manager = new SandboxSessionManager();
     await expect(manager.shutdown()).resolves.toBeUndefined();
   });
 
+  /* Preconditions: Active session map contains cancellable entries, including one cancel function that throws
+     Action: Call shutdown on the manager
+     Assertions: All sessions are cleared and cancel errors are ignored
+     Requirements: code_exec.3.7 */
   it('clears active sessions and ignores cancel errors', async () => {
     const manager = new SandboxSessionManager();
     const sessions = (manager as unknown as { activeSessions: Map<string, { cancel: () => void }> })
@@ -423,6 +517,10 @@ describe('code_exec helpers', () => {
     expect(resolveCodeExecSandboxPreloadPath()).toBe(mockPreloadPath);
   });
 
+  /* Preconditions: Bundle layout exposes preload relative to dist/main
+     Action: Resolve preload path with a file-relative dist/main current directory
+     Assertions: Helper prefers the file-relative preload path
+     Requirements: code_exec.1.5, code_exec.2.2 */
   it('prefers file-relative preload path when the current bundle layout provides it', () => {
     fsExistsSyncMock.mockImplementation(
       (targetPath: fs.PathLike) => String(targetPath) === mockPreloadPath
@@ -431,6 +529,10 @@ describe('code_exec helpers', () => {
     expect(resolveCodeExecSandboxPreloadPath(`${mockAppPath}/dist/main`)).toBe(mockPreloadPath);
   });
 
+  /* Preconditions: Functional bundle layout exposes preload relative to dist/main/main
+     Action: Resolve preload path with a functional-bundle current directory
+     Assertions: Helper prefers the functional file-relative preload path
+     Requirements: code_exec.1.5, code_exec.2.2 */
   it('prefers file-relative preload path when the functional bundle layout provides it', () => {
     fsExistsSyncMock.mockImplementation(
       (targetPath: fs.PathLike) => String(targetPath) === mockPreloadPath
@@ -441,18 +543,30 @@ describe('code_exec helpers', () => {
     );
   });
 
+  /* Preconditions: Raw sandbox output is null
+     Action: Normalize the invalid output shape
+     Assertions: Result is converted to internal_error
+     Requirements: code_exec.3.7 */
   it('normalizes invalid output into internal_error', () => {
     const result = normalizeCodeExecOutput(null);
     expect(result.status).toBe('error');
     expect(result.error?.code).toBe('internal_error');
   });
 
+  /* Preconditions: Raw sandbox output has an unsupported status value
+     Action: Normalize the invalid output shape
+     Assertions: Result is converted to internal_error
+     Requirements: code_exec.3.7 */
   it('normalizes invalid status into internal_error', () => {
     const result = normalizeCodeExecOutput({ status: 'bad-status' });
     expect(result.status).toBe('error');
     expect(result.error?.code).toBe('internal_error');
   });
 
+  /* Preconditions: Raw sandbox output already matches the supported error shape
+     Action: Normalize the valid output object
+     Assertions: Structured error object and truncation flags are preserved
+     Requirements: code_exec.3.7 */
   it('normalizes valid shape and keeps error object', () => {
     const result = normalizeCodeExecOutput({
       status: 'error',
@@ -473,6 +587,10 @@ describe('code_exec helpers', () => {
     });
   });
 
+  /* Preconditions: Raw tool args are provided both in valid and invalid shapes
+     Action: Map the raw values to CodeExecToolInput
+     Assertions: Valid values are preserved and invalid values normalize to empty/undefined fields
+     Requirements: code_exec.1.5 */
   it('maps raw args to CodeExecToolInput shape', () => {
     expect(toCodeExecInput({ task_summary: 'Print x', code: 'x', timeout_ms: 123 })).toEqual({
       task_summary: 'Print x',
@@ -500,6 +618,10 @@ describe('SandboxSessionManager private helpers', () => {
     electronMocks.browserWindowInstances.length = 0;
   });
 
+  /* Preconditions: Degraded mode flag is false for an otherwise successful output
+     Action: Append degraded diagnostic
+     Assertions: Output is returned unchanged
+     Requirements: code_exec.3.7 */
   it('returns output unchanged when degraded mode is disabled', () => {
     const manager = new SandboxSessionManager();
     const output = {
@@ -522,6 +644,10 @@ describe('SandboxSessionManager private helpers', () => {
     expect(result).toEqual(output);
   });
 
+  /* Preconditions: Output already represents a hard limit_exceeded error while degraded mode is true
+     Action: Append degraded diagnostic
+     Assertions: Existing output is preserved without extra degraded messaging
+     Requirements: code_exec.3.7 */
   it('does not append degraded diagnostic for limit_exceeded errors', () => {
     const manager = new SandboxSessionManager();
     const output = {
@@ -548,6 +674,10 @@ describe('SandboxSessionManager private helpers', () => {
     expect(result).toEqual(output);
   });
 
+  /* Preconditions: Resource monitor starts with invalid PID and later gets stopped twice
+     Action: Start the resource monitor, advance timers, and stop it twice
+     Assertions: Near-limit and hard-limit callbacks are not invoked and repeated stop is safe
+     Requirements: code_exec.3.7 */
   it('resource monitor returns early for invalid PID and can be stopped twice safely', () => {
     jest.useFakeTimers();
     const onNearLimit = jest.fn();
@@ -596,6 +726,10 @@ describe('SandboxSessionManager private helpers', () => {
     stop();
   });
 
+  /* Preconditions: Resource monitor starts with a PID that has no matching app metrics entry
+     Action: Start the resource monitor and advance timers
+     Assertions: Near-limit and hard-limit callbacks are not invoked
+     Requirements: code_exec.3.7 */
   it('resource monitor returns early when process metrics for PID are absent', () => {
     jest.useFakeTimers();
     const onNearLimit = jest.fn();

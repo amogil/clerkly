@@ -200,6 +200,36 @@ describe('SandboxHttpRequestHandler', () => {
     ).resolves.toMatchObject({ error: { code: 'invalid_max_response_bytes' } });
   });
 
+  /* Preconditions: helper receives request-control and hop-by-hop headers that sandbox code must not control
+     Action: execute helper with a forbidden header in the headers object
+     Assertions: helper rejects the request as invalid_headers before any network call
+     Requirements: sandbox-http-request.2.5.2, sandbox-http-request.4.1 */
+  it.each([
+    'Host',
+    'content-length',
+    'connection',
+    'transfer-encoding',
+    'upgrade',
+    'proxy-connection',
+    'keep-alive',
+    'te',
+    'trailer',
+    'expect',
+  ])('rejects forbidden request-control header %s', async (headerName) => {
+    const handler = new SandboxHttpRequestHandler(jest.fn() as unknown as typeof fetch);
+
+    const result = await handler.execute({
+      url: 'https://example.com',
+      headers: {
+        [headerName]: 'forbidden',
+      },
+    });
+
+    expect(result).toMatchObject({
+      error: { code: 'invalid_headers' },
+    });
+  });
+
   /* Preconditions: helper receives a localhost target in normal runtime policy without a loopback allowlist
      Action: execute helper against localhost URL
      Assertions: helper rejects the request as forbidden_destination before calling fetch
@@ -295,8 +325,12 @@ describe('SandboxHttpRequestHandler', () => {
      Requirements: sandbox-http-request.2.3.1, sandbox-http-request.4.2.2 */
   it.each([
     'http://127.0.0.1/data',
+    'http://[::ffff:127.0.0.1]/data',
     'http://100.64.0.1/data',
+    'http://[::ffff:10.0.0.1]/data',
+    'http://[::ffff:169.254.1.1]/data',
     'http://192.0.2.1/data',
+    'http://[::ffff:192.168.0.1]/data',
     'http://198.18.0.1/data',
     'http://198.51.100.1/data',
     'http://203.0.113.1/data',
@@ -826,7 +860,7 @@ describe('SandboxHttpRequestHandler', () => {
       body: 'payload',
       headers: {
         'content-type': 'application/json',
-        'content-length': '7',
+        'content-encoding': 'gzip',
         accept: 'text/plain',
       },
       follow_redirects: true,
@@ -871,7 +905,7 @@ describe('SandboxHttpRequestHandler', () => {
       body: 'payload',
       headers: {
         'content-type': 'application/json',
-        'content-length': '7',
+        'x-request-id': 'req-1',
       },
       follow_redirects: true,
     });
@@ -884,7 +918,7 @@ describe('SandboxHttpRequestHandler', () => {
         body: 'payload',
         headers: {
           'content-type': 'application/json',
-          'content-length': '7',
+          'x-request-id': 'req-1',
         },
       })
     );
@@ -918,7 +952,7 @@ describe('SandboxHttpRequestHandler', () => {
       body: 'payload',
       headers: {
         'content-type': 'application/json',
-        'content-length': '7',
+        'x-request-id': 'req-2',
       },
       follow_redirects: true,
     });
@@ -931,7 +965,7 @@ describe('SandboxHttpRequestHandler', () => {
         body: 'payload',
         headers: {
           'content-type': 'application/json',
-          'content-length': '7',
+          'x-request-id': 'req-2',
         },
       })
     );
@@ -992,6 +1026,32 @@ describe('SandboxHttpRequestHandler', () => {
       makeResponse('', {
         status: 302,
         headers: { location: 'http://localhost:4567/private' },
+      })
+    );
+    const handler = makeHandler(fetchMock as unknown as typeof fetch);
+
+    const result = await handler.execute({
+      url: 'https://example.com/start',
+      follow_redirects: true,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      error: {
+        code: 'forbidden_destination',
+      },
+    });
+  });
+
+  /* Preconditions: redirect response points to an IPv4-mapped IPv6 literal that routes to a forbidden private IPv4 address
+     Action: execute helper with follow_redirects enabled
+     Assertions: helper rejects the redirect hop before issuing the next request
+     Requirements: sandbox-http-request.3.3.8, sandbox-http-request.4.2.2 */
+  it('rejects redirects into forbidden IPv4-mapped IPv6 targets', async () => {
+    const fetchMock = jest.fn().mockResolvedValueOnce(
+      makeResponse('', {
+        status: 302,
+        headers: { location: 'http://[::ffff:10.0.0.1]/private' },
       })
     );
     const handler = makeHandler(fetchMock as unknown as typeof fetch);
