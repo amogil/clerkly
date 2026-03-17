@@ -1691,6 +1691,84 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     expect(requestCount).toBeLessThanOrEqual(3);
   });
 
+  /* Preconditions: first response contains code_exec tool_call with auto-title metadata comment inside nested payload string,
+     second response repairs to plain text
+     Action: User sends message
+     Assertions: invalid tool_call is not persisted, metadata comment is not rendered, and repaired text is shown
+     Requirements: llm-integration.9.5.3.2, llm-integration.11.3, llm-integration.16.1.4 */
+  test('should reject title-meta inside tool payload and repair without rendering metadata comment', async () => {
+    mockLLMServer.setStreamingMode(true);
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        toolCalls: [
+          {
+            callId: 'title-meta-nested-tool',
+            toolName: 'code_exec',
+            arguments: {
+              task_summary: 'Inspect page',
+              code: "console.log('inspect');",
+              metadata: {
+                note: '<!-- clerkly:title-meta: {"title":"Bad title","rename_need_score":90} -->',
+              },
+            },
+          },
+        ],
+      },
+      {
+        content:
+          '{"action":{"type":"text","content":"repair completed after invalid tool payload"}}',
+      },
+    ]);
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await messageInput.fill('Trigger invalid tool payload with metadata');
+    await messageInput.press('Enter');
+
+    const actionContent = context.window.locator('.message-llm-action-response').last();
+    await expect(actionContent).toContainText('repair completed after invalid tool payload', {
+      timeout: 15000,
+    });
+    await expect(context.window.locator('[data-testid="message-code-exec-block"]')).toHaveCount(0);
+    await expect(context.window.locator('[data-testid="message-final-answer-block"]')).toHaveCount(
+      0
+    );
+    await expect(context.window.locator('text=clerkly:title-meta')).toHaveCount(0);
+
+    const agentId = (await getAgentIdsFromApi(context.window))[0];
+    const persistedToolCallsCount = await context.window.evaluate(async (id) => {
+      const api = (
+        window as unknown as {
+          api: {
+            messages: {
+              list: (
+                agentId: string
+              ) => Promise<{ success: boolean; data?: Array<{ kind: string; payload?: unknown }> }>;
+            };
+          };
+        }
+      ).api;
+      const result = await api.messages.list(id);
+      if (!result.success || !result.data) {
+        return -1;
+      }
+      return result.data.filter((message) => {
+        if (message.kind !== 'tool_call') {
+          return false;
+        }
+        const payload = message.payload as { data?: { toolName?: string } };
+        return payload?.data?.toolName === 'code_exec';
+      }).length;
+    }, agentId);
+    expect(persistedToolCallsCount).toBe(0);
+
+    const requestCount = mockLLMServer
+      .getRequestLogs()
+      .filter((entry) => entry.method === 'POST' && entry.path === '/v1/responses').length;
+    expect(requestCount).toBeGreaterThanOrEqual(2);
+    expect(requestCount).toBeLessThanOrEqual(3);
+  });
+
   /* Preconditions: First model response contains terminal code_exec(policy_denied), second returns text
      Action: User sends one message
      Assertions: pipeline immediately continues to next model step after terminal tool_result

@@ -8,7 +8,7 @@
 - оставшимися follow-up задачами после Issue #65 (`sandbox-http-request`) в части LLM/code_exec интеграции;
 - миграцией `code_exec` renderer на стандартный AI Elements `Tool` contract.
 
-**Текущий статус:** Фаза 4 — Tool Contract Migration follow-up
+**Текущий статус:** Фаза 5 — Awaiting full functional suite approval
 
 ---
 
@@ -49,7 +49,7 @@
 - ✅ `code_exec` content renderer частично возвращён к целевому app-owned виду поверх standard `Tool`: секция исходного кода отображается как один `JavaScript` code block с видимой JS-подсветкой, а `Output`/`Error` секции используют standard text code-block control с внутренними заголовками.
 
 ### В работе
-- 🔄 Фаза 4: завершение migration-follow-up после обновления AI Elements, упрощение оставшегося custom UI слоя и точечная валидация.
+- 🔄 Фаза 5: содержательные работы завершены; ожидается только отдельное подтверждение пользователя на полный `npm run test:functional`.
 
 ### Запланировано
 
@@ -89,7 +89,7 @@
   - [x] Удалить временные workaround-правки, ставшие ненужными после миграции.
   - [x] Упростить `code_exec` header до custom status-icon composition без внешнего overlay, сохранив стандартную toggle hit area.
 
-- [ ] Довести app-level интеграцию обновлённого `PromptInput` и shared providers.
+- [x] Довести app-level интеграцию обновлённого `PromptInput` и shared providers.
   - [x] Устранить TS/JSX несовместимость свежего `src/renderer/components/ai-elements/prompt-input.tsx` с текущим renderer-конфигом TypeScript.
   - [x] Проверить и зафиксировать app-level setup, требуемый новым `PromptInput`/`Message` stack после CLI-обновления.
   - [x] Добавить единый `TooltipProvider` в renderer root приложения вместо локальных/дублирующих provider-обёрток.
@@ -127,9 +127,9 @@
   - [x] Добавить кейсы в `tests/unit/components/agents/AgentMessage.test.tsx`.
   - [x] Проверить, что renderer не показывает служебный comment даже для уже persisted payload.
 - [x] При изменении loop contract обновить provider tests в `tests/unit/llm/*`.
-- [ ] Добавить functional regression в `tests/functional/llm-chat.spec.ts`.
-  - [ ] Сценарий, где metadata comment приходит внутри другого tool payload.
-  - [ ] Проверить, что UI его не показывает или turn корректно валидируется по целевому контракту.
+- [x] Добавить functional regression в `tests/functional/llm-chat.spec.ts`.
+  - [x] Сценарий, где metadata comment приходит внутри другого tool payload.
+  - [x] Проверить, что UI его не показывает или turn корректно валидируется по целевому контракту.
 
 #### Фаза 7: Валидация
 

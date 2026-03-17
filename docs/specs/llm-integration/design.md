@@ -884,6 +884,7 @@ User отправляет сообщение
 - `tests/functional/llm-chat.spec.ts` — "should extract agent title and rename_need_score from single metadata comment in the same model turn"
 - `tests/functional/llm-chat.spec.ts` — "should extract agent title from llm text when the same turn also completes with final_answer"
 - `tests/functional/llm-chat.spec.ts` — "should include auto-title metadata contract in system prompt"
+- `tests/functional/llm-chat.spec.ts` — "should reject title-meta inside tool payload and repair without rendering metadata comment"
 - `tests/functional/llm-chat.spec.ts` — "should ignore unterminated title metadata comment when payload exceeds 260 chars"
 - `tests/functional/llm-chat.spec.ts` — "should keep default name when first user message is non-meaningful"
 - `tests/functional/llm-chat.spec.ts` — "should keep current name when auto-title candidate is non-meaningful"
