@@ -57,6 +57,13 @@ function makePublicLookup(address = '93.184.216.34', family = 4) {
   return jest.fn(async () => [{ address, family }]);
 }
 
+// Requirements: sandbox-http-request.3.2.1, sandbox-http-request.3.2.2
+function makeTransportError(code: string, message: string): Error & { code: string } {
+  const error = new Error(message) as Error & { code: string };
+  error.code = code;
+  return error;
+}
+
 // Requirements: sandbox-http-request.2, sandbox-http-request.3, sandbox-http-request.4
 function makeHandler(
   fetchImpl: typeof fetch,
@@ -638,7 +645,12 @@ describe('SandboxHttpRequestHandler', () => {
     ]);
     const transportMock = jest
       .fn()
-      .mockRejectedValueOnce(new Error('connect ECONNREFUSED 2606:2800:220:1:248:1893:25c8:1946'))
+      .mockRejectedValueOnce(
+        makeTransportError(
+          'ECONNREFUSED',
+          'connect ECONNREFUSED 2606:2800:220:1:248:1893:25c8:1946'
+        )
+      )
       .mockResolvedValueOnce(
         makeResponse('ok', {
           status: 200,
@@ -687,8 +699,15 @@ describe('SandboxHttpRequestHandler', () => {
     ]);
     const transportMock = jest
       .fn()
-      .mockRejectedValueOnce(new Error('connect ECONNREFUSED 2606:2800:220:1:248:1893:25c8:1946'))
-      .mockRejectedValueOnce(new Error('connect ECONNREFUSED 93.184.216.34'));
+      .mockRejectedValueOnce(
+        makeTransportError(
+          'ECONNREFUSED',
+          'connect ECONNREFUSED 2606:2800:220:1:248:1893:25c8:1946'
+        )
+      )
+      .mockRejectedValueOnce(
+        makeTransportError('ECONNREFUSED', 'connect ECONNREFUSED 93.184.216.34')
+      );
     const handler = makeTransportHandler(transportMock, lookupMock);
 
     const result = await handler.execute({
@@ -700,6 +719,41 @@ describe('SandboxHttpRequestHandler', () => {
       error: {
         code: 'fetch_failed',
         message: 'connect ECONNREFUSED 93.184.216.34',
+      },
+    });
+  });
+
+  /* Preconditions: hostname lookup resolves multiple validated public addresses but the first transport rejection is not a connect/setup failure
+     Action: execute helper through the bound transport path
+     Assertions: handler does not retry the next validated address and returns fetch_failed from the original transport error
+     Requirements: sandbox-http-request.3.2.1, sandbox-http-request.3.2.2, sandbox-http-request.4.2.2 */
+  it('does not retry the next validated address on non-connect transport failures', async () => {
+    const lookupMock = makeLookup([
+      { address: '2606:2800:220:1:248:1893:25c8:1946', family: 6 },
+      { address: '93.184.216.34', family: 4 },
+    ]);
+    const transportMock = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('upstream request failed after write'));
+    const handler = makeTransportHandler(transportMock, lookupMock);
+
+    const result = await handler.execute({
+      url: 'https://example.com/data',
+    });
+
+    expect(transportMock).toHaveBeenCalledTimes(1);
+    expect(transportMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        hostname: 'example.com',
+        address: '2606:2800:220:1:248:1893:25c8:1946',
+        family: 6,
+      }),
+      expect.any(Object)
+    );
+    expect(result).toMatchObject({
+      error: {
+        code: 'fetch_failed',
+        message: 'upstream request failed after write',
       },
     });
   });

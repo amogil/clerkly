@@ -103,10 +103,27 @@ const REWRITTEN_GET_STRIPPED_HEADERS = new Set([
 ]);
 const FORBIDDEN_DESTINATION_MESSAGE =
   'http_request cannot access localhost, loopback, private, link-local, or reserved internal network targets.';
+const RETRYABLE_CONNECTION_ERROR_CODES = new Set([
+  'ECONNREFUSED',
+  'EHOSTUNREACH',
+  'ENETUNREACH',
+  'EADDRNOTAVAIL',
+  'ETIMEDOUT',
+]);
 
 // Requirements: sandbox-http-request.2.3.1, sandbox-http-request.3.3.8
 function defaultLookup(hostname: string): Promise<HostLookupResult[]> {
   return dnsLookup(hostname, { all: true, verbatim: true });
+}
+
+// Requirements: sandbox-http-request.3.2.1, sandbox-http-request.3.2.2
+function isRetryableConnectionError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const code = 'code' in error ? error.code : undefined;
+  return typeof code === 'string' && RETRYABLE_CONNECTION_ERROR_CODES.has(code);
 }
 
 // Requirements: sandbox-http-request.2.3.1, sandbox-http-request.3.2, sandbox-http-request.3.3.8
@@ -523,6 +540,9 @@ export class SandboxHttpRequestHandler {
       } catch (error) {
         lastError = error;
         if (init.signal.aborted) {
+          throw error;
+        }
+        if (!isRetryableConnectionError(error)) {
           throw error;
         }
       }
