@@ -139,7 +139,9 @@ describe('SandboxSessionManager.execute', () => {
   afterEach(() => {
     jest.clearAllMocks();
     electronMocks.browserWindowInstances.length = 0;
-    fsExistsSyncMock.mockImplementation((targetPath: fs.PathLike) => String(targetPath) === mockPreloadPath);
+    fsExistsSyncMock.mockImplementation(
+      (targetPath: fs.PathLike) => String(targetPath) === mockPreloadPath
+    );
   });
 
   /* Preconditions: Sandbox session manager uses Electron app path to configure preload and runtime exposes sandbox bridge when preload/session args are correct
@@ -422,15 +424,21 @@ describe('code_exec helpers', () => {
   });
 
   it('prefers file-relative preload path when the current bundle layout provides it', () => {
-    fsExistsSyncMock.mockImplementation((targetPath: fs.PathLike) => String(targetPath) === mockPreloadPath);
+    fsExistsSyncMock.mockImplementation(
+      (targetPath: fs.PathLike) => String(targetPath) === mockPreloadPath
+    );
 
     expect(resolveCodeExecSandboxPreloadPath(`${mockAppPath}/dist/main`)).toBe(mockPreloadPath);
   });
 
   it('prefers file-relative preload path when the functional bundle layout provides it', () => {
-    fsExistsSyncMock.mockImplementation((targetPath: fs.PathLike) => String(targetPath) === mockPreloadPath);
+    fsExistsSyncMock.mockImplementation(
+      (targetPath: fs.PathLike) => String(targetPath) === mockPreloadPath
+    );
 
-    expect(resolveCodeExecSandboxPreloadPath(`${mockAppPath}/dist/main/main`)).toBe(mockPreloadPath);
+    expect(resolveCodeExecSandboxPreloadPath(`${mockAppPath}/dist/main/main`)).toBe(
+      mockPreloadPath
+    );
   });
 
   it('normalizes invalid output into internal_error', () => {
