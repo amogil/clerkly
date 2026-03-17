@@ -59,6 +59,7 @@ const HTTP_REQUEST_PROMPT_SPEC = {
     'When `follow_redirects` is `true`, redirects are followed for up to `10` hops.',
     '`303` becomes `GET` without `body`; `301/302` change `POST` to `GET` without `body`; `307/308` preserve `method` and `body`.',
     'On cross-origin redirects, sensitive request headers (`authorization`, `proxy-authorization`, `cookie`, `cookie2`) are stripped before the next hop.',
+    'This helper is only for public HTTP(S) resources; `localhost`, loopback, private, link-local, and other reserved/internal network targets are rejected.',
   ],
   inputFields: [
     '`url`: required absolute `http` or `https` URL string.',

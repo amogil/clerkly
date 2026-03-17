@@ -253,6 +253,9 @@ describe('PromptBuilder.build()', () => {
       expect(result.systemPrompt).toContain(
         'sensitive request headers (`authorization`, `proxy-authorization`, `cookie`, `cookie2`)'
       );
+      expect(result.systemPrompt).toContain(
+        'This helper is only for public HTTP(S) resources; `localhost`, loopback, private, link-local, and other reserved/internal network targets are rejected.'
+      );
       expect(result.systemPrompt).toContain('`headers`: optional `Record<string, string>`');
       expect(result.systemPrompt).toContain('Error fields:');
       expect(result.systemPrompt).toContain('`error.code`: short machine-readable error code.');

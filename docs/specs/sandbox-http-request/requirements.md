@@ -38,6 +38,8 @@
 
 1.4.4. Prompt/tool-инструкция ДОЛЖНА явно сообщать модели, что через `code_exec` и `await tools.http_request(...)` она МОЖЕТ открывать и читать публичные веб-сайты, веб-страницы и другие HTTP-ресурсы, а НЕ только API
 
+1.4.5. Prompt/tool-инструкция ДОЛЖНА явно сообщать модели, что helper предназначен только для публичных HTTP(S)-ресурсов и ДОЛЖЕН отклонять `localhost`, loopback, private, link-local и другие reserved/internal network targets
+
 #### Функциональные Тесты
 
 - `tests/functional/code_exec.spec.ts` - "should allow sandbox code to execute async http_request helper"
@@ -62,6 +64,10 @@
   - `max_response_bytes`
 
 2.3. Поле `url` ДОЛЖНО быть обязательной строкой и содержать абсолютный `http/https` URL
+
+2.3.1. ЕСЛИ `url` указывает на `localhost`, loopback, private, link-local или другой reserved/internal network target, ТО helper ДОЛЖЕН отклонять вызов structured runtime error
+
+2.3.2. ГДЕ приложение выполняется в functional test mode, система МОЖЕТ использовать явно задокументированный test-only loopback allowlist для локальных mock HTTP-сервисов test infrastructure
 
 2.4. Поле `method` МОЖЕТ быть опущено; ЕСЛИ оно опущено, ТО система ДОЛЖНА использовать `GET`
 
@@ -127,6 +133,8 @@
 
 3.3.7. ЕСЛИ redirect переводит запрос на другой origin, ТО helper ДОЛЖЕН удалять из следующего запроса чувствительные заголовки `authorization`, `proxy-authorization`, `cookie` и `cookie2`
 
+3.3.8. ЕСЛИ redirect переводит запрос на `localhost`, loopback, private, link-local или другой reserved/internal network target, ТО helper ДОЛЖЕН завершаться structured runtime error до отправки следующего hop
+
 3.4. КОГДА запрос завершается успешно, ТО helper ДОЛЖЕН возвращать структурированный результат
 
 3.4.1. Результат ДОЛЖЕН включать как минимум:
@@ -179,6 +187,8 @@
 
 4.2.1. Structured runtime error ДОЛЖНА включать объект `error` с полями `code` и `message`
 
+4.2.2. Structured runtime error для запрещённого назначения ДОЛЖНА использовать `error.code = "forbidden_destination"`
+
 4.3. Общая sandbox policy для данного helper-а ДОЛЖНА соответствовать спецификации `code_exec`
 
 4.4. Поведение helper-а ДОЛЖНО оставаться детерминированным по timeout, redirects и размеру результата
@@ -186,3 +196,4 @@
 #### Функциональные Тесты
 
 - `tests/functional/code_exec.spec.ts` - "should return structured validation and runtime errors from http_request helper"
+- `tests/functional/code_exec.spec.ts` - "should reject localhost http_request target before any request is sent"

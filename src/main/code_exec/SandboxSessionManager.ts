@@ -1,5 +1,6 @@
 // Requirements: code_exec.1.5, code_exec.2, code_exec.5
 
+import fs from 'node:fs';
 import path from 'node:path';
 import { app, BrowserWindow, ipcMain, session } from 'electron';
 import { Logger } from '../Logger';
@@ -51,8 +52,22 @@ interface SandboxToolInvocationPayload {
 
 // Requirements: code_exec.1.5, code_exec.2.2, sandbox-http-request.1.1-1.2
 export function resolveCodeExecSandboxPreloadPath(appPath = app.getAppPath()): string {
+  const candidates = [
+    path.join(appPath, 'dist/preload/preload/codeExecSandbox.js'),
+    path.resolve(appPath, '../../preload/preload/codeExecSandbox.js'),
+    path.resolve(appPath, '../preload/preload/codeExecSandbox.js'),
+  ];
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
   return path.join(appPath, 'dist/preload/preload/codeExecSandbox.js');
 }
+
+const TEST_HTTP_REQUEST_LOOPBACK_ALLOWLIST = ['127.0.0.1'];
 
 // Requirements: code_exec.1.5, code_exec.2.5-2.6, code_exec.2.10
 export class SandboxSessionManager {
@@ -61,7 +76,15 @@ export class SandboxSessionManager {
   private activeSessions = new Map<string, SessionHandle>();
   private activeSandboxToolInvokers = new Map<string, Map<string, SandboxToolInvoker>>();
 
-  constructor(private readonly httpRequestHandler = new SandboxHttpRequestHandler()) {
+  constructor(
+    private readonly httpRequestHandler = new SandboxHttpRequestHandler(
+      undefined,
+      undefined,
+      process.env.NODE_ENV === 'test'
+        ? new Set(TEST_HTTP_REQUEST_LOOPBACK_ALLOWLIST)
+        : new Set<string>()
+    )
+  ) {
     this.registerSandboxToolHandler();
   }
 
@@ -187,10 +210,12 @@ export class SandboxSessionManager {
     const sandboxSession = session.fromPartition(partition, { cache: false });
     attachSandboxSessionPolicies(sandboxSession);
 
+    const preloadPath = resolveCodeExecSandboxPreloadPath();
+
     const sandboxWindow = new BrowserWindow({
       show: false,
       webPreferences: {
-        preload: resolveCodeExecSandboxPreloadPath(),
+        preload: preloadPath,
         additionalArguments: [`--code-exec-session-id=${context.sessionId}`],
         sandbox: true,
         contextIsolation: true,

@@ -1,5 +1,21 @@
 // Requirements: code_exec.1.5, code_exec.2, code_exec.3.7
 
+jest.mock('node:fs', () => ({
+  __esModule: true,
+  default: {
+    existsSync: jest.fn(
+      (targetPath: string) =>
+        targetPath ===
+        '/Users/amogil/Documents/projects/clerkly/dist/preload/preload/codeExecSandbox.js'
+    ),
+  },
+  existsSync: jest.fn(
+    (targetPath: string) =>
+      targetPath ===
+      '/Users/amogil/Documents/projects/clerkly/dist/preload/preload/codeExecSandbox.js'
+  ),
+}));
+
 jest.mock('electron', () => {
   const getAppMetrics = jest.fn(() => []);
   const getAppPath = jest.fn(() => '/Users/amogil/Documents/projects/clerkly');
@@ -109,6 +125,7 @@ jest.mock('electron', () => {
 });
 
 import { app } from 'electron';
+import fs from 'node:fs';
 import { SandboxSessionManager } from '../../../src/main/code_exec/SandboxSessionManager';
 import {
   normalizeCodeExecOutput,
@@ -122,11 +139,17 @@ const electronMocks = jest.requireMock('electron').__mocks as {
     options: { webPreferences?: { preload?: string; additionalArguments?: string[] } };
   }>;
 };
+const fsExistsSyncMock = fs.existsSync as jest.MockedFunction<typeof fs.existsSync>;
 
 describe('SandboxSessionManager.execute', () => {
   afterEach(() => {
     jest.clearAllMocks();
     electronMocks.browserWindowInstances.length = 0;
+    fsExistsSyncMock.mockImplementation(
+      (targetPath: fs.PathLike) =>
+        String(targetPath) ===
+        '/Users/amogil/Documents/projects/clerkly/dist/preload/preload/codeExecSandbox.js'
+    );
   });
 
   /* Preconditions: Sandbox session manager uses Electron app path to configure preload and runtime exposes sandbox bridge when preload/session args are correct
@@ -290,6 +313,33 @@ describe('SandboxSessionManager.execute', () => {
     expect(result.error?.message).toContain('boom');
   });
 
+  it('keeps structured forbidden_destination helper results inside stdout instead of remapping them', async () => {
+    electronMocks.sandboxBridgeInvokeTool.mockResolvedValueOnce({
+      error: {
+        code: 'forbidden_destination',
+        message: 'http_request cannot access localhost.',
+      },
+    });
+
+    const manager = new SandboxSessionManager();
+    const result = await manager.execute('agent-1', 'call-1', {
+      task_summary: 'Reject localhost target',
+      code: `const result = await tools.http_request({ url: "http://localhost:3000/blocked" });
+console.log(JSON.stringify(result));`,
+    });
+
+    expect(result.status).toBe('success');
+    expect(result.error).toBeUndefined();
+    expect(result.stdout.trim()).toBe(
+      JSON.stringify({
+        error: {
+          code: 'forbidden_destination',
+          message: 'http_request cannot access localhost.',
+        },
+      })
+    );
+  });
+
   it('returns cancelled when aborted during execution', async () => {
     const manager = new SandboxSessionManager();
     const controller = new AbortController();
@@ -383,6 +433,30 @@ describe('code_exec helpers', () => {
     expect(resolveCodeExecSandboxPreloadPath()).toBe(
       '/Users/amogil/Documents/projects/clerkly/dist/preload/preload/codeExecSandbox.js'
     );
+  });
+
+  it('prefers file-relative preload path when the current bundle layout provides it', () => {
+    fsExistsSyncMock.mockImplementation(
+      (targetPath: fs.PathLike) =>
+        String(targetPath) ===
+        '/Users/amogil/Documents/projects/clerkly/dist/preload/preload/codeExecSandbox.js'
+    );
+
+    expect(
+      resolveCodeExecSandboxPreloadPath('/Users/amogil/Documents/projects/clerkly/dist/main')
+    ).toBe('/Users/amogil/Documents/projects/clerkly/dist/preload/preload/codeExecSandbox.js');
+  });
+
+  it('prefers file-relative preload path when the functional bundle layout provides it', () => {
+    fsExistsSyncMock.mockImplementation(
+      (targetPath: fs.PathLike) =>
+        String(targetPath) ===
+        '/Users/amogil/Documents/projects/clerkly/dist/preload/preload/codeExecSandbox.js'
+    );
+
+    expect(
+      resolveCodeExecSandboxPreloadPath('/Users/amogil/Documents/projects/clerkly/dist/main/main')
+    ).toBe('/Users/amogil/Documents/projects/clerkly/dist/preload/preload/codeExecSandbox.js');
   });
 
   it('normalizes invalid output into internal_error', () => {

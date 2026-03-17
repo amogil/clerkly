@@ -46,7 +46,58 @@ function makeResponse(
   } as unknown as Response;
 }
 
+// Requirements: sandbox-http-request.2.3.1, sandbox-http-request.3.3.8, sandbox-http-request.4.2.2
+function makeLookup(...entries: Array<Array<{ address: string; family: number }>>) {
+  const queue = [...entries];
+  return jest.fn(async () => queue.shift() ?? []);
+}
+
+// Requirements: sandbox-http-request.2.3.1, sandbox-http-request.3.3.8, sandbox-http-request.4.2.2
+function makePublicLookup(address = '93.184.216.34', family = 4) {
+  return jest.fn(async () => [{ address, family }]);
+}
+
+// Requirements: sandbox-http-request.2, sandbox-http-request.3, sandbox-http-request.4
+function makeHandler(
+  fetchImpl: typeof fetch,
+  lookupImpl = makePublicLookup()
+): SandboxHttpRequestHandler {
+  return new SandboxHttpRequestHandler(fetchImpl, lookupImpl);
+}
+
 describe('SandboxHttpRequestHandler', () => {
+  /* Preconditions: handler receives malformed argument shapes and unsupported destination scheme
+     Action: execute helper with non-object args, non-string url, ftp protocol, non-object headers, and non-string body
+     Assertions: helper returns the corresponding structured validation errors
+     Requirements: sandbox-http-request.2.3, sandbox-http-request.2.4.2, sandbox-http-request.2.5.1, sandbox-http-request.2.6.1, sandbox-http-request.4.1 */
+  it('rejects malformed arguments before any network call', async () => {
+    const handler = new SandboxHttpRequestHandler(jest.fn() as unknown as typeof fetch);
+
+    await expect(handler.execute(null)).resolves.toMatchObject({
+      error: { code: 'invalid_url' },
+    });
+    await expect(handler.execute({ url: 123 })).resolves.toMatchObject({
+      error: { code: 'invalid_url' },
+    });
+    await expect(handler.execute({ url: 'ftp://example.com/data' })).resolves.toMatchObject({
+      error: { code: 'invalid_url' },
+    });
+    await expect(
+      handler.execute({ url: 'https://example.com', headers: 'bad' })
+    ).resolves.toMatchObject({
+      error: { code: 'invalid_headers' },
+    });
+    await expect(
+      handler.execute({
+        url: 'https://example.com',
+        method: 'POST',
+        body: 123,
+      })
+    ).resolves.toMatchObject({
+      error: { code: 'invalid_body' },
+    });
+  });
+
   /* Preconditions: handler receives minimal valid input without optional fields
      Action: execute http_request with only url
      Assertions: fetch uses default GET/manual redirect/no body and success result is returned
@@ -59,7 +110,7 @@ describe('SandboxHttpRequestHandler', () => {
         url: 'https://example.com/data',
       })
     ) as unknown as typeof fetch;
-    const handler = new SandboxHttpRequestHandler(fetchMock);
+    const handler = makeHandler(fetchMock);
 
     const result = await handler.execute({ url: 'https://example.com/data' });
 
@@ -134,6 +185,126 @@ describe('SandboxHttpRequestHandler', () => {
     ).resolves.toMatchObject({ error: { code: 'invalid_max_response_bytes' } });
   });
 
+  /* Preconditions: helper receives a localhost target in normal runtime policy without a loopback allowlist
+     Action: execute helper against localhost URL
+     Assertions: helper rejects the request as forbidden_destination before calling fetch
+     Requirements: sandbox-http-request.2.3.1, sandbox-http-request.4.2.2 */
+  it('rejects localhost destinations before any request is sent', async () => {
+    const fetchMock = jest.fn() as unknown as typeof fetch;
+    const handler = makeHandler(fetchMock);
+
+    const result = await handler.execute({
+      url: 'http://localhost:3000/data',
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      error: {
+        code: 'forbidden_destination',
+      },
+    });
+  });
+
+  /* Preconditions: helper receives a private-network target resolved from a hostname
+     Action: execute helper against a hostname whose lookup resolves to RFC1918/private space
+     Assertions: helper rejects the request as forbidden_destination before calling fetch
+     Requirements: sandbox-http-request.2.3.1, sandbox-http-request.4.2.2 */
+  it('rejects hostnames that resolve to private network addresses', async () => {
+    const fetchMock = jest.fn() as unknown as typeof fetch;
+    const lookupMock = makeLookup([{ address: '10.0.0.5', family: 4 }]);
+    const handler = new SandboxHttpRequestHandler(fetchMock, lookupMock);
+
+    const result = await handler.execute({
+      url: 'https://internal.example.com/data',
+    });
+
+    expect(lookupMock).toHaveBeenCalledWith('internal.example.com');
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      error: {
+        code: 'forbidden_destination',
+      },
+    });
+  });
+
+  /* Preconditions: helper receives a direct RFC1918/private target as a literal IP address
+     Action: execute helper against the private IP URL
+     Assertions: helper rejects the request as forbidden_destination before calling fetch
+     Requirements: sandbox-http-request.2.3.1, sandbox-http-request.4.2.2 */
+  it('rejects direct private IP destinations before any request is sent', async () => {
+    const fetchMock = jest.fn() as unknown as typeof fetch;
+    const handler = makeHandler(fetchMock);
+
+    const result = await handler.execute({
+      url: 'http://10.0.0.5/data',
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      error: {
+        code: 'forbidden_destination',
+      },
+    });
+  });
+
+  /* Preconditions: helper receives multiple reserved or internal literal IP targets
+     Action: execute helper against loopback, CGNAT, documentation, multicast, broadcast, and IPv6-reserved destinations
+     Assertions: helper rejects each target as forbidden_destination before any network call
+     Requirements: sandbox-http-request.2.3.1, sandbox-http-request.4.2.2 */
+  it.each([
+    'http://127.0.0.1/data',
+    'http://100.64.0.1/data',
+    'http://192.0.2.1/data',
+    'http://198.18.0.1/data',
+    'http://198.51.100.1/data',
+    'http://203.0.113.1/data',
+    'http://224.0.0.1/data',
+    'http://255.255.255.255/data',
+    'http://[::1]/data',
+    'http://[2001:db8::1]/data',
+  ])('rejects reserved destination %s before any request is sent', async (url) => {
+    const fetchMock = jest.fn() as unknown as typeof fetch;
+    const handler = makeHandler(fetchMock);
+
+    const result = await handler.execute({ url });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      error: {
+        code: 'forbidden_destination',
+      },
+    });
+  });
+
+  /* Preconditions: helper is configured with a loopback allowlist for functional-test mode
+     Action: execute helper against an allowed loopback host
+     Assertions: helper allows the request to proceed and returns the fetch result
+     Requirements: sandbox-http-request.2.3.2, sandbox-http-request.3.4 */
+  it('allows explicitly whitelisted loopback destinations', async () => {
+    const fetchMock = jest.fn(async () =>
+      makeResponse('ok', {
+        status: 200,
+        headers: { 'content-type': 'text/plain; charset=utf-8' },
+        url: 'http://127.0.0.1:3000/data',
+      })
+    ) as unknown as typeof fetch;
+    const handler = new SandboxHttpRequestHandler(
+      fetchMock,
+      makePublicLookup(),
+      new Set(['127.0.0.1'])
+    );
+
+    const result = await handler.execute({
+      url: 'http://127.0.0.1:3000/data',
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      status: 200,
+      final_url: 'http://127.0.0.1:3000/data',
+    });
+  });
+
   /* Preconditions: handler receives redirect response and follow_redirects is false
      Action: execute helper against redirecting endpoint
      Assertions: helper returns first redirect response without following Location
@@ -145,7 +316,7 @@ describe('SandboxHttpRequestHandler', () => {
         headers: { location: 'https://example.com/next' },
       })
     ) as unknown as typeof fetch;
-    const handler = new SandboxHttpRequestHandler(fetchMock);
+    const handler = makeHandler(fetchMock);
 
     const result = await handler.execute({
       url: 'https://example.com/start',
@@ -180,7 +351,7 @@ describe('SandboxHttpRequestHandler', () => {
           headers: { 'content-type': 'text/plain; charset=utf-8' },
         })
       );
-    const handler = new SandboxHttpRequestHandler(fetchMock as unknown as typeof fetch);
+    const handler = makeHandler(fetchMock as unknown as typeof fetch);
 
     const result = await handler.execute({
       url: 'https://example.com/start',
@@ -217,7 +388,7 @@ describe('SandboxHttpRequestHandler', () => {
           url: 'https://example.com/next',
         })
       );
-    const handler = new SandboxHttpRequestHandler(fetchMock as unknown as typeof fetch);
+    const handler = makeHandler(fetchMock as unknown as typeof fetch);
 
     const result = await handler.execute({
       url: 'https://example.com/start',
@@ -256,7 +427,7 @@ describe('SandboxHttpRequestHandler', () => {
           url: 'https://example.com/next',
         })
       );
-    const handler = new SandboxHttpRequestHandler(fetchMock as unknown as typeof fetch);
+    const handler = makeHandler(fetchMock as unknown as typeof fetch);
 
     const result = await handler.execute({
       url: 'https://example.com/start',
@@ -280,6 +451,87 @@ describe('SandboxHttpRequestHandler', () => {
     });
   });
 
+  /* Preconditions: helper receives a redirect response without a Location header and a response with no body stream
+     Action: execute helper with follow_redirects enabled
+     Assertions: helper returns the redirect response as-is and treats missing body as empty text without crashing
+     Requirements: sandbox-http-request.3.3, sandbox-http-request.3.4, sandbox-http-request.3.5 */
+  it('returns redirect response as-is when location header is missing and supports null response bodies', async () => {
+    const fetchMock = jest.fn(async () => ({
+      status: 302,
+      headers: {
+        get: () => null,
+        entries: () => [][Symbol.iterator](),
+      },
+      url: '',
+      body: null,
+    })) as unknown as typeof fetch;
+    const handler = makeHandler(fetchMock);
+
+    const result = await handler.execute({
+      url: 'https://example.com/start',
+      follow_redirects: true,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      status: 302,
+      final_url: 'https://example.com/start',
+      body: '',
+      body_encoding: 'base64',
+      truncated: false,
+    });
+  });
+
+  /* Preconditions: helper resolves a public hostname via DNS lookup
+     Action: the lookup implementation throws before any network request
+     Assertions: helper surfaces the lookup failure as fetch_failed and does not call fetch
+     Requirements: sandbox-http-request.2.3.1, sandbox-http-request.4.2.2 */
+  it('returns fetch_failed when hostname lookup fails', async () => {
+    const fetchMock = jest.fn() as unknown as typeof fetch;
+    const lookupMock = jest.fn(async () => {
+      throw new Error('dns lookup failed');
+    });
+    const handler = new SandboxHttpRequestHandler(fetchMock, lookupMock);
+
+    const result = await handler.execute({
+      url: 'https://example.com/data',
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      error: {
+        code: 'fetch_failed',
+        message: 'dns lookup failed',
+      },
+    });
+  });
+
+  /* Preconditions: the runtime does not expose global fetch and the handler uses the default fetch implementation
+     Action: execute helper against a public URL without providing a custom fetch implementation
+     Assertions: helper fails with internal_error rather than crashing the process
+     Requirements: sandbox-http-request.2, sandbox-http-request.4.2 */
+  it('returns internal_error when default fetch is unavailable in the runtime', async () => {
+    const originalFetch = globalThis.fetch;
+    // @ts-expect-error test intentionally removes runtime fetch
+    delete globalThis.fetch;
+    const handler = new SandboxHttpRequestHandler(undefined, makePublicLookup());
+
+    try {
+      const result = await handler.execute({
+        url: 'https://example.com/data',
+      });
+
+      expect(result).toMatchObject({
+        error: {
+          code: 'fetch_failed',
+          message: 'fetch is not available in this runtime.',
+        },
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   /* Preconditions: redirecting POST request receives 301 before final response
      Action: execute helper with POST body and follow_redirects enabled
      Assertions: helper rewrites redirected request to GET without a body for 301 responses
@@ -300,7 +552,7 @@ describe('SandboxHttpRequestHandler', () => {
           url: 'https://example.com/next',
         })
       );
-    const handler = new SandboxHttpRequestHandler(fetchMock as unknown as typeof fetch);
+    const handler = makeHandler(fetchMock as unknown as typeof fetch);
 
     await handler.execute({
       url: 'https://example.com/start',
@@ -340,7 +592,7 @@ describe('SandboxHttpRequestHandler', () => {
           url: 'https://example.com/next',
         })
       );
-    const handler = new SandboxHttpRequestHandler(fetchMock as unknown as typeof fetch);
+    const handler = makeHandler(fetchMock as unknown as typeof fetch);
 
     await handler.execute({
       url: 'https://example.com/start',
@@ -385,7 +637,7 @@ describe('SandboxHttpRequestHandler', () => {
           url: 'https://example.com/next',
         })
       );
-    const handler = new SandboxHttpRequestHandler(fetchMock as unknown as typeof fetch);
+    const handler = makeHandler(fetchMock as unknown as typeof fetch);
 
     await handler.execute({
       url: 'https://example.com/start',
@@ -432,7 +684,7 @@ describe('SandboxHttpRequestHandler', () => {
           url: 'https://example.com/next',
         })
       );
-    const handler = new SandboxHttpRequestHandler(fetchMock as unknown as typeof fetch);
+    const handler = makeHandler(fetchMock as unknown as typeof fetch);
 
     await handler.execute({
       url: 'https://example.com/start',
@@ -479,7 +731,7 @@ describe('SandboxHttpRequestHandler', () => {
           url: 'https://other.example.com/next',
         })
       );
-    const handler = new SandboxHttpRequestHandler(fetchMock as unknown as typeof fetch);
+    const handler = makeHandler(fetchMock as unknown as typeof fetch);
 
     const result = await handler.execute({
       url: 'https://example.com/start',
@@ -505,6 +757,32 @@ describe('SandboxHttpRequestHandler', () => {
     });
   });
 
+  /* Preconditions: redirect response points to a forbidden localhost destination
+     Action: execute helper with follow_redirects enabled
+     Assertions: helper rejects the redirect hop before issuing the next request
+     Requirements: sandbox-http-request.3.3.8, sandbox-http-request.4.2.2 */
+  it('rejects redirects into forbidden localhost targets', async () => {
+    const fetchMock = jest.fn().mockResolvedValueOnce(
+      makeResponse('', {
+        status: 302,
+        headers: { location: 'http://localhost:4567/private' },
+      })
+    );
+    const handler = makeHandler(fetchMock as unknown as typeof fetch);
+
+    const result = await handler.execute({
+      url: 'https://example.com/start',
+      follow_redirects: true,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      error: {
+        code: 'forbidden_destination',
+      },
+    });
+  });
+
   /* Preconditions: redirect chain stays on the same origin with caller-supplied headers
      Action: execute helper with follow_redirects enabled on same-origin redirect
      Assertions: next hop preserves request headers
@@ -525,7 +803,7 @@ describe('SandboxHttpRequestHandler', () => {
           url: 'https://example.com/next',
         })
       );
-    const handler = new SandboxHttpRequestHandler(fetchMock as unknown as typeof fetch);
+    const handler = makeHandler(fetchMock as unknown as typeof fetch);
 
     await handler.execute({
       url: 'https://example.com/start',
@@ -559,7 +837,7 @@ describe('SandboxHttpRequestHandler', () => {
         headers: { location: 'https://example.com/loop' },
       })
     ) as unknown as typeof fetch;
-    const handler = new SandboxHttpRequestHandler(fetchMock);
+    const handler = makeHandler(fetchMock);
 
     const result = await handler.execute({
       url: 'https://example.com/start',
@@ -587,7 +865,7 @@ describe('SandboxHttpRequestHandler', () => {
         headers: { 'content-type': 'application/octet-stream' },
       })
     ) as unknown as typeof fetch;
-    const handler = new SandboxHttpRequestHandler(fetchMock);
+    const handler = makeHandler(fetchMock);
 
     const result = await handler.execute({
       url: 'https://example.com/file.bin',
@@ -612,7 +890,7 @@ describe('SandboxHttpRequestHandler', () => {
         headers: { 'content-type': 'text/plain; charset=utf-8' },
       })
     ) as unknown as typeof fetch;
-    const handler = new SandboxHttpRequestHandler(fetchMock);
+    const handler = makeHandler(fetchMock);
 
     const result = await handler.execute({
       url: 'https://example.com',
@@ -640,7 +918,7 @@ describe('SandboxHttpRequestHandler', () => {
         headers: { 'content-type': 'text/plain; charset=utf-8' },
       })
     ) as unknown as typeof fetch;
-    const handler = new SandboxHttpRequestHandler(fetchMock);
+    const handler = makeHandler(fetchMock);
 
     const result = await handler.execute({
       url: 'https://example.com',
@@ -679,7 +957,7 @@ describe('SandboxHttpRequestHandler', () => {
     const fetchMock = jest.fn(async () => {
       throw new Error('network down');
     }) as unknown as typeof fetch;
-    const handler = new SandboxHttpRequestHandler(fetchMock);
+    const handler = makeHandler(fetchMock);
 
     const result = await handler.execute({
       url: 'https://example.com',

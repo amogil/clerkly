@@ -1,5 +1,8 @@
 // Requirements: sandbox-http-request.2, sandbox-http-request.3, sandbox-http-request.4
 
+import { lookup as dnsLookup } from 'node:dns/promises';
+import { isIP } from 'node:net';
+
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS';
 
 const ALLOWED_HTTP_METHODS = new Set<HttpMethod>([
@@ -28,7 +31,10 @@ export type SandboxHttpRequestValidationErrorCode =
   | 'invalid_follow_redirects'
   | 'invalid_max_response_bytes';
 
-export type SandboxHttpRequestRuntimeErrorCode = 'fetch_failed' | 'internal_error';
+export type SandboxHttpRequestRuntimeErrorCode =
+  | 'fetch_failed'
+  | 'forbidden_destination'
+  | 'internal_error';
 
 export interface SandboxHttpRequestError {
   error: {
@@ -61,6 +67,8 @@ interface ValidatedHttpRequestInput {
 }
 
 type FetchLike = typeof fetch;
+type HostLookupResult = { address: string; family: number };
+type HostLookup = (hostname: string) => Promise<HostLookupResult[]>;
 const CROSS_ORIGIN_STRIPPED_HEADERS = new Set([
   'authorization',
   'proxy-authorization',
@@ -73,6 +81,13 @@ const REWRITTEN_GET_STRIPPED_HEADERS = new Set([
   'content-encoding',
   'transfer-encoding',
 ]);
+const FORBIDDEN_DESTINATION_MESSAGE =
+  'http_request cannot access localhost, loopback, private, link-local, or reserved internal network targets.';
+
+// Requirements: sandbox-http-request.2.3.1, sandbox-http-request.3.3.8
+function defaultLookup(hostname: string): Promise<HostLookupResult[]> {
+  return dnsLookup(hostname, { all: true, verbatim: true });
+}
 
 function defaultFetch(...args: Parameters<FetchLike>): ReturnType<FetchLike> {
   if (typeof globalThis.fetch !== 'function') {
@@ -84,7 +99,11 @@ function defaultFetch(...args: Parameters<FetchLike>): ReturnType<FetchLike> {
 
 // Requirements: sandbox-http-request.2, sandbox-http-request.3, sandbox-http-request.4
 export class SandboxHttpRequestHandler {
-  constructor(private readonly fetchImpl: FetchLike = defaultFetch as FetchLike) {}
+  constructor(
+    private readonly fetchImpl: FetchLike = defaultFetch as FetchLike,
+    private readonly lookupImpl: HostLookup = defaultLookup,
+    private readonly allowedLoopbackHosts = new Set<string>()
+  ) {}
 
   // Requirements: sandbox-http-request.2, sandbox-http-request.3, sandbox-http-request.4
   async execute(args: unknown): Promise<SandboxHttpRequestResult> {
@@ -246,6 +265,11 @@ export class SandboxHttpRequestHandler {
       let redirectHops = 0;
 
       for (;;) {
+        const destinationPolicy = await this.validateDestination(currentUrl);
+        if (destinationPolicy) {
+          return destinationPolicy;
+        }
+
         const response = await this.fetchImpl(currentUrl, {
           method: currentMethod,
           headers: currentHeaders,
@@ -461,6 +485,129 @@ export class SandboxHttpRequestHandler {
       normalized.startsWith('application/xml') ||
       normalized.includes('+json') ||
       normalized.includes('+xml')
+    );
+  }
+
+  // Requirements: sandbox-http-request.2.3.1, sandbox-http-request.3.3.8, sandbox-http-request.4.2.2
+  private async validateDestination(url: string): Promise<SandboxHttpRequestError | null> {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname.toLowerCase();
+    const normalizedHostname =
+      hostname.startsWith('[') && hostname.endsWith(']') ? hostname.slice(1, -1) : hostname;
+
+    if (this.isAllowedLoopbackHost(normalizedHostname)) {
+      return null;
+    }
+
+    if (normalizedHostname === 'localhost' || normalizedHostname.endsWith('.localhost')) {
+      return this.runtimeError('forbidden_destination', FORBIDDEN_DESTINATION_MESSAGE);
+    }
+
+    const ipFamily = isIP(normalizedHostname);
+    if (ipFamily > 0) {
+      return this.isForbiddenIpAddress(normalizedHostname)
+        ? this.runtimeError('forbidden_destination', FORBIDDEN_DESTINATION_MESSAGE)
+        : null;
+    }
+
+    let resolved: HostLookupResult[];
+    try {
+      resolved = await this.lookupImpl(normalizedHostname);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return this.runtimeError('fetch_failed', message);
+    }
+
+    if (resolved.some((entry) => this.isForbiddenIpAddress(entry.address))) {
+      return this.runtimeError('forbidden_destination', FORBIDDEN_DESTINATION_MESSAGE);
+    }
+
+    return null;
+  }
+
+  // Requirements: sandbox-http-request.4.2.1-4.2.2
+  private runtimeError(
+    code: SandboxHttpRequestRuntimeErrorCode,
+    message: string
+  ): SandboxHttpRequestError {
+    return { error: { code, message } };
+  }
+
+  // Requirements: sandbox-http-request.2.3.2
+  private isAllowedLoopbackHost(hostname: string): boolean {
+    return this.allowedLoopbackHosts.has(hostname);
+  }
+
+  // Requirements: sandbox-http-request.2.3.1, sandbox-http-request.3.3.8
+  private isForbiddenIpAddress(address: string): boolean {
+    return this.isForbiddenIpv4(address) || this.isForbiddenIpv6(address);
+  }
+
+  // Requirements: sandbox-http-request.2.3.1, sandbox-http-request.3.3.8
+  private isForbiddenIpv4(address: string): boolean {
+    const parts = address.split('.').map((part) => Number.parseInt(part, 10));
+    if (parts.length !== 4 || parts.some((part) => Number.isNaN(part) || part < 0 || part > 255)) {
+      return false;
+    }
+
+    const a = parts[0] ?? -1;
+    const b = parts[1] ?? -1;
+    const c = parts[2] ?? -1;
+    const d = parts[3] ?? -1;
+
+    if (a === 0 || a === 10 || a === 127) {
+      return true;
+    }
+    if (a === 169 && b === 254) {
+      return true;
+    }
+    if (a === 172 && b >= 16 && b <= 31) {
+      return true;
+    }
+    if (a === 192 && b === 168) {
+      return true;
+    }
+    if (a === 100 && b >= 64 && b <= 127) {
+      return true;
+    }
+    if (a === 192 && b === 0 && (c === 0 || c === 2)) {
+      return true;
+    }
+    if (a === 198 && (b === 18 || b === 19)) {
+      return true;
+    }
+    if (a === 198 && b === 51 && c === 100) {
+      return true;
+    }
+    if (a === 203 && b === 0 && c === 113) {
+      return true;
+    }
+    if (a >= 224 || (a === 255 && b === 255 && c === 255 && d === 255)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  // Requirements: sandbox-http-request.2.3.1, sandbox-http-request.3.3.8
+  private isForbiddenIpv6(address: string): boolean {
+    const normalized = address.toLowerCase();
+    return (
+      normalized === '::' ||
+      normalized === '::1' ||
+      normalized.startsWith('::ffff:127.') ||
+      normalized.startsWith('fc') ||
+      normalized.startsWith('fd') ||
+      normalized.startsWith('fe8') ||
+      normalized.startsWith('fe9') ||
+      normalized.startsWith('fea') ||
+      normalized.startsWith('feb') ||
+      normalized.startsWith('fec') ||
+      normalized.startsWith('fed') ||
+      normalized.startsWith('fee') ||
+      normalized.startsWith('fef') ||
+      normalized.startsWith('ff') ||
+      normalized.startsWith('2001:db8:')
     );
   }
 }

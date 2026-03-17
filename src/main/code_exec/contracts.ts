@@ -15,6 +15,7 @@ export const CODE_EXEC_LIMITS = {
 
 export type CodeExecErrorCode =
   | 'policy_denied'
+  | 'forbidden_destination'
   | 'sandbox_runtime_error'
   | 'invalid_tool_arguments'
   | 'limit_exceeded'

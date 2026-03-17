@@ -1122,6 +1122,70 @@ console.log(JSON.stringify(result));`,
     await expectNoToastError(window);
   });
 
+  /* Preconditions: mock model emits code_exec that calls tools.http_request against localhost while a loopback server is listening
+     Action: user sends a message that triggers sandbox http_request helper
+     Assertions: helper rejects localhost as forbidden_destination and no request reaches the local server
+     Requirements: sandbox-http-request.2.3.1, sandbox-http-request.4.2.2 */
+  test('should reject localhost http_request target before any request is sent', async () => {
+    const port = await getFreePort();
+    let requestCount = 0;
+    const localServer = http.createServer((_req, res) => {
+      requestCount += 1;
+      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('should not be reached');
+    });
+    await new Promise<void>((resolve) => localServer.listen(port, '127.0.0.1', () => resolve()));
+
+    try {
+      mockLLMServer.setStreamingMode(true);
+      mockLLMServer.setOpenAIStreamScripts([
+        {
+          toolCalls: [
+            {
+              callId: 'http-localhost-block-1',
+              toolName: 'code_exec',
+              arguments: {
+                task_summary: 'Reject localhost target',
+                code: `const result = await tools.http_request({
+  url: "http://localhost:${port}/blocked",
+  timeout_ms: 10000
+});
+console.log(JSON.stringify(result));`,
+                timeout_ms: 10000,
+              },
+            },
+          ],
+        },
+        {
+          content: '{"action":{"type":"text","content":"localhost helper blocked"}}',
+        },
+      ]);
+
+      await launchWithMockLLM();
+      await sendUserMessage('Try localhost via http helper');
+      await expect(window.locator('.message-llm-action-response').last()).toContainText(
+        'localhost helper blocked',
+        {
+          timeout: 15000,
+        }
+      );
+
+      const agentId = (await getAgentIdsFromApi(window))[0];
+      const output = await getCodeExecOutputByCallId(agentId, 'http-localhost-block-1');
+      const denied = await findCodeExecCallByCallId(agentId, 'http-localhost-block-1');
+      const helperResult = JSON.parse(output?.stdout ?? '{}') as {
+        error?: { code?: string; message?: string };
+      };
+      expect(denied?.payload?.data?.output?.status).toBe('success');
+      expect(helperResult.error?.code).toBe('forbidden_destination');
+      expect(String(helperResult.error?.message)).toContain('localhost');
+      expect(requestCount).toBe(0);
+      await expectNoToastError(window);
+    } finally {
+      await new Promise<void>((resolve) => localServer.close(() => resolve()));
+    }
+  });
+
   /* Preconditions: mock model repeatedly emits invalid code_exec args
      Action: user sends a message that triggers code_exec calls
      Assertions: invalid call is not persisted as terminal code_exec result; turn ends with persisted kind:error for the same turn

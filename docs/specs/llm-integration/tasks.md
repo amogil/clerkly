@@ -115,8 +115,9 @@
 #### Фаза 5: Sandbox HTTP Request Follow-up
 
 - [ ] Закрыть оставшийся follow-up по `sandbox-http-request`.
+  - [x] Синхронизировать traceability и prompt/spec contract по `http_request` после фактических runtime-изменений ветки.
+  - [x] Зафиксировать SSRF boundary для `http_request` на уровне requirements/design/runtime/tests, включая direct target rejection и redirect hop rejection.
   - [ ] После завершения релевантных runtime/UI изменений запросить подтверждение пользователя на полный `npm run test:functional`.
-  - [ ] При необходимости обновить traceability в `docs/specs/sandbox-http-request/requirements.md` и `docs/specs/sandbox-http-request/design.md`, не создавая отдельный `tasks.md`.
 
 #### Фаза 6: Тесты
 
@@ -125,7 +126,7 @@
 - [x] Обновить renderer unit tests.
   - [x] Добавить кейсы в `tests/unit/components/agents/AgentMessage.test.tsx`.
   - [x] Проверить, что renderer не показывает служебный comment даже для уже persisted payload.
-- [ ] При изменении loop contract обновить provider tests в `tests/unit/llm/*`.
+- [x] При изменении loop contract обновить provider tests в `tests/unit/llm/*`.
 - [ ] Добавить functional regression в `tests/functional/llm-chat.spec.ts`.
   - [ ] Сценарий, где metadata comment приходит внутри другого tool payload.
   - [ ] Проверить, что UI его не показывает или turn корректно валидируется по целевому контракту.
