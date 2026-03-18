@@ -470,7 +470,9 @@
 
 11.1.1. КОГДА один ответ модели содержит более одного `tool_call`, ТО такой ответ ДОЛЖЕН считаться невалидным и ДОЛЖЕН обрабатываться через bounded retry/repair без создания persisted `kind: tool_call`.
 
-11.1.2. КОГДА `tool_call` валиден, ТО система ДОЛЖНА отложить создание persisted `kind: tool_call` до завершения текущей reasoning-фазы ответа модели, затем завершить текущий непустой LLM-сегмент и только после этого создать persisted `kind: tool_call` в статусе выполнения (`done = false`, `status = "running"`).
+11.1.2. КОГДА `tool_call` валиден, ТО система ДОЛЖНА на boundary этого `tool_call` немедленно завершить текущий pre-tool LLM-сегмент (если он непустой) и сразу создать persisted `kind: tool_call` в статусе выполнения (`done = false`, `status = "running"`), без ожидания дополнительных чанков в текущем model-step.
+
+11.1.2.1. КОГДА после boundary `tool_call` в том же model-step приходят дополнительные `reasoning`/`text` чанки, ТО они ДОЛЖНЫ относиться к post-tool LLM-сегменту и НЕ ДОЛЖНЫ задерживать появление persisted `tool_call(status="running")` в UI.
 
 11.1.3. КОГДА `tool_call` валиден и создан в `running`, ТО post-tool LLM-сегмент ДОЛЖЕН начинать стримиться без ожидания terminal-результата `tool_call`.
 

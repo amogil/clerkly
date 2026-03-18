@@ -1902,11 +1902,11 @@ describe('MainPipeline.run()', () => {
     expect(finalizedPreToolOrder).toBeLessThan(runningToolCreateOrder);
   });
 
-  /* Preconditions: provider emits tool_call in the middle of reasoning stream
+  /* Preconditions: provider emits tool_call and then continues reasoning in the same model step
      Action: run pipeline for one attempt
-     Assertions: running tool_call is persisted only after reasoning stream tail is appended
+     Assertions: running tool_call is persisted immediately at tool_call boundary; subsequent reasoning is persisted after running tool_call
      Requirements: llm-integration.11.1.2 */
-  it('buffers tool_call until reasoning stream tail is processed', async () => {
+  it('persists running tool_call immediately and treats subsequent reasoning as post-tool segment', async () => {
     const { pipeline, llmProvider, messageManager } = makeMocks();
 
     llmProvider.chat.mockImplementation(
@@ -1967,9 +1967,9 @@ describe('MainPipeline.run()', () => {
     const runningToolCreateOrder =
       createMock.mock.invocationCallOrder[runningToolCreateIndex] ?? -1;
 
-    expect(tailReasoningOrder).toBeGreaterThan(0);
     expect(runningToolCreateOrder).toBeGreaterThan(0);
-    expect(tailReasoningOrder).toBeLessThan(runningToolCreateOrder);
+    expect(tailReasoningOrder).toBeGreaterThan(0);
+    expect(runningToolCreateOrder).toBeLessThan(tailReasoningOrder);
   });
 
   /* Preconditions: provider emits tool_call, then delays tool_result, and does not emit post-tool text

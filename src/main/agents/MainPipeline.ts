@@ -101,7 +101,6 @@ type AttemptRuntimeState = {
   pendingFirstType: 'reasoning' | 'text' | null;
   lastFlushAt: number;
   flushTimer: ReturnType<typeof setTimeout> | null;
-  pendingToolCallFlushTimer: ReturnType<typeof setTimeout> | null;
   finalLlmMessageId: number | null;
   toolCallsInCurrentStep: number;
   sawAnyToolCall: boolean;
@@ -422,7 +421,6 @@ export class MainPipeline {
       pendingFirstType: null,
       lastFlushAt: 0,
       flushTimer: null,
-      pendingToolCallFlushTimer: null,
       finalLlmMessageId: null,
       toolCallsInCurrentStep: 0,
       sawAnyToolCall: false,
@@ -512,16 +510,6 @@ export class MainPipeline {
       }
       state.pendingReasoningDelta += chunk.delta;
       this.scheduleLlmFlush(context, agentId, runId, attemptId, setLastLlmMessageId, state);
-      if (state.pendingToolCall) {
-        this.schedulePendingToolCallFlush(
-          context,
-          agentId,
-          runId,
-          attemptId,
-          setLastLlmMessageId,
-          state
-        );
-      }
       return;
     }
 
@@ -573,14 +561,7 @@ export class MainPipeline {
         toolName: chunk.toolName,
         args: chunk.arguments,
       };
-      this.schedulePendingToolCallFlush(
-        context,
-        agentId,
-        runId,
-        attemptId,
-        setLastLlmMessageId,
-        state
-      );
+      this.flushPendingToolCall(context, agentId, runId, attemptId, setLastLlmMessageId, state);
       return;
     }
 
@@ -628,14 +609,6 @@ export class MainPipeline {
     if (state.flushTimer) {
       clearTimeout(state.flushTimer);
       state.flushTimer = null;
-    }
-  }
-
-  // Requirements: llm-integration.1.6.4, llm-integration.2.3.1
-  private clearPendingToolCallFlushTimer(state: AttemptRuntimeState): void {
-    if (state.pendingToolCallFlushTimer) {
-      clearTimeout(state.pendingToolCallFlushTimer);
-      state.pendingToolCallFlushTimer = null;
     }
   }
 
@@ -768,7 +741,6 @@ export class MainPipeline {
     setLastLlmMessageId: (messageId: number) => void,
     state: AttemptRuntimeState
   ): void {
-    this.clearPendingToolCallFlushTimer(state);
     this.scheduleLlmFlush(context, agentId, runId, attemptId, setLastLlmMessageId, state, true);
     if (!state.pendingToolCall) {
       return;
@@ -814,25 +786,6 @@ export class MainPipeline {
       startedAt,
     });
     state.pendingToolCall = null;
-  }
-
-  // Requirements: llm-integration.1.6.4, llm-integration.2.3.1
-  private schedulePendingToolCallFlush(
-    context: StreamingCallContext,
-    agentId: string,
-    runId: string,
-    attemptId: number,
-    setLastLlmMessageId: (messageId: number) => void,
-    state: AttemptRuntimeState
-  ): void {
-    if (!state.pendingToolCall) {
-      return;
-    }
-    this.clearPendingToolCallFlushTimer(state);
-    state.pendingToolCallFlushTimer = setTimeout(() => {
-      state.pendingToolCallFlushTimer = null;
-      this.flushPendingToolCall(context, agentId, runId, attemptId, setLastLlmMessageId, state);
-    }, STREAM_FLUSH_INTERVAL_MS);
   }
 
   // Requirements: llm-integration.1.5, llm-integration.1.6, llm-integration.2
@@ -1278,7 +1231,6 @@ export class MainPipeline {
     state: AttemptRuntimeState,
     setLastLlmMessageId: (messageId: number) => void
   ): boolean {
-    this.clearPendingToolCallFlushTimer(state);
     const isInvalidFinalAnswer =
       error instanceof InvalidFinalAnswerContractError ||
       error instanceof InvalidToolArgumentsError;
