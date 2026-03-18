@@ -150,6 +150,11 @@ describe('AgentMessage — tool_call', () => {
     expect(screen.getByTestId('message-code-exec-toggle')).toHaveTextContent('Print ok to stdout');
     expect(screen.getByTestId('message-code-exec-toggle')).toHaveClass('relative');
     expect(screen.getByTestId('message-code-exec-toggle')).toHaveClass('z-10');
+    expect(screen.getByTestId('message-code-exec-toggle')).toHaveClass('items-start');
+    expect(screen.getByTestId('message-code-exec-toggle')).toHaveClass('text-left');
+    expect(screen.getByTestId('message-code-exec-status-icon')).toHaveClass('mt-0.5');
+    expect(screen.getByTestId('message-code-exec-status-icon')).toHaveClass('h-4');
+    expect(screen.getByTestId('message-code-exec-status-icon')).toHaveClass('w-4');
     expect(screen.getByTestId('message-code-exec-status-icon')).toHaveAttribute(
       'data-status',
       'success'

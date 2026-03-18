@@ -347,19 +347,21 @@ export function AgentMessage({
           >
             <CollapsibleTrigger
               data-testid="message-code-exec-toggle"
-              className="relative z-10 flex w-full items-center justify-between gap-4 p-3"
+              className="relative z-10 flex w-full items-start justify-between gap-4 p-3 text-left"
             >
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 items-start gap-2 text-left">
                 <span
                   data-testid="message-code-exec-status-icon"
                   data-status={status}
-                  className="flex items-center"
+                  className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center"
                 >
                   {getCodeExecStatusIcon(status)}
                 </span>
-                <span className="font-medium text-sm">{taskSummary}</span>
+                <span className="min-w-0 text-left font-medium text-sm leading-relaxed break-words">
+                  {taskSummary}
+                </span>
               </div>
-              <ChevronDownIcon className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+              <ChevronDownIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
             </CollapsibleTrigger>
             <ToolContent
               data-testid="message-code-exec-content"

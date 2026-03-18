@@ -1553,6 +1553,8 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 - Блок отображает persisted-статус выполнения (`running | success | error | timeout | cancelled`) через `code_exec`-specific header composition: leading status icon перед текстом заголовка.
 - Стандартная иконка `wrench` в заголовке `code_exec` не используется.
 - Для persisted-статуса `running` UI показывает крутилку того же фиолетового акцентного цвета, что и кнопки действия в области ввода; для `success` — зелёную галочку; для `error` — красный крестик; для `timeout` — иконку таймаута; для `cancelled` — иконку отмены.
+- Текст `task_summary` в заголовке `code_exec` выравнивается по левому краю (`text-left`) и переносится в несколько строк при необходимости.
+- Leading status icon в заголовке `code_exec` привязана к первой строке `task_summary` (top-aligned + небольшой `top` inset), а не центрируется по высоте всего многострочного заголовка.
 - Смена статуса `running -> terminal` выполняется в том же UI-блоке (без создания отдельной terminal-карточки).
 - Для security/policy отказов используется `status=error` с соответствующим `error.code` (например, `policy_denied`).
 - При наличии отображаются `stdout`, `stderr` и structured `output.error` из persisted payload.
