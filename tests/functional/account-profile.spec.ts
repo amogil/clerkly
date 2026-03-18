@@ -638,8 +638,8 @@ test.describe('Account Profile', () => {
     console.log('[TEST] Is on login screen:', hasLoginScreen);
     expect(hasLoginScreen).toBe(false);
 
-    // Check if loading screen is shown (it should NOT be shown)
-    const loadingScreen = context.window.locator('text=/Loading/i');
+    // Check if app loading overlay is shown (it should NOT be shown)
+    const loadingScreen = context.window.locator('[data-testid="app-loading-screen"]');
     const hasLoadingScreen = await loadingScreen.isVisible().catch(() => false);
 
     console.log('[TEST] Is on loading screen:', hasLoadingScreen);

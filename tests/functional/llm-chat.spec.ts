@@ -1507,6 +1507,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
             callId: 'running-1',
             toolName: 'code_exec',
             arguments: {
+              task_summary: 'Check running and post-tool ordering',
               code: "const started=Date.now();while(Date.now()-started<1200){};console.log('done');",
               timeout_ms: 10000,
             },
@@ -1529,15 +1530,17 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     const codeExecBlocks = context.window.locator('[data-testid="message-code-exec-block"]');
     await expect(codeExecBlocks).toHaveCount(0);
 
-    const codeExecStatus = context.window
-      .locator('[data-testid="message-code-exec-toggle"]')
+    const runningStatusIcon = context.window
+      .locator('[data-testid="message-code-exec-status-icon"][data-status="running"]')
       .last();
-    await expect(codeExecStatus).toContainText('running', { timeout: 8000 });
+    await expect(runningStatusIcon).toBeVisible({ timeout: 8000 });
 
     const actionContent = context.window.locator('.message-llm-action-response').last();
     await expect(actionContent).toContainText('post-tool text while running', { timeout: 8000 });
 
-    await expect(codeExecStatus).not.toContainText('running', { timeout: 15000 });
+    await expect(
+      context.window.locator('[data-testid="message-code-exec-status-icon"][data-status="running"]')
+    ).toHaveCount(0, { timeout: 15000 });
   });
 
   /* Preconditions: scripted response emits pre-tool reasoning, code_exec, then post-tool text
@@ -1554,6 +1557,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
             callId: 'order-1',
             toolName: 'code_exec',
             arguments: {
+              task_summary: 'Check visual order',
               code: "const started=Date.now();while(Date.now()-started<800){};console.log('ordered');",
               timeout_ms: 10000,
             },
@@ -1601,8 +1605,8 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     const codeExecBlocks = context.window.locator('[data-testid="message-code-exec-block"]');
     await expect(codeExecBlocks).toHaveCount(1);
     await expect(
-      context.window.locator('[data-testid="message-code-exec-toggle"]').last()
-    ).not.toContainText('running', { timeout: 15000 });
+      context.window.locator('[data-testid="message-code-exec-status-icon"][data-status="running"]')
+    ).toHaveCount(0, { timeout: 15000 });
     await expect(codeExecBlocks).toHaveCount(1);
   });
 
@@ -1619,6 +1623,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
             callId: 'no-post-text-1',
             toolName: 'code_exec',
             arguments: {
+              task_summary: 'Check running before terminal',
               code: "await new Promise((resolve) => setTimeout(resolve, 1500)); console.log('finished');",
               timeout_ms: 10000,
             },
@@ -1635,14 +1640,16 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await messageInput.fill('Check running before terminal without post-tool text');
     await messageInput.press('Enter');
 
-    const codeExecStatus = context.window
-      .locator('[data-testid="message-code-exec-toggle"]')
+    const runningStatusIcon = context.window
+      .locator('[data-testid="message-code-exec-status-icon"][data-status="running"]')
       .last();
-    await expect(codeExecStatus).toContainText('running', { timeout: 8000 });
+    await expect(runningStatusIcon).toBeVisible({ timeout: 8000 });
 
     const actionContent = context.window.locator('.message-llm-action-response').last();
     await expect(actionContent).toContainText('after terminal step', { timeout: 15000 });
-    await expect(codeExecStatus).not.toContainText('running', { timeout: 8000 });
+    await expect(
+      context.window.locator('[data-testid="message-code-exec-status-icon"][data-status="running"]')
+    ).toHaveCount(0, { timeout: 8000 });
     await expect(context.window.locator('[data-testid="message-code-exec-block"]')).toHaveCount(1);
   });
 
@@ -2049,7 +2056,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expect(finalAnswerBlock).toContainText('Checklist item');
 
     await expect(
-      context.window.locator('.message-llm-action-response', {
+      context.window.locator('[data-testid="message-llm-action"]', {
         hasText: '{"summary_points":["Checklist item"]}',
       })
     ).toHaveCount(0);
@@ -2093,7 +2100,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expect(finalAnswerBlock).toContainText('Another item');
 
     await expect(
-      context.window.locator('.message-llm-action-response', {
+      context.window.locator('[data-testid="message-llm-action"]', {
         hasText: 'Checklist item',
       })
     ).toHaveCount(0);

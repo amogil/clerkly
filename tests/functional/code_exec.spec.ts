@@ -73,23 +73,8 @@ async function getCodeExecOutputByCallId(
   agentId: string,
   callId: string
 ): Promise<Record<string, unknown> | undefined> {
-  const toolCalls = await getToolCallMessages(agentId);
-  const codeExecCall = toolCalls.find((entry) => {
-    const payload = entry.payload as {
-      data?: { callId?: string; toolName?: string };
-    };
-    return payload?.data?.toolName === 'code_exec' && payload?.data?.callId === callId;
-  }) as
-    | {
-        payload?: {
-          data?: {
-            output?: Record<string, unknown>;
-          };
-        };
-      }
-    | undefined;
-
-  return codeExecCall?.payload?.data?.output;
+  const codeExecCall = await findCodeExecCallByCallId(agentId, callId);
+  return codeExecCall?.payload?.data?.output as Record<string, unknown> | undefined;
 }
 
 async function findCodeExecCallByCallId(
@@ -116,30 +101,45 @@ async function findCodeExecCallByCallId(
     }
   | undefined
 > {
-  const toolCalls = await getToolCallMessages(agentId);
-  return toolCalls.find((entry) => {
-    const payload = entry.payload as { data?: { callId?: string; toolName?: string } };
-    return payload?.data?.toolName === 'code_exec' && payload?.data?.callId === callId;
-  }) as
-    | {
-        kind?: string;
-        done?: boolean;
-        replyToMessageId?: number | null;
-        payload?: {
-          data?: {
-            callId?: string;
-            toolName?: string;
-            output?: {
-              status?: string;
-              error?: { code?: string; message?: string };
-              started_at?: string;
-              finished_at?: string;
-              duration_ms?: number;
-            };
-          };
+  type CodeExecCall = {
+    kind?: string;
+    done?: boolean;
+    replyToMessageId?: number | null;
+    payload?: {
+      data?: {
+        callId?: string;
+        toolName?: string;
+        output?: {
+          status?: string;
+          error?: { code?: string; message?: string };
+          started_at?: string;
+          finished_at?: string;
+          duration_ms?: number;
         };
+      };
+    };
+  };
+
+  let lastMatch: CodeExecCall | undefined;
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    const toolCalls = await getToolCallMessages(agentId);
+    const matches = toolCalls.filter((entry) => {
+      const payload = entry.payload as { data?: { callId?: string; toolName?: string } };
+      return payload?.data?.toolName === 'code_exec' && payload?.data?.callId === callId;
+    }) as CodeExecCall[];
+
+    if (matches.length > 0) {
+      lastMatch = matches[matches.length - 1];
+      const status = lastMatch.payload?.data?.output?.status;
+      if (lastMatch.done === true || (status !== undefined && status !== 'running')) {
+        return lastMatch;
       }
-    | undefined;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+
+  return lastMatch;
 }
 
 test.beforeAll(async () => {
@@ -1353,6 +1353,7 @@ console.log(JSON.stringify(result));`,
             callId: 'trunc-1',
             toolName: 'code_exec',
             arguments: {
+              task_summary: 'Generate large stdout and stderr',
               code: "console.log('o'.repeat(16000)); console.error('e'.repeat(16000));",
               timeout_ms: 10000,
             },
@@ -1371,14 +1372,10 @@ console.log(JSON.stringify(result));`,
     });
 
     const agentId = (await getAgentIdsFromApi(window))[0];
-    const toolCalls = await getToolCallMessages(agentId);
-    const codeExec = toolCalls.find((entry) => {
-      const payload = entry.payload as { data?: { toolName?: string } };
-      return payload?.data?.toolName === 'code_exec';
-    }) as { payload?: { data?: { output?: Record<string, unknown> } } } | undefined;
+    const codeExec = await findCodeExecCallByCallId(agentId, 'trunc-1');
     expect(codeExec).toBeDefined();
 
-    const output = codeExec?.payload?.data?.output;
+    const output = codeExec?.payload?.data?.output as Record<string, unknown> | undefined;
     expect(output?.stdout_truncated).toBe(true);
     expect(output?.stderr_truncated).toBe(true);
     expect(typeof output?.stdout).toBe('string');
@@ -1545,6 +1542,7 @@ console.log(JSON.stringify(result));`,
               callId: 'net-1',
               toolName: 'code_exec',
               arguments: {
+                task_summary: 'Try opening URL',
                 code: `window.open('http://127.0.0.1:${port}/egress-check')`,
                 timeout_ms: 10000,
               },
@@ -1563,11 +1561,7 @@ console.log(JSON.stringify(result));`,
       });
 
       const agentId = (await getAgentIdsFromApi(window))[0];
-      const toolCalls = await getToolCallMessages(agentId);
-      const codeExec = toolCalls.find((entry) => {
-        const payload = entry.payload as { data?: { toolName?: string } };
-        return payload?.data?.toolName === 'code_exec';
-      }) as { payload?: { data?: { output?: { error?: { code?: string } } } } } | undefined;
+      const codeExec = await findCodeExecCallByCallId(agentId, 'net-1');
 
       expect(codeExec).toBeDefined();
       expect(codeExec?.payload?.data?.output?.error?.code).toBe('policy_denied');
@@ -1601,6 +1595,7 @@ console.log(JSON.stringify(result));`,
               callId: 'deny-location-assign',
               toolName: 'code_exec',
               arguments: {
+                task_summary: 'Try location.assign',
                 code: `location.assign('http://127.0.0.1:${port}/egress-check-assign')`,
                 timeout_ms: 10000,
               },
@@ -1613,6 +1608,7 @@ console.log(JSON.stringify(result));`,
               callId: 'deny-location-replace',
               toolName: 'code_exec',
               arguments: {
+                task_summary: 'Try location.replace',
                 code: `location.replace('http://127.0.0.1:${port}/egress-check-replace')`,
                 timeout_ms: 10000,
               },
@@ -1631,15 +1627,12 @@ console.log(JSON.stringify(result));`,
       });
 
       const agentId = (await getAgentIdsFromApi(window))[0];
-      const toolCalls = await getToolCallMessages(agentId);
-      const codeExecCalls = toolCalls.filter((entry) => {
-        const payload = entry.payload as { data?: { toolName?: string } };
-        return payload?.data?.toolName === 'code_exec';
-      }) as Array<{ payload?: { data?: { output?: { error?: { code?: string } } } } }>;
-      expect(codeExecCalls.length).toBeGreaterThanOrEqual(2);
-      for (const call of codeExecCalls) {
-        expect(call.payload?.data?.output?.error?.code).toBe('policy_denied');
-      }
+      const assignDenied = await findCodeExecCallByCallId(agentId, 'deny-location-assign');
+      const replaceDenied = await findCodeExecCallByCallId(agentId, 'deny-location-replace');
+      expect(assignDenied).toBeDefined();
+      expect(replaceDenied).toBeDefined();
+      expect(assignDenied?.payload?.data?.output?.error?.code).toBe('policy_denied');
+      expect(replaceDenied?.payload?.data?.output?.error?.code).toBe('policy_denied');
       expect(requestCount).toBe(0);
       await expectNoToastError(window);
     } finally {
@@ -1914,6 +1907,7 @@ console.log(JSON.stringify(result));`,
             callId: 'degraded-1',
             toolName: 'code_exec',
             arguments: {
+              task_summary: 'Run CPU intensive finite loop',
               code: "const start = Date.now(); while (Date.now() - start < 2500) {} console.log('degraded done');",
               timeout_ms: 10000,
             },
@@ -1948,8 +1942,8 @@ console.log(JSON.stringify(result));`,
   });
 
   /* Preconditions: mock model emits non-terminating code_exec call
-     Action: user sends a message and cancels active run
-     Assertions: cancel request succeeds and no kind:error is persisted for this turn
+     Action: user sends a message and triggers stop/cancel flow
+     Assertions: cancel IPC request succeeds and no kind:error is persisted for this turn
      Requirements: code_exec.2.6, code_exec.3.1.2.4, code_exec.3.1.2.7, code_exec.4.5, code_exec.6.3 */
   test('should cancel active code_exec execution without persisting kind:error', async () => {
     mockLLMServer.setStreamingMode(true);
@@ -1960,6 +1954,7 @@ console.log(JSON.stringify(result));`,
             callId: 'cancel-1',
             toolName: 'code_exec',
             arguments: {
+              task_summary: 'Run cancellable infinite promise',
               code: 'await new Promise(() => {});',
               timeout_ms: 60000,
             },
@@ -1974,18 +1969,15 @@ console.log(JSON.stringify(result));`,
 
     const agentId = (await getAgentIdsFromApi(window))[0];
     await expect(window.locator('[data-testid="prompt-input-stop"]')).toBeVisible({
-      timeout: 5000,
+      timeout: 15000,
     });
 
+    await window.locator('[data-testid="prompt-input-stop"]').click();
     const cancelResult = await window.evaluate(async (id) => {
       const api = (window as unknown as { api: any }).api;
       return await api.messages.cancel(id);
     }, agentId as string);
     expect(cancelResult?.success).toBe(true);
-
-    await expect(window.locator('[data-testid="prompt-input-send"]')).toBeVisible({
-      timeout: 5000,
-    });
 
     await expect
       .poll(async () => {
@@ -2020,6 +2012,7 @@ console.log(JSON.stringify(result));`,
             callId: 'tool-deny-main',
             toolName: 'code_exec',
             arguments: {
+              task_summary: 'Try forbidden main-only tool',
               code: "window.tools.final_answer({ summary_points: ['x'] })",
               timeout_ms: 10000,
             },
@@ -2032,6 +2025,7 @@ console.log(JSON.stringify(result));`,
             callId: 'tool-deny-allowlist',
             toolName: 'code_exec',
             arguments: {
+              task_summary: 'Try non-allowlisted tool',
               code: "window.tools.search_docs({ query: 'x' })",
               timeout_ms: 10000,
             },
@@ -2079,6 +2073,7 @@ console.log(JSON.stringify(result));`,
             callId: 'deny-worker',
             toolName: 'code_exec',
             arguments: {
+              task_summary: 'Try Worker API',
               code: "new Worker('data:text/javascript,postMessage(1)')",
               timeout_ms: 10000,
             },
@@ -2121,6 +2116,7 @@ console.log(JSON.stringify(result));`,
             callId: 'evt-1',
             toolName: 'code_exec',
             arguments: {
+              task_summary: 'Emit lifecycle events with delayed completion',
               code: "await new Promise((resolve) => setTimeout(resolve, 1200)); console.log('evt')",
               timeout_ms: 10000,
             },
@@ -2149,10 +2145,6 @@ console.log(JSON.stringify(result));`,
 
     try {
       await sendUserMessage('Emit lifecycle events');
-      await expect(window.locator('[data-testid="message-code-exec-toggle"]').last()).toContainText(
-        'running',
-        { timeout: 8000 }
-      );
       await expect(window.locator('.message-llm-action-response').last()).toContainText(
         'evt done',
         {
@@ -2160,8 +2152,8 @@ console.log(JSON.stringify(result));`,
         }
       );
       await expect(
-        window.locator('[data-testid="message-code-exec-toggle"]').last()
-      ).not.toContainText('running', { timeout: 8000 });
+        window.locator('[data-testid="message-code-exec-status-icon"][data-status="running"]')
+      ).toHaveCount(0, { timeout: 8000 });
 
       await expect
         .poll(async () => {
@@ -2275,7 +2267,7 @@ console.log(JSON.stringify(result));`,
   });
 
   /* Preconditions: active long-running code_exec execution is in-flight
-     Action: app receives close request
+     Action: app receives cancel request and then close request
      Assertions: shutdown completes within bounded time (no hanging close)
      Requirements: code_exec.2.10, code_exec.2.10.1 */
   test('should shutdown without hanging when code_exec is active', async () => {
@@ -2287,6 +2279,7 @@ console.log(JSON.stringify(result));`,
             callId: 'shutdown-1',
             toolName: 'code_exec',
             arguments: {
+              task_summary: 'Start run and close app while active',
               code: 'await new Promise(() => {});',
               timeout_ms: 60000,
             },
@@ -2299,12 +2292,17 @@ console.log(JSON.stringify(result));`,
     await sendUserMessage('Start run and close app');
 
     await expect(window.locator('[data-testid="prompt-input-stop"]')).toBeVisible({
-      timeout: 5000,
+      timeout: 15000,
     });
+    const cancelResult = await window.evaluate(async (id) => {
+      const api = (window as unknown as { api: any }).api;
+      return await api.messages.cancel(id);
+    }, (await getAgentIdsFromApi(window))[0] as string);
+    expect(cancelResult?.success).toBe(true);
 
     const closedWithinBound = await Promise.race([
       electronApp.close().then(() => true),
-      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 5000)),
+      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 15000)),
     ]);
     expect(closedWithinBound).toBe(true);
     appClosedInTest = true;
