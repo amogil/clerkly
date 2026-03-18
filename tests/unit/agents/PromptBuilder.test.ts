@@ -257,6 +257,12 @@ describe('PromptBuilder.build()', () => {
         'This helper is only for public HTTP(S) resources; `localhost`, loopback, private, link-local, and other reserved/internal network targets are rejected.'
       );
       expect(result.systemPrompt).toContain('`headers`: optional `Record<string, string>`');
+      expect(result.systemPrompt).toContain(
+        'Request-control/hop-by-hop headers are forbidden and rejected in `headers`'
+      );
+      expect(result.systemPrompt).toContain(
+        'forbidden: `host`, `content-length`, `connection`, `proxy-connection`, `transfer-encoding`, `upgrade`, `keep-alive`, `te`, `trailer`, `expect`'
+      );
       expect(result.systemPrompt).toContain('Error fields:');
       expect(result.systemPrompt).toContain('`error.code`: short machine-readable error code.');
       expect(result.systemPrompt).toContain('Error example:');

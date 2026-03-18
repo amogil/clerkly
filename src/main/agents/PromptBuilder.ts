@@ -60,11 +60,12 @@ const HTTP_REQUEST_PROMPT_SPEC = {
     '`303` becomes `GET` without `body`; `301/302` change `POST` to `GET` without `body`; `307/308` preserve `method` and `body`.',
     'On cross-origin redirects, sensitive request headers (`authorization`, `proxy-authorization`, `cookie`, `cookie2`) are stripped before the next hop.',
     'This helper is only for public HTTP(S) resources; `localhost`, loopback, private, link-local, and other reserved/internal network targets are rejected.',
+    'Request-control/hop-by-hop headers are forbidden and rejected in `headers`: `host`, `content-length`, `connection`, `proxy-connection`, `transfer-encoding`, `upgrade`, `keep-alive`, `te`, `trailer`, `expect`.',
   ],
   inputFields: [
     '`url`: required absolute `http` or `https` URL string.',
     '`method`: optional HTTP method string; default `GET`; allowed: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`.',
-    '`headers`: optional `Record<string, string>` flat JSON object, for example `{ "accept": "application/json", "x-trace-id": "abc-123" }`.',
+    '`headers`: optional `Record<string, string>` flat JSON object (forbidden: `host`, `content-length`, `connection`, `proxy-connection`, `transfer-encoding`, `upgrade`, `keep-alive`, `te`, `trailer`, `expect`), for example `{ "accept": "application/json", "x-trace-id": "abc-123" }`.',
     '`body`: optional string request body; do not send `body` with `GET` or `HEAD`.',
     '`timeout_ms`: optional integer in milliseconds; default `10000`; maximum `180000`.',
     '`follow_redirects`: optional boolean; default `true`.',
