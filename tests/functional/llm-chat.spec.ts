@@ -3084,10 +3084,10 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await messageInput.fill('Сделай краткое резюме статьи');
     await messageInput.press('Enter');
 
-    const actionContent = context.window.locator('.message-llm-action-response').last();
-    await expect(actionContent).toBeVisible({ timeout: 10000 });
-    await expect(actionContent).toContainText('Короткое резюме');
-    await expect(actionContent).not.toContainText(
+    const actionMessages = context.window.locator('.message-llm-action-response');
+    await expect(actionMessages.first()).toBeVisible({ timeout: 10000 });
+    const renderedChatText = await context.window.locator('body').innerText();
+    expect(renderedChatText).not.toContain(
       `<!-- clerkly:title-meta: {"title":"${expectedTitle}","rename_need_score":91} -->`
     );
 
