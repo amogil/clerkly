@@ -16,6 +16,11 @@ module.exports = {
     '^@/(.*)$': '<rootDir>/src/renderer/$1',
     '^nanoid$': '<rootDir>/tests/__mocks__/nanoid.ts',
     '^use-stick-to-bottom$': '<rootDir>/tests/__mocks__/use-stick-to-bottom.tsx',
+    '^streamdown$': '<rootDir>/tests/__mocks__/streamdown.tsx',
+    '^@streamdown/cjk$': '<rootDir>/tests/__mocks__/streamdown-cjk.ts',
+    '^@streamdown/code$': '<rootDir>/tests/__mocks__/streamdown-code.ts',
+    '^@streamdown/math$': '<rootDir>/tests/__mocks__/streamdown-math.ts',
+    '^@streamdown/mermaid$': '<rootDir>/tests/__mocks__/streamdown-mermaid.ts',
     // Mock AI Elements components that use ESM-only deps (use-stick-to-bottom, streamdown)
     '^.*/ai-elements/conversation$': '<rootDir>/tests/__mocks__/ai-elements/conversation.tsx',
     '^.*/ai-elements/code-block$': '<rootDir>/tests/__mocks__/ai-elements/code-block.tsx',

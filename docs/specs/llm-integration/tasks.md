@@ -47,6 +47,7 @@
 - ✅ Prompt input submit/reset contract доведён до целевого состояния: controlled textarea очищается сразу после успешного старта submit-path и восстанавливает исходный текст только если отправка не передана в чат.
 - ✅ `code_exec` header использует status-icon-first contract без `wrench`: иконка берётся напрямую из persisted source status (`running`, `success`, `error`, `timeout`, `cancelled`), при этом `running` использует тот же фиолетовый акцент, что и action buttons prompt area.
 - ✅ `code_exec` content renderer частично возвращён к целевому app-owned виду поверх standard `Tool`: секция исходного кода отображается как один `JavaScript` code block с видимой JS-подсветкой, а `Output`/`Error` секции используют standard text code-block control с внутренними заголовками.
+- ✅ Исправлен markdown math runtime-контракт для inline `$...$`: в app-owned markdown renderer внутри `AgentMessage` включён `singleDollarTextMath: true` (без ручной правки vendor AI Elements), добавлен functional regression на `$\\pi$` и `$|\\Delta|$` в обычном тексте.
 
 ### В работе
 - 🔄 Фаза 5: содержательные работы завершены; ожидается только отдельное подтверждение пользователя на полный `npm run test:functional`.

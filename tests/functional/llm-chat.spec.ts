@@ -2844,8 +2844,32 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
      Assertions: katex inline rendered
      Requirements: agents.7.7 */
   test('should render markdown inline math', async () => {
-    await renderMarkdownMessage('Inline $$E=mc^2$$');
-    await expect(context.window.locator('.message-llm-action-response .katex')).toBeVisible();
+    await renderMarkdownMessage('Inline $E=mc^2$');
+    const actionContent = context.window.locator('.message-llm-action-response').last();
+    await expect(actionContent.locator('.katex').first()).toBeVisible();
+    await expect(actionContent.locator('.katex-display')).toHaveCount(0);
+    await expect(actionContent).toContainText('Inline');
+  });
+
+  /* Preconditions: MockLLMServer returns inline single-dollar math symbols used in plain text and list item
+     Action: User sends a message
+     Assertions: inline symbols are rendered as KaTeX and not shown as raw $...$ literals
+     Requirements: agents.7.7 */
+  test('should render single-dollar inline symbols in paragraphs and lists', async () => {
+    await renderMarkdownMessage(
+      [
+        'Сделал оценку: $\\pi$ методом Монте-Карло.',
+        '',
+        '- Ошибка: $|\\Delta|$ относительно `Math.PI`.',
+      ].join('\n')
+    );
+
+    const actionContent = context.window.locator('.message-llm-action-response').last();
+    await expect(actionContent.locator('.katex')).toHaveCount(2);
+    await expect(actionContent).toContainText('Сделал оценку');
+    await expect(actionContent).toContainText('Ошибка:');
+    await expect(actionContent).not.toContainText('$\\pi$');
+    await expect(actionContent).not.toContainText('$|\\Delta|$');
   });
 
   /* Preconditions: MockLLMServer returns markdown block math

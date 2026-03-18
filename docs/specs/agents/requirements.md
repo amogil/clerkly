@@ -633,6 +633,7 @@
 7.7. КОГДА `format = "markdown"`, ТО текст ДОЛЖЕН рендериться с поддержкой Markdown
 
 7.7.1. КОГДА в тексте встречаются математические делимитеры `\(...\)`, `\[...\]` или экранированные dollar-делимитеры `\$...\$` / `\$\$...\$\$`, ТО UI ДОЛЖЕН нормализовать их в KaTeX-совместимый формат (`$...$`/`$$...$$`) до рендера.
+7.7.1.1. КОГДА `llm`-текст содержит inline математические выражения в формате `$...$`, ТО UI ДОЛЖЕН рендерить их как KaTeX inline math (без отображения сырых `$`-делимитеров в пользовательском тексте).
 
 7.7.2. КОГДА `llm`-ответ содержит markdown code block, контейнеры code block в ответе ДОЛЖНЫ использовать прозрачный фон (`transparent`).
 
@@ -663,6 +664,7 @@
 - `tests/functional/llm-chat.spec.ts` - "should render markdown images"
 - `tests/functional/llm-chat.spec.ts` - "should render markdown mermaid diagrams"
 - `tests/functional/llm-chat.spec.ts` - "should render markdown inline math"
+- `tests/functional/llm-chat.spec.ts` - "should render single-dollar inline symbols in paragraphs and lists"
 - `tests/functional/llm-chat.spec.ts` - "should render markdown block math"
 - `tests/functional/llm-chat.spec.ts` - "should keep markdown fenced text code block lines unwrapped with horizontal scroll"
 - `tests/functional/llm-chat.spec.ts` - "should render math when model returns LaTeX delimiters"

@@ -1605,7 +1605,7 @@ if (message.kind === 'tool_call' && toolName === 'final_answer') {
 
 ## Markdown рендеринг
 
-Используется `MessageResponse` (Streamdown) с GFM и подсветкой кода. Поддерживаются:
+В `AgentMessage` используется app-owned Streamdown-рендерер с GFM и подсветкой кода. Поддерживаются:
 - заголовки, параграфы, жирный/курсив/зачеркнутый
 - ссылки и автоссылки (включая email)
 - цитаты
@@ -1625,14 +1625,26 @@ if (message.kind === 'tool_call' && toolName === 'final_answer') {
 - `\$...\$` -> `$...$`
 - `\$\$...\$\$` -> `$$...$$`
 - fenced code и inline code при нормализации не изменяются
+- App-owned Streamdown math plugin в `AgentMessage` сконфигурирован с `singleDollarTextMath: true`, поэтому inline-делимитеры `$...$` в обычном markdown-тексте рендерятся как KaTeX inline math.
 
 ```typescript
 // Requirements: agents.7.7, agents.7.7.1, agents.7.7.2
-import { MessageResponse } from '../ai-elements/message';
+import { Streamdown } from 'streamdown';
+import { cjk } from '@streamdown/cjk';
+import { code } from '@streamdown/code';
+import { createMathPlugin } from '@streamdown/math';
+import { mermaid } from '@streamdown/mermaid';
 import { normalizeMathDelimiters } from '../../lib/mathDelimiterNormalization';
 
 function MarkdownMessage({ content }: { content: string }) {
-  return <MessageResponse>{normalizeMathDelimiters(content)}</MessageResponse>;
+  const plugins = {
+    cjk,
+    code,
+    math: createMathPlugin({ singleDollarTextMath: true }),
+    mermaid,
+  };
+
+  return <Streamdown plugins={plugins}>{normalizeMathDelimiters(content)}</Streamdown>;
 }
 ```
 

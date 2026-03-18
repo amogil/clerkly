@@ -1,5 +1,9 @@
 import React from 'react';
 // Requirements: llm-integration.7, llm-integration.3.4.1, llm-integration.3.4.4, agents.4.22, agents.4.9, agents.4.10.1, agents.4.10.2, agents.7.4
+import { cjk } from '@streamdown/cjk';
+import { code } from '@streamdown/code';
+import { createMathPlugin } from '@streamdown/math';
+import { mermaid } from '@streamdown/mermaid';
 import {
   Check,
   CheckCircleIcon,
@@ -9,8 +13,9 @@ import {
   LoaderCircle,
   XCircleIcon,
 } from 'lucide-react';
-import { Message, MessageContent, MessageResponse } from '../ai-elements/message';
-import { Reasoning, ReasoningContent } from '../ai-elements/reasoning';
+import { Streamdown } from 'streamdown';
+import { Message, MessageContent } from '../ai-elements/message';
+import { Reasoning } from '../ai-elements/reasoning';
 import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from '../ai-elements/tool';
 import { Queue, QueueItem } from '../ai-elements/queue';
 import { CollapsibleTrigger } from '../ui/collapsible';
@@ -32,6 +37,48 @@ interface AgentMessageProps {
   message: MessageSnapshot;
   isReasoningStreaming?: boolean;
   onNavigate?: (screen: string) => void;
+}
+
+const streamdownPlugins = {
+  cjk,
+  code,
+  math: createMathPlugin({ singleDollarTextMath: true }),
+  mermaid,
+};
+
+type AgentMarkdownResponseProps = React.ComponentProps<typeof Streamdown>;
+
+// Requirements: agents.7.7, agents.7.7.1, agents.7.7.1.1
+function AgentMarkdownResponse({ className, ...props }: AgentMarkdownResponseProps) {
+  return (
+    <Streamdown
+      className={`size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 ${className ?? ''}`.trim()}
+      plugins={streamdownPlugins}
+      {...props}
+    />
+  );
+}
+
+interface AgentReasoningContentProps extends React.HTMLAttributes<HTMLDivElement> {
+  children: string;
+}
+
+// Requirements: llm-integration.7.2, agents.7.7, agents.7.7.1, agents.7.7.1.1
+function AgentReasoningContent({ className, children, ...props }: AgentReasoningContentProps) {
+  return (
+    <div
+      className={[
+        'mt-4 text-sm',
+        'data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 text-muted-foreground outline-none data-[state=closed]:animate-out data-[state=open]:animate-in',
+        className,
+      ]
+        .filter(Boolean)
+        .join(' ')}
+      {...props}
+    >
+      <AgentMarkdownResponse>{children}</AgentMarkdownResponse>
+    </div>
+  );
 }
 
 // Requirements: agents.7.4.2.2.1, agents.14.5
@@ -178,9 +225,9 @@ export function AgentMessage({
             // Requirements: llm-integration.2, llm-integration.7.2 — collapsible reasoning block with streaming state
             <Reasoning isStreaming={isReasoningStreaming}>
               <AgentReasoningTrigger />
-              <ReasoningContent data-testid="message-llm-reasoning">
+              <AgentReasoningContent data-testid="message-llm-reasoning">
                 {llmReasoningText ?? ''}
-              </ReasoningContent>
+              </AgentReasoningContent>
             </Reasoning>
           )}
           {llmText ? (
@@ -188,9 +235,9 @@ export function AgentMessage({
               data-testid="message-llm-action"
               className="w-full message-llm-action message-llm-action-response"
             >
-              <MessageResponse className="message-response-transparent-code-blocks text-sm leading-relaxed break-words">
+              <AgentMarkdownResponse className="message-response-transparent-code-blocks text-sm leading-relaxed break-words">
                 {llmText}
-              </MessageResponse>
+              </AgentMarkdownResponse>
             </MessageContent>
           ) : null}
         </div>
@@ -234,9 +281,9 @@ export function AgentMessage({
                     <Check className="h-3 w-3 text-white" />
                   </span>
                   <MessageContent className="w-full message-llm-action message-llm-action-response">
-                    <MessageResponse className="message-response-transparent-code-blocks text-sm leading-relaxed break-words">
+                    <AgentMarkdownResponse className="message-response-transparent-code-blocks text-sm leading-relaxed break-words">
                       {point}
-                    </MessageResponse>
+                    </AgentMarkdownResponse>
                   </MessageContent>
                 </QueueItem>
               ))}
@@ -323,35 +370,35 @@ export function AgentMessage({
                   data-testid="message-code-exec-input"
                   className="message-code-exec-text-section"
                 >
-                  <MessageResponse className="message-response-transparent-code-blocks text-sm leading-relaxed break-words">
+                  <AgentMarkdownResponse className="message-response-transparent-code-blocks text-sm leading-relaxed break-words">
                     {buildCodeFence(codeInput, 'JavaScript')}
-                  </MessageResponse>
+                  </AgentMarkdownResponse>
                 </div>
               </div>
               {stdout.length > 0 ? (
                 <div className="min-w-0 max-w-full overflow-hidden">
                   <div data-testid="message-code-exec-stdout">
-                    <MessageResponse className="message-response-transparent-code-blocks text-sm leading-relaxed break-words">
+                    <AgentMarkdownResponse className="message-response-transparent-code-blocks text-sm leading-relaxed break-words">
                       {buildCodeFence(stripAutoTitleMetadataComments(stdout), 'Output')}
-                    </MessageResponse>
+                    </AgentMarkdownResponse>
                   </div>
                 </div>
               ) : null}
               {stderr.length > 0 ? (
                 <div className="min-w-0 max-w-full overflow-hidden">
                   <div data-testid="message-code-exec-stderr">
-                    <MessageResponse className="message-response-transparent-code-blocks text-sm leading-relaxed break-words">
+                    <AgentMarkdownResponse className="message-response-transparent-code-blocks text-sm leading-relaxed break-words">
                       {buildCodeFence(stripAutoTitleMetadataComments(stderr), 'Output')}
-                    </MessageResponse>
+                    </AgentMarkdownResponse>
                   </div>
                 </div>
               ) : null}
               {errorText ? (
                 <div className="min-w-0 max-w-full overflow-hidden">
                   <div data-testid="message-code-exec-error">
-                    <MessageResponse className="message-response-transparent-code-blocks text-sm leading-relaxed break-words">
+                    <AgentMarkdownResponse className="message-response-transparent-code-blocks text-sm leading-relaxed break-words">
                       {buildCodeFence(stripAutoTitleMetadataComments(errorText), 'Error')}
-                    </MessageResponse>
+                    </AgentMarkdownResponse>
                   </div>
                 </div>
               ) : null}
