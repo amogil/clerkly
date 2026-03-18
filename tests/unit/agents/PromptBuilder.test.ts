@@ -258,7 +258,7 @@ describe('PromptBuilder.build()', () => {
       );
       expect(result.systemPrompt).toContain('`headers`: optional `Record<string, string>`');
       expect(result.systemPrompt).toContain(
-        'Request-control/hop-by-hop headers are forbidden and rejected in `headers`'
+        'Request-control and hop-by-hop header restrictions are defined in the `headers` input field below and are enforced by validation.'
       );
       expect(result.systemPrompt).toContain(
         'forbidden: `host`, `content-length`, `connection`, `proxy-connection`, `transfer-encoding`, `upgrade`, `keep-alive`, `te`, `trailer`, `expect`'

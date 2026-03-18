@@ -60,7 +60,7 @@ const HTTP_REQUEST_PROMPT_SPEC = {
     '`303` becomes `GET` without `body`; `301/302` change `POST` to `GET` without `body`; `307/308` preserve `method` and `body`.',
     'On cross-origin redirects, sensitive request headers (`authorization`, `proxy-authorization`, `cookie`, `cookie2`) are stripped before the next hop.',
     'This helper is only for public HTTP(S) resources; `localhost`, loopback, private, link-local, and other reserved/internal network targets are rejected.',
-    'Request-control/hop-by-hop headers are forbidden and rejected in `headers`: `host`, `content-length`, `connection`, `proxy-connection`, `transfer-encoding`, `upgrade`, `keep-alive`, `te`, `trailer`, `expect`.',
+    'Request-control and hop-by-hop header restrictions are defined in the `headers` input field below and are enforced by validation.',
   ],
   inputFields: [
     '`url`: required absolute `http` or `https` URL string.',
