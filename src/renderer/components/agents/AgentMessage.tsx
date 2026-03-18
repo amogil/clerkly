@@ -25,6 +25,8 @@ import type { AgentDialogActionItem } from './AgentDialog';
 import { AgentReasoningTrigger } from './AgentReasoningTrigger';
 
 const TITLE_META_COMMENT_RENDER_PATTERN = /<!--\s*clerkly:title-meta:[\s\S]*?(?:-->|$)/g;
+const MARKDOWN_FOOTNOTE_DEFINITION_PATTERN = /^\[\^[^\]\r\n]+\]:.*(?:\r?\n(?:[ \t]{2,}.*|\s*))*/gm;
+const MARKDOWN_FOOTNOTE_REFERENCE_PATTERN = /\[\^[^\]\r\n]+\]/g;
 
 interface AgentMessageProps {
   message: MessageSnapshot;
@@ -41,6 +43,15 @@ function stripAutoTitleMetadataComments(text: string): string {
 function sanitizeInlineToolText(text: string): string {
   return stripAutoTitleMetadataComments(text)
     .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+// Requirements: agents.7.7
+function stripMarkdownFootnotes(text: string): string {
+  return text
+    .replace(MARKDOWN_FOOTNOTE_DEFINITION_PATTERN, '')
+    .replace(MARKDOWN_FOOTNOTE_REFERENCE_PATTERN, '')
+    .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
 
@@ -81,7 +92,7 @@ export function AgentMessage({
   const llmTextRaw =
     typeof llmData?.['text'] === 'string' ? (llmData['text'] as string) : undefined;
   const llmText = llmTextRaw
-    ? normalizeMathDelimiters(stripAutoTitleMetadataComments(llmTextRaw))
+    ? normalizeMathDelimiters(stripMarkdownFootnotes(stripAutoTitleMetadataComments(llmTextRaw)))
     : undefined;
   const llmReasoningText = llmReasoning?.text
     ? normalizeMathDelimiters(
