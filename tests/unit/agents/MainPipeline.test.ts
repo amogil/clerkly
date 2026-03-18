@@ -3501,8 +3501,9 @@ describe('MainPipeline.run()', () => {
         bindToolExecutors: (
           tools: Array<{
             name: string;
-            execute?: (args: Record<string, unknown>) => Promise<unknown>;
-          }>
+            execute?: (args: Record<string, unknown>, signal?: AbortSignal) => Promise<unknown>;
+          }>,
+          fallbackSignal?: AbortSignal
         ) => Array<{
           execute: (args: Record<string, unknown>, opts?: unknown) => Promise<unknown>;
         }>;
@@ -3510,8 +3511,17 @@ describe('MainPipeline.run()', () => {
     ).bindToolExecutors.bind(pipeline);
 
     expect(extractAbortSignal({ abortSignal: signal })).toBe(signal);
+    expect(extractAbortSignal({ signal })).toBe(signal);
     expect(extractAbortSignal(signal)).toBe(signal);
     expect(extractToolCallId({ toolCallId: '  ' })).toBeUndefined();
+
+    const executeSpy = jest.fn(async () => ({ ok: true }));
+    const boundWithFallbackSignal = bindToolExecutors(
+      [{ name: 'code_exec', execute: executeSpy }],
+      signal
+    );
+    await boundWithFallbackSignal[0].execute({});
+    expect(executeSpy).toHaveBeenCalledWith({}, signal);
 
     const limiter = createLimiter(1);
     const order: string[] = [];

@@ -72,11 +72,14 @@ export class AnthropicProvider implements ILLMProvider {
   async chat(
     messages: ChatMessage[],
     options: ChatOptions,
-    onChunk: (chunk: ChatChunk) => void
+    onChunk: (chunk: ChatChunk) => void,
+    signal?: AbortSignal
   ): Promise<LLMChatResult> {
     const apiUrl = process.env.CLERKLY_ANTHROPIC_API_URL ?? this.config.apiUrl;
     const baseURL = apiUrl.replace(/\/messages\/?$/, '');
     const controller = new AbortController();
+    const abortFromExternalSignal = () => controller.abort();
+    signal?.addEventListener('abort', abortFromExternalSignal);
     const timeoutId = setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);
     const stepDiagnostics: Array<{
       stepIndex: number;
@@ -262,6 +265,7 @@ export class AnthropicProvider implements ILLMProvider {
       throw error;
     } finally {
       clearTimeout(timeoutId);
+      signal?.removeEventListener('abort', abortFromExternalSignal);
     }
   }
 

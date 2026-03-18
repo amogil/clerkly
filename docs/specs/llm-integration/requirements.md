@@ -244,7 +244,7 @@
 
 #### Критерии Приемки
 
-5.1. Внутренний слой адаптера провайдера (`ILLMProvider` или эквивалент) ДОЛЖЕН иметь метод `chat(messages, options, onChunk)` с event-driven стримингом чанков (`reasoning`, `text`, `tool_call`, `turn_error`) и успешным завершением текущего ответа модели через завершение `chat(...)` без ошибки
+5.1. Внутренний слой адаптера провайдера (`ILLMProvider` или эквивалент) ДОЛЖЕН иметь метод `chat(messages, options, onChunk, signal?)` с event-driven стримингом чанков (`reasoning`, `text`, `tool_call`, `turn_error`) и успешным завершением текущего ответа модели через завершение `chat(...)` без ошибки; переданный `signal` ДОЛЖЕН использоваться для штатной отмены активного turn без формирования `kind:error`
 
 5.2. `apiKey` ДОЛЖЕН передаваться в конструктор провайдера (не в каждый вызов)
 
@@ -386,7 +386,11 @@
 
 9.4.1. КОГДА terminal `tool_call(code_exec)` имеет `output.status = "success"`, ТО до следующего шага tool-loop статус агента ДОЛЖЕН оставаться `in-progress`.
 
-9.4.2. КОГДА terminal `tool_call(code_exec)` имеет `output.status ∈ {"error","timeout","cancelled"}`, ТО статус агента ДОЛЖЕН оставаться `in-progress`.
+9.4.2. КОГДА terminal `tool_call(code_exec)` имеет `output.status ∈ {"error","timeout"}`, ТО статус агента ДОЛЖЕН оставаться `in-progress`.
+
+9.4.3. КОГДА terminal `tool_call(code_exec)` имеет `output.status = "cancelled"`, ТО статус агента ДОЛЖЕН вычисляться по runtime-контексту активности pipeline:
+  - ПОКА pipeline этого агента активен, статус ДОЛЖЕН оставаться `in-progress`;
+  - ЕСЛИ pipeline этого агента не активен, статус ДОЛЖЕН быть `awaiting-response`.
 
 9.5. Основной пользовательский ответ модели ДОЛЖЕН оставаться в `kind: llm` (`data.text`).
 
@@ -432,7 +436,7 @@
 - `tests/functional/agent-status-calculation.spec.ts` - "should keep in-progress status for done code_exec success tool_call"
 - `tests/functional/agent-status-calculation.spec.ts` - "should keep in-progress status from done code_exec error tool_call"
 - `tests/functional/agent-status-calculation.spec.ts` - "should keep in-progress status from done code_exec timeout tool_call"
-- `tests/functional/agent-status-calculation.spec.ts` - "should keep in-progress status from done code_exec cancelled tool_call"
+- `tests/functional/llm-chat.spec.ts` — "should cancel active request via stop button without creating error message"
 
 ---
 

@@ -269,7 +269,7 @@ export class MainPipeline {
     const replyToMessageId = userMessageId;
     const options = {
       ...this.resolveOptions(provider),
-      tools: this.bindToolExecutors(builtPrompt.tools),
+      tools: this.bindToolExecutors(builtPrompt.tools, signal),
     };
     const llmProvider = this.createProvider(provider, apiKey);
 
@@ -460,7 +460,8 @@ export class MainPipeline {
           attemptId,
           setLastLlmMessageId
         );
-      }
+      },
+      signal
     );
 
     this.flushPendingToolCall(
@@ -2130,14 +2131,15 @@ export class MainPipeline {
    * Requirements: llm-integration.11.4, llm-integration.11.5
    */
   private bindToolExecutors(
-    tools: NonNullable<ChatOptions['tools']>
+    tools: NonNullable<ChatOptions['tools']>,
+    fallbackSignal?: AbortSignal
   ): NonNullable<ChatOptions['tools']> {
     const runLimited = this.createConcurrencyLimiter(3);
     return tools.map((toolDef) => ({
       ...toolDef,
       execute: async (args: Record<string, unknown>, executeOptions?: unknown) =>
         runLimited(async () => {
-          const abortSignal = this.extractToolAbortSignal(executeOptions);
+          const abortSignal = this.extractToolAbortSignal(executeOptions) ?? fallbackSignal;
           const toolCallId = this.extractToolCallId(executeOptions);
           if (toolDef.execute) {
             return toolDef.execute(args, abortSignal);
@@ -2168,14 +2170,25 @@ export class MainPipeline {
   }
 
   private extractToolAbortSignal(executeOptions: unknown): AbortSignal | undefined {
-    if (executeOptions && typeof executeOptions === 'object' && 'abortSignal' in executeOptions) {
-      const candidate = (executeOptions as { abortSignal?: unknown }).abortSignal;
-      if (
+    const isAbortSignalLike = (candidate: unknown): candidate is AbortSignal => {
+      return Boolean(
         candidate &&
         typeof candidate === 'object' &&
         'addEventListener' in candidate &&
         typeof (candidate as { addEventListener?: unknown }).addEventListener === 'function'
-      ) {
+      );
+    };
+
+    if (executeOptions && typeof executeOptions === 'object' && 'abortSignal' in executeOptions) {
+      const candidate = (executeOptions as { abortSignal?: unknown }).abortSignal;
+      if (isAbortSignalLike(candidate)) {
+        return candidate as AbortSignal;
+      }
+    }
+
+    if (executeOptions && typeof executeOptions === 'object' && 'signal' in executeOptions) {
+      const candidate = (executeOptions as { signal?: unknown }).signal;
+      if (isAbortSignalLike(candidate)) {
         return candidate as AbortSignal;
       }
     }
@@ -2183,9 +2196,21 @@ export class MainPipeline {
     if (
       executeOptions &&
       typeof executeOptions === 'object' &&
-      'addEventListener' in executeOptions &&
-      typeof (executeOptions as { addEventListener?: unknown }).addEventListener === 'function'
+      'context' in executeOptions &&
+      (executeOptions as { context?: unknown }).context &&
+      typeof (executeOptions as { context?: unknown }).context === 'object'
     ) {
+      const context = (executeOptions as { context?: { abortSignal?: unknown; signal?: unknown } })
+        .context;
+      if (isAbortSignalLike(context?.abortSignal)) {
+        return context.abortSignal as AbortSignal;
+      }
+      if (isAbortSignalLike(context?.signal)) {
+        return context.signal as AbortSignal;
+      }
+    }
+
+    if (isAbortSignalLike(executeOptions)) {
       return executeOptions as AbortSignal;
     }
 

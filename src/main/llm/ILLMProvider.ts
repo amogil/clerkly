@@ -169,7 +169,8 @@ export interface ILLMProvider {
   chat(
     messages: ChatMessage[],
     options: ChatOptions,
-    onChunk: (chunk: ChatChunk) => void
+    onChunk: (chunk: ChatChunk) => void,
+    signal?: AbortSignal
   ): Promise<LLMChatResult>;
 
   /**

@@ -77,13 +77,16 @@ export class OpenAIProvider implements ILLMProvider {
   async chat(
     messages: ChatMessage[],
     options: ChatOptions,
-    onChunk: (chunk: ChatChunk) => void
+    onChunk: (chunk: ChatChunk) => void,
+    signal?: AbortSignal
   ): Promise<LLMChatResult> {
     // Allow runtime override via env (used by functional tests with MockLLMServer).
     // AI SDK expects baseURL without trailing `/responses`.
     const apiUrl = process.env.CLERKLY_OPENAI_API_URL ?? this.config.apiUrl;
     const baseURL = apiUrl.replace(/\/responses\/?$/, '');
     const controller = new AbortController();
+    const abortFromExternalSignal = () => controller.abort();
+    signal?.addEventListener('abort', abortFromExternalSignal);
     const timeoutId = setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);
     const stepDiagnostics: Array<{
       stepIndex: number;
@@ -265,6 +268,7 @@ export class OpenAIProvider implements ILLMProvider {
       throw error;
     } finally {
       clearTimeout(timeoutId);
+      signal?.removeEventListener('abort', abortFromExternalSignal);
     }
   }
 

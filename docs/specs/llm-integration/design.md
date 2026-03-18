@@ -497,7 +497,8 @@ interface ILLMProvider {
   chat(
     messages: ChatMessage[],
     options: ChatOptions,
-    onChunk: (chunk: ChatChunk) => void
+    onChunk: (chunk: ChatChunk) => void,
+    signal?: AbortSignal
   ): Promise<LLMChatResult>;
   getProviderName(): string;
 }
@@ -611,7 +612,7 @@ class MainPipeline {
     private providerFactory: LLMProviderFactory
   ) {}
 
-  async run(agentId: string, userMessageId: number): Promise<void>
+  async run(agentId: string, userMessageId: number, signal?: AbortSignal): Promise<void>
 }
 ```
 
@@ -624,7 +625,7 @@ class MainPipeline {
 4. Собирает промпт через PromptBuilder
    - `const { messages, tools } = promptBuilder.build(history)`
 5. Инициализирует локальное состояние выполнения (`llmMessageId`, `accumulatedReasoning`, `accumulatedText`, `pendingReasoningDelta`, `pendingTextDelta`, `lastFlushAt`)
-6. Вызывает `provider.chat(messages, { ...options, tools }, onChunk)` (провайдерная реализация использует `Vercel AI SDK`):
+6. Вызывает `provider.chat(messages, { ...options, tools }, onChunk, signal)` (провайдерная реализация использует `Vercel AI SDK`):
    onChunk(chunk):
      if llmMessageId == null:
       создаёт `kind: llm` сообщение (`done: false`, `reply_to_message_id = userMessageId`) → `llmMessageId = message.id`
@@ -1004,6 +1005,7 @@ User отправляет сообщение
 | llm-integration.9.4 | ✓ | ✓ |
 | llm-integration.9.4.1 | ✓ | ✓ |
 | llm-integration.9.4.2 | ✓ | ✓ |
+| llm-integration.9.4.3 | ✓ | ✓ |
 | llm-integration.9.5 | ✓ | ✓ |
 | llm-integration.9.5.1 | ✓ | ✓ |
 | llm-integration.9.5.1.1 | ✓ | ✓ |

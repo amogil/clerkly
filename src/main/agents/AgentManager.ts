@@ -97,6 +97,33 @@ export class AgentManager {
   }
 
   /**
+   * Extract code_exec output status from persisted tool_call payload.
+   * Requirements: agents.9.2, llm-integration.9.4
+   */
+  private extractCodeExecOutputStatus(
+    message: Message
+  ): 'running' | 'success' | 'error' | 'timeout' | 'cancelled' | null {
+    try {
+      const payload = JSON.parse(message.payloadJson) as {
+        data?: { output?: { status?: unknown } };
+      };
+      const status = payload?.data?.output?.status;
+      if (
+        status === 'running' ||
+        status === 'success' ||
+        status === 'error' ||
+        status === 'timeout' ||
+        status === 'cancelled'
+      ) {
+        return status;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Resolve latest visible message with fast path for normal streaming updates.
    * Requirements: agents.9.2, realtime-events.6.1
    */
@@ -122,6 +149,15 @@ export class AgentManager {
     const lastVisible = this.getLatestVisibleMessage(agent.agentId);
     let status = this.computeAgentStatus(lastVisible);
     if (lastVisible?.kind === MESSAGE_KIND.USER && !this.pipelineControllers.has(agent.agentId)) {
+      status = AGENT_STATUS.AWAITING_RESPONSE;
+    }
+    if (
+      lastVisible?.kind === MESSAGE_KIND.TOOL_CALL &&
+      lastVisible.done &&
+      !this.pipelineControllers.has(agent.agentId) &&
+      this.extractToolName(lastVisible) === 'code_exec' &&
+      this.extractCodeExecOutputStatus(lastVisible) === 'cancelled'
+    ) {
       status = AGENT_STATUS.AWAITING_RESPONSE;
     }
 

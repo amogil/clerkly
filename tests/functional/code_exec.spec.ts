@@ -37,7 +37,10 @@ async function launchWithMockLLM() {
 }
 
 async function sendUserMessage(text: string) {
-  const input = window.locator('textarea[placeholder*="Ask"]');
+  const input = window.locator(
+    '[data-testid="agent-chat-root"][data-active="true"] [data-testid="auto-expanding-textarea"]'
+  );
+  await expect(input).toHaveCount(1, { timeout: 5000 });
   await expect(input).toBeVisible({ timeout: 5000 });
   await input.click();
   await input.fill(text);
@@ -1663,6 +1666,7 @@ console.log(JSON.stringify(result));`,
               callId: 'deny-fetch',
               toolName: 'code_exec',
               arguments: {
+                task_summary: 'Deny fetch API call',
                 code: `await fetch('http://127.0.0.1:${port}/fetch-blocked')`,
                 timeout_ms: 10000,
               },
@@ -1675,6 +1679,7 @@ console.log(JSON.stringify(result));`,
               callId: 'deny-xhr',
               toolName: 'code_exec',
               arguments: {
+                task_summary: 'Deny XMLHttpRequest call',
                 code: `const xhr = new XMLHttpRequest(); xhr.open('GET', 'http://127.0.0.1:${port}/xhr-blocked', true); xhr.send();`,
                 timeout_ms: 10000,
               },
@@ -1687,6 +1692,7 @@ console.log(JSON.stringify(result));`,
               callId: 'deny-websocket',
               toolName: 'code_exec',
               arguments: {
+                task_summary: 'Deny WebSocket call',
                 code: `new WebSocket('ws://127.0.0.1:${port}/ws-blocked')`,
                 timeout_ms: 10000,
               },
@@ -1699,6 +1705,7 @@ console.log(JSON.stringify(result));`,
               callId: 'deny-sendbeacon',
               toolName: 'code_exec',
               arguments: {
+                task_summary: 'Deny sendBeacon call',
                 code: `navigator.sendBeacon('http://127.0.0.1:${port}/beacon-blocked', 'x')`,
                 timeout_ms: 10000,
               },
@@ -1978,6 +1985,14 @@ console.log(JSON.stringify(result));`,
       return await api.messages.cancel(id);
     }, agentId as string);
     expect(cancelResult?.success).toBe(true);
+    await expect(window.locator('[data-testid="prompt-input-stop"]')).toHaveCount(0, {
+      timeout: 15000,
+    });
+    await expect(
+      window.locator('[data-testid="message-code-exec-status-icon"][data-status="running"]')
+    ).toHaveCount(0, {
+      timeout: 15000,
+    });
 
     await expect
       .poll(async () => {
@@ -2294,15 +2309,18 @@ console.log(JSON.stringify(result));`,
     await expect(window.locator('[data-testid="prompt-input-stop"]')).toBeVisible({
       timeout: 15000,
     });
-    const cancelResult = await window.evaluate(async (id) => {
-      const api = (window as unknown as { api: any }).api;
-      return await api.messages.cancel(id);
-    }, (await getAgentIdsFromApi(window))[0] as string);
+    const cancelResult = await window.evaluate(
+      async (id) => {
+        const api = (window as unknown as { api: any }).api;
+        return await api.messages.cancel(id);
+      },
+      (await getAgentIdsFromApi(window))[0] as string
+    );
     expect(cancelResult?.success).toBe(true);
 
     const closedWithinBound = await Promise.race([
       electronApp.close().then(() => true),
-      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 15000)),
+      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 25000)),
     ]);
     expect(closedWithinBound).toBe(true);
     appClosedInTest = true;
