@@ -65,4 +65,46 @@ describe('messageOrder', () => {
 
     expect(sorted.map((m) => m.id)).toEqual([10, 20]);
   });
+
+  /* Preconditions: first snapshot has invalid runId type while second has valid order metadata
+     Action: compare snapshots
+     Assertions: comparator falls back to timestamp/id when runId is invalid
+     Requirements: llm-integration.11.1.5 */
+  it('falls back when runId is not a string', () => {
+    const invalidRunId = {
+      ...makeSnapshot(2, 1002, { runId: 'run-a', attemptId: 1, sequence: 2 }),
+      runId: 123 as unknown as string,
+    };
+    const valid = makeSnapshot(1, 1001, { runId: 'run-a', attemptId: 1, sequence: 1 });
+
+    expect(compareMessageSnapshots(invalidRunId, valid)).toBeGreaterThan(0);
+  });
+
+  /* Preconditions: first snapshot has invalid attemptId type while second has valid order metadata
+     Action: compare snapshots
+     Assertions: comparator falls back to timestamp/id when attemptId is invalid
+     Requirements: llm-integration.11.1.5 */
+  it('falls back when attemptId is not a number', () => {
+    const invalidAttemptId = {
+      ...makeSnapshot(2, 1002, { runId: 'run-a', attemptId: 1, sequence: 2 }),
+      attemptId: '1' as unknown as number,
+    };
+    const valid = makeSnapshot(1, 1001, { runId: 'run-a', attemptId: 1, sequence: 1 });
+
+    expect(compareMessageSnapshots(invalidAttemptId, valid)).toBeGreaterThan(0);
+  });
+
+  /* Preconditions: first snapshot has invalid sequence type while second has valid order metadata
+     Action: compare snapshots
+     Assertions: comparator falls back to timestamp/id when sequence is invalid
+     Requirements: llm-integration.11.1.5 */
+  it('falls back when sequence is not a number', () => {
+    const invalidSequence = {
+      ...makeSnapshot(2, 1002, { runId: 'run-a', attemptId: 1, sequence: 2 }),
+      sequence: '2' as unknown as number,
+    };
+    const valid = makeSnapshot(1, 1001, { runId: 'run-a', attemptId: 1, sequence: 1 });
+
+    expect(compareMessageSnapshots(invalidSequence, valid)).toBeGreaterThan(0);
+  });
 });
