@@ -1010,19 +1010,36 @@ export class MainPipeline {
       return text;
     }
 
-    const extracted = this.extractLeadingMarkdownList(text);
-    if (!extracted) {
-      return text;
-    }
-
     const expectedPoints = summaryPoints.filter(
       (point): point is string => typeof point === 'string'
     );
-    if (!this.areNormalizedSummaryPointsEqual(extracted.items, expectedPoints)) {
+
+    const extracted = this.extractLeadingMarkdownList(text);
+    if (extracted) {
+      if (this.areNormalizedSummaryPointsEqual(extracted.items, expectedPoints)) {
+        return extracted.rest.trimStart();
+      }
+
+      const textWithoutSummaryPrefix = this.stripLeadingSummaryListWithTrailingSuffix(
+        extracted.items,
+        expectedPoints,
+        extracted.rest
+      );
+      if (textWithoutSummaryPrefix !== null) {
+        return textWithoutSummaryPrefix;
+      }
+    }
+
+    const escapedListItems = this.extractEscapedNewlineMarkdownListItems(text);
+    if (!escapedListItems) {
       return text;
     }
 
-    return extracted.rest.trimStart();
+    if (!this.areNormalizedSummaryPointsEqual(escapedListItems, expectedPoints)) {
+      return text;
+    }
+
+    return '';
   }
 
   // Requirements: llm-integration.9.5.6
@@ -1147,6 +1164,63 @@ export class MainPipeline {
     }
 
     return null;
+  }
+
+  // Requirements: llm-integration.9.5.3.3, llm-integration.9.5.6.2
+  private extractEscapedNewlineMarkdownListItems(text: string): string[] | null {
+    const trimmed = text.trim();
+    if (!trimmed.includes('\\n')) {
+      return null;
+    }
+    const normalized = trimmed.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n');
+    const lines = normalized.split('\n');
+    const items: string[] = [];
+
+    for (const line of lines) {
+      if (line.trim().length === 0) {
+        continue;
+      }
+      const item = this.parseMarkdownListItem(line);
+      if (item === null) {
+        return null;
+      }
+      items.push(item);
+    }
+
+    return items.length > 0 ? items : null;
+  }
+
+  // Requirements: llm-integration.9.5.3.3, llm-integration.9.5.6.2
+  private stripLeadingSummaryListWithTrailingSuffix(
+    candidateItems: string[],
+    expectedItems: string[],
+    rest: string
+  ): string | null {
+    if (candidateItems.length !== expectedItems.length) {
+      return null;
+    }
+
+    for (let index = 0; index < expectedItems.length - 1; index += 1) {
+      const expectedItem = expectedItems[index] ?? '';
+      const candidateItem = candidateItems[index] ?? '';
+      if (
+        this.normalizeSummaryPointText(candidateItem) !==
+        this.normalizeSummaryPointText(expectedItem)
+      ) {
+        return null;
+      }
+    }
+
+    const lastIndex = expectedItems.length - 1;
+    const expectedLastItem = (expectedItems[lastIndex] ?? '').trimStart();
+    const candidateLastItem = (candidateItems[lastIndex] ?? '').trimStart();
+
+    if (!candidateLastItem.startsWith(expectedLastItem)) {
+      return null;
+    }
+
+    const trailingSuffix = candidateLastItem.slice(expectedLastItem.length);
+    return `${trailingSuffix}${rest}`.trimStart();
   }
 
   // Requirements: llm-integration.9.5.6

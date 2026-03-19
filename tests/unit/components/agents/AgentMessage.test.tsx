@@ -649,6 +649,33 @@ describe('AgentMessage — llm', () => {
     expect(screen.getByTestId('message-llm-action')).toBeInTheDocument();
   });
 
+  /* Preconditions: kind:llm with reasoning and non-streaming state
+     Action: click reasoning trigger twice
+     Assertions: reasoning content toggles open/closed states
+     Requirements: llm-integration.2, llm-integration.7.2 */
+  it('should toggle reasoning content visibility state on trigger clicks', () => {
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'llm',
+          payload: {
+            data: {
+              reasoning: { text: 'Thinking...' },
+              text: 'Answer',
+            },
+          },
+        })}
+      />
+    );
+
+    const trigger = screen.getByTestId('message-llm-reasoning-trigger');
+    fireEvent.click(trigger);
+    expect(screen.getByTestId('reasoning-root')).toHaveAttribute('data-state', 'open');
+
+    fireEvent.click(trigger);
+    expect(screen.getByTestId('reasoning-root')).toHaveAttribute('data-state', 'closed');
+  });
+
   /* Preconditions: kind:llm reasoning text has glued bold opener after plain text
      Action: render AgentMessage
      Assertions: reasoning text has paragraph break before heading-like bold fragment

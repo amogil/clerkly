@@ -3212,6 +3212,67 @@ describe('MainPipeline.run()', () => {
     );
   });
 
+  /* Preconditions: Provider returns valid final_answer tool_call and output.text contains duplicate markdown list with escaped newline separators
+     Action: Run pipeline for one user turn
+     Assertions: Escaped-newline duplicate markdown summary is suppressed and kind:llm is not persisted
+     Requirements: llm-integration.9.5.3.3, llm-integration.9.5.6.2 */
+  it('does not persist duplicate llm text when markdown list mirror uses escaped newline separators', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-bullet-escaped-newline-dup',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['Checklist item', 'Another item'] },
+        });
+        return { text: '- Checklist item\\n- Another item' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(0);
+  });
+
+  /* Preconditions: Provider returns valid final_answer tool_call and output.text contains duplicate markdown summary where last list item is glued with trailing assistant text
+     Action: Run pipeline for one user turn
+     Assertions: Duplicate markdown summary is stripped and only trailing assistant text is persisted
+     Requirements: llm-integration.9.5.3.3, llm-integration.9.5.6.2 */
+  it('strips duplicate markdown summary when trailing assistant text is glued to last list item', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-bullet-glued-tail',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['Checklist item', 'Another item'] },
+        });
+        return { text: '- Checklist item\n- Another itemHello! How can I help?' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(1);
+    expect(llmCreates[0]?.[2]).toEqual(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          text: 'Hello! How can I help?',
+        }),
+      })
+    );
+  });
+
   /* Preconditions: Provider streams final_answer tool_call and then streamed JSON chunks mirroring final payload
      Action: Run pipeline for one user turn
      Assertions: Streamed mirror text is suppressed and kind:llm is not persisted

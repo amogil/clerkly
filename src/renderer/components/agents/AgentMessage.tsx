@@ -15,10 +15,10 @@ import {
 } from 'lucide-react';
 import { Streamdown } from 'streamdown';
 import { Message, MessageContent } from '../ai-elements/message';
-import { Reasoning } from '../ai-elements/reasoning';
+import { Reasoning, ReasoningContent } from '../ai-elements/reasoning';
 import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from '../ai-elements/tool';
 import { Queue, QueueItem } from '../ai-elements/queue';
-import { CollapsibleTrigger } from '../ui/collapsible';
+import { CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toUIMessage } from '../../lib/messageMapper';
 import {
   normalizeMathDelimiters,
@@ -59,14 +59,14 @@ function AgentMarkdownResponse({ className, ...props }: AgentMarkdownResponsePro
   );
 }
 
-interface AgentReasoningContentProps extends React.HTMLAttributes<HTMLDivElement> {
+interface AgentReasoningContentProps extends React.ComponentProps<typeof ReasoningContent> {
   children: string;
 }
 
 // Requirements: llm-integration.7.2, agents.7.7, agents.7.7.1, agents.7.7.1.1
 function AgentReasoningContent({ className, children, ...props }: AgentReasoningContentProps) {
   return (
-    <div
+    <ReasoningContent
       className={[
         'mt-4 text-sm',
         'data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 text-muted-foreground outline-none data-[state=closed]:animate-out data-[state=open]:animate-in',
@@ -76,8 +76,8 @@ function AgentReasoningContent({ className, children, ...props }: AgentReasoning
         .join(' ')}
       {...props}
     >
-      <AgentMarkdownResponse>{children}</AgentMarkdownResponse>
-    </div>
+      {children}
+    </ReasoningContent>
   );
 }
 
