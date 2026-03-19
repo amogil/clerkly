@@ -244,6 +244,23 @@ describe('OpenAIProvider.chat()', () => {
     );
   });
 
+  it('throws LLMRequestAbortedError when external signal is already aborted before chat starts', async () => {
+    (aiModule.streamText as unknown as jest.Mock).mockImplementation(({ abortSignal }) => {
+      if (abortSignal?.aborted) {
+        const abortError = new Error('aborted before start');
+        (abortError as Error & { name: string }).name = 'AbortError';
+        throw abortError;
+      }
+      return { fullStream: toAsyncIterable([]), totalUsage: Promise.resolve({}) };
+    });
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(
+      provider.chat(mockMessages, mockOptions, () => {}, controller.signal)
+    ).rejects.toBeInstanceOf(LLMRequestAbortedError);
+  });
+
   it('uses CHAT_TIMEOUT_MS for abort controller timer', async () => {
     const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
     mockSdkResult([{ type: 'text-delta', text: 'ok' }]);

@@ -740,10 +740,10 @@
      - `kind = 'llm'` и `done = true` → `awaiting-response`
      - `kind = 'tool_call'` и `done = false` → `in-progress`
      - `kind = 'tool_call'` и `toolName = 'final_answer'` и `done = true` → `completed`
-     - `kind = 'tool_call'` и `toolName = 'code_exec'` и `done = true` → определяется по правилам `llm-integration.9.4.1-9.4.2`
+     - `kind = 'tool_call'` и `toolName = 'code_exec'` и `done = true` → определяется по правилам `llm-integration.9.4.1-9.4.3`
      - `kind = 'error'` → `error`
 
-9.2.1. Детальная статусная семантика terminal `tool_call(code_exec)` ДОЛЖНА определяться в `llm-integration.9.4.1-9.4.2` и НЕ ДОЛЖНА дублироваться в данной спецификации.
+9.2.1. Детальная статусная семантика terminal `tool_call(code_exec)` ДОЛЖНА определяться в `llm-integration.9.4.1-9.4.3` и НЕ ДОЛЖНА дублироваться в данной спецификации.
 
 9.3. Статус ДОЛЖЕН пересчитываться при получении любого нового сообщения в чате агента
 
@@ -756,7 +756,7 @@
 - `tests/functional/agent-status-calculation.spec.ts` - "should keep in-progress status for done code_exec success tool_call"
 - `tests/functional/agent-status-calculation.spec.ts` - "should keep in-progress status from done code_exec error tool_call"
 - `tests/functional/agent-status-calculation.spec.ts` - "should keep in-progress status from done code_exec timeout tool_call"
-- `tests/functional/agent-status-calculation.spec.ts` - "should keep in-progress status from done code_exec cancelled tool_call"
+- `tests/functional/agent-status-calculation.spec.ts` - "should resolve awaiting-response status from done code_exec cancelled tool_call when pipeline is inactive"
 
 ---
 

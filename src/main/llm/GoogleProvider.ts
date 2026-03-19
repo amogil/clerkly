@@ -72,6 +72,9 @@ export class GoogleProvider implements ILLMProvider {
     const apiUrl = process.env.CLERKLY_GOOGLE_LLM_API_URL ?? this.config.apiUrl;
     const baseURL = apiUrl.replace(/\/models\/.*$/, '');
     const controller = new AbortController();
+    if (signal?.aborted) {
+      controller.abort();
+    }
     const abortFromExternalSignal = () => controller.abort();
     signal?.addEventListener('abort', abortFromExternalSignal);
     const timeoutId = setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);

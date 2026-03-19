@@ -285,7 +285,7 @@ describe('AgentManager', () => {
     /* Preconditions: Agent with last message kind:tool_call(code_exec), done=true, output.status=cancelled, no active pipeline
        Action: Call toEventAgent() with agent
        Assertions: Returns AgentSnapshot with status 'awaiting-response'
-       Requirements: agents.9.2, llm-integration.8.7 */
+       Requirements: agents.9.2, llm-integration.9.4.3 */
     it('should compute status as awaiting-response when last message is done code_exec cancelled tool_call and pipeline is inactive', () => {
       const lastMessage = {
         id: 1,

@@ -78,6 +78,9 @@ export class AnthropicProvider implements ILLMProvider {
     const apiUrl = process.env.CLERKLY_ANTHROPIC_API_URL ?? this.config.apiUrl;
     const baseURL = apiUrl.replace(/\/messages\/?$/, '');
     const controller = new AbortController();
+    if (signal?.aborted) {
+      controller.abort();
+    }
     const abortFromExternalSignal = () => controller.abort();
     signal?.addEventListener('abort', abortFromExternalSignal);
     const timeoutId = setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);
