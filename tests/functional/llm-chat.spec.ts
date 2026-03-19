@@ -1367,7 +1367,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
           data: {
             callId: 'running-call-1',
             toolName: 'code_exec',
-            arguments: { code: '1+1' },
+            arguments: { task_summary: 'Run code', code: '1+1' },
             output: { status: 'running' },
           },
         });
@@ -1461,7 +1461,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
           {
             callId: 'call-1',
             toolName: 'code_exec',
-            arguments: { code: "console.log('flow')", timeout_ms: 10000 },
+            arguments: { task_summary: 'Run code', code: "console.log('flow')", timeout_ms: 10000 },
           },
         ],
       },
@@ -1498,15 +1498,17 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
      Assertions: during reasoning phase tool_call is not visible; after reasoning phase tool_call becomes running and post-tool text appears before terminal update
      Requirements: llm-integration.11.1.2, llm-integration.11.1.3 */
   test('should create tool_call only after reasoning phase and start post-tool text without waiting terminal result', async () => {
-    mockLLMServer.setStreamingMode(true, { chunkDelayMs: 40 });
+    mockLLMServer.setStreamingMode(true, { chunkDelayMs: 60 });
     mockLLMServer.setOpenAIStreamScripts([
       {
-        reasoning: 'pre-tool reasoning',
+        reasoning:
+          'pre-tool reasoning phase starts now and continues with extra chunks to keep tool call hidden while reasoning is still streaming in this test scenario',
         toolCalls: [
           {
             callId: 'running-1',
             toolName: 'code_exec',
             arguments: {
+              task_summary: 'Check running and post-tool ordering',
               code: "const started=Date.now();while(Date.now()-started<1200){};console.log('done');",
               timeout_ms: 10000,
             },
@@ -1529,15 +1531,17 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     const codeExecBlocks = context.window.locator('[data-testid="message-code-exec-block"]');
     await expect(codeExecBlocks).toHaveCount(0);
 
-    const codeExecStatus = context.window
-      .locator('[data-testid="message-code-exec-status"]')
+    const runningStatusIcon = context.window
+      .locator('[data-testid="message-code-exec-status-icon"][data-status="running"]')
       .last();
-    await expect(codeExecStatus).toContainText('running', { timeout: 8000 });
+    await expect(runningStatusIcon).toBeVisible({ timeout: 15000 });
 
     const actionContent = context.window.locator('.message-llm-action-response').last();
     await expect(actionContent).toContainText('post-tool text while running', { timeout: 8000 });
 
-    await expect(codeExecStatus).not.toContainText('running', { timeout: 15000 });
+    await expect(
+      context.window.locator('[data-testid="message-code-exec-status-icon"][data-status="running"]')
+    ).toHaveCount(0, { timeout: 15000 });
   });
 
   /* Preconditions: scripted response emits pre-tool reasoning, code_exec, then post-tool text
@@ -1554,6 +1558,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
             callId: 'order-1',
             toolName: 'code_exec',
             arguments: {
+              task_summary: 'Check visual order',
               code: "const started=Date.now();while(Date.now()-started<800){};console.log('ordered');",
               timeout_ms: 10000,
             },
@@ -1601,8 +1606,8 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     const codeExecBlocks = context.window.locator('[data-testid="message-code-exec-block"]');
     await expect(codeExecBlocks).toHaveCount(1);
     await expect(
-      context.window.locator('[data-testid="message-code-exec-status"]').last()
-    ).not.toContainText('running', { timeout: 15000 });
+      context.window.locator('[data-testid="message-code-exec-status-icon"][data-status="running"]')
+    ).toHaveCount(0, { timeout: 15000 });
     await expect(codeExecBlocks).toHaveCount(1);
   });
 
@@ -1619,6 +1624,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
             callId: 'no-post-text-1',
             toolName: 'code_exec',
             arguments: {
+              task_summary: 'Check running before terminal',
               code: "await new Promise((resolve) => setTimeout(resolve, 1500)); console.log('finished');",
               timeout_ms: 10000,
             },
@@ -1635,14 +1641,16 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await messageInput.fill('Check running before terminal without post-tool text');
     await messageInput.press('Enter');
 
-    const codeExecStatus = context.window
-      .locator('[data-testid="message-code-exec-status"]')
+    const runningStatusIcon = context.window
+      .locator('[data-testid="message-code-exec-status-icon"][data-status="running"]')
       .last();
-    await expect(codeExecStatus).toContainText('running', { timeout: 8000 });
+    await expect(runningStatusIcon).toBeVisible({ timeout: 8000 });
 
     const actionContent = context.window.locator('.message-llm-action-response').last();
     await expect(actionContent).toContainText('after terminal step', { timeout: 15000 });
-    await expect(codeExecStatus).not.toContainText('running', { timeout: 8000 });
+    await expect(
+      context.window.locator('[data-testid="message-code-exec-status-icon"][data-status="running"]')
+    ).toHaveCount(0, { timeout: 8000 });
     await expect(context.window.locator('[data-testid="message-code-exec-block"]')).toHaveCount(1);
   });
 
@@ -1658,12 +1666,12 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
           {
             callId: 'multi-1',
             toolName: 'code_exec',
-            arguments: { code: "console.log('A')", timeout_ms: 10000 },
+            arguments: { task_summary: 'Run code', code: "console.log('A')", timeout_ms: 10000 },
           },
           {
             callId: 'multi-2',
             toolName: 'code_exec',
-            arguments: { code: "console.log('B')", timeout_ms: 10000 },
+            arguments: { task_summary: 'Run code', code: "console.log('B')", timeout_ms: 10000 },
           },
         ],
       },
@@ -1691,6 +1699,84 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     expect(requestCount).toBeLessThanOrEqual(3);
   });
 
+  /* Preconditions: first response contains code_exec tool_call with auto-title metadata comment inside nested payload string,
+     second response repairs to plain text
+     Action: User sends message
+     Assertions: invalid tool_call is not persisted, metadata comment is not rendered, and repaired text is shown
+     Requirements: llm-integration.9.5.3.2, llm-integration.11.3, llm-integration.16.1.4 */
+  test('should reject title-meta inside tool payload and repair without rendering metadata comment', async () => {
+    mockLLMServer.setStreamingMode(true);
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        toolCalls: [
+          {
+            callId: 'title-meta-nested-tool',
+            toolName: 'code_exec',
+            arguments: {
+              task_summary: 'Inspect page',
+              code: "console.log('inspect');",
+              metadata: {
+                note: '<!-- clerkly:title-meta: {"title":"Bad title","rename_need_score":90} -->',
+              },
+            },
+          },
+        ],
+      },
+      {
+        content:
+          '{"action":{"type":"text","content":"repair completed after invalid tool payload"}}',
+      },
+    ]);
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await messageInput.fill('Trigger invalid tool payload with metadata');
+    await messageInput.press('Enter');
+
+    const actionContent = context.window.locator('.message-llm-action-response').last();
+    await expect(actionContent).toContainText('repair completed after invalid tool payload', {
+      timeout: 15000,
+    });
+    await expect(context.window.locator('[data-testid="message-code-exec-block"]')).toHaveCount(0);
+    await expect(context.window.locator('[data-testid="message-final-answer-block"]')).toHaveCount(
+      0
+    );
+    await expect(context.window.locator('text=clerkly:title-meta')).toHaveCount(0);
+
+    const agentId = (await getAgentIdsFromApi(context.window))[0];
+    const persistedToolCallsCount = await context.window.evaluate(async (id) => {
+      const api = (
+        window as unknown as {
+          api: {
+            messages: {
+              list: (
+                agentId: string
+              ) => Promise<{ success: boolean; data?: Array<{ kind: string; payload?: unknown }> }>;
+            };
+          };
+        }
+      ).api;
+      const result = await api.messages.list(id);
+      if (!result.success || !result.data) {
+        return -1;
+      }
+      return result.data.filter((message) => {
+        if (message.kind !== 'tool_call') {
+          return false;
+        }
+        const payload = message.payload as { data?: { toolName?: string } };
+        return payload?.data?.toolName === 'code_exec';
+      }).length;
+    }, agentId);
+    expect(persistedToolCallsCount).toBe(0);
+
+    const requestCount = mockLLMServer
+      .getRequestLogs()
+      .filter((entry) => entry.method === 'POST' && entry.path === '/v1/responses').length;
+    expect(requestCount).toBeGreaterThanOrEqual(2);
+    expect(requestCount).toBeLessThanOrEqual(3);
+  });
+
   /* Preconditions: First model response contains terminal code_exec(policy_denied), second returns text
      Action: User sends one message
      Assertions: pipeline immediately continues to next model step after terminal tool_result
@@ -1703,7 +1789,11 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
           {
             callId: 'code-loop-1',
             toolName: 'code_exec',
-            arguments: { code: "fetch('https://example.com')", timeout_ms: 10000 },
+            arguments: {
+              task_summary: 'Run code',
+              code: "fetch('https://example.com')",
+              timeout_ms: 10000,
+            },
           },
         ],
       },
@@ -1725,7 +1815,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
       timeout: 5000,
     });
     await expect(
-      context.window.locator('[data-testid="message-code-exec-status"]').last()
+      context.window.locator('[data-testid="message-code-exec-toggle"]').last()
     ).not.toHaveText('running');
 
     const requestCount = mockLLMServer
@@ -1967,8 +2057,52 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expect(finalAnswerBlock).toContainText('Checklist item');
 
     await expect(
-      context.window.locator('.message-llm-action-response', {
+      context.window.locator('[data-testid="message-llm-action"]', {
         hasText: '{"summary_points":["Checklist item"]}',
+      })
+    ).toHaveCount(0);
+    await expectNoToastError(context.window);
+  });
+
+  /* Preconditions: MockLLMServer returns valid final_answer tool_call and duplicate markdown bullet summary in output text
+     Action: User sends a message
+     Assertions: UI renders only final_answer checklist block and does not show duplicate markdown summary llm bubble
+     Requirements: llm-integration.9.5.3.3, llm-integration.9.5.6.2 */
+  test('should not render duplicate markdown summary before final_answer checklist', async () => {
+    mockLLMServer.setStreamingMode(true);
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        toolCalls: [
+          {
+            callId: 'final-checklist-markdown-dup-1',
+            toolName: 'final_answer',
+            arguments: {
+              summary_points: ['Checklist item', 'Another item'],
+            },
+          },
+        ],
+        content: '- Checklist item\n- Another item',
+      },
+    ]);
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await messageInput.fill('Render tool call without duplicate markdown summary');
+    await messageInput.press('Enter');
+
+    const finalAnswerBlock = context.window
+      .locator('[data-testid="message-final-answer-block"]')
+      .last();
+    await expect(finalAnswerBlock).toBeVisible({ timeout: 15000 });
+    await expect(context.window.locator('[data-testid="message-final-answer-item"]')).toHaveCount(
+      2
+    );
+    await expect(finalAnswerBlock).toContainText('Checklist item');
+    await expect(finalAnswerBlock).toContainText('Another item');
+
+    await expect(
+      context.window.locator('[data-testid="message-llm-action"]', {
+        hasText: 'Checklist item',
       })
     ).toHaveCount(0);
     await expectNoToastError(context.window);
@@ -2718,8 +2852,32 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
      Assertions: katex inline rendered
      Requirements: agents.7.7 */
   test('should render markdown inline math', async () => {
-    await renderMarkdownMessage('Inline $$E=mc^2$$');
-    await expect(context.window.locator('.message-llm-action-response .katex')).toBeVisible();
+    await renderMarkdownMessage('Inline $E=mc^2$');
+    const actionContent = context.window.locator('.message-llm-action-response').last();
+    await expect(actionContent.locator('.katex').first()).toBeVisible();
+    await expect(actionContent.locator('.katex-display')).toHaveCount(0);
+    await expect(actionContent).toContainText('Inline');
+  });
+
+  /* Preconditions: MockLLMServer returns inline single-dollar math symbols used in plain text and list item
+     Action: User sends a message
+     Assertions: inline symbols are rendered as KaTeX and not shown as raw $...$ literals
+     Requirements: agents.7.7 */
+  test('should render single-dollar inline symbols in paragraphs and lists', async () => {
+    await renderMarkdownMessage(
+      [
+        'Сделал оценку: $\\pi$ методом Монте-Карло.',
+        '',
+        '- Ошибка: $|\\Delta|$ относительно `Math.PI`.',
+      ].join('\n')
+    );
+
+    const actionContent = context.window.locator('.message-llm-action-response').last();
+    await expect(actionContent.locator('.katex')).toHaveCount(2);
+    await expect(actionContent).toContainText('Сделал оценку');
+    await expect(actionContent).toContainText('Ошибка:');
+    await expect(actionContent).not.toContainText('$\\pi$');
+    await expect(actionContent).not.toContainText('$|\\Delta|$');
   });
 
   /* Preconditions: MockLLMServer returns markdown block math
@@ -2931,6 +3089,55 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expectNoToastError(context.window);
   });
 
+  /* Preconditions: Mock stream returns regular text with auto-title HTML comment and the same turn also emits tool_call(final_answer)
+     Action: User sends a message and waits for turn completion
+     Assertions: Agent rename is extracted from llm text, comment is not shown, and Final Answer checklist renders only real summary points
+     Requirements: llm-integration.16.1, llm-integration.16.1.4, llm-integration.9.5.3.2, agents.7.4.2.2.1 */
+  test('should extract agent title from llm text when the same turn also completes with final_answer', async () => {
+    const expectedTitle = 'Резюме статьи про AI-агентов';
+    mockLLMServer.setStreamingMode(true);
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        content: `Короткое резюме <!-- clerkly:title-meta: {"title":"${expectedTitle}","rename_need_score":91} -->`,
+        toolCalls: [
+          {
+            callId: 'final-title-text-1',
+            toolName: 'final_answer',
+            arguments: {
+              summary_points: ['Сформировал краткое резюме статьи на русском.'],
+            },
+          },
+        ],
+      },
+    ]);
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await messageInput.fill('Сделай краткое резюме статьи');
+    await messageInput.press('Enter');
+
+    const actionMessages = context.window.locator('.message-llm-action-response');
+    await expect(actionMessages.first()).toBeVisible({ timeout: 10000 });
+    const renderedChatText = await context.window.locator('body').innerText();
+    expect(renderedChatText).not.toContain(
+      `<!-- clerkly:title-meta: {"title":"${expectedTitle}","rename_need_score":91} -->`
+    );
+
+    const finalAnswerBlock = context.window
+      .locator('[data-testid="message-final-answer-block"]')
+      .last();
+    await expect(finalAnswerBlock).toBeVisible({ timeout: 10000 });
+    const summary = context.window.locator('[data-testid="message-final-answer-summary"]').last();
+    await expect(summary).toContainText('Сформировал краткое резюме статьи на русском.');
+    await expect(context.window.locator('[data-testid="message-final-answer-item"]')).toHaveCount(
+      1
+    );
+
+    const headerTitle = context.window.locator('[data-testid="agent-header-title"]');
+    await expect(headerTitle).toHaveText(expectedTitle, { timeout: 10000 });
+    await expectNoToastError(context.window);
+  });
+
   /* Preconditions: App uses mock provider and sends first chat request
      Action: User sends a message, test inspects provider request body
      Assertions: System prompt contains auto-title metadata contract
@@ -2965,9 +3172,9 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
 
   /* Preconditions: App uses mock provider and sends first chat request
      Action: User sends a message, test inspects provider request body
-     Assertions: System prompt forbids duplicating tool_call payload as plaintext JSON
-     Requirements: llm-integration.9.5.1.1 */
-  test('should include no tool-payload duplication rule in system prompt', async () => {
+     Assertions: System prompt forbids both raw payload mirroring and plain-text summary duplication before final_answer
+     Requirements: llm-integration.9.5.3.3, llm-integration.9.5.6 */
+  test('should include final_answer non-duplication rules in system prompt', async () => {
     mockLLMServer.setStreamingMode(true, {
       content: 'Simple answer',
       chunkDelayMs: 0,
@@ -2989,6 +3196,9 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
 
     expect(systemPrompt).toContain(
       'Do not duplicate tool payload as plain assistant text: never output raw JSON that mirrors `final_answer` arguments/output.'
+    );
+    expect(systemPrompt).toContain(
+      'do not first emit a normal assistant summary, bullet list, or checklist that repeats the same solved tasks'
     );
   });
 

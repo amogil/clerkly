@@ -11,7 +11,9 @@ UI-визуализация исполнения описывается в `docs
 ### Компоненты
 
 - **"CodeExecFeature" (Prompt layer)**
-  - добавляет системную инструкцию и tool schema `code_exec`.
+  - добавляет системную инструкцию и tool schema `code_exec`;
+  - фиксирует prompt-level иерархию, где `code_exec` является основным рабочим инструментом, а новые tool calls делаются только при наличии конкретного пробела в данных или обработке;
+  - явно разводит внешний LLM tool-loop (`max 1 tool_call` на один ответ модели) и внутренние sandbox helper-вызовы внутри одного `code_exec`, которые могут быть множественными и при необходимости конкурентными.
 - **"MainPipeline" (Main Process)**
   - обрабатывает tool call `code_exec`;
   - инициирует lifecycle persisted-сообщения выполнения;
@@ -23,10 +25,12 @@ UI-визуализация исполнения описывается в `docs
   - реализует timeout, cancel и гарантированную очистку после завершения вызова.
 - **"SandboxBridge" (Shared policy module)**
   - хранит централизованный allowlist/policy-правила sandbox tools;
+  - публикует разрешённые helper-ы sandbox runtime, включая `tools.http_request(...)`, когда он включён в allowlist;
   - используется runtime и unit-тестами как единый source of truth.
 - **"SandboxRuntime" (Sandbox Renderer)**
   - исполняет JavaScript-код;
-  - применяет injected runtime hardening (без preload) и собирает `stdout/stderr/error`;
+  - получает preload bridge `codeExecSandbox.js`, который публикует allowlisted bridge API в `globalThis.__sandboxBridge`;
+  - применяет runtime hardening поверх preload bridge и собирает `stdout/stderr/error`;
   - возвращает результат в main.
 
 ## Контракт данных
@@ -43,6 +47,7 @@ UI-визуализация исполнения описывается в `docs
     "callId": "call-code-exec-1",
     "toolName": "code_exec",
     "arguments": {
+      "task_summary": "Calculate and print hello-world output",
       "code": "console.log('hello')",
       "timeout_ms": 10000
     },
@@ -94,7 +99,7 @@ Lifecycle:
 3. Если аргументы невалидны (`invalid_tool_arguments`), `tool_call(code_exec)` не создаётся, sandbox не запускается, pipeline формирует model response validation error.
 4. Если аргументы валидны, `MainPipeline` создаёт persisted `kind: tool_call` сообщение (`toolName=code_exec`, `running`).
 5. `SandboxSessionManager` создаёт отдельную sandbox-инстанцию для текущего вызова.
-6. `SandboxRuntime` выполняет код и формирует результат.
+6. `SandboxRuntime` получает session-scoped preload bridge и выполняет код с доступом только к allowlisted helper-ам.
 7. `MainPipeline` обновляет то же сообщение до terminal status.
 8. Sandbox-инстанция текущего вызова очищается и уничтожается.
 
@@ -121,7 +126,7 @@ Lifecycle:
 
 ### Принципы
 
-- sandbox window запускается с `contextIsolation=true`, `nodeIntegration=false`, sandbox-режимом и injected hardening-скриптом (без preload entry).
+- sandbox window запускается с `contextIsolation=true`, `nodeIntegration=false`, sandbox-режимом и preload bridge entry для session-scoped allowlisted helper-ов.
 - sandbox API ограничен whitelist-методами.
 - любые привилегированные операции валидируются в main process.
 
@@ -171,6 +176,7 @@ Lifecycle:
 ### Закрытый список тулов sandbox runtime
 
 - JavaScript-код в sandbox runtime работает только через отдельный allowlist тулов (`SANDBOX_JS_TOOLS_ALLOWLIST`).
+- Helper `tools.http_request(...)`, если он включён в allowlist, является частью этого sandbox API и описывается профильной спецификацией `docs/specs/sandbox-http-request/*`.
 - Tool calls из основного pipeline потока (`MainPipeline` tool-loop) не прокидываются в sandbox bridge и недоступны для прямого вызова из JavaScript.
 - Любой вызов инструмента вне allowlist завершается `status=error` с `error.code='policy_denied'`.
 - Allowlist хранится централизованно и используется всеми проверками bridge/gateway.
@@ -193,6 +199,9 @@ Lifecycle:
 
 Информирование модели о лимитах:
 - prompt/tool-инструкция явно сообщает модели лимиты `timeout_ms`, `code` size, `stdout/stderr`, а также ограничения CPU/памяти sandbox.
+- prompt/tool-инструкция явно сообщает, что `code_exec` является основным рабочим инструментом turn для программной обработки, а не вспомогательной опцией “на случай необходимости”.
+- prompt/tool-инструкция явно требует оценивать достаточность уже полученных tool results перед новым exploratory вызовом.
+- prompt/tool-инструкция явно сообщает, что несколько allowlisted helper-вызовов внутри одного `code_exec` допустимы и что независимые helper-вызовы могут выполняться конкурентно через обычные async-механизмы JavaScript.
 
 Политика превышения CPU/памяти:
 Политика превышения CPU/памяти в текущей реализации:
@@ -234,13 +243,14 @@ Lifecycle:
 ### Модульные Тесты
 
 - `tests/unit/agents/MainPipeline.test.ts` — lifecycle `running -> terminal`, mapping `error.code`, cancel/timeout, дедупликация по `callId`, terminal-immutability.
-- `tests/unit/agents/PromptBuilder.test.ts` — наличие `code_exec` tool schema, лимитов и правил для модели (`timeout`, `code size`, `stdout/stderr`, CPU/RAM).
+- `tests/unit/agents/PromptBuilder.test.ts` — наличие `code_exec` tool schema, обязательного `task_summary` (1..200 символов) и правил для модели (`timeout`, `code size`, `stdout/stderr`, CPU/RAM).
 - `tests/unit/code_exec/SandboxSessionManager.test.ts` — one-call-one-sandbox, timeout, cancel, cleanup, shutdown timeout `15000`.
+- `tests/unit/code_exec/SandboxSessionManager.test.ts` — preload bridge bootstrap через `app.getAppPath()` и доступность `window.tools.http_request(...)` внутри sandbox runtime.
 - `tests/unit/code_exec/SandboxBridge.test.ts` — allowlist enforcement, запрет main-pipeline-only tools, `policy_denied`.
 - `tests/unit/code_exec/SandboxPolicy.test.ts` — browser/session policy hardening (`webRequest`, permissions, navigation, CSP/network deny).
 - `tests/unit/code_exec/SandboxSessionManager.test.ts` — capture `console.*`, раздельные `stdout/stderr`, запрет multithreading API.
 - `tests/unit/code_exec/OutputLimiter.test.ts` — лимиты `stdout/stderr`, truncation, флаги `stdout_truncated`/`stderr_truncated`.
-- `tests/unit/code_exec/CodeExecToolSchema.test.ts` — валидация `code`, `timeout_ms` диапазона и `additionalProperties=false`.
+- `tests/unit/code_exec/CodeExecToolSchema.test.ts` — валидация `task_summary` (1..200 символов), `code`, `timeout_ms` диапазона и `additionalProperties=false`.
 - `tests/unit/code_exec/CodeExecPersistenceMapper.test.ts` — запись `started_at`, `finished_at`, `duration_ms`, переход `done=false/true`.
 
 ### Функциональные Тесты

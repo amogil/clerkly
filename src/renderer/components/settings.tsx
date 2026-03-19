@@ -127,8 +127,7 @@ export function Settings({ onSignOut, onNavigate: _onNavigate }: SettingsProps) 
 
       try {
         const runtimeInfo = await window.api.app.getRuntimeInfo();
-        shouldLockToOpenAI =
-          runtimeInfo.success === true && runtimeInfo.data?.isPackaged === true;
+        shouldLockToOpenAI = runtimeInfo.success === true && runtimeInfo.data?.isPackaged === true;
 
         if (!runtimeInfo.success) {
           logger.warn(

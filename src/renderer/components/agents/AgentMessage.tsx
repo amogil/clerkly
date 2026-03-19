@@ -1,20 +1,24 @@
 import React from 'react';
 // Requirements: llm-integration.7, llm-integration.3.4.1, llm-integration.3.4.4, agents.4.22, agents.4.9, agents.4.10.1, agents.4.10.2, agents.7.4
+import { cjk } from '@streamdown/cjk';
+import { code } from '@streamdown/code';
+import { createMathPlugin } from '@streamdown/math';
+import { mermaid } from '@streamdown/mermaid';
 import {
   Check,
+  CheckCircleIcon,
   ChevronDownIcon,
-  CircleCheck,
-  CircleMinus,
-  CircleX,
-  Clock3,
-  Code2,
-  Loader2,
+  ClockAlert,
+  CircleSlash,
+  LoaderCircle,
+  XCircleIcon,
 } from 'lucide-react';
-import { Message, MessageContent, MessageResponse } from '../ai-elements/message';
+import { Streamdown } from 'streamdown';
+import { Message, MessageContent } from '../ai-elements/message';
 import { Reasoning, ReasoningContent } from '../ai-elements/reasoning';
 import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from '../ai-elements/tool';
 import { Queue, QueueItem } from '../ai-elements/queue';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
+import { CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toUIMessage } from '../../lib/messageMapper';
 import {
   normalizeMathDelimiters,
@@ -25,51 +29,197 @@ import { AgentErrorDialog } from './AgentErrorDialog';
 import type { AgentDialogActionItem } from './AgentDialog';
 import { AgentReasoningTrigger } from './AgentReasoningTrigger';
 
+const TITLE_META_COMMENT_RENDER_PATTERN = /<!--\s*clerkly:title-meta:[\s\S]*?(?:-->|$)/g;
+
 interface AgentMessageProps {
   message: MessageSnapshot;
   isReasoningStreaming?: boolean;
   onNavigate?: (screen: string) => void;
 }
 
-// Requirements: agents.7.4.6.8
-export function buildJavaScriptFence(code: string): string {
-  const longestBacktickRun = Math.max(0, ...(code.match(/`+/g) ?? []).map((match) => match.length));
-  const fenceLength = Math.max(3, longestBacktickRun + 1);
-  const fence = '`'.repeat(fenceLength);
-  return `${fence}javascript\n${code}\n${fence}`;
+const streamdownPlugins = {
+  cjk,
+  code,
+  math: createMathPlugin({ singleDollarTextMath: true }),
+  mermaid,
+};
+
+type AgentMarkdownResponseProps = React.ComponentProps<typeof Streamdown>;
+
+// Requirements: agents.7.7, agents.7.7.1, agents.7.7.1.1
+function AgentMarkdownResponse({ className, ...props }: AgentMarkdownResponseProps) {
+  return (
+    <Streamdown
+      className={`size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 ${className ?? ''}`.trim()}
+      plugins={streamdownPlugins}
+      {...props}
+    />
+  );
 }
 
-function getCodeExecStatusIcon(status: string) {
-  switch (status) {
-    case 'success':
-      return CircleCheck;
-    case 'running':
-      return Loader2;
-    case 'error':
-      return CircleX;
-    case 'timeout':
-      return Clock3;
-    case 'cancelled':
-      return CircleMinus;
-    default:
-      return Loader2;
+interface AgentReasoningContentProps extends React.ComponentProps<typeof ReasoningContent> {
+  children: string;
+}
+
+// Requirements: llm-integration.7.2, agents.7.7, agents.7.7.1, agents.7.7.1.1
+function AgentReasoningContent({ className, children, ...props }: AgentReasoningContentProps) {
+  return (
+    <ReasoningContent
+      className={[
+        'mt-4 text-sm',
+        'data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 text-muted-foreground outline-none data-[state=closed]:animate-out data-[state=open]:animate-in',
+        className,
+      ]
+        .filter(Boolean)
+        .join(' ')}
+      {...props}
+    >
+      {children}
+    </ReasoningContent>
+  );
+}
+
+// Requirements: agents.7.4.2.2.1, agents.14.5
+function stripAutoTitleMetadataComments(text: string): string {
+  return text.replace(TITLE_META_COMMENT_RENDER_PATTERN, '');
+}
+
+// Requirements: agents.7.4.2.2.1, agents.7.4.6.3, agents.14.5
+function sanitizeInlineToolText(text: string): string {
+  return stripAutoTitleMetadataComments(text)
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+// Requirements: agents.7.7
+function stripMarkdownFootnotes(text: string): string {
+  const lines = text.split(/\r?\n/);
+  const output: string[] = [];
+  let inFence = false;
+  let fenceChar: '`' | '~' | null = null;
+  let fenceLength = 0;
+
+  const toggleFence = (line: string): void => {
+    const match = line.match(/^\s*([`~]{3,})/);
+    if (!match) {
+      return;
+    }
+
+    const marker = match[1];
+    if (!marker) {
+      return;
+    }
+    const markerChar = marker[0] as '`' | '~';
+    const markerLength = marker.length;
+
+    if (!inFence) {
+      inFence = true;
+      fenceChar = markerChar;
+      fenceLength = markerLength;
+      return;
+    }
+
+    if (fenceChar === markerChar && markerLength >= fenceLength) {
+      inFence = false;
+      fenceChar = null;
+      fenceLength = 0;
+    }
+  };
+
+  const stripFootnoteRefsOutsideInlineCode = (line: string): string => {
+    let result = '';
+    let index = 0;
+    let inlineCodeFenceLength = 0;
+
+    while (index < line.length) {
+      if (line.charAt(index) === '`') {
+        let tickCount = 1;
+        while (index + tickCount < line.length && line.charAt(index + tickCount) === '`') {
+          tickCount += 1;
+        }
+
+        result += line.slice(index, index + tickCount);
+
+        if (inlineCodeFenceLength === 0) {
+          inlineCodeFenceLength = tickCount;
+        } else if (inlineCodeFenceLength === tickCount) {
+          inlineCodeFenceLength = 0;
+        }
+
+        index += tickCount;
+        continue;
+      }
+
+      if (
+        inlineCodeFenceLength === 0 &&
+        line.charAt(index) === '[' &&
+        line.charAt(index + 1) === '^'
+      ) {
+        let end = index + 2;
+        while (end < line.length && line.charAt(end) !== ']') {
+          end += 1;
+        }
+        if (end < line.length && end > index + 2) {
+          index = end + 1;
+          continue;
+        }
+      }
+
+      result += line.charAt(index);
+      index += 1;
+    }
+
+    return result;
+  };
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i] ?? '';
+    const isDefinitionLine = !inFence && /^\[\^[^\]\r\n]+\]:/.test(line);
+
+    if (isDefinitionLine) {
+      while (
+        i + 1 < lines.length &&
+        (/^[ \t]{2,}/.test(lines[i + 1] ?? '') || (lines[i + 1] ?? '') === '')
+      ) {
+        i += 1;
+      }
+      continue;
+    }
+
+    if (inFence) {
+      output.push(line);
+      toggleFence(line);
+      continue;
+    }
+
+    output.push(stripFootnoteRefsOutsideInlineCode(line));
+    toggleFence(line);
   }
+
+  return output
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
-function getCodeExecStatusIconColorClass(status: string) {
+// Requirements: agents.7.4.6.5.2
+function buildCodeFence(code: string, language: string): string {
+  return `\`\`\`${language}\n${code}\n\`\`\``;
+}
+
+// Requirements: agents.7.4.6.4
+function getCodeExecStatusIcon(status: string): React.ReactNode {
   switch (status) {
     case 'success':
-      return 'text-emerald-600';
-    case 'running':
-      return 'text-muted-foreground';
-    case 'error':
-      return 'text-red-600';
-    case 'timeout':
-      return 'text-amber-600';
+      return <CheckCircleIcon className="size-4 text-green-600" />;
     case 'cancelled':
-      return 'text-zinc-500';
+      return <CircleSlash className="size-4 text-muted-foreground" />;
+    case 'running':
+      return <LoaderCircle className="size-4 animate-spin text-primary" />;
+    case 'timeout':
+      return <ClockAlert className="size-4 text-amber-600" />;
     default:
-      return 'text-muted-foreground';
+      return <XCircleIcon className="size-4 text-red-600" />;
   }
 }
 
@@ -80,7 +230,6 @@ export function AgentMessage({
   onNavigate,
 }: AgentMessageProps) {
   const [isDismissed, setIsDismissed] = React.useState(false);
-  const [isCodeExecExpanded, setIsCodeExecExpanded] = React.useState(false);
 
   const isLlmMessage = message.kind === 'llm';
   const llmData = isLlmMessage
@@ -89,9 +238,13 @@ export function AgentMessage({
   const llmReasoning = llmData?.['reasoning'] as { text?: string } | undefined;
   const llmTextRaw =
     typeof llmData?.['text'] === 'string' ? (llmData['text'] as string) : undefined;
-  const llmText = llmTextRaw ? normalizeMathDelimiters(llmTextRaw) : undefined;
+  const llmText = llmTextRaw
+    ? normalizeMathDelimiters(stripMarkdownFootnotes(stripAutoTitleMetadataComments(llmTextRaw)))
+    : undefined;
   const llmReasoningText = llmReasoning?.text
-    ? normalizeMathDelimiters(normalizeReasoningMarkdownSpacing(llmReasoning.text))
+    ? normalizeMathDelimiters(
+        normalizeReasoningMarkdownSpacing(stripAutoTitleMetadataComments(llmReasoning.text))
+      )
     : undefined;
 
   if (message.kind === 'user') {
@@ -172,9 +325,9 @@ export function AgentMessage({
             // Requirements: llm-integration.2, llm-integration.7.2 — collapsible reasoning block with streaming state
             <Reasoning isStreaming={isReasoningStreaming}>
               <AgentReasoningTrigger />
-              <ReasoningContent data-testid="message-llm-reasoning">
+              <AgentReasoningContent data-testid="message-llm-reasoning">
                 {llmReasoningText ?? ''}
-              </ReasoningContent>
+              </AgentReasoningContent>
             </Reasoning>
           )}
           {llmText ? (
@@ -182,9 +335,9 @@ export function AgentMessage({
               data-testid="message-llm-action"
               className="w-full message-llm-action message-llm-action-response"
             >
-              <MessageResponse className="message-response-transparent-code-blocks text-sm leading-relaxed break-words">
+              <AgentMarkdownResponse className="message-response-transparent-code-blocks text-sm leading-relaxed break-words">
                 {llmText}
-              </MessageResponse>
+              </AgentMarkdownResponse>
             </MessageContent>
           ) : null}
         </div>
@@ -208,7 +361,10 @@ export function AgentMessage({
           : undefined;
       const summaryPointsRaw = args?.['summary_points'];
       const summaryPoints = Array.isArray(summaryPointsRaw)
-        ? summaryPointsRaw.filter((point): point is string => typeof point === 'string')
+        ? summaryPointsRaw
+            .filter((point): point is string => typeof point === 'string')
+            .map((point) => stripAutoTitleMetadataComments(point))
+            .filter((point) => point.trim().length > 0)
         : [];
 
       return (
@@ -225,9 +381,9 @@ export function AgentMessage({
                     <Check className="h-3 w-3 text-white" />
                   </span>
                   <MessageContent className="w-full message-llm-action message-llm-action-response">
-                    <MessageResponse className="message-response-transparent-code-blocks text-sm leading-relaxed break-words">
+                    <AgentMarkdownResponse className="message-response-transparent-code-blocks text-sm leading-relaxed break-words">
                       {point}
-                    </MessageResponse>
+                    </AgentMarkdownResponse>
                   </MessageContent>
                 </QueueItem>
               ))}
@@ -259,129 +415,125 @@ export function AgentMessage({
         status?: unknown;
         stdout?: unknown;
         stderr?: unknown;
+        error?: unknown;
       };
       const status =
         typeof output.status === 'string' ? output.status : message.done ? 'success' : 'running';
       const stdout = typeof output.stdout === 'string' ? output.stdout : '';
       const stderr = typeof output.stderr === 'string' ? output.stderr : '';
+      const errorData =
+        output.error && typeof output.error === 'object'
+          ? (output.error as { code?: unknown; message?: unknown })
+          : null;
+      const errorCode = typeof errorData?.code === 'string' ? errorData.code : null;
+      const errorMessage = typeof errorData?.message === 'string' ? errorData.message : null;
+      const errorText =
+        errorCode && errorMessage
+          ? `${errorCode}: ${errorMessage}`
+          : (errorMessage ?? errorCode ?? null);
       const codeInput =
         toolData.arguments && typeof toolData.arguments.code === 'string'
-          ? toolData.arguments.code
-          : JSON.stringify(toolData.arguments ?? {}, null, 2);
-      const StatusIcon = getCodeExecStatusIcon(status);
-      const statusIconColorClass = getCodeExecStatusIconColorClass(status);
-
+          ? stripAutoTitleMetadataComments(toolData.arguments.code)
+          : stripAutoTitleMetadataComments(JSON.stringify(toolData.arguments ?? {}, null, 2));
+      const taskSummary =
+        toolData.arguments && typeof toolData.arguments.task_summary === 'string'
+          ? sanitizeInlineToolText(toolData.arguments.task_summary) || 'Code'
+          : 'Code';
       return (
         <Message from="assistant" className="w-full max-w-full">
-          <Collapsible
-            open={isCodeExecExpanded}
-            onOpenChange={setIsCodeExecExpanded}
-            data-testid="message-code-exec-collapsible"
+          <Tool
+            data-testid="message-code-exec-block"
+            className="bg-transparent min-w-0 max-w-full overflow-hidden"
           >
-            <Tool data-testid="message-code-exec-block" className="bg-transparent">
-              <ToolHeader
-                data-testid="message-code-exec-header"
-                className={`items-center justify-between ${isCodeExecExpanded ? 'mb-2' : 'mb-0'}`}
-              >
-                <div className="flex min-w-0 items-center gap-2">
-                  <Code2
-                    data-testid="message-code-exec-icon"
-                    className="h-4 w-4 shrink-0 text-muted-foreground"
-                  />
-                  <div
-                    data-testid="message-code-exec-title"
-                    className="font-medium text-foreground"
-                  >
-                    Code
-                  </div>
-                  <div
-                    data-testid="message-code-exec-status"
-                    className="inline-flex items-center rounded-full border border-border/70 bg-transparent px-2 py-0.5 text-xs text-muted-foreground"
-                  >
-                    <StatusIcon
-                      data-testid="message-code-exec-status-icon"
-                      className={`mr-1 h-3 w-3 shrink-0 ${statusIconColorClass} ${status === 'running' ? 'animate-spin' : ''}`}
-                    />
-                    {status}
+            <CollapsibleTrigger
+              data-testid="message-code-exec-toggle"
+              className="relative z-10 flex w-full items-start justify-between gap-4 p-3 text-left"
+            >
+              <div className="flex min-w-0 items-start gap-2 text-left">
+                <span
+                  data-testid="message-code-exec-status-icon"
+                  data-status={status}
+                  className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center"
+                >
+                  {getCodeExecStatusIcon(status)}
+                </span>
+                <span className="min-w-0 text-left font-medium text-sm leading-relaxed break-words">
+                  {taskSummary}
+                </span>
+              </div>
+              <ChevronDownIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+            </CollapsibleTrigger>
+            <ToolContent
+              data-testid="message-code-exec-content"
+              className="relative z-0 min-w-0 max-w-full grid-cols-1 overflow-hidden data-[state=closed]:pointer-events-none"
+            >
+              <div className="min-w-0 max-w-full overflow-hidden">
+                <div
+                  data-testid="message-code-exec-input"
+                  className="message-code-exec-text-section"
+                >
+                  <AgentMarkdownResponse className="message-response-transparent-code-blocks text-sm leading-relaxed break-words">
+                    {buildCodeFence(codeInput, 'JavaScript')}
+                  </AgentMarkdownResponse>
+                </div>
+              </div>
+              {stdout.length > 0 ? (
+                <div className="min-w-0 max-w-full overflow-hidden">
+                  <div data-testid="message-code-exec-stdout">
+                    <AgentMarkdownResponse className="message-response-transparent-code-blocks text-sm leading-relaxed break-words">
+                      {buildCodeFence(stripAutoTitleMetadataComments(stdout), 'Output')}
+                    </AgentMarkdownResponse>
                   </div>
                 </div>
-                <CollapsibleTrigger asChild>
-                  <button
-                    data-testid="message-code-exec-toggle"
-                    type="button"
-                    className="group inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
-                  >
-                    <ChevronDownIcon className="h-4 w-4 transition-transform group-data-[state=closed]:-rotate-90" />
-                  </button>
-                </CollapsibleTrigger>
-              </ToolHeader>
-              <CollapsibleContent data-testid="message-code-exec-content">
-                <ToolContent>
-                  <ToolInput data-testid="message-code-exec-input" className="bg-transparent">
-                    <MessageResponse className="message-response-transparent-code-blocks message-response-code-exec-input text-xs leading-relaxed break-words">
-                      {buildJavaScriptFence(codeInput)}
-                    </MessageResponse>
-                  </ToolInput>
-                  {stdout.length > 0 ? (
-                    <div>
-                      <div className="mb-1 text-xs font-medium text-muted-foreground">stdout</div>
-                      <ToolOutput data-testid="message-code-exec-stdout" className="bg-transparent">
-                        {stdout}
-                      </ToolOutput>
-                    </div>
-                  ) : null}
-                  {stderr.length > 0 ? (
-                    <div>
-                      <div className="mb-1 text-xs font-medium text-muted-foreground">stderr</div>
-                      <ToolOutput data-testid="message-code-exec-stderr" className="bg-transparent">
-                        {stderr}
-                      </ToolOutput>
-                    </div>
-                  ) : null}
-                </ToolContent>
-              </CollapsibleContent>
-            </Tool>
-          </Collapsible>
+              ) : null}
+              {stderr.length > 0 ? (
+                <div className="min-w-0 max-w-full overflow-hidden">
+                  <div data-testid="message-code-exec-stderr">
+                    <AgentMarkdownResponse className="message-response-transparent-code-blocks text-sm leading-relaxed break-words">
+                      {buildCodeFence(stripAutoTitleMetadataComments(stderr), 'Output')}
+                    </AgentMarkdownResponse>
+                  </div>
+                </div>
+              ) : null}
+              {errorText ? (
+                <div className="min-w-0 max-w-full overflow-hidden">
+                  <div data-testid="message-code-exec-error">
+                    <AgentMarkdownResponse className="message-response-transparent-code-blocks text-sm leading-relaxed break-words">
+                      {buildCodeFence(stripAutoTitleMetadataComments(errorText), 'Error')}
+                    </AgentMarkdownResponse>
+                  </div>
+                </div>
+              ) : null}
+            </ToolContent>
+          </Tool>
         </Message>
       );
     }
 
     const toolName = toolPart.toolName;
-    const callId = toolPart.toolCallId;
-    const toolInput = JSON.stringify(toolPart.input ?? {}, null, 2);
-    const toolStatus =
-      toolPart.state === 'output-error'
-        ? 'error'
-        : toolPart.state === 'output-available'
-          ? 'success'
-          : 'in-progress';
-
-    const toolOutput =
-      toolPart.state === 'output-error'
-        ? (toolPart.errorText ?? 'Tool execution failed')
-        : toolPart.state === 'output-available'
-          ? JSON.stringify(toolPart.output ?? {}, null, 2)
-          : '';
 
     return (
       <Message from="assistant" className="w-full max-w-full">
         <Tool data-testid="message-tool-call">
-          <ToolHeader data-testid="message-tool-call-header">
-            <div className="font-medium text-foreground">{toolName}</div>
-            <div className="text-xs text-muted-foreground">
-              {toolStatus} · {callId}
-            </div>
-          </ToolHeader>
+          <ToolHeader
+            data-testid="message-tool-call-header"
+            title={toolName}
+            toolName={toolName}
+            type="dynamic-tool"
+            state={toolPart.state}
+          />
           <ToolContent>
-            <div>
-              <div className="mb-1 text-xs font-medium text-muted-foreground">Input</div>
-              <ToolInput data-testid="message-tool-call-input">{toolInput}</ToolInput>
-            </div>
+            <ToolInput data-testid="message-tool-call-input" input={toolPart.input ?? {}} />
             {toolPart.state === 'output-available' || toolPart.state === 'output-error' ? (
-              <div>
-                <div className="mb-1 text-xs font-medium text-muted-foreground">Output</div>
-                <ToolOutput data-testid="message-tool-call-output">{toolOutput}</ToolOutput>
-              </div>
+              <ToolOutput
+                data-testid="message-tool-call-output"
+                output={toolPart.state === 'output-available' ? (toolPart.output ?? {}) : undefined}
+                errorText={
+                  toolPart.state === 'output-error'
+                    ? (toolPart.errorText ?? 'Tool execution failed')
+                    : undefined
+                }
+              />
             ) : null}
           </ToolContent>
         </Tool>

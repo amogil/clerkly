@@ -111,7 +111,7 @@ describe('Prompt model contract', () => {
           data: {
             callId: 'call-1',
             toolName: 'code_exec',
-            arguments: { code: '1+1' },
+            arguments: { task_summary: 'Run code', code: '1+1' },
             output: { status: 'success', stdout: '2' },
           },
         }),
@@ -151,7 +151,7 @@ describe('Prompt model contract', () => {
             data: {
               callId: `call-${status}`,
               toolName: 'code_exec',
-              arguments: { code: 'x' },
+              arguments: { task_summary: 'Run code', code: 'x' },
               output: { status, stdout: '', stderr: '' },
             },
           }),
@@ -287,7 +287,11 @@ describe('Prompt model contract', () => {
         id: 4,
         kind: 'tool_call',
         payloadJson: JSON.stringify({
-          data: { toolName: 'code_exec', arguments: { code: 'x' }, output: { status: 'success' } },
+          data: {
+            toolName: 'code_exec',
+            arguments: { task_summary: 'Run code', code: 'x' },
+            output: { status: 'success' },
+          },
         }),
       }),
       makeMessage({
@@ -297,7 +301,7 @@ describe('Prompt model contract', () => {
           data: {
             callId: 'call-running',
             toolName: 'code_exec',
-            arguments: { code: 'x' },
+            arguments: { task_summary: 'Run code', code: 'x' },
             output: { status: 'running' },
           },
         }),
@@ -309,7 +313,7 @@ describe('Prompt model contract', () => {
           data: {
             callId: 'call-ok',
             toolName: 'code_exec',
-            arguments: { code: 'console.log(1)' },
+            arguments: { task_summary: 'Run code', code: 'console.log(1)' },
             output: { status: 'success', stdout: '1' },
           },
         }),

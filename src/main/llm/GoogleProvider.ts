@@ -13,6 +13,7 @@ import { LLM_PROVIDERS, ERROR_MESSAGES, CHAT_TIMEOUT_MS } from './LLMConfig';
 import { LLMRequestAbortedError, isAbortLikeError } from './LLMErrors';
 
 const AI_SDK_MAX_RETRIES = 2;
+const AI_SDK_MAX_STEPS = 100000;
 
 /**
  * Google Gemini LLM provider implementation
@@ -60,16 +61,22 @@ export class GoogleProvider implements ILLMProvider {
 
   /**
    * Send a chat request with streaming reasoning/text and native tool-calling events.
-   * Requirements: llm-integration.5.1, llm-integration.5.4, llm-integration.5.5, llm-integration.5.7
+   * Requirements: llm-integration.5.1, llm-integration.5.4, llm-integration.5.5, llm-integration.5.7, llm-integration.11.5
    */
   async chat(
     messages: ChatMessage[],
     options: ChatOptions,
-    onChunk: (chunk: ChatChunk) => void
+    onChunk: (chunk: ChatChunk) => void,
+    signal?: AbortSignal
   ): Promise<LLMChatResult> {
     const apiUrl = process.env.CLERKLY_GOOGLE_LLM_API_URL ?? this.config.apiUrl;
     const baseURL = apiUrl.replace(/\/models\/.*$/, '');
     const controller = new AbortController();
+    if (signal?.aborted) {
+      controller.abort();
+    }
+    const abortFromExternalSignal = () => controller.abort();
+    signal?.addEventListener('abort', abortFromExternalSignal);
     const timeoutId = setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);
     const stepDiagnostics: Array<{
       stepIndex: number;
@@ -92,7 +99,6 @@ export class GoogleProvider implements ILLMProvider {
       }
 
       const { streamText, tool, jsonSchema, stepCountIs } = await import('ai');
-      const stopWhen = typeof stepCountIs === 'function' ? stepCountIs(5) : undefined;
       const { createGoogleGenerativeAI } = await import('@ai-sdk/google');
 
       const google = createGoogleGenerativeAI({ apiKey: this.apiKey, baseURL });
@@ -107,7 +113,7 @@ export class GoogleProvider implements ILLMProvider {
         messages: messages as unknown as Parameters<typeof streamText>[0]['messages'],
         sendReasoning: true,
         tools,
-        ...(stopWhen ? { stopWhen } : {}),
+        stopWhen: stepCountIs(AI_SDK_MAX_STEPS),
         maxRetries: AI_SDK_MAX_RETRIES,
         abortSignal: controller.signal,
         onStepFinish: (event: Record<string, unknown>) => {
@@ -260,6 +266,7 @@ export class GoogleProvider implements ILLMProvider {
       throw error;
     } finally {
       clearTimeout(timeoutId);
+      signal?.removeEventListener('abort', abortFromExternalSignal);
     }
   }
 

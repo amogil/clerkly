@@ -15,6 +15,7 @@ export const CODE_EXEC_LIMITS = {
 
 export type CodeExecErrorCode =
   | 'policy_denied'
+  | 'forbidden_destination'
   | 'sandbox_runtime_error'
   | 'invalid_tool_arguments'
   | 'limit_exceeded'
@@ -23,6 +24,7 @@ export type CodeExecErrorCode =
 export type CodeExecStatus = 'running' | 'success' | 'error' | 'timeout' | 'cancelled';
 
 export interface CodeExecToolInput {
+  task_summary: string;
   code: string;
   timeout_ms?: number;
 }
@@ -43,29 +45,61 @@ export interface CodeExecToolOutput {
 
 export interface CodeExecValidationResult {
   ok: boolean;
-  value?: { code: string; timeoutMs: number };
+  value?: { taskSummary: string; code: string; timeoutMs: number };
   error?: CodeExecError;
 }
 
-// Requirements: code_exec.3.1.1, code_exec.3.1.3-3.1.5, code_exec.5.1
+// Requirements: code_exec.3.1.1-3.1.1.4, code_exec.3.1.3-3.1.5, code_exec.5.1
 export function validateCodeExecInput(args: Record<string, unknown>): CodeExecValidationResult {
   const keys = Object.keys(args);
-  if (!keys.includes('code')) {
+  if (!keys.includes('task_summary') || !keys.includes('code')) {
     return {
       ok: false,
       error: {
         code: 'invalid_tool_arguments',
-        message: 'code_exec requires a string field "code".',
+        message: 'code_exec requires string fields "task_summary" and "code".',
       },
     };
   }
 
-  if (keys.some((key) => key !== 'code' && key !== 'timeout_ms')) {
+  if (keys.some((key) => key !== 'task_summary' && key !== 'code' && key !== 'timeout_ms')) {
     return {
       ok: false,
       error: {
         code: 'invalid_tool_arguments',
-        message: 'code_exec accepts only: code, timeout_ms.',
+        message: 'code_exec accepts only: task_summary, code, timeout_ms.',
+      },
+    };
+  }
+
+  const taskSummary = args.task_summary;
+  if (typeof taskSummary !== 'string') {
+    return {
+      ok: false,
+      error: {
+        code: 'invalid_tool_arguments',
+        message: 'code_exec.task_summary must be a string.',
+      },
+    };
+  }
+
+  const trimmedTaskSummary = taskSummary.trim();
+  if (trimmedTaskSummary.length === 0) {
+    return {
+      ok: false,
+      error: {
+        code: 'invalid_tool_arguments',
+        message: 'code_exec.task_summary must not be empty.',
+      },
+    };
+  }
+
+  if (trimmedTaskSummary.length > 200) {
+    return {
+      ok: false,
+      error: {
+        code: 'invalid_tool_arguments',
+        message: 'code_exec.task_summary must be 1..200 characters after trim.',
       },
     };
   }
@@ -121,7 +155,7 @@ export function validateCodeExecInput(args: Record<string, unknown>): CodeExecVa
 
   return {
     ok: true,
-    value: { code, timeoutMs },
+    value: { taskSummary: trimmedTaskSummary, code, timeoutMs },
   };
 }
 
@@ -139,8 +173,16 @@ export function makeCodeExecError(code: CodeExecErrorCode, message: string): Cod
 export const CODE_EXEC_TOOL_SCHEMA: Record<string, unknown> = {
   type: 'object',
   additionalProperties: false,
-  required: ['code'],
+  required: ['task_summary', 'code'],
   properties: {
+    task_summary: {
+      type: 'string',
+      description:
+        'Required short description of the work performed by this code execution (1..200 characters).',
+      minLength: 1,
+      maxLength: 200,
+      pattern: '.*\\S.*',
+    },
     code: {
       type: 'string',
       description: `JavaScript code to run in sandbox runtime (max ${CODE_EXEC_LIMITS.maxCodeBytes} bytes).`,

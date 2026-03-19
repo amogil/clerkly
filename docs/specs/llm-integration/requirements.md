@@ -244,7 +244,7 @@
 
 #### Критерии Приемки
 
-5.1. Внутренний слой адаптера провайдера (`ILLMProvider` или эквивалент) ДОЛЖЕН иметь метод `chat(messages, options, onChunk)` с event-driven стримингом чанков (`reasoning`, `text`, `tool_call`, `turn_error`) и успешным завершением текущего ответа модели через завершение `chat(...)` без ошибки
+5.1. Внутренний слой адаптера провайдера (`ILLMProvider` или эквивалент) ДОЛЖЕН иметь метод `chat(messages, options, onChunk, signal?)` с event-driven стримингом чанков (`reasoning`, `text`, `tool_call`, `turn_error`) и успешным завершением текущего ответа модели через завершение `chat(...)` без ошибки; переданный `signal` ДОЛЖЕН использоваться для штатной отмены активного turn без формирования `kind:error`
 
 5.2. `apiKey` ДОЛЖЕН передаваться в конструктор провайдера (не в каждый вызов)
 
@@ -386,7 +386,11 @@
 
 9.4.1. КОГДА terminal `tool_call(code_exec)` имеет `output.status = "success"`, ТО до следующего шага tool-loop статус агента ДОЛЖЕН оставаться `in-progress`.
 
-9.4.2. КОГДА terminal `tool_call(code_exec)` имеет `output.status ∈ {"error","timeout","cancelled"}`, ТО статус агента ДОЛЖЕН оставаться `in-progress`.
+9.4.2. КОГДА terminal `tool_call(code_exec)` имеет `output.status ∈ {"error","timeout"}`, ТО статус агента ДОЛЖЕН оставаться `in-progress`.
+
+9.4.3. КОГДА terminal `tool_call(code_exec)` имеет `output.status = "cancelled"`, ТО статус агента ДОЛЖЕН вычисляться по runtime-контексту активности pipeline:
+  - ПОКА pipeline этого агента активен, статус ДОЛЖЕН оставаться `in-progress`;
+  - ЕСЛИ pipeline этого агента не активен, статус ДОЛЖЕН быть `awaiting-response`.
 
 9.5. Основной пользовательский ответ модели ДОЛЖЕН оставаться в `kind: llm` (`data.text`).
 
@@ -399,6 +403,7 @@
   - ЕСЛИ работа не завершена и `final_answer` не вызывается, модель ДОЛЖНА явно запросить у пользователя недостающую информацию или подтверждение следующего шага;
   - `final_answer` вызывается только в одиночку в рамках одного model-turn; в том же turn НЕ ДОЛЖНЫ вызываться другие инструменты;
   - payload вызова инструмента НЕ ДОЛЖЕН дублироваться в plain-text ответе модели; модель НЕ ДОЛЖНА выводить сырой JSON, который зеркалирует `tool_call` (`summary_points`, `toolName`, `arguments`, `output`);
+  - КОГДА модель завершает turn через `final_answer`, она НЕ ДОЛЖНА перед этим публиковать обычный markdown/text summary, буллеты или checklist, которые дублируют тот же итог; список решённых задач ДОЛЖЕН находиться только в `final_answer.summary_points`;
   - КОГДА пункт `summary_points` содержит математическое выражение, модель ДОЛЖНА использовать KaTeX-совместимые markdown-делимитеры `$...$` (inline) или `$$...$$` (block);
   - `summary_points` соблюдает лимиты `llm-integration.9.5.2-9.5.3.1` и перечисляет решённые задачи.
 
@@ -408,6 +413,10 @@
 
 9.5.3.1. КАЖДЫЙ пункт `summary_points` ДОЛЖЕН содержать непустой текст: после `trim` длина ДОЛЖНА быть не менее 1 символа.
 
+9.5.3.2. Служебный auto-title metadata comment вида `<!-- clerkly:title-meta: ... -->` ДОЛЖЕН появляться только в текстовом ответе модели (`kind: llm`, `data.text`) и НЕ ДОЛЖЕН появляться в других payload-контрактах turn.
+
+9.5.3.3. КОГДА модель завершает turn через `final_answer`, ТО она НЕ ДОЛЖНА перед этим публиковать обычный markdown/text summary, буллеты или checklist, которые дублируют тот же итог; список решённых задач ДОЛЖЕН находиться только в `final_answer.summary_points`.
+
 9.5.4. ЕСЛИ `final_answer` нарушает ограничения по `summary_points`, ТО система ДОЛЖНА считать такой `final_answer` невалидным и запустить retry/repair по правилам `llm-integration.12.*`.
 
 9.5.5. ОТСУТСТВИЕ `summary_points` (или пустой массив) НЕ ДОЛЖНО считаться успешным `completed`; такой `final_answer` ДОЛЖЕН обрабатываться как невалидный по правилам retry/repair (`llm-integration.12.*`).
@@ -415,6 +424,8 @@
 9.5.6. КОГДА в успешной попытке присутствует валидный `tool_call`, ТО система НЕ ДОЛЖНА сохранять отдельный пользовательский `kind: llm` ответ, если его текст является техническим сериализованным payload вызова инструмента (например, JSON с полями `summary_points`, `toolName`, `arguments`, `output`).
 
 9.5.6.1. Это правило ДОЛЖНО применяться к ответам провайдера, где в одном model-turn одновременно пришли `kind: llm` text-chunks/`output.text` и валидный `tool_call`; дублирование в UI в таком случае считается следствием персиста, а не отдельной ошибки renderer.
+
+9.5.6.2. КОГДА в успешной попытке присутствует валидный `final_answer`, ТО система НЕ ДОЛЖНА сохранять отдельный пользовательский `kind: llm` ответ, если его markdown/text контент эквивалентен `final_answer.summary_points` и отличается только списочной разметкой (`-`, `*`, `+`, `1.`, `1)`, checkbox-style prefixes) или пробельной нормализацией.
 
 9.6. В целевой модели невалидный `final_answer` НЕ ДОЛЖЕН фиксироваться как успешный `completed`; он ДОЛЖЕН либо быть исправлен через retry, либо завершиться `kind:error` при исчерпании retry-лимита.
 
@@ -425,7 +436,8 @@
 - `tests/functional/agent-status-calculation.spec.ts` - "should keep in-progress status for done code_exec success tool_call"
 - `tests/functional/agent-status-calculation.spec.ts` - "should keep in-progress status from done code_exec error tool_call"
 - `tests/functional/agent-status-calculation.spec.ts` - "should keep in-progress status from done code_exec timeout tool_call"
-- `tests/functional/agent-status-calculation.spec.ts` - "should keep in-progress status from done code_exec cancelled tool_call"
+- `tests/functional/llm-chat.spec.ts` — "should cancel active request via stop button without creating error message"
+- `tests/functional/agent-status-calculation.spec.ts` - "should resolve awaiting-response status from done code_exec cancelled tool_call when pipeline is inactive"
 
 ---
 
@@ -463,7 +475,9 @@
 
 11.1.1. КОГДА один ответ модели содержит более одного `tool_call`, ТО такой ответ ДОЛЖЕН считаться невалидным и ДОЛЖЕН обрабатываться через bounded retry/repair без создания persisted `kind: tool_call`.
 
-11.1.2. КОГДА `tool_call` валиден, ТО система ДОЛЖНА отложить создание persisted `kind: tool_call` до завершения текущей reasoning-фазы ответа модели, затем завершить текущий непустой LLM-сегмент и только после этого создать persisted `kind: tool_call` в статусе выполнения (`done = false`, `status = "running"`).
+11.1.2. КОГДА `tool_call` валиден, ТО система ДОЛЖНА на boundary этого `tool_call` немедленно завершить текущий pre-tool LLM-сегмент (если он непустой) и сразу создать persisted `kind: tool_call` в статусе выполнения (`done = false`, `status = "running"`), без ожидания дополнительных чанков в текущем model-step.
+
+11.1.2.1. КОГДА после boundary `tool_call` в том же model-step приходят дополнительные `reasoning`/`text` чанки, ТО они ДОЛЖНЫ относиться к post-tool LLM-сегменту и НЕ ДОЛЖНЫ задерживать появление persisted `tool_call(status="running")` в UI.
 
 11.1.3. КОГДА `tool_call` валиден и создан в `running`, ТО post-tool LLM-сегмент ДОЛЖЕН начинать стримиться без ожидания terminal-результата `tool_call`.
 
@@ -507,6 +521,10 @@
 
 11.5.1. КОГДА `tool_call` завершён terminal-результатом с любым статусом (`success | error | timeout | cancelled`), ТО `MainPipeline` ДОЛЖЕН немедленно передать этот результат в следующий шаг модели.
 
+11.5.2. Система НЕ ДОЛЖНА использовать скрытый provider-level лимит числа шагов tool-loop; любой guard на число шагов ДОЛЖЕН быть явно задокументирован в `llm-integration` как safety bound runtime-слоя.
+
+11.5.3. КОГДА SDK-managed tool-loop выполняется внутри provider-layer, ТО provider-layer ДОЛЖЕН обеспечивать continuation после terminal `tool_result` до доменного завершения turn (`final_answer`, ошибка, abort/cancel`) в пределах явно задокументированного safety bound, а НЕ останавливаться после первого tool-result без такого задокументированного guard.
+
 11.6. Runtime-поток tool-calling НЕ ДОЛЖЕН требовать отдельного realtime-сигнала; обработка ДОЛЖНА строиться по persisted `message.created`/`message.updated`.
 
 11.6.1. Система ДОЛЖНА гарантировать, что при завершении run/attempt не остаётся `tool_call` со статусом `running`: каждый такой вызов ДОЛЖЕН переходить в terminal-статус (`cancelled | error | timeout | success`) до завершения попытки.
@@ -526,8 +544,9 @@
 - `tests/functional/llm-chat.spec.ts` — "should continue to next model step after terminal code_exec tool result"
 - `tests/functional/llm-chat.spec.ts` — "should render final_answer tool_call as completed assistant response"
 - `tests/functional/llm-chat.spec.ts` — "should render math inside tool_call(final_answer) checklist item"
-- `tests/functional/llm-chat.spec.ts` — "should include no tool-payload duplication rule in system prompt"
+- `tests/functional/llm-chat.spec.ts` — "should include final_answer non-duplication rules in system prompt"
 - `tests/functional/llm-chat.spec.ts` — "should not render raw final_answer JSON text when tool_call(final_answer) is present"
+- `tests/functional/llm-chat.spec.ts` — "should not render duplicate markdown summary before final_answer checklist"
 
 ### 12. Надёжность chat-flow и обработка некорректных ответов
 
@@ -631,7 +650,7 @@
 
 #### Критерии Приемки
 
-16.1. Система ДОЛЖНА извлекать метаданные auto-title из markdown-ответа ассистента по контракту `<!-- clerkly:title-meta: ... -->` в рамках того же `MainPipeline.run(...)`.
+16.1. Система ДОЛЖНА извлекать метаданные auto-title из обычного markdown/text-ответа ассистента (`kind: llm`, `data.text`) по контракту `<!-- clerkly:title-meta: ... -->` в рамках того же `MainPipeline.run(...)`.
 
 16.1.1. КОГДА текущий turn удовлетворяет guard-условиям auto-title, ТО система ДОЛЖНА добавлять в model input per-turn system instruction с контрактом генерации `<!-- clerkly:title-meta: ... -->` и контекстом текущего названия чата.
 
@@ -640,6 +659,8 @@
   - `rename_need_score` (целое число `0..100`, где большее значение означает более сильную необходимость смены текущего названия).
 
 16.1.3. Payload тега `<!-- clerkly:title-meta: ... -->` ДОЛЖЕН быть JSON-объектом формата `{"title":"<short title>","rename_need_score":NN}`.
+
+16.1.4. Служебный тег `<!-- clerkly:title-meta: ... -->` ДОЛЖЕН размещаться только в обычном markdown/text-ответе модели и НЕ ДОЛЖЕН размещаться внутри аргументов инструментов.
 
 16.2. Система НЕ ДОЛЖНА выполнять отдельный LLM-вызов для генерации названия агента.
 
@@ -684,8 +705,10 @@
 #### Функциональные Тесты
 
 - `tests/functional/llm-chat.spec.ts` - "should extract agent title and rename_need_score from single metadata comment in the same model turn"
+- `tests/functional/llm-chat.spec.ts` - "should extract agent title from llm text when the same turn also completes with final_answer"
 - `tests/functional/llm-chat.spec.ts` - "should include auto-title metadata contract in system prompt"
 - `tests/functional/llm-chat.spec.ts` - "should ignore unterminated title metadata comment when payload exceeds 260 chars"
+- `tests/functional/llm-chat.spec.ts` - "should reject title-meta inside tool payload and repair without rendering metadata comment"
 - `tests/functional/llm-chat.spec.ts` - "should keep default name when first user message is non-meaningful"
 - `tests/functional/llm-chat.spec.ts` - "should skip rename when rename_need_score is below threshold"
 - `tests/functional/llm-chat.spec.ts` - "should skip rename when rename_need_score is invalid"

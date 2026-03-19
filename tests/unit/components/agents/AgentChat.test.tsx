@@ -99,31 +99,65 @@ jest.mock('../../../../src/renderer/components/ai-elements/prompt-input', () => 
     setText: React.Dispatch<React.SetStateAction<string>>;
   } | null>(null);
 
+  const PromptInputProvider = ({ children }: { children: React.ReactNode }) => {
+    const [text, setText] = React.useState('');
+    return <PromptContext.Provider value={{ text, setText }}>{children}</PromptContext.Provider>;
+  };
+
   const PromptInput = ({
     children,
+    className,
     onSubmit,
   }: {
     children: React.ReactNode;
-    onSubmit?: (message: { text?: string }) => void;
+    className?: string;
+    onSubmit?: (message: { text?: string }) => void | Promise<void>;
   }) => {
-    const [text, setText] = React.useState('');
+    const providerContext = React.useContext(PromptContext);
+    const [localText, setLocalText] = React.useState('');
+    const text = providerContext?.text ?? localText;
+    const setText = providerContext?.setText ?? setLocalText;
+
     return (
-      <PromptContext.Provider value={{ text, setText }}>
-        <form
-          data-testid="agent-prompt-input"
-          onSubmit={(event) => {
-            event.preventDefault();
-            onSubmit?.({ text });
-          }}
-        >
-          {children}
-        </form>
-      </PromptContext.Provider>
+      <form
+        data-testid="agent-prompt-input"
+        className={className}
+        onSubmit={async (event) => {
+          event.preventDefault();
+          const result = onSubmit?.({ text });
+          if (result instanceof Promise) {
+            await result;
+          }
+        }}
+      >
+        <PromptContext.Provider value={{ text, setText }}>{children}</PromptContext.Provider>
+      </form>
     );
   };
 
   const PromptInputBody = ({ children }: { children: React.ReactNode }) => <div>{children}</div>;
-  const PromptInputFooter = ({ children }: { children: React.ReactNode }) => <div>{children}</div>;
+  const PromptInputFooter = ({
+    children,
+    className,
+  }: {
+    children: React.ReactNode;
+    className?: string;
+  }) => (
+    <div data-testid="prompt-input-footer" className={className}>
+      {children}
+    </div>
+  );
+  const PromptInputTools = ({
+    children,
+    className,
+  }: {
+    children?: React.ReactNode;
+    className?: string;
+  }) => (
+    <div data-testid="prompt-input-tools" className={className}>
+      {children}
+    </div>
+  );
   const PromptInputSubmit = ({
     disabled,
     ...props
@@ -138,12 +172,8 @@ jest.mock('../../../../src/renderer/components/ai-elements/prompt-input', () => 
   };
   const PromptInputTextarea = React.forwardRef<
     HTMLTextAreaElement,
-    {
-      className?: string;
-      value?: string;
-      onChange?: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
-    }
-  >(({ className, value, onChange }, ref) => {
+    React.TextareaHTMLAttributes<HTMLTextAreaElement>
+  >(({ className, value, onChange, ...props }, ref) => {
     const context = React.useContext(PromptContext);
     const resolvedValue = value ?? context?.text ?? '';
     return (
@@ -156,18 +186,36 @@ jest.mock('../../../../src/renderer/components/ai-elements/prompt-input', () => 
           context?.setText(event.target.value);
           onChange?.(event);
         }}
+        {...props}
         value={resolvedValue}
       />
     );
   });
   PromptInputTextarea.displayName = 'PromptInputTextarea';
 
+  const usePromptInputController = () => {
+    const context = React.useContext(PromptContext);
+    if (!context) {
+      throw new Error('Missing PromptInputProvider');
+    }
+    return {
+      textInput: {
+        value: context.text,
+        setInput: context.setText,
+        clear: () => context.setText(''),
+      },
+    };
+  };
+
   return {
     PromptInput,
     PromptInputBody,
     PromptInputFooter,
+    PromptInputTools,
+    PromptInputProvider,
     PromptInputSubmit,
     PromptInputTextarea,
+    usePromptInputController,
   };
 });
 
@@ -438,15 +486,21 @@ describe('AgentChat — messages rendering', () => {
 describe('AgentChat — send message', () => {
   /* Preconditions: user types text and submits
      Action: change input value, click submit
-     Assertions: sendMessage called with trimmed text
-     Requirements: agents.4.3 */
+     Assertions: sendMessage called with trimmed text and input is cleared immediately after submit starts
+     Requirements: agents.4.3.1, agents.4.3.2 */
   it('should call sendMessage and clear input on submit', async () => {
-    mockSendMessage.mockResolvedValue(true);
+    let resolveSend: ((value: boolean) => void) | null = null;
+    mockSendMessage.mockImplementation(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveSend = resolve;
+        })
+    );
     render(<AgentChat {...defaultProps} />);
 
     // Type into the controlled input — triggers onChange → setTaskInput
     await act(async () => {
-      fireEvent.change(screen.getByTestId('prompt-input-field'), {
+      fireEvent.change(screen.getByTestId('auto-expanding-textarea'), {
         target: { value: 'Hello agent' },
       });
     });
@@ -455,6 +509,11 @@ describe('AgentChat — send message', () => {
     });
 
     expect(mockSendMessage).toHaveBeenCalledWith('Hello agent');
+    expect(screen.getByTestId('auto-expanding-textarea')).toHaveValue('');
+
+    await act(async () => {
+      resolveSend?.(true);
+    });
   });
 
   /* Preconditions: AgentWelcome prompt clicked
@@ -477,13 +536,13 @@ describe('AgentChat — send message', () => {
   /* Preconditions: sendMessage returns false (error)
      Action: submit message
      Assertions: input NOT cleared (message preserved for retry)
-     Requirements: agents.4.3 */
+     Requirements: agents.4.3.3 */
   it('should NOT clear input when sendMessage returns false', async () => {
     mockSendMessage.mockResolvedValue(false);
     render(<AgentChat {...defaultProps} />);
 
     await act(async () => {
-      fireEvent.change(screen.getByTestId('prompt-input-field'), {
+      fireEvent.change(screen.getByTestId('auto-expanding-textarea'), {
         target: { value: 'Hello' },
       });
     });
@@ -491,7 +550,7 @@ describe('AgentChat — send message', () => {
       fireEvent.click(screen.getByTestId('prompt-input-send'));
     });
 
-    expect(screen.getByTestId('prompt-input-field')).toHaveValue('Hello');
+    expect(screen.getByTestId('auto-expanding-textarea')).toHaveValue('Hello');
   });
 });
 
@@ -565,6 +624,67 @@ describe('AgentChat — PromptInput rendered', () => {
     expect(screen.getByTestId('agent-prompt-input')).toBeInTheDocument();
   });
 
+  /* Preconditions: component rendered with idle input
+     Action: inspect PromptInput root classes
+     Assertions: usage-level unfocused visibility styling is applied without replacing vendor focus ownership
+     Requirements: agents.4.7.4, agents.4.7.5 */
+  it('should apply usage-level unfocused input visibility styling', () => {
+    render(<AgentChat {...defaultProps} />);
+
+    expect(screen.getByTestId('agent-prompt-input')).toHaveClass(
+      'mt-4',
+      '[&_[data-slot=input-group]]:border-border/80'
+    );
+  });
+
+  /* Preconditions: component rendered
+     Action: render AgentChat
+     Assertions: shortcut hint is rendered inside PromptInput footer content
+     Requirements: agents.4.3, agents.4.4, agents.4.7.3 */
+  it('should render keyboard shortcut hint inside PromptInput footer', () => {
+    render(<AgentChat {...defaultProps} />);
+
+    const promptInput = screen.getByTestId('agent-prompt-input');
+    const promptInputFooter = screen.getByTestId('prompt-input-footer');
+    const promptInputTools = screen.getByTestId('prompt-input-tools');
+    const shortcutHint = screen.getByText('Press Enter to send, Shift+Enter for new line');
+    expect(shortcutHint).toBeInTheDocument();
+    expect(promptInput).toContainElement(shortcutHint);
+    expect(promptInputFooter).not.toHaveClass('pb-5');
+    expect(promptInputTools).toHaveClass('items-end');
+    expect(shortcutHint).toHaveClass('translate-y-3', 'text-[11px]', 'text-muted-foreground/80');
+    expect(shortcutHint).not.toHaveClass('pl-3');
+  });
+
+  /* Preconditions: component rendered
+     Action: render AgentChat
+     Assertions: input area wrapper uses the same horizontal inset as chat content
+     Requirements: agents.4.1, agents.4.3 */
+  it('should render input area with horizontal chat inset', () => {
+    render(<AgentChat {...defaultProps} />);
+
+    expect(screen.getByTestId('agent-chat-input-area')).toHaveClass(
+      'px-6',
+      'pb-6',
+      'overflow-y-auto',
+      '[scrollbar-gutter:stable]'
+    );
+  });
+
+  /* Preconditions: component rendered
+     Action: render AgentChat
+     Assertions: PromptInput textarea keeps usage-level horizontal padding without custom sizing overrides
+     Requirements: agents.4.5, agents.4.6, agents.4.7 */
+  it('should keep PromptInput textarea usage-level padding without custom sizing overrides', () => {
+    render(<AgentChat {...defaultProps} />);
+
+    expect(screen.getByTestId('auto-expanding-textarea')).toHaveClass('px-3');
+    expect(screen.getByTestId('auto-expanding-textarea')).toHaveClass('max-h-32');
+    expect(screen.getByTestId('auto-expanding-textarea')).toHaveClass('block');
+    expect(screen.getByTestId('auto-expanding-textarea')).toHaveClass('flex-none');
+    expect(screen.getByTestId('auto-expanding-textarea')).toHaveClass('[field-sizing:fixed]');
+  });
+
   /* Preconditions: agent status is not in-progress
      Action: render AgentChat
      Assertions: send button is rendered, stop button is not rendered
@@ -615,7 +735,7 @@ describe('AgentChat — PromptInput rendered', () => {
     expect(sendButton).toBeDisabled();
 
     await act(async () => {
-      fireEvent.change(screen.getByTestId('prompt-input-field'), {
+      fireEvent.change(screen.getByTestId('auto-expanding-textarea'), {
         target: { value: 'hello' },
       });
     });
@@ -635,7 +755,7 @@ describe('AgentChat — PromptInput rendered', () => {
     expect(stopButton).toBeEnabled();
 
     await act(async () => {
-      fireEvent.change(screen.getByTestId('prompt-input-field'), {
+      fireEvent.change(screen.getByTestId('auto-expanding-textarea'), {
         target: { value: '' },
       });
     });
@@ -643,16 +763,57 @@ describe('AgentChat — PromptInput rendered', () => {
   });
 });
 
-describe('AgentChat — textarea auto-resize on activation', () => {
-  /* Preconditions: textarea rendered in inactive chat
-     Action: chat becomes active without input change
-     Assertions: AgentChat does not inject inline sizing and preserves default PromptInput behavior
-     Requirements: agents.4.5, agents.4.6, agents.4.7 */
-  it('should keep default PromptInput sizing behavior when chat becomes active', () => {
-    const { rerender } = render(<AgentChat {...defaultProps} isActive={false} />);
-    rerender(<AgentChat {...defaultProps} isActive={true} />);
-    const textarea = screen.getByTestId('prompt-input-field') as HTMLTextAreaElement;
-    expect(textarea.style.height).toBe('');
-    expect(textarea.style.overflowY).toBe('');
+describe('AgentChat — textarea autoresize contract', () => {
+  /* Preconditions: active chat textarea is rendered
+     Action: textarea receives one line and then multiline content
+     Assertions: baseline height is kept for up to two lines and grows afterwards
+     Requirements: agents.4.5, agents.4.6 */
+  it('should keep two-line baseline and grow after third line', async () => {
+    render(<AgentChat {...defaultProps} />);
+    const textarea = screen.getByTestId('auto-expanding-textarea') as HTMLTextAreaElement;
+
+    Object.defineProperty(textarea, 'scrollHeight', {
+      configurable: true,
+      get: () => {
+        const lineCount = textarea.value.split('\n').length;
+        return lineCount <= 2 ? 64 : lineCount === 3 ? 84 : 104;
+      },
+    });
+
+    await act(async () => {
+      fireEvent.change(textarea, { target: { value: 'Line 1' } });
+    });
+    expect(textarea.style.height).toBe('64px');
+    expect(textarea.style.overflowY).toBe('hidden');
+
+    await act(async () => {
+      fireEvent.change(textarea, { target: { value: 'Line 1\nLine 2' } });
+    });
+    expect(textarea.style.height).toBe('64px');
+    expect(textarea.style.overflowY).toBe('hidden');
+
+    await act(async () => {
+      fireEvent.change(textarea, { target: { value: 'Line 1\nLine 2\nLine 3' } });
+    });
+    expect(textarea.style.height).toBe('84px');
+    expect(textarea.style.overflowY).toBe('hidden');
+  });
+
+  /* Preconditions: active chat textarea is rendered
+     Action: textarea receives content above the visible height cap
+     Assertions: height is capped and internal scroll is enabled
+     Requirements: agents.4.7, agents.4.7.1 */
+  it('should cap height and enable internal scroll after visible limit', async () => {
+    render(<AgentChat {...defaultProps} />);
+    const textarea = screen.getByTestId('auto-expanding-textarea') as HTMLTextAreaElement;
+
+    await act(async () => {
+      fireEvent.change(textarea, {
+        target: { value: 'Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6' },
+      });
+    });
+
+    expect(textarea.style.height).toBe('124px');
+    expect(textarea.style.overflowY).toBe('auto');
   });
 });

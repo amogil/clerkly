@@ -230,7 +230,7 @@ describe('MainPipeline.run()', () => {
       data: {
         callId: 'call-main-pipeline',
         toolName: 'code_exec',
-        arguments: { code: 'console.log(1)' },
+        arguments: { task_summary: 'Run code', code: 'console.log(1)' },
         output: { status: 'success', stdout: '1' },
       },
     });
@@ -389,13 +389,13 @@ describe('MainPipeline.run()', () => {
             type: 'tool_call',
             callId: 'call-force-flush',
             toolName: 'code_exec',
-            arguments: { code: "console.log('x')" },
+            arguments: { task_summary: 'Run code', code: "console.log('x')" },
           });
           onChunk({
             type: 'tool_result',
             callId: 'call-force-flush',
             toolName: 'code_exec',
-            arguments: { code: "console.log('x')" },
+            arguments: { task_summary: 'Run code', code: "console.log('x')" },
             output: { status: 'success', stdout: 'x\n', stderr: '' },
             status: 'success',
           });
@@ -1200,6 +1200,58 @@ describe('MainPipeline.run()', () => {
     );
   });
 
+  /* Preconditions: provider returns final_answer with auto-title metadata comment embedded in summary_points
+     Action: run pipeline once
+     Assertions: invalid tool arguments are surfaced as provider error and final_answer is not persisted
+     Requirements: llm-integration.9.5.3.2, llm-integration.9.5.4, llm-integration.12.3 */
+  it('creates kind:error when final_answer contains auto-title metadata comment', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-title-meta',
+          toolName: 'final_answer',
+          arguments: {
+            summary_points: [
+              '<!-- clerkly:title-meta: {"title":"Sprint Summary","rename_need_score":90} -->',
+            ],
+          },
+        });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'error',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          error: expect.objectContaining({
+            type: 'provider',
+            message: expect.stringContaining('invalid tool call arguments'),
+          }),
+        }),
+      }),
+      1,
+      true
+    );
+    expect(messageManager.create).not.toHaveBeenCalledWith(
+      'agent-1',
+      'tool_call',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          toolName: 'final_answer',
+        }),
+      }),
+      1,
+      expect.anything()
+    );
+  });
+
   /* Preconditions: first attempt returns invalid final_answer, second attempt returns valid final_answer
      Action: run pipeline with retry/repair
      Assertions: persisted final_answer is created once with attemptId=2 in order metadata
@@ -1273,7 +1325,7 @@ describe('MainPipeline.run()', () => {
         type: 'tool_call',
         callId: `call-code-${attempt}`,
         toolName: 'code_exec',
-        arguments: { code: 'console.log(1)' },
+        arguments: { task_summary: 'Run code', code: 'console.log(1)' },
       });
       return { text: '' };
     });
@@ -1404,6 +1456,112 @@ describe('MainPipeline.run()', () => {
       }),
       1,
       true
+    );
+  });
+
+  /* Preconditions: provider returns code_exec tool_call with auto-title metadata comment embedded in task_summary
+     Action: run pipeline once
+     Assertions: invalid tool arguments are surfaced as provider error and code_exec tool_call is not persisted
+     Requirements: llm-integration.9.5.3.2, llm-integration.11.3, llm-integration.16.1.4 */
+  it('creates kind:error when code_exec task_summary contains auto-title metadata comment', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-code-exec-title-meta',
+          toolName: 'code_exec',
+          arguments: {
+            task_summary:
+              'Run check <!-- clerkly:title-meta: {"title":"Bad title","rename_need_score":90} -->',
+            code: "console.log('ok')",
+          },
+        });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'error',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          error: expect.objectContaining({
+            type: 'provider',
+            message: expect.stringContaining('invalid tool call arguments'),
+          }),
+        }),
+      }),
+      1,
+      true
+    );
+    expect(messageManager.create).not.toHaveBeenCalledWith(
+      'agent-1',
+      'tool_call',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          toolName: 'code_exec',
+        }),
+      }),
+      1,
+      expect.anything()
+    );
+  });
+
+  /* Preconditions: provider returns code_exec tool_call with auto-title metadata comment embedded in nested payload string field
+     Action: run pipeline once
+     Assertions: invalid tool arguments are surfaced as provider error and code_exec tool_call is not persisted
+     Requirements: llm-integration.9.5.3.2, llm-integration.11.3, llm-integration.16.1.4 */
+  it('creates kind:error when nested code_exec payload string contains auto-title metadata comment', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-code-exec-title-meta-nested',
+          toolName: 'code_exec',
+          arguments: {
+            task_summary: 'Run nested check',
+            code: "console.log('ok')",
+            metadata: {
+              note: '<!-- clerkly:title-meta: {"title":"Bad title","rename_need_score":90} -->',
+            },
+          },
+        });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'error',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          error: expect.objectContaining({
+            type: 'provider',
+            message: expect.stringContaining('invalid tool call arguments'),
+          }),
+        }),
+      }),
+      1,
+      true
+    );
+    expect(messageManager.create).not.toHaveBeenCalledWith(
+      'agent-1',
+      'tool_call',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          toolName: 'code_exec',
+        }),
+      }),
+      1,
+      expect.anything()
     );
   });
 
@@ -1641,14 +1799,14 @@ describe('MainPipeline.run()', () => {
           type: 'tool_call',
           callId: 'call-ordered',
           toolName: 'code_exec',
-          arguments: { code: "console.log('ok')" },
+          arguments: { task_summary: 'Run code', code: "console.log('ok')" },
         });
         onChunk({ type: 'text', delta: 'post text' });
         onChunk({
           type: 'tool_result',
           callId: 'call-ordered',
           toolName: 'code_exec',
-          arguments: { code: "console.log('ok')" },
+          arguments: { task_summary: 'Run code', code: "console.log('ok')" },
           output: { status: 'success', stdout: 'ok\n', stderr: '' },
           status: 'success',
         });
@@ -1698,14 +1856,14 @@ describe('MainPipeline.run()', () => {
           type: 'tool_call',
           callId: 'call-pre-finalize',
           toolName: 'code_exec',
-          arguments: { code: "console.log('ok')" },
+          arguments: { task_summary: 'Run code', code: "console.log('ok')" },
         });
         onChunk({ type: 'text', delta: 'post text' });
         onChunk({
           type: 'tool_result',
           callId: 'call-pre-finalize',
           toolName: 'code_exec',
-          arguments: { code: "console.log('ok')" },
+          arguments: { task_summary: 'Run code', code: "console.log('ok')" },
           output: { status: 'success', stdout: 'ok\n', stderr: '' },
           status: 'success',
         });
@@ -1744,11 +1902,11 @@ describe('MainPipeline.run()', () => {
     expect(finalizedPreToolOrder).toBeLessThan(runningToolCreateOrder);
   });
 
-  /* Preconditions: provider emits tool_call in the middle of reasoning stream
+  /* Preconditions: provider emits tool_call and then continues reasoning in the same model step
      Action: run pipeline for one attempt
-     Assertions: running tool_call is persisted only after reasoning stream tail is appended
+     Assertions: running tool_call is persisted immediately at tool_call boundary; subsequent reasoning is persisted after running tool_call
      Requirements: llm-integration.11.1.2 */
-  it('buffers tool_call until reasoning stream tail is processed', async () => {
+  it('persists running tool_call immediately and treats subsequent reasoning as post-tool segment', async () => {
     const { pipeline, llmProvider, messageManager } = makeMocks();
 
     llmProvider.chat.mockImplementation(
@@ -1758,7 +1916,7 @@ describe('MainPipeline.run()', () => {
           type: 'tool_call',
           callId: 'call-buffered-reasoning',
           toolName: 'code_exec',
-          arguments: { code: "console.log('ok')" },
+          arguments: { task_summary: 'Run code', code: "console.log('ok')" },
         });
         onChunk({ type: 'reasoning', delta: 'tail' });
         onChunk({ type: 'text', delta: 'post text' });
@@ -1766,7 +1924,7 @@ describe('MainPipeline.run()', () => {
           type: 'tool_result',
           callId: 'call-buffered-reasoning',
           toolName: 'code_exec',
-          arguments: { code: "console.log('ok')" },
+          arguments: { task_summary: 'Run code', code: "console.log('ok')" },
           output: { status: 'success', stdout: 'ok\n', stderr: '' },
           status: 'success',
         });
@@ -1809,9 +1967,9 @@ describe('MainPipeline.run()', () => {
     const runningToolCreateOrder =
       createMock.mock.invocationCallOrder[runningToolCreateIndex] ?? -1;
 
-    expect(tailReasoningOrder).toBeGreaterThan(0);
     expect(runningToolCreateOrder).toBeGreaterThan(0);
-    expect(tailReasoningOrder).toBeLessThan(runningToolCreateOrder);
+    expect(tailReasoningOrder).toBeGreaterThan(0);
+    expect(runningToolCreateOrder).toBeLessThan(tailReasoningOrder);
   });
 
   /* Preconditions: provider emits tool_call, then delays tool_result, and does not emit post-tool text
@@ -1827,14 +1985,14 @@ describe('MainPipeline.run()', () => {
           type: 'tool_call',
           callId: 'call-no-post-text',
           toolName: 'code_exec',
-          arguments: { code: "console.log('ok')" },
+          arguments: { task_summary: 'Run code', code: "console.log('ok')" },
         });
         await new Promise((resolve) => setTimeout(resolve, 150));
         onChunk({
           type: 'tool_result',
           callId: 'call-no-post-text',
           toolName: 'code_exec',
-          arguments: { code: "console.log('ok')" },
+          arguments: { task_summary: 'Run code', code: "console.log('ok')" },
           output: { status: 'success', stdout: 'ok\n', stderr: '' },
           status: 'success',
         });
@@ -2932,6 +3090,189 @@ describe('MainPipeline.run()', () => {
     expect(llmCreates).toHaveLength(1);
   });
 
+  /* Preconditions: Provider returns valid final_answer tool_call and output.text contains markdown bullet list matching summary_points
+     Action: Run pipeline for one user turn
+     Assertions: Duplicate markdown summary text is suppressed and kind:llm is not persisted
+     Requirements: llm-integration.9.5.3.3, llm-integration.9.5.6.2 */
+  it('does not persist duplicate llm text when markdown bullet list mirrors final_answer summary_points', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-bullet-dup',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['First done', 'Second done'] },
+        });
+        return { text: '- First done\n- Second done' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(0);
+  });
+
+  /* Preconditions: Provider returns valid final_answer tool_call and output.text contains numbered list matching summary_points with whitespace differences
+     Action: Run pipeline for one user turn
+     Assertions: Equivalent numbered summary text is suppressed and kind:llm is not persisted
+     Requirements: llm-integration.9.5.3.3, llm-integration.9.5.6.2 */
+  it('does not persist duplicate llm text when numbered list mirrors final_answer summary_points', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-numbered-dup',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['First done', 'Second done'] },
+        });
+        return { text: '1.  First done\n2) Second   done' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(0);
+  });
+
+  /* Preconditions: Provider returns valid final_answer tool_call and output.text contains markdown list that differs from summary_points
+     Action: Run pipeline for one user turn
+     Assertions: Non-equivalent markdown summary remains persisted as kind:llm
+     Requirements: llm-integration.9.5.6.2 */
+  it('persists llm text when markdown list does not mirror final_answer summary_points', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-bullet-non-mirror',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['First done', 'Second done'] },
+        });
+        return { text: '- First done\n- Different detail' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(1);
+    expect(llmCreates[0]?.[2]).toEqual(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          text: '- First done\n- Different detail',
+        }),
+      })
+    );
+  });
+
+  /* Preconditions: Provider returns valid final_answer tool_call and output.text starts with duplicate markdown summary followed by extra assistant text
+     Action: Run pipeline for one user turn
+     Assertions: Duplicate summary prefix is removed and only trailing non-duplicate text is persisted
+     Requirements: llm-integration.9.5.6.2 */
+  it('strips duplicate markdown summary prefix and preserves trailing assistant text', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-bullet-prefix-with-tail',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['Checklist item'] },
+        });
+        return { text: '- Checklist item\n\nHello! How can I help?' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(1);
+    expect(llmCreates[0]?.[2]).toEqual(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          text: 'Hello! How can I help?',
+        }),
+      })
+    );
+  });
+
+  /* Preconditions: Provider returns valid final_answer tool_call and output.text contains duplicate markdown list with escaped newline separators
+     Action: Run pipeline for one user turn
+     Assertions: Escaped-newline duplicate markdown summary is suppressed and kind:llm is not persisted
+     Requirements: llm-integration.9.5.3.3, llm-integration.9.5.6.2 */
+  it('does not persist duplicate llm text when markdown list mirror uses escaped newline separators', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-bullet-escaped-newline-dup',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['Checklist item', 'Another item'] },
+        });
+        return { text: '- Checklist item\\n- Another item' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(0);
+  });
+
+  /* Preconditions: Provider returns valid final_answer tool_call and output.text contains duplicate markdown summary where last list item is glued with trailing assistant text
+     Action: Run pipeline for one user turn
+     Assertions: Duplicate markdown summary is stripped and only trailing assistant text is persisted
+     Requirements: llm-integration.9.5.3.3, llm-integration.9.5.6.2 */
+  it('strips duplicate markdown summary when trailing assistant text is glued to last list item', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-bullet-glued-tail',
+          toolName: 'final_answer',
+          arguments: { summary_points: ['Checklist item', 'Another item'] },
+        });
+        return { text: '- Checklist item\n- Another itemHello! How can I help?' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    const llmCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'llm'
+    );
+    expect(llmCreates).toHaveLength(1);
+    expect(llmCreates[0]?.[2]).toEqual(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          text: 'Hello! How can I help?',
+        }),
+      })
+    );
+  });
+
   /* Preconditions: Provider streams final_answer tool_call and then streamed JSON chunks mirroring final payload
      Action: Run pipeline for one user turn
      Assertions: Streamed mirror text is suppressed and kind:llm is not persisted
@@ -3221,8 +3562,9 @@ describe('MainPipeline.run()', () => {
         bindToolExecutors: (
           tools: Array<{
             name: string;
-            execute?: (args: Record<string, unknown>) => Promise<unknown>;
-          }>
+            execute?: (args: Record<string, unknown>, signal?: AbortSignal) => Promise<unknown>;
+          }>,
+          fallbackSignal?: AbortSignal
         ) => Array<{
           execute: (args: Record<string, unknown>, opts?: unknown) => Promise<unknown>;
         }>;
@@ -3230,8 +3572,17 @@ describe('MainPipeline.run()', () => {
     ).bindToolExecutors.bind(pipeline);
 
     expect(extractAbortSignal({ abortSignal: signal })).toBe(signal);
+    expect(extractAbortSignal({ signal })).toBe(signal);
     expect(extractAbortSignal(signal)).toBe(signal);
     expect(extractToolCallId({ toolCallId: '  ' })).toBeUndefined();
+
+    const executeSpy = jest.fn(async () => ({ ok: true }));
+    const boundWithFallbackSignal = bindToolExecutors(
+      [{ name: 'code_exec', execute: executeSpy }],
+      signal
+    );
+    await boundWithFallbackSignal[0].execute({});
+    expect(executeSpy).toHaveBeenCalledWith({}, signal);
 
     const limiter = createLimiter(1);
     const order: string[] = [];

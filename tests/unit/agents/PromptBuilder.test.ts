@@ -169,6 +169,9 @@ describe('PromptBuilder.build()', () => {
       expect(result.systemPrompt).toContain(
         'Do not duplicate tool payload as plain assistant text'
       );
+      expect(result.systemPrompt).toContain(
+        'do not first emit a normal assistant summary, bullet list, or checklist that repeats the same solved tasks'
+      );
       expect(result.systemPrompt).toContain('list solved tasks');
       expect(result.systemPrompt).toContain('1 to 10 non-empty points');
       expect(result.systemPrompt).toContain(
@@ -205,7 +208,80 @@ describe('PromptBuilder.build()', () => {
       const sandboxManager = {} as SandboxSessionManager;
       const feature = new CodeExecFeature(sandboxManager);
       const result = makeBuilder('Base.', [feature]).build();
+      expect(result.systemPrompt).toContain('Tool priority and completion rules:');
+      expect(result.systemPrompt).toContain(
+        '`code_exec` is your primary work tool for computation, extraction, transformation, structured analysis, verification'
+      );
+      expect(result.systemPrompt).toContain(
+        'Inside one `code_exec` call, your sandbox code may use multiple allowlisted helper calls when needed to solve the task'
+      );
+      expect(result.systemPrompt).toContain(
+        'Independent allowlisted helper calls inside one `code_exec` may run sequentially with `await` or concurrently with standard async JavaScript patterns such as `await Promise.all([...])`'
+      );
+      expect(result.systemPrompt).toContain(
+        'This does not change the outer chat-flow rule: each model response may request at most one top-level tool call'
+      );
+      expect(result.systemPrompt).toContain(
+        'Before making another tool call, check whether the available tool results are already sufficient to answer the user'
+      );
+      expect(result.systemPrompt).toContain(
+        '`final_answer` is not a work tool; use it only to finish the task once the work is complete'
+      );
       expect(result.systemPrompt).toContain('top-level `await` is supported');
+      expect(result.systemPrompt).toContain('required string fields `task_summary`');
+      expect(result.systemPrompt).toContain('HTTP requests inside code_exec:');
+      expect(result.systemPrompt).toContain('const result = await tools.http_request({ ... })');
+      expect(result.systemPrompt).toContain(
+        'When sandbox code needs external HTTP interaction, call `await tools.http_request(...)` to send requests to pages, APIs, feeds, files, or other HTTP resources'
+      );
+      expect(result.systemPrompt).toContain(
+        'Use this helper when you need to open or read a public website or web page from `code_exec`; it is not limited to JSON APIs.'
+      );
+      expect(result.systemPrompt).toContain(
+        'fetch an HTTP resource with `await tools.http_request({...})`, then parse, validate, transform, or summarize the returned body inside `code_exec`'
+      );
+      expect(result.systemPrompt).toContain(
+        '{ "accept": "application/json", "x-trace-id": "abc-123" }'
+      );
+      expect(result.systemPrompt).toContain('internal safety cap of `262144` bytes');
+      expect(result.systemPrompt).toContain('redirects are followed for up to `10` hops');
+      expect(result.systemPrompt).toContain(
+        '`303` becomes `GET` without `body`; `301/302` change `POST` to `GET` without `body`; `307/308` preserve `method` and `body`'
+      );
+      expect(result.systemPrompt).toContain('applied_limit_bytes');
+      expect(result.systemPrompt).toContain('default internal cap `262144`');
+      expect(result.systemPrompt).toContain(
+        'sensitive request headers (`authorization`, `proxy-authorization`, `cookie`, `cookie2`)'
+      );
+      expect(result.systemPrompt).toContain(
+        'This helper is only for public HTTP(S) resources; `localhost`, loopback, private, link-local, and other reserved/internal network targets are rejected.'
+      );
+      expect(result.systemPrompt).toContain('`headers`: optional `Record<string, string>`');
+      expect(result.systemPrompt).toContain(
+        'Request-control and hop-by-hop header restrictions are defined in the `headers` input field below and are enforced by validation.'
+      );
+      expect(result.systemPrompt).toContain(
+        'forbidden: `host`, `content-length`, `connection`, `proxy-connection`, `transfer-encoding`, `upgrade`, `keep-alive`, `te`, `trailer`, `expect`'
+      );
+      expect(result.systemPrompt).toContain('Error fields:');
+      expect(result.systemPrompt).toContain('`error.code`: short machine-readable error code.');
+      expect(result.systemPrompt).toContain('Error example:');
+      expect(result.systemPrompt).toContain('message: "network down"');
+      expect(result.systemPrompt).toContain('Response example:');
+    });
+
+    /* Preconditions: CodeExecFeature is enabled for the model-facing tool registry
+       Action: build() collects LLM tools
+       Assertions: code_exec tool description explicitly advertises public URL/API fetching via tools.http_request
+       Requirements: code_exec.1, sandbox-http-request.1.4 */
+    it('should advertise URL fetching capability in code_exec tool description', () => {
+      const sandboxManager = {} as SandboxSessionManager;
+      const feature = new CodeExecFeature(sandboxManager);
+      const result = makeBuilder('Base.', [feature]).build();
+
+      expect(result.tools.find((tool) => tool.name === 'code_exec')?.description).toContain(
+        'primary work tool for computation, extraction, transformation, analysis, and verification'
+      );
     });
   });
 
@@ -427,6 +503,7 @@ describe('PromptBuilder.buildMessages()', () => {
           data: {
             callId: 'call-1',
             toolName: 'code_exec',
+            arguments: { task_summary: 'Run code', code: "console.log('ok')" },
             output: { status: 'success', stdout: 'ok' },
           },
         }),
@@ -482,7 +559,7 @@ describe('PromptBuilder.buildMessages()', () => {
           data: {
             callId: 'call-timeout',
             toolName: 'code_exec',
-            arguments: { code: 'while(true){}' },
+            arguments: { task_summary: 'Loop forever', code: 'while(true){}' },
             output: { status: 'timeout', stdout: '', stderr: 'timed out' },
           },
         }),
@@ -523,7 +600,11 @@ describe('PromptBuilder.buildMessages()', () => {
           data: {
             callId: 'call-args',
             toolName: 'code_exec',
-            arguments: { code: "console.log('x')", timeout_ms: 5000 },
+            arguments: {
+              task_summary: 'Print x',
+              code: "console.log('x')",
+              timeout_ms: 5000,
+            },
             output: { status: 'success', stdout: 'x' },
           },
         }),
@@ -538,7 +619,7 @@ describe('PromptBuilder.buildMessages()', () => {
           type: 'tool-call',
           toolCallId: 'call-args',
           toolName: 'code_exec',
-          input: { code: "console.log('x')", timeout_ms: 5000 },
+          input: { task_summary: 'Print x', code: "console.log('x')", timeout_ms: 5000 },
         },
       ],
     });

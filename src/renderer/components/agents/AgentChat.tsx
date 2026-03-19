@@ -2,14 +2,13 @@
 // Per-agent chat component — mounted at startup, stays mounted forever.
 // Scroll position is managed by Conversation (use-stick-to-bottom) — preserved automatically.
 
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback, useLayoutEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { CornerDownLeft, Square } from 'lucide-react';
 import { useAgentChat } from '../../hooks/useAgentChat';
 import { AgentMessage } from './AgentMessage';
 import { AgentWelcome } from './AgentWelcome';
 import { RateLimitBanner } from './RateLimitBanner';
-import { Button } from '../ui/button';
 import {
   Conversation,
   ConversationContent,
@@ -22,6 +21,7 @@ import {
   type PromptInputMessage,
   PromptInputSubmit,
   PromptInputTextarea,
+  PromptInputTools,
 } from '../ai-elements/prompt-input';
 import { type StickToBottomContext } from 'use-stick-to-bottom';
 import type { AgentSnapshot } from '../../types/agent';
@@ -123,21 +123,27 @@ export function AgentChat({
   const { rawMessages, sendMessage, cancelCurrentRequest, isLoading, isStreaming } = useAgentChat(
     agent.id
   );
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const [taskInput, setTaskInput] = useState('');
   const stickContextRef = useRef<StickToBottomContext | null>(null);
   const hasReachedStartupSettledRef = useRef(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const promptHeightRafRef = useRef<number | null>(null);
+  // Requirements: agents.4.5, agents.4.6, agents.4.7, agents.4.7.1
+  const syncPromptTextareaHeight = useCallback((textarea: HTMLTextAreaElement | null) => {
+    if (!textarea) return;
 
-  // Autofocus textarea when this chat becomes active (agents.4.7.1)
-  useEffect(() => {
-    if (!isActive) return;
-    const timeouts = [0, 100, 300, 600].map((delay) =>
-      window.setTimeout(() => textareaRef.current?.focus(), delay)
-    );
-    return () => {
-      timeouts.forEach((timeoutId) => window.clearTimeout(timeoutId));
-    };
-  }, [isActive]);
+    const computedStyle = window.getComputedStyle(textarea);
+    const minHeightPx = Number.parseFloat(computedStyle.minHeight) || 64;
+    const maxHeightPx = Number.parseFloat(computedStyle.maxHeight) || 128;
+    const lineHeightPx = Number.parseFloat(computedStyle.lineHeight) || 20;
+    const explicitLineCount = Math.max(textarea.value.split('\n').length, 1);
+    const visibleLineCount = Math.min(Math.max(explicitLineCount, 2), 5);
+    const additionalLineCount = Math.max(visibleLineCount - 2, 0);
+    const contentHeightPx = minHeightPx + additionalLineCount * lineHeightPx;
+    const nextHeightPx = Math.min(contentHeightPx, maxHeightPx);
+    textarea.style.height = `${nextHeightPx}px`;
+    textarea.style.overflowY = explicitLineCount > 5 ? 'auto' : 'hidden';
+  }, []);
 
   // Notify parent when loading state changes (agents.13.2, agents.13.10)
   useEffect(() => {
@@ -265,11 +271,39 @@ export function AgentChat({
     };
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (promptHeightRafRef.current !== null) {
+        window.cancelAnimationFrame(promptHeightRafRef.current);
+      }
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!isActive) return;
+    const textarea = rootRef.current?.querySelector(
+      '[data-testid="auto-expanding-textarea"]'
+    ) as HTMLTextAreaElement | null;
+    syncPromptTextareaHeight(textarea);
+  }, [isActive, taskInput, syncPromptTextareaHeight]);
+
+  // Requirements: agents.4.2.2, agents.4.3
   const handleSubmit = useCallback(
     async (message: PromptInputMessage) => {
-      const messageText = message.text?.trim();
-      if (!messageText) return;
-      await sendMessage(messageText);
+      const submittedText = message.text ?? '';
+      const messageText = submittedText.trim();
+      if (!messageText) {
+        setTaskInput('');
+        return;
+      }
+
+      // Clear the controlled value as soon as the chat request is submitted.
+      setTaskInput('');
+
+      const sent = await sendMessage(messageText);
+      if (!sent) {
+        setTaskInput(submittedText);
+      }
     },
     [sendMessage]
   );
@@ -325,34 +359,51 @@ export function AgentChat({
         />
         <ConversationScrollButton data-testid="scroll-to-bottom" />
       </Conversation>
-      <div className="flex-shrink-0">
-        <PromptInput className="mt-2" onSubmit={handleSubmit}>
+      <div
+        className="flex-shrink-0 overflow-y-auto px-6 pb-6 [scrollbar-gutter:stable]"
+        data-testid="agent-chat-input-area"
+      >
+        <PromptInput
+          className="mt-4 [&_[data-slot=input-group]]:border-border/80"
+          onSubmit={handleSubmit}
+        >
           <PromptInputBody>
             <PromptInputTextarea
-              ref={textareaRef}
+              className="block flex-none max-h-32 px-3 [field-sizing:fixed]"
               data-testid="auto-expanding-textarea"
+              onChange={(event) => {
+                setTaskInput(event.currentTarget.value);
+                if (promptHeightRafRef.current !== null) {
+                  window.cancelAnimationFrame(promptHeightRafRef.current);
+                }
+                const textarea = event.currentTarget;
+                promptHeightRafRef.current = window.requestAnimationFrame(() => {
+                  syncPromptTextareaHeight(textarea);
+                  promptHeightRafRef.current = null;
+                });
+              }}
               placeholder="Ask, reply, or give command..."
+              value={taskInput}
             />
-            {isInProgress ? (
-              <Button
-                className="h-10 w-10 shrink-0 p-0"
-                data-testid="prompt-input-stop"
-                onClick={() => void handleStop()}
-                type="button"
-              >
-                <Square className="h-4 w-4 fill-current" />
-                <span className="sr-only">Stop generation</span>
-              </Button>
-            ) : (
-              <PromptInputSubmit data-testid="prompt-input-send">
-                <CornerDownLeft className="h-4 w-4" />
-              </PromptInputSubmit>
-            )}
           </PromptInputBody>
           <PromptInputFooter>
-            <p className="px-0.5 text-xs text-muted-foreground">
-              Press Enter to send, Shift+Enter for new line
-            </p>
+            <PromptInputTools className="items-end">
+              <span className="translate-y-3 text-[11px] text-muted-foreground/80">
+                Press Enter to send, Shift+Enter for new line
+              </span>
+            </PromptInputTools>
+            <PromptInputSubmit
+              data-testid={isInProgress ? 'prompt-input-stop' : 'prompt-input-send'}
+              disabled={!isInProgress && !taskInput.trim()}
+              onStop={isInProgress ? () => void handleStop() : undefined}
+              status={isInProgress ? 'streaming' : 'ready'}
+            >
+              {isInProgress ? (
+                <Square className="h-4 w-4 fill-current" />
+              ) : (
+                <CornerDownLeft className="h-4 w-4" />
+              )}
+            </PromptInputSubmit>
           </PromptInputFooter>
         </PromptInput>
       </div>

@@ -32,6 +32,12 @@
   - при `error.code = "limit_exceeded"` модель ДОЛЖНА уменьшать объём/сложность кода или разбивать задачу на несколько вызовов;
   - при наличии предупреждения о throttling в `stderr` модель ДОЛЖНА учитывать, что выполнение шло в деградированном режиме.
 
+1.1.3. Prompt/tool-инструкция для модели ДОЛЖНА явно позиционировать `code_exec` как основной рабочий инструмент для вычислений, извлечения данных, преобразований, анализа, проверки и другой программной обработки в рамках turn.
+
+1.1.4. Prompt/tool-инструкция для модели ДОЛЖНА требовать, чтобы перед новым tool call модель сначала проверяла, достаточно ли уже имеющихся результатов инструментов для полезного ответа пользователю.
+
+1.1.5. ЕСЛИ уже собранных результатов инструментов достаточно для ответа, модель НЕ ДОЛЖНА продолжать exploratory tool-loop и ДОЛЖНА переходить к пользовательскому ответу или завершению через `final_answer`.
+
 1.2. КОГДА модель вызывает `code_exec`, ТО система ДОЛЖНА запускать переданный JavaScript-код в sandbox runtime активного агента.
 
 1.2.1. КОГДА модель вызывает `code_exec`, ТО вызов ДОЛЖЕН обрабатываться как tool call в рамках существующего tool-loop (`model -> tools -> model`).
@@ -136,6 +142,7 @@
 #### Критерии Приемки
 
 3.1. Система ДОЛЖНА документировать для модели контракт инструмента `code_exec`:
+  - обязательное поле `task_summary` (непустая краткая строка с описанием сути работы, выполняемой данным кодом);
   - обязательное поле `code` (JavaScript строка);
   - опциональное поле `timeout_ms`;
   - ожидаемый результат: `status`, `stdout`, `stderr`, `stdout_truncated`, `stderr_truncated`, `error`.
@@ -145,9 +152,18 @@
 3.1.1. Формальный входной контракт `code_exec` ДОЛЖЕН быть задокументирован как JSON schema:
   - `type: object`
   - `additionalProperties: false`
-  - `required: ["code"]`
+  - `required: ["task_summary", "code"]`
+  - `properties.task_summary: string`
   - `properties.code: string`
   - `properties.timeout_ms: integer`
+
+3.1.1.1. Поле `task_summary` ДОЛЖНО содержать краткое описание сути работы, выполняемой через данный вызов `code_exec`.
+
+3.1.1.2. ЕСЛИ `task_summary` отсутствует, не является строкой или после `trim()` пусто, ТО система ДОЛЖНА отклонять вызов контролируемой ошибкой валидации инструмента.
+
+3.1.1.3. Длина `task_summary` после `trim()` ДОЛЖНА быть от `1` до `200` символов включительно.
+
+3.1.1.4. ЕСЛИ длина `task_summary` после `trim()` превышает `200` символов, ТО система ДОЛЖНА отклонять вызов контролируемой ошибкой валидации инструмента.
 
 3.1.2. Формальный выходной контракт `code_exec` ДОЛЖЕН быть задокументирован как структура:
   - `status: "running" | "success" | "error" | "timeout" | "cancelled"`
@@ -191,6 +207,12 @@
 
 3.2.1. Разрешённые API консоли ДОЛЖНЫ быть перечислены явно: `console.log`, `console.info`, `console.warn`, `console.error`.
 
+3.2.2. КОГДА в allowlist sandbox runtime включён helper `http_request`, ТО система ДОЛЖНА документировать его для модели как разрешённый API `tools.http_request(...)`; детальный контракт данного helper-а ДОЛЖЕН определяться в `docs/specs/sandbox-http-request/*`.
+
+3.2.3. Prompt/tool-инструкция для модели ДОЛЖНА явно указывать, что внутри одного вызова `code_exec` sandbox-код МОЖЕТ выполнять несколько вызовов allowlisted helper-ов, если это необходимо для решения задачи.
+
+3.2.4. Prompt/tool-инструкция для модели ДОЛЖНА явно указывать, что независимые allowlisted helper-вызовы внутри одного `code_exec` МОГУТ выполняться конкурентно через стандартные async-паттерны JavaScript (например, `await Promise.all(...)`), если это не нарушает sandbox policy и лимиты.
+
 3.3. Система ДОЛЖНА содержать минимум один позитивный и один негативный пример использования API для модели.
 
 3.4. КОГДА модель использует только разрешённый API, ТО исполнение ДОЛЖНО завершаться без ошибки `error.code = "policy_denied"`.
@@ -232,6 +254,8 @@ return await window.api.saveData('x', 'y');
 #### Модульные Тесты
 
 - `tests/unit/code_exec/CodeExecToolSchema.test.ts` — "should validate code_exec input schema and timeout range/default"
+- `tests/unit/code_exec/CodeExecToolSchema.test.ts` — "should reject missing or empty task_summary in code_exec input"
+- `tests/unit/code_exec/CodeExecToolSchema.test.ts` — "should reject task_summary longer than 200 characters"
 - `tests/unit/agents/PromptBuilder.test.ts` — "should include allowed API, examples and console usage guidance for code_exec"
 
 ### 4. Контракт хранения и realtime-события

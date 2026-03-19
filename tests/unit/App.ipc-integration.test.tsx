@@ -84,6 +84,12 @@ jest.mock('../../src/renderer/components/ErrorBoundary', () => ({
   ErrorBoundary: ({ children }: any) => <div data-testid="error-boundary">{children}</div>,
 }));
 
+jest.mock('../../src/renderer/components/ui/tooltip', () => ({
+  TooltipProvider: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="tooltip-provider">{children}</div>
+  ),
+}));
+
 // Store event handlers for testing
 type EventHandler = (payload: any) => void;
 const eventHandlers: Map<string, Set<EventHandler>> = new Map();
@@ -319,6 +325,22 @@ describe('App IPC Integration with Error Notification System', () => {
 
     // NotificationUI is rendered but returns null when there are no notifications
     // We just verify the component doesn't crash during render
+  });
+
+  /* Preconditions: App component is mounted with AI Elements prompt/tool stack available
+     Action: Render App component
+     Assertions: A single app-level TooltipProvider wraps the rendered shell
+     Requirements: agents.4.7 */
+  it('should render a single app-level TooltipProvider around the application shell', async () => {
+    const { getByTestId } = render(<App />);
+
+    await waitFor(() => {
+      expect(getByTestId('tooltip-provider')).toBeInTheDocument();
+      expect(getByTestId('error-boundary')).toBeInTheDocument();
+      expect(getByTestId('toaster')).toBeInTheDocument();
+    });
+
+    expect(getByTestId('tooltip-provider')).toContainElement(getByTestId('error-boundary'));
   });
 
   /* Preconditions: App component is mounted and multiple error events are received

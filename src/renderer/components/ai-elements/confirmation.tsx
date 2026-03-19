@@ -1,106 +1,174 @@
-'use client';
+"use client";
 
-import * as React from 'react';
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import type { ToolUIPart } from "ai";
+import type { ComponentProps, ReactNode } from "react";
+import { createContext, useContext, useMemo } from "react";
 
-import { Alert } from '../ui/alert';
-import { Button } from '../ui/button';
-import { cn } from '../../lib/utils';
-
-type ConfirmationState =
-  | 'approval-requested'
-  | 'approval-responded'
-  | 'output-denied'
-  | 'output-available';
-type ConfirmationApproval = { id: string; approved?: boolean };
+type ToolUIPartApproval =
+  | {
+      id: string;
+      approved?: never;
+      reason?: never;
+    }
+  | {
+      id: string;
+      approved: boolean;
+      reason?: string;
+    }
+  | {
+      id: string;
+      approved: true;
+      reason?: string;
+    }
+  | {
+      id: string;
+      approved: true;
+      reason?: string;
+    }
+  | {
+      id: string;
+      approved: false;
+      reason?: string;
+    }
+  | undefined;
 
 interface ConfirmationContextValue {
-  state: ConfirmationState;
-  approval?: ConfirmationApproval;
+  approval: ToolUIPartApproval;
+  state: ToolUIPart["state"];
 }
 
-const ConfirmationContext = React.createContext<ConfirmationContextValue | null>(null);
+const ConfirmationContext = createContext<ConfirmationContextValue | null>(
+  null
+);
 
-// Requirements: llm-integration.3.4.1, llm-integration.3.7
-function useConfirmationContext(): ConfirmationContextValue {
-  const context = React.useContext(ConfirmationContext);
+const useConfirmation = () => {
+  const context = useContext(ConfirmationContext);
+
   if (!context) {
-    throw new Error('Confirmation components must be used within Confirmation');
+    throw new Error("Confirmation components must be used within Confirmation");
   }
-  return context;
-}
 
-export type ConfirmationProps = React.ComponentProps<'div'> & {
-  state: ConfirmationState;
-  approval?: ConfirmationApproval;
+  return context;
 };
 
-// Requirements: llm-integration.3.4.1, llm-integration.3.7
-export function Confirmation({ state, approval, className, ...props }: ConfirmationProps) {
+export type ConfirmationProps = ComponentProps<typeof Alert> & {
+  approval?: ToolUIPartApproval;
+  state: ToolUIPart["state"];
+};
+
+export const Confirmation = ({
+  className,
+  approval,
+  state,
+  ...props
+}: ConfirmationProps) => {
+  const contextValue = useMemo(() => ({ approval, state }), [approval, state]);
+
+  if (!approval || state === "input-streaming" || state === "input-available") {
+    return null;
+  }
+
   return (
-    <ConfirmationContext.Provider value={{ state, approval }}>
-      <Alert
-        data-state={state}
-        data-approved={approval?.approved === undefined ? undefined : String(approval.approved)}
-        className={cn('grid gap-2', className)}
-        {...props}
-      />
+    <ConfirmationContext.Provider value={contextValue}>
+      <Alert className={cn("flex flex-col gap-2", className)} {...props} />
     </ConfirmationContext.Provider>
   );
+};
+
+export type ConfirmationTitleProps = ComponentProps<typeof AlertDescription>;
+
+export const ConfirmationTitle = ({
+  className,
+  ...props
+}: ConfirmationTitleProps) => (
+  <AlertDescription className={cn("inline", className)} {...props} />
+);
+
+export interface ConfirmationRequestProps {
+  children?: ReactNode;
 }
 
-export type ConfirmationRequestProps = React.ComponentProps<'div'>;
+export const ConfirmationRequest = ({ children }: ConfirmationRequestProps) => {
+  const { state } = useConfirmation();
 
-// Requirements: llm-integration.3.4.1, llm-integration.3.7
-export function ConfirmationRequest({ className, ...props }: ConfirmationRequestProps) {
-  const { state } = useConfirmationContext();
-  if (state !== 'approval-requested') {
+  // Only show when approval is requested
+  if (state !== "approval-requested") {
     return null;
   }
-  return <div className={cn('col-start-2 text-sm leading-relaxed', className)} {...props} />;
+
+  return children;
+};
+
+export interface ConfirmationAcceptedProps {
+  children?: ReactNode;
 }
 
-export type ConfirmationAcceptedProps = React.ComponentProps<'div'>;
+export const ConfirmationAccepted = ({
+  children,
+}: ConfirmationAcceptedProps) => {
+  const { approval, state } = useConfirmation();
 
-// Requirements: llm-integration.3.4.1, llm-integration.3.7
-export function ConfirmationAccepted({ className, ...props }: ConfirmationAcceptedProps) {
-  const { state, approval } = useConfirmationContext();
-  const isAccepted = state === 'approval-responded' || state === 'output-available';
-  if (!isAccepted || approval?.approved === false) {
+  // Only show when approved and in response states
+  if (
+    !approval?.approved ||
+    (state !== "approval-responded" &&
+      state !== "output-denied" &&
+      state !== "output-available")
+  ) {
     return null;
   }
+
+  return children;
+};
+
+export interface ConfirmationRejectedProps {
+  children?: ReactNode;
+}
+
+export const ConfirmationRejected = ({
+  children,
+}: ConfirmationRejectedProps) => {
+  const { approval, state } = useConfirmation();
+
+  // Only show when rejected and in response states
+  if (
+    approval?.approved !== false ||
+    (state !== "approval-responded" &&
+      state !== "output-denied" &&
+      state !== "output-available")
+  ) {
+    return null;
+  }
+
+  return children;
+};
+
+export type ConfirmationActionsProps = ComponentProps<"div">;
+
+export const ConfirmationActions = ({
+  className,
+  ...props
+}: ConfirmationActionsProps) => {
+  const { state } = useConfirmation();
+
+  // Only show when approval is requested
+  if (state !== "approval-requested") {
+    return null;
+  }
+
   return (
-    <div className={cn('col-start-2 flex items-center gap-2 text-sm', className)} {...props} />
+    <div
+      className={cn("flex items-center justify-end gap-2 self-end", className)}
+      {...props}
+    />
   );
-}
+};
 
-export type ConfirmationRejectedProps = React.ComponentProps<'div'>;
+export type ConfirmationActionProps = ComponentProps<typeof Button>;
 
-// Requirements: llm-integration.3.4.1, llm-integration.3.7
-export function ConfirmationRejected({ className, ...props }: ConfirmationRejectedProps) {
-  const { state, approval } = useConfirmationContext();
-  const isRejected = state === 'output-denied' || approval?.approved === false;
-  if (!isRejected) {
-    return null;
-  }
-  return (
-    <div className={cn('col-start-2 flex items-center gap-2 text-sm', className)} {...props} />
-  );
-}
-
-export type ConfirmationActionsProps = React.ComponentProps<'div'>;
-
-// Requirements: llm-integration.3.4.1, llm-integration.3.7
-export function ConfirmationActions({ className, ...props }: ConfirmationActionsProps) {
-  const { state } = useConfirmationContext();
-  if (state !== 'approval-requested') {
-    return null;
-  }
-  return <div className={cn('col-start-2 flex items-center gap-2', className)} {...props} />;
-}
-
-export type ConfirmationActionProps = React.ComponentProps<typeof Button>;
-
-// Requirements: llm-integration.3.4.1, llm-integration.3.7
-export function ConfirmationAction({ className, ...props }: ConfirmationActionProps) {
-  return <Button className={className} {...props} />;
-}
+export const ConfirmationAction = (props: ConfirmationActionProps) => (
+  <Button className="h-8 px-3 text-sm" type="button" {...props} />
+);

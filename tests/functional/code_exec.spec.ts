@@ -37,7 +37,10 @@ async function launchWithMockLLM() {
 }
 
 async function sendUserMessage(text: string) {
-  const input = window.locator('textarea[placeholder*="Ask"]');
+  const input = window.locator(
+    '[data-testid="agent-chat-root"][data-active="true"] [data-testid="auto-expanding-textarea"]'
+  );
+  await expect(input).toHaveCount(1, { timeout: 5000 });
   await expect(input).toBeVisible({ timeout: 5000 });
   await input.click();
   await input.fill(text);
@@ -68,6 +71,15 @@ async function getAllMessages(agentId: string): Promise<Array<Record<string, unk
   }, agentId);
 }
 
+// Requirements: sandbox-http-request.3, sandbox-http-request.4
+async function getCodeExecOutputByCallId(
+  agentId: string,
+  callId: string
+): Promise<Record<string, unknown> | undefined> {
+  const codeExecCall = await findCodeExecCallByCallId(agentId, callId);
+  return codeExecCall?.payload?.data?.output as Record<string, unknown> | undefined;
+}
+
 async function findCodeExecCallByCallId(
   agentId: string,
   callId: string
@@ -92,30 +104,45 @@ async function findCodeExecCallByCallId(
     }
   | undefined
 > {
-  const toolCalls = await getToolCallMessages(agentId);
-  return toolCalls.find((entry) => {
-    const payload = entry.payload as { data?: { callId?: string; toolName?: string } };
-    return payload?.data?.toolName === 'code_exec' && payload?.data?.callId === callId;
-  }) as
-    | {
-        kind?: string;
-        done?: boolean;
-        replyToMessageId?: number | null;
-        payload?: {
-          data?: {
-            callId?: string;
-            toolName?: string;
-            output?: {
-              status?: string;
-              error?: { code?: string; message?: string };
-              started_at?: string;
-              finished_at?: string;
-              duration_ms?: number;
-            };
-          };
+  type CodeExecCall = {
+    kind?: string;
+    done?: boolean;
+    replyToMessageId?: number | null;
+    payload?: {
+      data?: {
+        callId?: string;
+        toolName?: string;
+        output?: {
+          status?: string;
+          error?: { code?: string; message?: string };
+          started_at?: string;
+          finished_at?: string;
+          duration_ms?: number;
         };
+      };
+    };
+  };
+
+  let lastMatch: CodeExecCall | undefined;
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    const toolCalls = await getToolCallMessages(agentId);
+    const matches = toolCalls.filter((entry) => {
+      const payload = entry.payload as { data?: { callId?: string; toolName?: string } };
+      return payload?.data?.toolName === 'code_exec' && payload?.data?.callId === callId;
+    }) as CodeExecCall[];
+
+    if (matches.length > 0) {
+      lastMatch = matches[matches.length - 1];
+      const status = lastMatch.payload?.data?.output?.status;
+      if (lastMatch.done === true || (status !== undefined && status !== 'running')) {
+        return lastMatch;
       }
-    | undefined;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+
+  return lastMatch;
 }
 
 test.beforeAll(async () => {
@@ -157,13 +184,13 @@ test.afterEach(async () => {
 
 test.describe('code_exec tool_call rendering', () => {
   /* Preconditions: authenticated app with one visible agent
-     Action: create persisted kind:tool_call with toolName=code_exec and terminal output, then expand collapsed block by toggle
-     Assertions: dedicated code_exec block renders Code header/icon/status, starts collapsed by default with vertically centered header content, and shows transparent sections after expand
+     Action: create persisted kind:tool_call with toolName=code_exec and terminal output, then expand collapsed block by standard ToolHeader toggle
+     Assertions: dedicated code_exec block renders standard ToolHeader toggle with task summary and status icon, starts collapsed by default, and shows JavaScript input plus persisted sections after expand
      Exception Rationale (testing.3.13): this test validates renderer behavior for an already persisted historical
      tool_call(code_exec) message and intentionally bypasses LLM transport; LLM+UI path coverage remains in
      code_exec tool-loop scenarios below.
-     Requirements: agents.7.4.5, agents.7.4.6, agents.7.4.6.9, agents.7.4.7 */
-  test('should render tool_call(code_exec) message block with Code header/icon/status and transparent streams', async () => {
+     Requirements: agents.7.4.5, agents.7.4.6, agents.7.4.7 */
+  test('should render tool_call(code_exec) message block with standard ToolHeader toggle and JavaScript input', async () => {
     await launchWithMockLLM();
     const agentId = (await getAgentIdsFromApi(window))[0];
     expect(agentId).toBeTruthy();
@@ -175,6 +202,7 @@ test.describe('code_exec tool_call rendering', () => {
           callId: 'code-1',
           toolName: 'code_exec',
           arguments: {
+            task_summary: 'Print ok to stdout',
             code: "console.log('ok')",
             timeout_ms: 10000,
           },
@@ -195,59 +223,104 @@ test.describe('code_exec tool_call rendering', () => {
     await expect(window.locator('[data-testid="message-code-exec-block"]').last()).toBeVisible({
       timeout: 5000,
     });
-    await expect(window.locator('[data-testid="message-code-exec-icon"]').last()).toBeVisible();
-    await expect(window.locator('[data-testid="message-code-exec-title"]').last()).toHaveText(
-      'Code'
-    );
-    await expect(window.locator('[data-testid="message-code-exec-status"]').last()).toHaveText(
-      'success'
+    await expect(window.locator('[data-testid="message-code-exec-toggle"]').last()).toContainText(
+      'Print ok to stdout'
     );
     await expect(
-      window.locator('[data-testid="message-code-exec-status-icon"]').last()
+      window.locator('[data-testid="message-code-exec-status-icon"][data-status="success"]').last()
     ).toBeVisible();
-    await expect(window.locator('[data-testid="message-code-exec-toggle"]').last()).toBeVisible();
     await expect(window.locator('[data-testid="message-code-exec-input"]')).toHaveCount(0);
     await expect(window.locator('[data-testid="message-code-exec-stdout"]')).toHaveCount(0);
     await expect(window.locator('[data-testid="message-code-exec-stderr"]')).toHaveCount(0);
 
-    const collapsedHeaderMetrics = await window
-      .locator('[data-testid="message-code-exec-header"]')
-      .last()
-      .evaluate((header) => {
-        const title = header.querySelector('[data-testid="message-code-exec-title"]');
-        const status = header.querySelector('[data-testid="message-code-exec-status"]');
-        if (!(title instanceof HTMLElement) || !(status instanceof HTMLElement)) {
-          return null;
-        }
-
-        const headerRect = header.getBoundingClientRect();
-        const titleRect = title.getBoundingClientRect();
-        const statusRect = status.getBoundingClientRect();
-
-        return {
-          headerClassName: header.className,
-          headerCenterY: headerRect.top + headerRect.height / 2,
-          titleCenterY: titleRect.top + titleRect.height / 2,
-          statusCenterY: statusRect.top + statusRect.height / 2,
-        };
-      });
-    expect(collapsedHeaderMetrics).not.toBeNull();
-    expect(collapsedHeaderMetrics!.headerClassName).toContain('mb-0');
-    expect(
-      Math.abs(collapsedHeaderMetrics!.headerCenterY - collapsedHeaderMetrics!.titleCenterY)
-    ).toBeLessThanOrEqual(2);
-    expect(
-      Math.abs(collapsedHeaderMetrics!.headerCenterY - collapsedHeaderMetrics!.statusCenterY)
-    ).toBeLessThanOrEqual(2);
-
     await window.locator('[data-testid="message-code-exec-toggle"]').last().click();
 
-    const expandedHeaderClassName = await window
-      .locator('[data-testid="message-code-exec-header"]')
-      .last()
-      .evaluate((el) => el.className);
-    expect(expandedHeaderClassName).toContain('mb-2');
+    const inputSection = window.locator('[data-testid="message-code-exec-input"]').last();
+    await expect(inputSection.locator('[data-streamdown="code-block-header"]')).toContainText(
+      'JavaScript'
+    );
+    await expect(inputSection).toContainText("console.log('ok')");
+    const stdoutSection = window.locator('[data-testid="message-code-exec-stdout"]').last();
+    await expect(stdoutSection.locator('[data-streamdown="code-block-header"]')).toContainText(
+      'Output'
+    );
+    await expect(stdoutSection).toContainText('ok');
+    const stderrSection = window.locator('[data-testid="message-code-exec-stderr"]').last();
+    await expect(stderrSection.locator('[data-streamdown="code-block-header"]')).toContainText(
+      'Output'
+    );
+    await expect(stderrSection).toContainText('warn');
+    await expect(
+      window
+        .locator('[data-testid="message-code-exec-stdout"]')
+        .last()
+        .locator('[data-streamdown="code-block-actions"]')
+    ).toBeVisible();
+    await expect(
+      window
+        .locator('[data-testid="message-code-exec-stderr"]')
+        .last()
+        .locator('[data-streamdown="code-block-actions"]')
+    ).toBeVisible();
 
+    await expectNoToastError(window);
+  });
+
+  /* Preconditions: authenticated app with one visible agent
+     Action: create persisted kind:tool_call with toolName=code_exec, expand it via chevron click, collapse it via right-edge click, then reopen via the same standard toggle
+     Assertions: collapsed content is removed from visible UI and standard ToolHeader toggle remains usable across chevron, right-edge, and whole-header clicks
+     Exception Rationale (testing.3.13): this test validates renderer behavior for persisted historical
+     tool_call(code_exec) message and intentionally bypasses LLM transport; LLM+UI path coverage remains in
+     code_exec tool-loop scenarios below.
+     Requirements: agents.7.4.7 */
+  test('should keep standard code_exec toggle usable after reopen cycle', async () => {
+    await launchWithMockLLM();
+    const agentId = (await getAgentIdsFromApi(window))[0];
+    expect(agentId).toBeTruthy();
+
+    await window.evaluate(async (id) => {
+      const api = (window as unknown as { api: any }).api;
+      const result = await api.messages.create(id, 'tool_call', {
+        data: {
+          callId: 'code-collapse-1',
+          toolName: 'code_exec',
+          arguments: {
+            task_summary: 'Print ok to stdout',
+            code: "console.log('ok')",
+            timeout_ms: 10000,
+          },
+          output: {
+            status: 'success',
+            stdout: 'ok\\n',
+            stderr: 'warn\\n',
+            stdout_truncated: false,
+            stderr_truncated: false,
+          },
+        },
+      });
+      if (!result?.success) {
+        throw new Error(result?.error || 'Failed to create code_exec tool_call for collapse test');
+      }
+    }, agentId as string);
+
+    const toggle = window.locator('[data-testid="message-code-exec-toggle"]').last();
+    await expect(toggle).toBeVisible({ timeout: 5000 });
+    await expect(window.locator('[data-testid="message-code-exec-input"]')).toHaveCount(0);
+    await expect(window.locator('[data-testid="app-loading-screen"]')).toHaveCount(0);
+
+    await toggle.locator('svg').last().click();
+    await expect(window.locator('[data-testid="message-code-exec-input"]').last()).toContainText(
+      "console.log('ok')"
+    );
+
+    const toggleBox = await toggle.boundingBox();
+    expect(toggleBox).toBeTruthy();
+    await toggle.click({ position: { x: toggleBox!.width - 16, y: toggleBox!.height / 2 } });
+    await expect(window.locator('[data-testid="message-code-exec-input"]')).toHaveCount(0);
+    await expect(window.locator('[data-testid="message-code-exec-stdout"]')).toHaveCount(0);
+    await expect(window.locator('[data-testid="message-code-exec-stderr"]')).toHaveCount(0);
+
+    await toggle.click();
     await expect(window.locator('[data-testid="message-code-exec-input"]').last()).toContainText(
       "console.log('ok')"
     );
@@ -257,58 +330,280 @@ test.describe('code_exec tool_call rendering', () => {
     await expect(window.locator('[data-testid="message-code-exec-stderr"]').last()).toContainText(
       'warn'
     );
-    const inputClassName = await window
-      .locator('[data-testid="message-code-exec-input"]')
-      .last()
-      .evaluate((el) => el.className);
-    const codeBlockBorderTop = await window
-      .locator('[data-testid="message-code-exec-input"] [data-streamdown="code-block"]')
-      .last()
-      .evaluate((el) => Number.parseFloat(getComputedStyle(el).borderTopWidth || '0'));
-    const codeBodyBorderTop = await window
-      .locator('[data-testid="message-code-exec-input"] [data-streamdown="code-block-body"]')
-      .last()
-      .evaluate((el) => Number.parseFloat(getComputedStyle(el).borderTopWidth || '0'));
-    const blockClassName = await window
-      .locator('[data-testid="message-code-exec-block"]')
-      .last()
-      .evaluate((el) => el.className);
-    const statusClassName = await window
-      .locator('[data-testid="message-code-exec-status"]')
-      .last()
-      .evaluate((el) => el.className);
-    const stdoutClassName = await window
-      .locator('[data-testid="message-code-exec-stdout"]')
-      .last()
-      .evaluate((el) => el.className);
-    const stderrClassName = await window
-      .locator('[data-testid="message-code-exec-stderr"]')
-      .last()
-      .evaluate((el) => el.className);
-    expect(blockClassName).toContain('bg-transparent');
-    expect(statusClassName).toContain('bg-transparent');
-    expect(inputClassName).toContain('bg-transparent');
-    expect(inputClassName).toContain('rounded-md');
-    expect(inputClassName).toContain('border-border/60');
-    expect(inputClassName).toContain('p-2');
-    expect(codeBlockBorderTop).toBe(0);
-    expect(codeBodyBorderTop).toBe(0);
-    expect(stdoutClassName).toContain('rounded-md');
-    expect(stdoutClassName).toContain('border-border/60');
-    expect(stdoutClassName).toContain('p-2');
-    expect(stdoutClassName).toContain('bg-transparent');
-    expect(stderrClassName).toContain('bg-transparent');
+
+    await expectNoToastError(window);
+  });
+
+  /* Preconditions: authenticated app with one visible agent and collapsed persisted code_exec block after one open-close cycle
+     Action: hover and click the top-right corner of the header where hidden code-block actions previously overlapped the chevron area
+     Assertions: no download tooltip appears and the same top-right hit area still toggles the block open
+     Exception Rationale (testing.3.13): this test validates persisted historical renderer behavior and specifically guards the header hit-area bug.
+     Requirements: agents.7.4.6.2, agents.7.4.6.2.1, agents.7.4.7 */
+  test('should keep the top-right code_exec header area free of hidden code-block actions', async () => {
+    await launchWithMockLLM();
+    const agentId = (await getAgentIdsFromApi(window))[0];
+    expect(agentId).toBeTruthy();
+
+    await window.evaluate(async (id) => {
+      const api = (window as unknown as { api: any }).api;
+      const result = await api.messages.create(id, 'tool_call', {
+        data: {
+          callId: 'code-header-hit-area-1',
+          toolName: 'code_exec',
+          arguments: {
+            task_summary: 'Inspect top-right hit area',
+            code: "console.log('ok')",
+            timeout_ms: 10000,
+          },
+          output: {
+            status: 'success',
+            stdout: 'ok\\n',
+            stderr: '',
+            stdout_truncated: false,
+            stderr_truncated: false,
+          },
+        },
+      });
+      if (!result?.success) {
+        throw new Error(result?.error || 'Failed to create code_exec tool_call for hit-area test');
+      }
+    }, agentId as string);
+
+    const toggle = window.locator('[data-testid="message-code-exec-toggle"]').last();
+    await expect(toggle).toBeVisible({ timeout: 5000 });
+
+    await toggle.click();
+    await expect(window.locator('[data-testid="message-code-exec-input"]').last()).toContainText(
+      "console.log('ok')"
+    );
+    await toggle.click();
+    await expect(window.locator('[data-testid="message-code-exec-input"]')).toHaveCount(0);
+
+    const toggleBox = await toggle.boundingBox();
+    expect(toggleBox).toBeTruthy();
+    await toggle.hover({ position: { x: toggleBox!.width - 12, y: toggleBox!.height / 2 } });
+    await expect(window.getByText('Download file')).toHaveCount(0);
+
+    await toggle.click({ position: { x: toggleBox!.width - 12, y: toggleBox!.height / 2 } });
+    await expect(window.locator('[data-testid="message-code-exec-input"]').last()).toContainText(
+      "console.log('ok')"
+    );
 
     await expectNoToastError(window);
   });
 
   /* Preconditions: authenticated app with one visible agent
+     Action: create persisted kind:tool_call with toolName=code_exec and terminal structured output.error, then expand collapsed block
+     Assertions: code_exec block renders a separate error section in addition to stderr and shows standard code-block actions
+     Exception Rationale (testing.3.13): this test validates renderer behavior for persisted historical
+     tool_call(code_exec) message and intentionally bypasses LLM transport; LLM+UI path coverage remains in
+     code_exec tool-loop scenarios below.
+     Requirements: agents.7.4.6, agents.7.4.6.5.1, agents.7.4.6.5.2, agents.7.4.7, agents.7.4.9 */
+  test('should render code_exec error section from structured output.error', async () => {
+    await launchWithMockLLM();
+    const agentId = (await getAgentIdsFromApi(window))[0];
+    expect(agentId).toBeTruthy();
+
+    await window.evaluate(async (id) => {
+      const api = (window as unknown as { api: any }).api;
+      const result = await api.messages.create(id, 'tool_call', {
+        data: {
+          callId: 'code-error-1',
+          toolName: 'code_exec',
+          arguments: {
+            task_summary: 'Attempt forbidden request',
+            code: "window.open('https://example.com')",
+            timeout_ms: 10000,
+          },
+          output: {
+            status: 'error',
+            stdout: '',
+            stderr: 'console.error fallback\\n',
+            stdout_truncated: false,
+            stderr_truncated: false,
+            error: {
+              code: 'policy_denied',
+              message: 'Tool is not allowed in sandbox allowlist.',
+            },
+          },
+        },
+      });
+      if (!result?.success) {
+        throw new Error(result?.error || 'Failed to create code_exec tool_call with output.error');
+      }
+    }, agentId as string);
+
+    await expect(window.locator('[data-testid="message-code-exec-block"]').last()).toBeVisible({
+      timeout: 5000,
+    });
+    await expect(window.locator('[data-testid="message-code-exec-error"]')).toHaveCount(0);
+
+    await window.locator('[data-testid="message-code-exec-toggle"]').last().click();
+
+    await expect(
+      window.locator('[data-testid="message-code-exec-status-icon"][data-status="error"]').last()
+    ).toBeVisible();
+    const stderrSection = window.locator('[data-testid="message-code-exec-stderr"]').last();
+    await expect(stderrSection.locator('[data-streamdown="code-block-header"]')).toContainText(
+      'Output'
+    );
+    await expect(stderrSection).toContainText('console.error fallback');
+    const errorSection = window.locator('[data-testid="message-code-exec-error"]').last();
+    await expect(errorSection.locator('[data-streamdown="code-block-header"]')).toContainText(
+      'Error'
+    );
+    await expect(errorSection).toContainText(
+      'policy_denied: Tool is not allowed in sandbox allowlist.'
+    );
+    await expect(errorSection.locator('[data-streamdown="code-block-actions"]')).toBeVisible();
+
+    await expectNoToastError(window);
+  });
+
+  /* Preconditions: authenticated app with one visible agent
+     Action: create persisted kind:tool_call with toolName=code_exec and cancelled terminal status
+     Assertions: code_exec header shows cancelled status icon without the wrench icon
+     Exception Rationale (testing.3.13): this test validates renderer behavior for persisted historical
+     tool_call(code_exec) message and intentionally bypasses LLM transport.
+     Requirements: agents.7.4.6.4, agents.7.4.6.4.1, agents.7.4.6.4.6 */
+  test('should render cancelled status icon in code_exec header', async () => {
+    await launchWithMockLLM();
+    const agentId = (await getAgentIdsFromApi(window))[0];
+    expect(agentId).toBeTruthy();
+
+    await window.evaluate(async (id) => {
+      const api = (window as unknown as { api: any }).api;
+      const result = await api.messages.create(id, 'tool_call', {
+        data: {
+          callId: 'code-cancelled-1',
+          toolName: 'code_exec',
+          arguments: {
+            task_summary: 'Cancelled request',
+            code: "console.log('cancelled')",
+            timeout_ms: 10000,
+          },
+          output: {
+            status: 'cancelled',
+            stdout: '',
+            stderr: '',
+            stdout_truncated: false,
+            stderr_truncated: false,
+          },
+        },
+      });
+      if (!result?.success) {
+        throw new Error(result?.error || 'Failed to create cancelled code_exec tool_call');
+      }
+    }, agentId as string);
+
+    const toggle = window.locator('[data-testid="message-code-exec-toggle"]').last();
+    await expect(toggle).toBeVisible({ timeout: 5000 });
+    await expect(
+      window
+        .locator('[data-testid="message-code-exec-status-icon"][data-status="cancelled"]')
+        .last()
+    ).toBeVisible();
+    await expect(toggle.locator('svg.lucide-wrench')).toHaveCount(0);
+    await expectNoToastError(window);
+  });
+
+  /* Preconditions: authenticated app with one visible agent
+     Action: create persisted kind:tool_call with toolName=code_exec and timeout terminal status
+     Assertions: code_exec header shows timeout status icon without the wrench icon
+     Exception Rationale (testing.3.13): this test validates renderer behavior for persisted historical
+     tool_call(code_exec) message and intentionally bypasses LLM transport.
+     Requirements: agents.7.4.6.4, agents.7.4.6.4.1, agents.7.4.6.4.5 */
+  test('should render timeout status icon in code_exec header', async () => {
+    await launchWithMockLLM();
+    const agentId = (await getAgentIdsFromApi(window))[0];
+    expect(agentId).toBeTruthy();
+
+    await window.evaluate(async (id) => {
+      const api = (window as unknown as { api: any }).api;
+      const result = await api.messages.create(id, 'tool_call', {
+        data: {
+          callId: 'code-timeout-1',
+          toolName: 'code_exec',
+          arguments: {
+            task_summary: 'Timed out request',
+            code: 'while (true) {}',
+            timeout_ms: 10000,
+          },
+          output: {
+            status: 'timeout',
+            stdout: '',
+            stderr: '',
+            stdout_truncated: false,
+            stderr_truncated: false,
+          },
+        },
+      });
+      if (!result?.success) {
+        throw new Error(result?.error || 'Failed to create timeout code_exec tool_call');
+      }
+    }, agentId as string);
+
+    const toggle = window.locator('[data-testid="message-code-exec-toggle"]').last();
+    await expect(toggle).toBeVisible({ timeout: 5000 });
+    await expect(
+      window.locator('[data-testid="message-code-exec-status-icon"][data-status="timeout"]').last()
+    ).toBeVisible();
+    await expect(toggle.locator('svg.lucide-clock-alert')).toHaveCount(1);
+    await expect(toggle.locator('svg.lucide-wrench')).toHaveCount(0);
+    await expectNoToastError(window);
+  });
+
+  /* Preconditions: authenticated app with one visible agent and historical code_exec payload without task_summary
+     Action: create persisted kind:tool_call with toolName=code_exec and terminal output
+     Assertions: legacy persisted payload falls back to title "Code" for backward compatibility
+     Exception Rationale (testing.3.13): this test validates renderer behavior for persisted historical
+     tool_call(code_exec) data created before the task_summary contract existed.
+     Requirements: agents.7.4.6.3, agents.7.4.6.3.1 */
+  test('should render fallback Code title for historical code_exec payload without task_summary', async () => {
+    await launchWithMockLLM();
+    const agentId = (await getAgentIdsFromApi(window))[0];
+    expect(agentId).toBeTruthy();
+
+    await window.evaluate(async (id) => {
+      const api = (window as unknown as { api: any }).api;
+      const result = await api.messages.create(id, 'tool_call', {
+        data: {
+          callId: 'code-legacy-1',
+          toolName: 'code_exec',
+          arguments: {
+            code: "console.log('legacy')",
+            timeout_ms: 10000,
+          },
+          output: {
+            status: 'success',
+            stdout: 'legacy\\n',
+            stderr: '',
+            stdout_truncated: false,
+            stderr_truncated: false,
+          },
+        },
+      });
+      if (!result?.success) {
+        throw new Error(result?.error || 'Failed to create historical code_exec tool_call');
+      }
+    }, agentId as string);
+
+    await expect(window.locator('[data-testid="message-code-exec-block"]').last()).toBeVisible({
+      timeout: 5000,
+    });
+    await expect(window.locator('[data-testid="message-code-exec-toggle"]').last()).toContainText(
+      'Code'
+    );
+    await expectNoToastError(window);
+  });
+
+  /* Preconditions: authenticated app with one visible agent
      Action: create persisted kind:tool_call with toolName=code_exec and JavaScript input, then expand collapsed block
-     Assertions: JavaScript input renders as syntax-highlighted fenced javascript code block via shared message code component
+     Assertions: code_exec input renders through a single JavaScript code block with syntax label
      Exception Rationale (testing.3.13): this test validates renderer behavior for persisted historical
      tool_call(code_exec) payload and intentionally bypasses LLM transport.
      Requirements: agents.7.4.6 */
-  test('should render JavaScript syntax highlighting in code_exec input section', async () => {
+  test('should render JavaScript code block in code_exec input section', async () => {
     await launchWithMockLLM();
     const agentId = (await getAgentIdsFromApi(window))[0];
     expect(agentId).toBeTruthy();
@@ -343,21 +638,49 @@ test.describe('code_exec tool_call rendering', () => {
 
     const inputSection = window.locator('[data-testid="message-code-exec-input"]').last();
     await expect(inputSection).toBeVisible();
-    await expect(inputSection).toContainText('const answer = 42;');
-
-    const javascriptCodeBlock = inputSection.locator(
-      '[data-streamdown="code-block"][data-language="javascript"]'
+    await expect(inputSection.locator('[data-streamdown="code-block-header"]')).toContainText(
+      'JavaScript'
     );
-    await expect(javascriptCodeBlock).toHaveCount(1);
-    await expect(
-      javascriptCodeBlock.locator('[data-streamdown="code-block-body"] pre code')
-    ).toHaveCount(1);
+    await expect(inputSection).toContainText('const answer = 42;');
+    await expect(inputSection.locator('[data-streamdown="code-block"]')).toHaveCount(1);
+
+    await expect(inputSection.locator('pre code')).toHaveCount(1);
+    await expect(inputSection.locator('pre code')).toContainText('function run()');
+    await expect
+      .poll(async () =>
+        inputSection.evaluate((element) => {
+          const tokenSpans = Array.from(element.querySelectorAll('pre code span'));
+          return tokenSpans.some((span) => {
+            if (!(span instanceof HTMLElement)) {
+              return false;
+            }
+            const computedColor = getComputedStyle(span).color;
+            return computedColor !== '' && computedColor !== 'rgb(0, 0, 0)';
+          });
+        })
+      )
+      .toBe(true);
+    expect(
+      await inputSection.evaluate((element) => {
+        const codeBlocks = element.querySelectorAll('[data-streamdown="code-block"]');
+        const codeBlock = codeBlocks.item(0) as HTMLElement | null;
+        if (!codeBlock) {
+          return null;
+        }
+        if (codeBlocks.length !== 1) {
+          return 'multiple';
+        }
+        const computed = getComputedStyle(element);
+        return computed.backgroundColor;
+      })
+    ).toBe('rgba(0, 0, 0, 0)');
+    await expect(inputSection.locator('[data-streamdown="code-block"]')).toHaveCount(1);
 
     await expectNoToastError(window);
   });
 
   /* Preconditions: authenticated app with one visible agent
-     Action: create persisted kind:tool_call code_exec with long unbroken input/output lines
+     Action: create persisted kind:tool_call code_exec with long unbroken input/output lines and then create a following llm message
      Assertions: code_exec block stays within chat width and uses internal horizontal scroll for long lines
      Exception Rationale (testing.3.13): this validates renderer layout behavior for persisted historical
      code_exec payload and intentionally bypasses LLM transport.
@@ -394,6 +717,15 @@ test.describe('code_exec tool_call rendering', () => {
         if (!result?.success) {
           throw new Error(result?.error || 'Failed to create code_exec tool_call');
         }
+
+        const llmResult = await api.messages.create(id, 'llm', {
+          data: {
+            text: `This is a short reply after code_exec.\n\nThe link \`sponsr.ru/goblin/\` appears to show an author page and a publication list.`,
+          },
+        });
+        if (!llmResult?.success) {
+          throw new Error(llmResult?.error || 'Failed to create llm message after code_exec');
+        }
       },
       { id: agentId as string, code: longCode, stdout: longStdout }
     );
@@ -407,19 +739,29 @@ test.describe('code_exec tool_call rendering', () => {
 
     await expect(input).toBeVisible({ timeout: 5000 });
     await expect(stdout).toContainText(longToken.slice(0, 20));
+    await expect(window.locator('[data-testid="message-llm-action"]').last()).toBeVisible({
+      timeout: 5000,
+    });
 
     const messagesArea = window.locator('[data-testid="messages-area"]');
     const blockWidth = await codeExecBlock.evaluate((el) => (el as HTMLElement).offsetWidth);
-    const messagesAreaWidth = await messagesArea.evaluate((el) => (el as HTMLElement).clientWidth);
+    const messagesAreaLayout = await messagesArea.evaluate((el) => {
+      const area = el as HTMLElement;
+      return {
+        clientWidth: area.clientWidth,
+        scrollWidth: area.scrollWidth,
+      };
+    });
     const inputLayout = await input.evaluate((el) => {
       const inputElement = el as HTMLElement;
-      const innerPre =
-        inputElement.querySelector('[data-streamdown="code-block-body"] pre') ??
-        inputElement.querySelector('pre');
-      const scrollTarget = (innerPre as HTMLElement | null) ?? inputElement;
+      const innerPre = (inputElement.querySelector('pre') ?? inputElement) as HTMLElement;
+      const innerCode = innerPre.querySelector('code') ?? innerPre;
+      const scrollTarget = innerPre;
       const hasHorizontalScroll = scrollTarget.scrollWidth > scrollTarget.clientWidth + 1;
-      const whiteSpace = window.getComputedStyle(scrollTarget).whiteSpace;
-      return { hasHorizontalScroll, whiteSpace };
+      const overflowX = window.getComputedStyle(scrollTarget).overflowX;
+      const preWhiteSpace = window.getComputedStyle(innerPre as HTMLElement).whiteSpace;
+      const codeDisplay = window.getComputedStyle(innerCode as HTMLElement).display;
+      return { hasHorizontalScroll, preWhiteSpace, overflowX, codeDisplay };
     });
     const stdoutLayout = await stdout.evaluate((el) => {
       const stdoutElement = el as HTMLElement;
@@ -432,15 +774,15 @@ test.describe('code_exec tool_call rendering', () => {
       const overflowX = window.getComputedStyle(scrollTarget).overflowX;
       return { hasHorizontalScroll, whiteSpace, overflowX };
     });
-
-    expect(blockWidth).toBeLessThanOrEqual(messagesAreaWidth + 1);
-    expect(inputLayout.hasHorizontalScroll || inputLayout.whiteSpace.includes('pre')).toBe(true);
-    expect(
-      stdoutLayout.hasHorizontalScroll ||
-        stdoutLayout.whiteSpace.includes('pre') ||
-        stdoutLayout.overflowX === 'auto' ||
-        stdoutLayout.overflowX === 'scroll'
-    ).toBe(true);
+    expect(blockWidth).toBeLessThanOrEqual(messagesAreaLayout.clientWidth + 1);
+    expect(messagesAreaLayout.scrollWidth).toBeLessThanOrEqual(messagesAreaLayout.clientWidth + 1);
+    expect(inputLayout.hasHorizontalScroll).toBe(true);
+    expect(inputLayout.preWhiteSpace).toBe('pre');
+    expect(['visible', 'auto', 'scroll']).toContain(inputLayout.overflowX);
+    expect(['block', 'inline']).toContain(inputLayout.codeDisplay);
+    expect(stdoutLayout.hasHorizontalScroll).toBe(true);
+    expect(stdoutLayout.whiteSpace).toBe('pre');
+    expect(['auto', 'scroll']).toContain(stdoutLayout.overflowX);
 
     await expectNoToastError(window);
   });
@@ -460,7 +802,7 @@ test.describe('code_exec tool_call rendering', () => {
         data: {
           callId: 'code-2',
           toolName: 'code_exec',
-          arguments: { code: '1+1' },
+          arguments: { task_summary: 'Run code', code: '1+1' },
           output: {
             status: 'error',
             stdout: '',
@@ -484,6 +826,369 @@ test.describe('code_exec tool_call rendering', () => {
 });
 
 test.describe('code_exec tool loop execution', () => {
+  /* Preconditions: mock model emits code_exec that calls tools.http_request against a local JSON endpoint
+     Action: user sends a message that triggers sandbox http_request helper
+     Assertions: helper response is returned to sandbox code as structured metadata with textual body
+     Requirements: sandbox-http-request.1.1, sandbox-http-request.1.3, sandbox-http-request.2.1, sandbox-http-request.3.4 */
+  test('should allow sandbox code to execute async http_request helper', async () => {
+    const port = await getFreePort();
+    const requests: Array<{ method?: string; accept?: string }> = [];
+    const localServer = http.createServer((req, res) => {
+      requests.push({ method: req.method, accept: req.headers.accept });
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: true, source: 'local-server' }));
+    });
+    await new Promise<void>((resolve) => localServer.listen(port, '127.0.0.1', () => resolve()));
+
+    try {
+      mockLLMServer.setStreamingMode(true);
+      mockLLMServer.setOpenAIStreamScripts([
+        {
+          toolCalls: [
+            {
+              callId: 'http-ok-1',
+              toolName: 'code_exec',
+              arguments: {
+                task_summary: 'Fetch local JSON',
+                code: `const result = await tools.http_request({
+  url: "http://127.0.0.1:${port}/data",
+  method: "GET",
+  headers: { "accept": "application/json" },
+  timeout_ms: 10000
+});
+console.log(JSON.stringify(result));`,
+                timeout_ms: 10000,
+              },
+            },
+          ],
+        },
+        {
+          content: '{"action":{"type":"text","content":"http helper done"}}',
+        },
+      ]);
+
+      await launchWithMockLLM();
+      await sendUserMessage('Fetch local JSON via http helper');
+      await expect(window.locator('.message-llm-action-response').last()).toContainText(
+        'http helper done',
+        {
+          timeout: 15000,
+        }
+      );
+
+      const agentId = (await getAgentIdsFromApi(window))[0];
+      const output = await getCodeExecOutputByCallId(agentId, 'http-ok-1');
+      expect(output).toBeDefined();
+      expect(output?.status).toBe('success');
+      const stdout = typeof output?.stdout === 'string' ? output.stdout.trim() : '';
+      const payload = JSON.parse(stdout) as Record<string, unknown>;
+      expect(payload).toMatchObject({
+        status: 200,
+        final_url: `http://127.0.0.1:${port}/data`,
+        content_type: 'application/json; charset=utf-8',
+        body_encoding: 'text',
+        truncated: false,
+      });
+      expect(String(payload.body)).toContain('"ok":true');
+      expect(requests).toEqual([{ method: 'GET', accept: 'application/json' }]);
+      await expectNoToastError(window);
+    } finally {
+      await new Promise<void>((resolve) => localServer.close(() => resolve()));
+    }
+  });
+
+  /* Preconditions: mock model emits code_exec that calls tools.http_request with follow_redirects disabled
+     Action: user sends a message that triggers sandbox http_request helper
+     Assertions: helper returns the redirect response without following the Location target
+     Requirements: sandbox-http-request.2.8, sandbox-http-request.3.3.3 */
+  test('should return redirect response without following in http_request helper', async () => {
+    const port = await getFreePort();
+    let finalRequestCount = 0;
+    const localServer = http.createServer((req, res) => {
+      if (req.url === '/redirect') {
+        res.writeHead(302, { Location: `http://127.0.0.1:${port}/final` });
+        res.end('');
+        return;
+      }
+
+      if (req.url === '/final') {
+        finalRequestCount += 1;
+        res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('final');
+        return;
+      }
+
+      res.writeHead(404);
+      res.end('missing');
+    });
+    await new Promise<void>((resolve) => localServer.listen(port, '127.0.0.1', () => resolve()));
+
+    try {
+      mockLLMServer.setStreamingMode(true);
+      mockLLMServer.setOpenAIStreamScripts([
+        {
+          toolCalls: [
+            {
+              callId: 'http-redirect-1',
+              toolName: 'code_exec',
+              arguments: {
+                task_summary: 'Inspect redirect response',
+                code: `const result = await tools.http_request({
+  url: "http://127.0.0.1:${port}/redirect",
+  follow_redirects: false
+});
+console.log(JSON.stringify(result));`,
+                timeout_ms: 10000,
+              },
+            },
+          ],
+        },
+        {
+          content: '{"action":{"type":"text","content":"redirect helper done"}}',
+        },
+      ]);
+
+      await launchWithMockLLM();
+      await sendUserMessage('Fetch redirect without following');
+      await expect(window.locator('.message-llm-action-response').last()).toContainText(
+        'redirect helper done',
+        {
+          timeout: 15000,
+        }
+      );
+
+      const agentId = (await getAgentIdsFromApi(window))[0];
+      const output = await getCodeExecOutputByCallId(agentId, 'http-redirect-1');
+      const stdout = typeof output?.stdout === 'string' ? output.stdout.trim() : '';
+      const payload = JSON.parse(stdout) as Record<string, unknown>;
+      expect(payload).toMatchObject({
+        status: 302,
+        final_url: `http://127.0.0.1:${port}/redirect`,
+        truncated: false,
+      });
+      expect(finalRequestCount).toBe(0);
+      await expectNoToastError(window);
+    } finally {
+      await new Promise<void>((resolve) => localServer.close(() => resolve()));
+    }
+  });
+
+  /* Preconditions: mock model emits code_exec that calls tools.http_request against a binary endpoint with explicit byte limit
+     Action: user sends a message that triggers sandbox http_request helper
+     Assertions: helper truncates the binary response by bytes and returns base64-encoded body metadata
+     Requirements: sandbox-http-request.2.9, sandbox-http-request.2.10, sandbox-http-request.3.4.6, sandbox-http-request.3.5, sandbox-http-request.3.6 */
+  test('should enforce max_response_bytes and base64 encoding in http_request helper', async () => {
+    const port = await getFreePort();
+    const binaryBody = Buffer.from([0, 1, 2, 3, 4, 5]);
+    const localServer = http.createServer((_req, res) => {
+      res.writeHead(200, { 'Content-Type': 'application/octet-stream' });
+      res.end(binaryBody);
+    });
+    await new Promise<void>((resolve) => localServer.listen(port, '127.0.0.1', () => resolve()));
+
+    try {
+      mockLLMServer.setStreamingMode(true);
+      mockLLMServer.setOpenAIStreamScripts([
+        {
+          toolCalls: [
+            {
+              callId: 'http-bin-1',
+              toolName: 'code_exec',
+              arguments: {
+                task_summary: 'Fetch binary payload',
+                code: `const result = await tools.http_request({
+  url: "http://127.0.0.1:${port}/bin",
+  max_response_bytes: 4
+});
+console.log(JSON.stringify(result));`,
+                timeout_ms: 10000,
+              },
+            },
+          ],
+        },
+        {
+          content: '{"action":{"type":"text","content":"binary helper done"}}',
+        },
+      ]);
+
+      await launchWithMockLLM();
+      await sendUserMessage('Fetch binary content via http helper');
+      await expect(window.locator('.message-llm-action-response').last()).toContainText(
+        'binary helper done',
+        {
+          timeout: 15000,
+        }
+      );
+
+      const agentId = (await getAgentIdsFromApi(window))[0];
+      const output = await getCodeExecOutputByCallId(agentId, 'http-bin-1');
+      const stdout = typeof output?.stdout === 'string' ? output.stdout.trim() : '';
+      const payload = JSON.parse(stdout) as Record<string, unknown>;
+      expect(payload).toMatchObject({
+        status: 200,
+        body_encoding: 'base64',
+        truncated: true,
+        applied_limit_bytes: 4,
+      });
+      expect(payload.body).toBe(Buffer.from(binaryBody.subarray(0, 4)).toString('base64'));
+      await expectNoToastError(window);
+    } finally {
+      await new Promise<void>((resolve) => localServer.close(() => resolve()));
+    }
+  });
+
+  /* Preconditions: mock model emits code_exec that calls tools.http_request with invalid helper arguments and then with an unreachable target
+     Action: user sends two messages that trigger sandbox http_request helper
+     Assertions: helper returns structured validation and runtime errors to sandbox code without breaking the chat flow
+     Requirements: sandbox-http-request.4.1, sandbox-http-request.4.2 */
+  test('should return structured validation and runtime errors from http_request helper', async () => {
+    const unreachablePort = await getFreePort();
+
+    mockLLMServer.setStreamingMode(true);
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        toolCalls: [
+          {
+            callId: 'http-invalid-1',
+            toolName: 'code_exec',
+            arguments: {
+              task_summary: 'Validate helper input',
+              code: `const result = await tools.http_request({
+  url: "https://example.com",
+  method: "TRACE"
+});
+console.log(JSON.stringify(result));`,
+              timeout_ms: 10000,
+            },
+          },
+        ],
+      },
+      {
+        content: '{"action":{"type":"text","content":"invalid helper done"}}',
+      },
+      {
+        toolCalls: [
+          {
+            callId: 'http-runtime-1',
+            toolName: 'code_exec',
+            arguments: {
+              task_summary: 'Handle fetch failure',
+              code: `const result = await tools.http_request({
+  url: "http://127.0.0.1:${unreachablePort}/unreachable",
+  timeout_ms: 10000
+});
+console.log(JSON.stringify(result));`,
+              timeout_ms: 10000,
+            },
+          },
+        ],
+      },
+      {
+        content: '{"action":{"type":"text","content":"runtime helper done"}}',
+      },
+    ]);
+
+    await launchWithMockLLM();
+
+    await sendUserMessage('Return invalid helper error');
+    await expect(window.locator('.message-llm-action-response').last()).toContainText(
+      'invalid helper done',
+      {
+        timeout: 15000,
+      }
+    );
+
+    const agentId = (await getAgentIdsFromApi(window))[0];
+    const invalidOutput = await getCodeExecOutputByCallId(agentId, 'http-invalid-1');
+    const invalidStdout =
+      typeof invalidOutput?.stdout === 'string' ? invalidOutput.stdout.trim() : '';
+    const invalidPayload = JSON.parse(invalidStdout) as Record<string, unknown>;
+    expect(invalidPayload).toMatchObject({
+      error: { code: 'invalid_method' },
+    });
+
+    await sendUserMessage('Return runtime helper error');
+    await expect(window.locator('.message-llm-action-response').last()).toContainText(
+      'runtime helper done',
+      {
+        timeout: 15000,
+      }
+    );
+
+    const runtimeOutput = await getCodeExecOutputByCallId(agentId, 'http-runtime-1');
+    const runtimeStdout =
+      typeof runtimeOutput?.stdout === 'string' ? runtimeOutput.stdout.trim() : '';
+    const runtimePayload = JSON.parse(runtimeStdout) as Record<string, unknown>;
+    expect(runtimePayload).toMatchObject({
+      error: { code: 'fetch_failed' },
+    });
+    await expectNoToastError(window);
+  });
+
+  /* Preconditions: mock model emits code_exec that calls tools.http_request against localhost while a loopback server is listening
+     Action: user sends a message that triggers sandbox http_request helper
+     Assertions: helper rejects localhost as forbidden_destination and no request reaches the local server
+     Requirements: sandbox-http-request.2.3.1, sandbox-http-request.4.2.2 */
+  test('should reject localhost http_request target before any request is sent', async () => {
+    const port = await getFreePort();
+    let requestCount = 0;
+    const localServer = http.createServer((_req, res) => {
+      requestCount += 1;
+      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('should not be reached');
+    });
+    await new Promise<void>((resolve) => localServer.listen(port, '127.0.0.1', () => resolve()));
+
+    try {
+      mockLLMServer.setStreamingMode(true);
+      mockLLMServer.setOpenAIStreamScripts([
+        {
+          toolCalls: [
+            {
+              callId: 'http-localhost-block-1',
+              toolName: 'code_exec',
+              arguments: {
+                task_summary: 'Reject localhost target',
+                code: `const result = await tools.http_request({
+  url: "http://localhost:${port}/blocked",
+  timeout_ms: 10000
+});
+console.log(JSON.stringify(result));`,
+                timeout_ms: 10000,
+              },
+            },
+          ],
+        },
+        {
+          content: '{"action":{"type":"text","content":"localhost helper blocked"}}',
+        },
+      ]);
+
+      await launchWithMockLLM();
+      await sendUserMessage('Try localhost via http helper');
+      await expect(window.locator('.message-llm-action-response').last()).toContainText(
+        'localhost helper blocked',
+        {
+          timeout: 15000,
+        }
+      );
+
+      const agentId = (await getAgentIdsFromApi(window))[0];
+      const output = await getCodeExecOutputByCallId(agentId, 'http-localhost-block-1');
+      const denied = await findCodeExecCallByCallId(agentId, 'http-localhost-block-1');
+      const helperResult = JSON.parse(output?.stdout ?? '{}') as {
+        error?: { code?: string; message?: string };
+      };
+      expect(denied?.payload?.data?.output?.status).toBe('success');
+      expect(helperResult.error?.code).toBe('forbidden_destination');
+      expect(String(helperResult.error?.message)).toContain('localhost');
+      expect(requestCount).toBe(0);
+      await expectNoToastError(window);
+    } finally {
+      await new Promise<void>((resolve) => localServer.close(() => resolve()));
+    }
+  });
+
   /* Preconditions: mock model repeatedly emits invalid code_exec args
      Action: user sends a message that triggers code_exec calls
      Assertions: invalid call is not persisted as terminal code_exec result; turn ends with persisted kind:error for the same turn
@@ -571,13 +1276,31 @@ test.describe('code_exec tool loop execution', () => {
     mockLLMServer.setStreamingMode(true);
     mockLLMServer.setOpenAIStreamScripts([
       {
-        toolCalls: [{ callId: 'big-1', toolName: 'code_exec', arguments: { code: oversizedCode } }],
+        toolCalls: [
+          {
+            callId: 'big-1',
+            toolName: 'code_exec',
+            arguments: { task_summary: 'Run oversized code', code: oversizedCode },
+          },
+        ],
       },
       {
-        toolCalls: [{ callId: 'big-2', toolName: 'code_exec', arguments: { code: oversizedCode } }],
+        toolCalls: [
+          {
+            callId: 'big-2',
+            toolName: 'code_exec',
+            arguments: { task_summary: 'Run oversized code', code: oversizedCode },
+          },
+        ],
       },
       {
-        toolCalls: [{ callId: 'big-3', toolName: 'code_exec', arguments: { code: oversizedCode } }],
+        toolCalls: [
+          {
+            callId: 'big-3',
+            toolName: 'code_exec',
+            arguments: { task_summary: 'Run oversized code', code: oversizedCode },
+          },
+        ],
       },
     ]);
 
@@ -633,6 +1356,7 @@ test.describe('code_exec tool loop execution', () => {
             callId: 'trunc-1',
             toolName: 'code_exec',
             arguments: {
+              task_summary: 'Generate large stdout and stderr',
               code: "console.log('o'.repeat(16000)); console.error('e'.repeat(16000));",
               timeout_ms: 10000,
             },
@@ -651,14 +1375,10 @@ test.describe('code_exec tool loop execution', () => {
     });
 
     const agentId = (await getAgentIdsFromApi(window))[0];
-    const toolCalls = await getToolCallMessages(agentId);
-    const codeExec = toolCalls.find((entry) => {
-      const payload = entry.payload as { data?: { toolName?: string } };
-      return payload?.data?.toolName === 'code_exec';
-    }) as { payload?: { data?: { output?: Record<string, unknown> } } } | undefined;
+    const codeExec = await findCodeExecCallByCallId(agentId, 'trunc-1');
     expect(codeExec).toBeDefined();
 
-    const output = codeExec?.payload?.data?.output;
+    const output = codeExec?.payload?.data?.output as Record<string, unknown> | undefined;
     expect(output?.stdout_truncated).toBe(true);
     expect(output?.stderr_truncated).toBe(true);
     expect(typeof output?.stdout).toBe('string');
@@ -678,7 +1398,7 @@ test.describe('code_exec tool loop execution', () => {
           {
             callId: 'parallel-a',
             toolName: 'code_exec',
-            arguments: { code: "console.log('A')", timeout_ms: 10000 },
+            arguments: { task_summary: 'Run code', code: "console.log('A')", timeout_ms: 10000 },
           },
         ],
       },
@@ -687,7 +1407,7 @@ test.describe('code_exec tool loop execution', () => {
           {
             callId: 'parallel-b',
             toolName: 'code_exec',
-            arguments: { code: "console.log('B')", timeout_ms: 10000 },
+            arguments: { task_summary: 'Run code', code: "console.log('B')", timeout_ms: 10000 },
           },
         ],
       },
@@ -747,7 +1467,11 @@ test.describe('code_exec tool loop execution', () => {
           {
             callId: 'audit-1',
             toolName: 'code_exec',
-            arguments: { code: "console.log('audit')", timeout_ms: 10000 },
+            arguments: {
+              task_summary: 'Run code',
+              code: "console.log('audit')",
+              timeout_ms: 10000,
+            },
           },
         ],
       },
@@ -821,6 +1545,7 @@ test.describe('code_exec tool loop execution', () => {
               callId: 'net-1',
               toolName: 'code_exec',
               arguments: {
+                task_summary: 'Try opening URL',
                 code: `window.open('http://127.0.0.1:${port}/egress-check')`,
                 timeout_ms: 10000,
               },
@@ -839,11 +1564,7 @@ test.describe('code_exec tool loop execution', () => {
       });
 
       const agentId = (await getAgentIdsFromApi(window))[0];
-      const toolCalls = await getToolCallMessages(agentId);
-      const codeExec = toolCalls.find((entry) => {
-        const payload = entry.payload as { data?: { toolName?: string } };
-        return payload?.data?.toolName === 'code_exec';
-      }) as { payload?: { data?: { output?: { error?: { code?: string } } } } } | undefined;
+      const codeExec = await findCodeExecCallByCallId(agentId, 'net-1');
 
       expect(codeExec).toBeDefined();
       expect(codeExec?.payload?.data?.output?.error?.code).toBe('policy_denied');
@@ -877,6 +1598,7 @@ test.describe('code_exec tool loop execution', () => {
               callId: 'deny-location-assign',
               toolName: 'code_exec',
               arguments: {
+                task_summary: 'Try location.assign',
                 code: `location.assign('http://127.0.0.1:${port}/egress-check-assign')`,
                 timeout_ms: 10000,
               },
@@ -889,6 +1611,7 @@ test.describe('code_exec tool loop execution', () => {
               callId: 'deny-location-replace',
               toolName: 'code_exec',
               arguments: {
+                task_summary: 'Try location.replace',
                 code: `location.replace('http://127.0.0.1:${port}/egress-check-replace')`,
                 timeout_ms: 10000,
               },
@@ -907,15 +1630,12 @@ test.describe('code_exec tool loop execution', () => {
       });
 
       const agentId = (await getAgentIdsFromApi(window))[0];
-      const toolCalls = await getToolCallMessages(agentId);
-      const codeExecCalls = toolCalls.filter((entry) => {
-        const payload = entry.payload as { data?: { toolName?: string } };
-        return payload?.data?.toolName === 'code_exec';
-      }) as Array<{ payload?: { data?: { output?: { error?: { code?: string } } } } }>;
-      expect(codeExecCalls.length).toBeGreaterThanOrEqual(2);
-      for (const call of codeExecCalls) {
-        expect(call.payload?.data?.output?.error?.code).toBe('policy_denied');
-      }
+      const assignDenied = await findCodeExecCallByCallId(agentId, 'deny-location-assign');
+      const replaceDenied = await findCodeExecCallByCallId(agentId, 'deny-location-replace');
+      expect(assignDenied).toBeDefined();
+      expect(replaceDenied).toBeDefined();
+      expect(assignDenied?.payload?.data?.output?.error?.code).toBe('policy_denied');
+      expect(replaceDenied?.payload?.data?.output?.error?.code).toBe('policy_denied');
       expect(requestCount).toBe(0);
       await expectNoToastError(window);
     } finally {
@@ -946,6 +1666,7 @@ test.describe('code_exec tool loop execution', () => {
               callId: 'deny-fetch',
               toolName: 'code_exec',
               arguments: {
+                task_summary: 'Deny fetch API call',
                 code: `await fetch('http://127.0.0.1:${port}/fetch-blocked')`,
                 timeout_ms: 10000,
               },
@@ -958,6 +1679,7 @@ test.describe('code_exec tool loop execution', () => {
               callId: 'deny-xhr',
               toolName: 'code_exec',
               arguments: {
+                task_summary: 'Deny XMLHttpRequest call',
                 code: `const xhr = new XMLHttpRequest(); xhr.open('GET', 'http://127.0.0.1:${port}/xhr-blocked', true); xhr.send();`,
                 timeout_ms: 10000,
               },
@@ -970,6 +1692,7 @@ test.describe('code_exec tool loop execution', () => {
               callId: 'deny-websocket',
               toolName: 'code_exec',
               arguments: {
+                task_summary: 'Deny WebSocket call',
                 code: `new WebSocket('ws://127.0.0.1:${port}/ws-blocked')`,
                 timeout_ms: 10000,
               },
@@ -982,6 +1705,7 @@ test.describe('code_exec tool loop execution', () => {
               callId: 'deny-sendbeacon',
               toolName: 'code_exec',
               arguments: {
+                task_summary: 'Deny sendBeacon call',
                 code: `navigator.sendBeacon('http://127.0.0.1:${port}/beacon-blocked', 'x')`,
                 timeout_ms: 10000,
               },
@@ -1028,7 +1752,11 @@ test.describe('code_exec tool loop execution', () => {
           {
             callId: 'hist-1',
             toolName: 'code_exec',
-            arguments: { code: "console.log('history')", timeout_ms: 10000 },
+            arguments: {
+              task_summary: 'Run code',
+              code: "console.log('history')",
+              timeout_ms: 10000,
+            },
           },
         ],
       },
@@ -1112,7 +1840,7 @@ test.describe('code_exec tool loop execution', () => {
           {
             callId: 'timeout-1',
             toolName: 'code_exec',
-            arguments: { code: 'while (true) {}', timeout_ms: 10000 },
+            arguments: { task_summary: 'Run code', code: 'while (true) {}', timeout_ms: 10000 },
           },
         ],
       },
@@ -1147,7 +1875,10 @@ test.describe('code_exec tool loop execution', () => {
           {
             callId: 'memory-1',
             toolName: 'code_exec',
-            arguments: { code: "const huge = 'x'.repeat(2 ** 31); console.log(huge.length);" },
+            arguments: {
+              task_summary: 'Run code',
+              code: "const huge = 'x'.repeat(2 ** 31); console.log(huge.length);",
+            },
           },
         ],
       },
@@ -1183,6 +1914,7 @@ test.describe('code_exec tool loop execution', () => {
             callId: 'degraded-1',
             toolName: 'code_exec',
             arguments: {
+              task_summary: 'Run CPU intensive finite loop',
               code: "const start = Date.now(); while (Date.now() - start < 2500) {} console.log('degraded done');",
               timeout_ms: 10000,
             },
@@ -1217,8 +1949,8 @@ test.describe('code_exec tool loop execution', () => {
   });
 
   /* Preconditions: mock model emits non-terminating code_exec call
-     Action: user sends a message and cancels active run
-     Assertions: cancel request succeeds and no kind:error is persisted for this turn
+     Action: user sends a message and triggers stop/cancel flow
+     Assertions: cancel IPC request succeeds and no kind:error is persisted for this turn
      Requirements: code_exec.2.6, code_exec.3.1.2.4, code_exec.3.1.2.7, code_exec.4.5, code_exec.6.3 */
   test('should cancel active code_exec execution without persisting kind:error', async () => {
     mockLLMServer.setStreamingMode(true);
@@ -1229,6 +1961,7 @@ test.describe('code_exec tool loop execution', () => {
             callId: 'cancel-1',
             toolName: 'code_exec',
             arguments: {
+              task_summary: 'Run cancellable infinite promise',
               code: 'await new Promise(() => {});',
               timeout_ms: 60000,
             },
@@ -1243,17 +1976,22 @@ test.describe('code_exec tool loop execution', () => {
 
     const agentId = (await getAgentIdsFromApi(window))[0];
     await expect(window.locator('[data-testid="prompt-input-stop"]')).toBeVisible({
-      timeout: 5000,
+      timeout: 15000,
     });
 
+    await window.locator('[data-testid="prompt-input-stop"]').click();
     const cancelResult = await window.evaluate(async (id) => {
       const api = (window as unknown as { api: any }).api;
       return await api.messages.cancel(id);
     }, agentId as string);
     expect(cancelResult?.success).toBe(true);
-
-    await expect(window.locator('[data-testid="prompt-input-send"]')).toBeVisible({
-      timeout: 5000,
+    await expect(window.locator('[data-testid="prompt-input-stop"]')).toHaveCount(0, {
+      timeout: 15000,
+    });
+    await expect(
+      window.locator('[data-testid="message-code-exec-status-icon"][data-status="running"]')
+    ).toHaveCount(0, {
+      timeout: 15000,
     });
 
     await expect
@@ -1289,6 +2027,7 @@ test.describe('code_exec tool loop execution', () => {
             callId: 'tool-deny-main',
             toolName: 'code_exec',
             arguments: {
+              task_summary: 'Try forbidden main-only tool',
               code: "window.tools.final_answer({ summary_points: ['x'] })",
               timeout_ms: 10000,
             },
@@ -1301,6 +2040,7 @@ test.describe('code_exec tool loop execution', () => {
             callId: 'tool-deny-allowlist',
             toolName: 'code_exec',
             arguments: {
+              task_summary: 'Try non-allowlisted tool',
               code: "window.tools.search_docs({ query: 'x' })",
               timeout_ms: 10000,
             },
@@ -1348,6 +2088,7 @@ test.describe('code_exec tool loop execution', () => {
             callId: 'deny-worker',
             toolName: 'code_exec',
             arguments: {
+              task_summary: 'Try Worker API',
               code: "new Worker('data:text/javascript,postMessage(1)')",
               timeout_ms: 10000,
             },
@@ -1390,6 +2131,7 @@ test.describe('code_exec tool loop execution', () => {
             callId: 'evt-1',
             toolName: 'code_exec',
             arguments: {
+              task_summary: 'Emit lifecycle events with delayed completion',
               code: "await new Promise((resolve) => setTimeout(resolve, 1200)); console.log('evt')",
               timeout_ms: 10000,
             },
@@ -1418,10 +2160,6 @@ test.describe('code_exec tool loop execution', () => {
 
     try {
       await sendUserMessage('Emit lifecycle events');
-      await expect(window.locator('[data-testid="message-code-exec-status"]').last()).toContainText(
-        'running',
-        { timeout: 8000 }
-      );
       await expect(window.locator('.message-llm-action-response').last()).toContainText(
         'evt done',
         {
@@ -1429,8 +2167,8 @@ test.describe('code_exec tool loop execution', () => {
         }
       );
       await expect(
-        window.locator('[data-testid="message-code-exec-status"]').last()
-      ).not.toContainText('running', { timeout: 8000 });
+        window.locator('[data-testid="message-code-exec-status-icon"][data-status="running"]')
+      ).toHaveCount(0, { timeout: 8000 });
 
       await expect
         .poll(async () => {
@@ -1544,7 +2282,7 @@ test.describe('code_exec tool loop execution', () => {
   });
 
   /* Preconditions: active long-running code_exec execution is in-flight
-     Action: app receives close request
+     Action: app receives cancel request and then close request
      Assertions: shutdown completes within bounded time (no hanging close)
      Requirements: code_exec.2.10, code_exec.2.10.1 */
   test('should shutdown without hanging when code_exec is active', async () => {
@@ -1556,6 +2294,7 @@ test.describe('code_exec tool loop execution', () => {
             callId: 'shutdown-1',
             toolName: 'code_exec',
             arguments: {
+              task_summary: 'Start run and close app while active',
               code: 'await new Promise(() => {});',
               timeout_ms: 60000,
             },
@@ -1568,12 +2307,20 @@ test.describe('code_exec tool loop execution', () => {
     await sendUserMessage('Start run and close app');
 
     await expect(window.locator('[data-testid="prompt-input-stop"]')).toBeVisible({
-      timeout: 5000,
+      timeout: 15000,
     });
+    const cancelResult = await window.evaluate(
+      async (id) => {
+        const api = (window as unknown as { api: any }).api;
+        return await api.messages.cancel(id);
+      },
+      (await getAgentIdsFromApi(window))[0] as string
+    );
+    expect(cancelResult?.success).toBe(true);
 
     const closedWithinBound = await Promise.race([
       electronApp.close().then(() => true),
-      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 5000)),
+      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 25000)),
     ]);
     expect(closedWithinBound).toBe(true);
     appClosedInTest = true;

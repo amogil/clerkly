@@ -39,6 +39,7 @@ import {
   parseAgentTitleMetadataPayload,
   type AgentTitleMetadata,
   isValidRenameNeedScore,
+  TITLE_META_COMMENT_PREFIX,
   TITLE_RENAME_MIN_USER_TURN_GAP,
 } from './AgentTitleRuntime';
 import type { Message } from '../db/schema';
@@ -100,7 +101,6 @@ type AttemptRuntimeState = {
   pendingFirstType: 'reasoning' | 'text' | null;
   lastFlushAt: number;
   flushTimer: ReturnType<typeof setTimeout> | null;
-  pendingToolCallFlushTimer: ReturnType<typeof setTimeout> | null;
   finalLlmMessageId: number | null;
   toolCallsInCurrentStep: number;
   sawAnyToolCall: boolean;
@@ -269,7 +269,7 @@ export class MainPipeline {
     const replyToMessageId = userMessageId;
     const options = {
       ...this.resolveOptions(provider),
-      tools: this.bindToolExecutors(builtPrompt.tools),
+      tools: this.bindToolExecutors(builtPrompt.tools, signal),
     };
     const llmProvider = this.createProvider(provider, apiKey);
 
@@ -421,7 +421,6 @@ export class MainPipeline {
       pendingFirstType: null,
       lastFlushAt: 0,
       flushTimer: null,
-      pendingToolCallFlushTimer: null,
       finalLlmMessageId: null,
       toolCallsInCurrentStep: 0,
       sawAnyToolCall: false,
@@ -461,7 +460,8 @@ export class MainPipeline {
           attemptId,
           setLastLlmMessageId
         );
-      }
+      },
+      signal
     );
 
     this.flushPendingToolCall(
@@ -511,16 +511,6 @@ export class MainPipeline {
       }
       state.pendingReasoningDelta += chunk.delta;
       this.scheduleLlmFlush(context, agentId, runId, attemptId, setLastLlmMessageId, state);
-      if (state.pendingToolCall) {
-        this.schedulePendingToolCallFlush(
-          context,
-          agentId,
-          runId,
-          attemptId,
-          setLastLlmMessageId,
-          state
-        );
-      }
       return;
     }
 
@@ -572,14 +562,7 @@ export class MainPipeline {
         toolName: chunk.toolName,
         args: chunk.arguments,
       };
-      this.schedulePendingToolCallFlush(
-        context,
-        agentId,
-        runId,
-        attemptId,
-        setLastLlmMessageId,
-        state
-      );
+      this.flushPendingToolCall(context, agentId, runId, attemptId, setLastLlmMessageId, state);
       return;
     }
 
@@ -627,14 +610,6 @@ export class MainPipeline {
     if (state.flushTimer) {
       clearTimeout(state.flushTimer);
       state.flushTimer = null;
-    }
-  }
-
-  // Requirements: llm-integration.1.6.4, llm-integration.2.3.1
-  private clearPendingToolCallFlushTimer(state: AttemptRuntimeState): void {
-    if (state.pendingToolCallFlushTimer) {
-      clearTimeout(state.pendingToolCallFlushTimer);
-      state.pendingToolCallFlushTimer = null;
     }
   }
 
@@ -767,7 +742,6 @@ export class MainPipeline {
     setLastLlmMessageId: (messageId: number) => void,
     state: AttemptRuntimeState
   ): void {
-    this.clearPendingToolCallFlushTimer(state);
     this.scheduleLlmFlush(context, agentId, runId, attemptId, setLastLlmMessageId, state, true);
     if (!state.pendingToolCall) {
       return;
@@ -815,25 +789,6 @@ export class MainPipeline {
     state.pendingToolCall = null;
   }
 
-  // Requirements: llm-integration.1.6.4, llm-integration.2.3.1
-  private schedulePendingToolCallFlush(
-    context: StreamingCallContext,
-    agentId: string,
-    runId: string,
-    attemptId: number,
-    setLastLlmMessageId: (messageId: number) => void,
-    state: AttemptRuntimeState
-  ): void {
-    if (!state.pendingToolCall) {
-      return;
-    }
-    this.clearPendingToolCallFlushTimer(state);
-    state.pendingToolCallFlushTimer = setTimeout(() => {
-      state.pendingToolCallFlushTimer = null;
-      this.flushPendingToolCall(context, agentId, runId, attemptId, setLastLlmMessageId, state);
-    }, STREAM_FLUSH_INTERVAL_MS);
-  }
-
   // Requirements: llm-integration.1.5, llm-integration.1.6, llm-integration.2
   private finalizeAttemptResult(
     output: LLMChatResult,
@@ -848,20 +803,20 @@ export class MainPipeline {
     const outputText = typeof output.text === 'string' ? output.text : '';
     const rawToolPayloadCandidateText =
       outputText.trim().length > 0 ? outputText : state.currentSegment.text;
-    const toolPayloadCandidateText = this.stripLeadingMirroredToolPayloadText(
-      rawToolPayloadCandidateText,
+    const toolPayloadCandidateText = this.stripLeadingDuplicateToolPayloadText(
+      this.stripLeadingMirroredToolPayloadText(rawToolPayloadCandidateText, state),
       state
     );
     if (state.currentSegment.text) {
-      state.currentSegment.text = this.stripLeadingMirroredToolPayloadText(
-        state.currentSegment.text,
+      state.currentSegment.text = this.stripLeadingDuplicateToolPayloadText(
+        this.stripLeadingMirroredToolPayloadText(state.currentSegment.text, state),
         state
       );
     }
-    const suppressTechnicalToolPayloadText =
+    const suppressDuplicateToolPayloadText =
       this.shouldSuppressTechnicalToolPayloadText(toolPayloadCandidateText, state) ||
       toolPayloadCandidateText.trim().length === 0;
-    if (suppressTechnicalToolPayloadText && state.currentSegment.id !== null) {
+    if (suppressDuplicateToolPayloadText && state.currentSegment.id !== null) {
       this.hideIncompleteLlmMessage(state.currentSegment.id, agentId);
       state.currentSegment = { id: null, reasoning: '', text: '', order: null };
     }
@@ -876,7 +831,7 @@ export class MainPipeline {
       state.currentSegment.id !== null &&
       !state.currentSegment.text &&
       outputText.length > 0 &&
-      !suppressTechnicalToolPayloadText
+      !suppressDuplicateToolPayloadText
     ) {
       state.currentSegment.text = outputText;
     }
@@ -899,7 +854,7 @@ export class MainPipeline {
           text: state.currentSegment.text || undefined,
         },
       };
-    } else if (toolPayloadCandidateText.trim().length > 0 && !suppressTechnicalToolPayloadText) {
+    } else if (toolPayloadCandidateText.trim().length > 0 && !suppressDuplicateToolPayloadText) {
       const fallbackOrder = this.nextOrder(cycleState.runId, attemptId, state);
       const msg = this.createCompletedLlmMessage(
         agentId,
@@ -1044,6 +999,49 @@ export class MainPipeline {
     return extracted.rest.trimStart();
   }
 
+  // Requirements: llm-integration.9.5.3.3, llm-integration.9.5.6
+  private stripLeadingDuplicateToolPayloadText(text: string, state: AttemptRuntimeState): string {
+    if (!state.finalAnswerCall) {
+      return text;
+    }
+
+    const summaryPoints = state.finalAnswerCall.args['summary_points'];
+    if (!Array.isArray(summaryPoints) || summaryPoints.length === 0) {
+      return text;
+    }
+
+    const expectedPoints = summaryPoints.filter(
+      (point): point is string => typeof point === 'string'
+    );
+
+    const extracted = this.extractLeadingMarkdownList(text);
+    if (extracted) {
+      if (this.areNormalizedSummaryPointsEqual(extracted.items, expectedPoints)) {
+        return extracted.rest.trimStart();
+      }
+
+      const textWithoutSummaryPrefix = this.stripLeadingSummaryListWithTrailingSuffix(
+        extracted.items,
+        expectedPoints,
+        extracted.rest
+      );
+      if (textWithoutSummaryPrefix !== null) {
+        return textWithoutSummaryPrefix;
+      }
+    }
+
+    const escapedListItems = this.extractEscapedNewlineMarkdownListItems(text);
+    if (!escapedListItems) {
+      return text;
+    }
+
+    if (!this.areNormalizedSummaryPointsEqual(escapedListItems, expectedPoints)) {
+      return text;
+    }
+
+    return '';
+  }
+
   // Requirements: llm-integration.9.5.6
   private extractLeadingJsonObject(text: string): { objectText: string; rest: string } | null {
     let depth = 0;
@@ -1097,6 +1095,132 @@ export class MainPipeline {
     } catch {
       return null;
     }
+  }
+
+  // Requirements: llm-integration.9.5.3.3, llm-integration.9.5.6
+  private extractLeadingMarkdownList(text: string): { items: string[]; rest: string } | null {
+    const trimmedStart = text.trimStart();
+    if (!trimmedStart) {
+      return null;
+    }
+
+    const lineBreakMatch = trimmedStart.match(/\r?\n/);
+    const newline = lineBreakMatch?.[0] ?? '\n';
+    const lines = trimmedStart.split(/\r?\n/);
+    const items: string[] = [];
+    let consumedChars = 0;
+    let sawListItem = false;
+
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index] ?? '';
+      const item = this.parseMarkdownListItem(line);
+      const lineLength = line.length;
+      const separatorLength = index < lines.length - 1 ? newline.length : 0;
+
+      if (item !== null) {
+        sawListItem = true;
+        items.push(item);
+        consumedChars += lineLength + separatorLength;
+        continue;
+      }
+
+      if (!sawListItem) {
+        if (line.trim().length === 0) {
+          consumedChars += lineLength + separatorLength;
+          continue;
+        }
+        return null;
+      }
+
+      if (line.trim().length === 0) {
+        consumedChars += lineLength + separatorLength;
+        const rest = trimmedStart.slice(consumedChars);
+        return { items, rest };
+      }
+
+      return { items, rest: trimmedStart.slice(consumedChars) };
+    }
+
+    if (!sawListItem) {
+      return null;
+    }
+
+    return {
+      items,
+      rest: trimmedStart.slice(consumedChars),
+    };
+  }
+
+  // Requirements: llm-integration.9.5.3.3, llm-integration.9.5.6
+  private parseMarkdownListItem(line: string): string | null {
+    const checkboxMatch = line.match(/^\s*[-*+]\s+\[(?: |x|X)\]\s+(.+?)\s*$/);
+    if (checkboxMatch) {
+      return checkboxMatch[1] ?? null;
+    }
+
+    const bulletMatch = line.match(/^\s*(?:[-*+]|(?:\d+|[A-Za-z])[.)])\s+(.+?)\s*$/);
+    if (bulletMatch) {
+      return bulletMatch[1] ?? null;
+    }
+
+    return null;
+  }
+
+  // Requirements: llm-integration.9.5.3.3, llm-integration.9.5.6.2
+  private extractEscapedNewlineMarkdownListItems(text: string): string[] | null {
+    const trimmed = text.trim();
+    if (!trimmed.includes('\\n')) {
+      return null;
+    }
+    const normalized = trimmed.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n');
+    const lines = normalized.split('\n');
+    const items: string[] = [];
+
+    for (const line of lines) {
+      if (line.trim().length === 0) {
+        continue;
+      }
+      const item = this.parseMarkdownListItem(line);
+      if (item === null) {
+        return null;
+      }
+      items.push(item);
+    }
+
+    return items.length > 0 ? items : null;
+  }
+
+  // Requirements: llm-integration.9.5.3.3, llm-integration.9.5.6.2
+  private stripLeadingSummaryListWithTrailingSuffix(
+    candidateItems: string[],
+    expectedItems: string[],
+    rest: string
+  ): string | null {
+    if (candidateItems.length !== expectedItems.length) {
+      return null;
+    }
+
+    for (let index = 0; index < expectedItems.length - 1; index += 1) {
+      const expectedItem = expectedItems[index] ?? '';
+      const candidateItem = candidateItems[index] ?? '';
+      if (
+        this.normalizeSummaryPointText(candidateItem) !==
+        this.normalizeSummaryPointText(expectedItem)
+      ) {
+        return null;
+      }
+    }
+
+    const lastIndex = expectedItems.length - 1;
+    const expectedLastItem = (expectedItems[lastIndex] ?? '').trimStart();
+    const candidateLastItem = (candidateItems[lastIndex] ?? '').trimStart();
+
+    if (!candidateLastItem.startsWith(expectedLastItem)) {
+      return null;
+    }
+
+    const trailingSuffix = candidateLastItem.slice(expectedLastItem.length);
+    return `${trailingSuffix}${rest}`.trimStart();
   }
 
   // Requirements: llm-integration.9.5.6
@@ -1155,6 +1279,23 @@ export class MainPipeline {
     return candidate.every((item, index) => item === expected[index]);
   }
 
+  // Requirements: llm-integration.9.5.3.3, llm-integration.9.5.6
+  private areNormalizedSummaryPointsEqual(candidate: string[], expected: string[]): boolean {
+    if (candidate.length !== expected.length) {
+      return false;
+    }
+
+    return candidate.every((item, index) => {
+      const expectedItem = expected[index] ?? '';
+      return this.normalizeSummaryPointText(item) === this.normalizeSummaryPointText(expectedItem);
+    });
+  }
+
+  // Requirements: llm-integration.9.5.3.3, llm-integration.9.5.6
+  private normalizeSummaryPointText(text: string): string {
+    return text.replace(/\s+/g, ' ').trim();
+  }
+
   // Requirements: llm-integration.11.3.1, llm-integration.11.1.5
   private handleAttemptFailure(
     error: unknown,
@@ -1165,7 +1306,6 @@ export class MainPipeline {
     state: AttemptRuntimeState,
     setLastLlmMessageId: (messageId: number) => void
   ): boolean {
-    this.clearPendingToolCallFlushTimer(state);
     const isInvalidFinalAnswer =
       error instanceof InvalidFinalAnswerContractError ||
       error instanceof InvalidToolArgumentsError;
@@ -1375,7 +1515,9 @@ export class MainPipeline {
       return message.id !== excludedLlmMessageId;
     });
 
-    const lastProcessedMessageId = filteredMessages.at(-1)?.id ?? 0;
+    const lastFilteredMessage =
+      filteredMessages.length > 0 ? filteredMessages[filteredMessages.length - 1] : null;
+    const lastProcessedMessageId = lastFilteredMessage ? lastFilteredMessage.id : 0;
     const cache = this.autoTitleHistoryCache.get(agentId);
     if (cache && cache.lastProcessedMessageId === lastProcessedMessageId) {
       return cache.lastRenameUserTurn;
@@ -1553,6 +1695,35 @@ export class MainPipeline {
     return messages.some((message) => !message.hidden && this.isMeaningfulUserMessage(message));
   }
 
+  // Requirements: llm-integration.9.5.3.2, llm-integration.16.1.4
+  private assertToolPayloadHasNoAutoTitleMetadata(
+    value: unknown,
+    path: string,
+    createError: (message: string) => Error
+  ): void {
+    if (typeof value === 'string') {
+      if (value.includes(TITLE_META_COMMENT_PREFIX)) {
+        throw createError(`${path} must not contain auto-title metadata comments`);
+      }
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      value.forEach((item, index) => {
+        this.assertToolPayloadHasNoAutoTitleMetadata(item, `${path}[${index}]`, createError);
+      });
+      return;
+    }
+
+    if (!value || typeof value !== 'object') {
+      return;
+    }
+
+    Object.entries(value).forEach(([key, nestedValue]) => {
+      this.assertToolPayloadHasNoAutoTitleMetadata(nestedValue, `${path}.${key}`, createError);
+    });
+  }
+
   private validateToolCallArguments(toolName: string, args: Record<string, unknown>): void {
     if (toolName === 'code_exec') {
       const validated = validateCodeExecInput(args);
@@ -1561,6 +1732,11 @@ export class MainPipeline {
           validated.error?.message ?? 'Invalid code_exec arguments.'
         );
       }
+      this.assertToolPayloadHasNoAutoTitleMetadata(
+        args,
+        toolName,
+        (message) => new InvalidToolArgumentsError(message)
+      );
       return;
     }
 
@@ -1596,6 +1772,12 @@ export class MainPipeline {
         );
       }
     }
+
+    this.assertToolPayloadHasNoAutoTitleMetadata(
+      args,
+      toolName,
+      (message) => new InvalidFinalAnswerContractError(message)
+    );
   }
 
   private persistFinalAnswerToolCall(
@@ -2023,14 +2205,15 @@ export class MainPipeline {
    * Requirements: llm-integration.11.4, llm-integration.11.5
    */
   private bindToolExecutors(
-    tools: NonNullable<ChatOptions['tools']>
+    tools: NonNullable<ChatOptions['tools']>,
+    fallbackSignal?: AbortSignal
   ): NonNullable<ChatOptions['tools']> {
     const runLimited = this.createConcurrencyLimiter(3);
     return tools.map((toolDef) => ({
       ...toolDef,
       execute: async (args: Record<string, unknown>, executeOptions?: unknown) =>
         runLimited(async () => {
-          const abortSignal = this.extractToolAbortSignal(executeOptions);
+          const abortSignal = this.extractToolAbortSignal(executeOptions) ?? fallbackSignal;
           const toolCallId = this.extractToolCallId(executeOptions);
           if (toolDef.execute) {
             return toolDef.execute(args, abortSignal);
@@ -2061,14 +2244,25 @@ export class MainPipeline {
   }
 
   private extractToolAbortSignal(executeOptions: unknown): AbortSignal | undefined {
-    if (executeOptions && typeof executeOptions === 'object' && 'abortSignal' in executeOptions) {
-      const candidate = (executeOptions as { abortSignal?: unknown }).abortSignal;
-      if (
+    const isAbortSignalLike = (candidate: unknown): candidate is AbortSignal => {
+      return Boolean(
         candidate &&
         typeof candidate === 'object' &&
         'addEventListener' in candidate &&
         typeof (candidate as { addEventListener?: unknown }).addEventListener === 'function'
-      ) {
+      );
+    };
+
+    if (executeOptions && typeof executeOptions === 'object' && 'abortSignal' in executeOptions) {
+      const candidate = (executeOptions as { abortSignal?: unknown }).abortSignal;
+      if (isAbortSignalLike(candidate)) {
+        return candidate as AbortSignal;
+      }
+    }
+
+    if (executeOptions && typeof executeOptions === 'object' && 'signal' in executeOptions) {
+      const candidate = (executeOptions as { signal?: unknown }).signal;
+      if (isAbortSignalLike(candidate)) {
         return candidate as AbortSignal;
       }
     }
@@ -2076,9 +2270,21 @@ export class MainPipeline {
     if (
       executeOptions &&
       typeof executeOptions === 'object' &&
-      'addEventListener' in executeOptions &&
-      typeof (executeOptions as { addEventListener?: unknown }).addEventListener === 'function'
+      'context' in executeOptions &&
+      (executeOptions as { context?: unknown }).context &&
+      typeof (executeOptions as { context?: unknown }).context === 'object'
     ) {
+      const context = (executeOptions as { context?: { abortSignal?: unknown; signal?: unknown } })
+        .context;
+      if (isAbortSignalLike(context?.abortSignal)) {
+        return context.abortSignal as AbortSignal;
+      }
+      if (isAbortSignalLike(context?.signal)) {
+        return context.signal as AbortSignal;
+      }
+    }
+
+    if (isAbortSignalLike(executeOptions)) {
       return executeOptions as AbortSignal;
     }
 

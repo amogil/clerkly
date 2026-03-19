@@ -20,7 +20,7 @@ export function AgentReasoningTrigger() {
   const isReasoningActive = isStreaming && isOpen;
 
   return (
-    <ReasoningTrigger data-testid="message-llm-reasoning-trigger">
+    <ReasoningTrigger data-testid="message-llm-reasoning-trigger" className="pl-3">
       <span className="inline-flex items-center justify-center [&_svg]:size-4">
         <Logo animated={isReasoningActive} showText={false} size="sm" />
       </span>

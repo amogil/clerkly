@@ -181,21 +181,33 @@
 
 4.3. КОГДА пользователь нажимает Enter (без Shift), ТО сообщение ДОЛЖНО отправляться
 
+4.3.1. КОГДА пользователь нажимает кнопку отправки в режиме `send`, ТО сообщение ДОЛЖНО отправляться.
+
+4.3.2. КОГДА запрос на отправку сообщения успешно передан в чат, ТО поле ввода ДОЛЖНО очищаться немедленно, не дожидаясь ответа модели.
+
+4.3.3. ЕСЛИ отправка сообщения завершается ошибкой до передачи запроса в чат, ТО исходный текст ДОЛЖЕН оставаться в поле ввода для повтора.
+
 4.4. КОГДА пользователь нажимает Shift+Enter, ТО ДОЛЖНА добавляться новая строка
 
-4.5. Поле ввода ДОЛЖНО автоматически увеличивать высоту при вводе многострочного текста
+4.5. Поле ввода ДОЛЖНО поддерживать ввод многострочного текста и по умолчанию отображать две строки текста без внутреннего вертикального скролла.
 
-4.6. Максимальная высота поля ввода ДОЛЖНА быть ограничена 50% высоты области чата
+4.6. КОГДА пользователь добавляет третью, четвёртую и пятую строки, ТО поле ввода ДОЛЖНО поэтапно увеличивать свою видимую высоту на каждой новой строке.
 
-4.7. КОГДА текст превышает максимальную высоту поля ввода, ТО ДОЛЖЕН появляться вертикальный скролл
+4.7. КОГДА пользователь добавляет шестую строку и последующие строки, ТО дальнейший рост высоты поля ввода ДОЛЖЕН прекращаться, а внутри поля ввода ДОЛЖЕН использоваться внутренний вертикальный скролл.
 
-4.7.1. КОГДА активируется чат агента (выбор агента, возврат из AllAgents, первая загрузка), ТО фокус ввода ДОЛЖЕН автоматически устанавливаться на поле ввода сообщения
+4.7.1. КОГДА содержимое поля ввода снова помещается в пять строк или меньше, ТО внутренний вертикальный скролл НЕ ДОЛЖЕН отображаться.
 
-4.7.2. Автофокус ДОЛЖЕН срабатывать при:
-   - Клике на иконку агента в списке
-   - Возврате из AllAgents после выбора агента
-   - Первой загрузке приложения (на автоматически созданном агенте)
-   - Создании нового агента через кнопку "+"
+4.7.2. Область ввода ДОЛЖНА быть выровнена по той же визуальной ширине контентной колонки сообщений.
+4.7.2.1. Область ввода ДОЛЖНА иметь нижний отступ от нижней границы чат-области.
+
+4.7.3. Подсказка `Press Enter to send, Shift+Enter for new line` ДОЛЖНА отображаться внутри области `PromptInput` в нижней части поля ввода.
+4.7.3.1. Подсказка `Press Enter to send, Shift+Enter for new line` ДОЛЖНА иметь внутренний нижний отступ внутри области `PromptInput`.
+4.7.3.2. Подсказка `Press Enter to send, Shift+Enter for new line` ДОЛЖНА использовать менее акцентную и немного меньшую типографику, чем основной вводимый текст.
+4.7.3.3. Подсказка `Press Enter to send, Shift+Enter for new line` ДОЛЖНА быть выровнена по той же левой колонке, что и текст, вводимый пользователем в поле ввода.
+
+4.7.4. Поле ввода ДОЛЖНО оставаться визуально различимым в unfocused состоянии.
+
+4.7.5. КОГДА поле ввода получает фокус, ТО существующая фиолетовая focus-рамка ДОЛЖНА сохраняться.
 
 4.8. Сообщения ДОЛЖНЫ отображаться в хронологическом порядке
 
@@ -230,6 +242,8 @@
 4.11.6. Нормализация markdown-склейки для reasoning SHALL NOT изменять persisted payload сообщения (`payload.data.reasoning.text`) и SHALL применяться только при рендере reasoning.
 
 4.11.7. Потоковые данные reasoning (`delta` и накопленный текст до сохранения) SHALL сохранять исходный текст модели без display-time нормализации; нормализация SHALL применяться только к отображаемому renderer-представлению reasoning.
+
+4.11.8. Заголовок reasoning-блока ДОЛЖЕН начинаться по той же горизонтальной линии, что и ведущая иконка в заголовке блока `tool_call(code_exec)`.
 
 4.12. Сообщения агента ДОЛЖНЫ поддерживать React-компоненты (для rich content)
 
@@ -325,13 +339,17 @@
 #### Функциональные Тесты
 
 - `tests/functional/agent-messaging.spec.ts` - "should send message on Enter key"
+- `tests/functional/agent-messaging.spec.ts` - "should clear input after clicking send button"
 - `tests/functional/agent-messaging.spec.ts` - "should add new line on Shift+Enter"
 - `tests/functional/agent-messaging.spec.ts` - "should enable send button only when input has text"
 - `tests/functional/agent-messaging.spec.ts` - "should keep stop button enabled regardless of input text in in-progress status"
 - `tests/functional/agent-messaging.spec.ts` - "should display messages in chronological order"
 - `tests/functional/agent-messaging.spec.ts` - "should autoscroll to last message"
-- `tests/functional/auto-expanding-textarea.spec.ts` - "AutoExpandingTextarea - Functional Tests"
-- `tests/functional/input-autofocus.spec.ts` - "Functional tests for input autofocus on agent activation"
+- `tests/functional/auto-expanding-textarea.spec.ts` - "should keep two-line baseline height before overflow threshold"
+- `tests/functional/auto-expanding-textarea.spec.ts` - "should grow height when third fourth and fifth lines are added"
+- `tests/functional/auto-expanding-textarea.spec.ts` - "should stop growing and enable internal scroll at sixth line"
+- `tests/functional/auto-expanding-textarea.spec.ts` - "should hide scrollbar for short content"
+- `tests/functional/auto-expanding-textarea.spec.ts` - "should restore short-content scrolling state after content is cleared"
 - `tests/functional/empty-state-placeholder.spec.ts` - "should display empty state for new agent"
 - `tests/functional/empty-state-placeholder.spec.ts` - "should show 4 prompt suggestions"
 - `tests/functional/empty-state-placeholder.spec.ts` - "should send message on prompt click"
@@ -533,6 +551,8 @@
 
 7.4.2.2. КОГДА `summary_points` пустой, отсутствует ИЛИ содержит пункт с пустым текстом (после `trim`), ТО это состояние ДОЛЖНО считаться нарушением контракта `final_answer` (см. `llm-integration.9.5.*`).
 
+7.4.2.2.1. Служебные metadata comments (например `<!-- clerkly:title-meta: ... -->`) НЕ ДОЛЖНЫ отображаться пользователю ни в обычных сообщениях `kind: llm`, ни внутри UI-представления `tool_call`; renderer ДОЛЖЕН показывать только пользовательский контент, включая persisted historical payloads, записанные до введения runtime-guard.
+
 7.4.2.3. Контракт и лимиты аргументов `final_answer` задаются в спецификации `llm-integration`; `agents` использует только persisted payload для отображения.
 
 7.4.2.4. В каждом checklist-пункте блока `"Final Answer"` зелёная иконка `Check` ДОЛЖНА быть выровнена по вертикальному центру первой строки текста пункта (а НЕ по центру всего многострочного блока).
@@ -546,48 +566,47 @@
 
 7.4.5. `tool_call` с `toolName = "code_exec"` НЕ ДОЛЖЕН отображаться как обычный текстовый bubble (`user`/`llm`); для него ДОЛЖЕН использоваться специализированный блок выполнения кода.
 
-7.4.6. Блок `tool_call(code_exec)` ДОЛЖЕН отображать статус выполнения и детали результата (включая `stdout`/`stderr` при наличии) на основе persisted payload.
+7.4.6. Блок `tool_call(code_exec)` ДОЛЖЕН отображать статус выполнения и детали результата (включая `stdout`/`stderr` и structured `error` при наличии) на основе persisted payload.
 
 7.4.6.1. Для визуализации `tool_call(code_exec)` ДОЛЖЕН использоваться компонент AI Elements `Tool` (см. [https://elements.ai-sdk.dev/components/tool](https://elements.ai-sdk.dev/components/tool)).
 
-7.4.6.2. Заголовок блока `tool_call(code_exec)` ДОЛЖЕН содержать иконку `Code2` (из набора `lucide-react`).
+7.4.6.2. Заголовок блока `tool_call(code_exec)` ДОЛЖЕН использовать стандартный toggle компонента `Tool` без дополнительного app-owned overlay поверх toggle hit area.
+7.4.6.2.1. Верхний правый угол заголовка `tool_call(code_exec)` (включая область chevron) ДОЛЖЕН оставаться hit-testable для стандартного toggle и ДОЛЖЕН быть свободен от перекрытия скрытыми интерактивными элементами секций `JavaScript`/`Output`/`Error`.
 
-7.4.6.3. Заголовок блока `tool_call(code_exec)` ДОЛЖЕН отображать название инструмента как `Code` (с заглавной буквы).
+7.4.6.3. Заголовок блока `tool_call(code_exec)` ДОЛЖЕН отображать краткое описание работы из `arguments.task_summary`.
 
-7.4.6.4. Статус выполнения `tool_call(code_exec)` ДОЛЖЕН отображаться сразу после названия `Code` в заголовке.
+7.4.6.3.1. ЕСЛИ persisted historical payload `tool_call(code_exec)` не содержит `arguments.task_summary`, ТО заголовок блока ДОЛЖЕН использовать fallback-значение `"Code"` для backward compatibility с историческими записями.
 
-7.4.6.5. В блоке `tool_call(code_exec)` прозрачный фон (`transparent`) ДОЛЖЕН использоваться для:
-  - корневого контейнера блока,
-  - status-badge,
-  - секций `JavaScript`, `stdout` и `stderr`.
+7.4.6.4. Статус выполнения `tool_call(code_exec)` ДОЛЖЕН отображаться в заголовке блока через status icon перед текстом заголовка.
+7.4.6.4.1. Заголовок `tool_call(code_exec)` НЕ ДОЛЖЕН отображать стандартную иконку `wrench` перед текстом заголовка.
+7.4.6.4.2. КОГДА `tool_call(code_exec)` находится в persisted-статусе `running`, ТО перед текстом заголовка ДОЛЖНА отображаться крутилка того же фиолетового акцентного цвета, что и кнопки действия в области ввода.
+7.4.6.4.3. КОГДА `tool_call(code_exec)` находится в persisted-статусе `success`, ТО перед текстом заголовка ДОЛЖНА отображаться зелёная галочка.
+7.4.6.4.4. КОГДА `tool_call(code_exec)` находится в persisted-статусе `error`, ТО перед текстом заголовка ДОЛЖЕН отображаться красный крестик.
+7.4.6.4.5. КОГДА `tool_call(code_exec)` находится в persisted-статусе `timeout`, ТО перед текстом заголовка ДОЛЖНА отображаться иконка таймаута.
+7.4.6.4.6. КОГДА `tool_call(code_exec)` находится в persisted-статусе `cancelled`, ТО перед текстом заголовка ДОЛЖНА отображаться иконка отмены.
+7.4.6.4.7. Текст заголовка `tool_call(code_exec)` ДОЛЖЕН быть выровнен по левому краю заголовка (а НЕ центрирован по ширине).
+7.4.6.4.8. В заголовке `tool_call(code_exec)` status icon ДОЛЖНА быть выровнена по вертикальному центру первой строки текста заголовка (а НЕ по центру всего многострочного блока).
 
-7.4.6.6. Статус-badge компонента `Tool` (включая блок `tool_call(code_exec)`) ДОЛЖЕН содержать иконку статуса, соответствующую persisted-статусу выполнения:
-  - `running` → `Loader2` (с анимацией вращения),
-  - `success` → `CircleCheck`,
-  - `error` → `CircleX`,
-  - `timeout` → `Clock3`,
-  - `cancelled` → `CircleMinus`.
+7.4.6.5. В блоке `tool_call(code_exec)` прозрачный фон (`transparent`) ДОЛЖЕН использоваться для корневого контейнера блока.
 
-7.4.6.7. Иконки статусов в status-badge `tool_call(code_exec)` ДОЛЖНЫ использовать цветовую кодировку (colorized icons), а не монохромный цвет.
+7.4.6.5.1. ЕСЛИ persisted payload `tool_call(code_exec)` содержит `output.error`, ТО UI ДОЛЖЕН отображать отдельную секцию `error`, а НЕ скрывать structured-ошибку внутри индикатора статуса или смешивать её с `stderr`.
 
-7.4.6.8. Секция `JavaScript` в `tool_call(code_exec)` ДОЛЖНА рендерить входной код через общий компонент markdown code block (fenced `javascript`) с встроенной JavaScript syntax highlighting, а НЕ как plain text.
+7.4.6.5.2. Секция `error` в `tool_call(code_exec)` ДОЛЖНА отображать человекочитаемое диагностическое содержимое из persisted `output.error`.
+7.4.6.5.2.1. Секция `error` в `tool_call(code_exec)` ДОЛЖНА использовать стандартный text code-block control с действиями копирования и сохранения содержимого.
+7.4.6.5.3. Секции `stdout`, `stderr` и `error` в `tool_call(code_exec)` ДОЛЖНЫ использовать один и тот же стандартный text code-block control без цветовой подсветки синтаксиса и с той же прозрачной поверхностью, что и блок `JavaScript`.
+7.4.6.5.4. Секции `stdout` и `stderr` в `tool_call(code_exec)` ДОЛЖНЫ отображать стандартный заголовок code block `Output` внутри соответствующего блока.
+7.4.6.5.5. Секция `error` в `tool_call(code_exec)` ДОЛЖНА отображать стандартный заголовок code block `Error` внутри соответствующего блока.
 
-7.4.6.9. КОГДА блок `tool_call(code_exec)` находится в свернутом состоянии, ТО контент заголовка (`Code`, status-badge и toggle) ДОЛЖЕН быть выровнен по вертикальному центру; при этом нижний отступ заголовка ДОЛЖЕН отсутствовать. КОГДА блок раскрыт, ТО нижний отступ заголовка ДОЛЖЕН быть восстановлен.
-
-7.4.6.10. Для входного кода `tool_call(code_exec)` ДОЛЖЕН отображаться только встроенный markdown code block (с его собственным language-header); дополнительный верхний label `JavaScript` и отдельный внешний контейнер-рамка вокруг этого блока НЕ ДОЛЖНЫ рендериться.
-
-7.4.6.11. Для входного кода `tool_call(code_exec)` ДОЛЖЕН использоваться тот же контейнерный frame, что и у `stdout`/`stderr`; дополнительная внутренняя рамка встроенного markdown code block НЕ ДОЛЖНА рендериться.
+7.4.6.6. Код, переданный для исполнения в `tool_call(code_exec)`, ДОЛЖЕН отображаться в одном стандартном code block с заголовком `JavaScript` и подсветкой синтаксиса JavaScript.
+7.4.6.6.1. Блок кода для исполняемого JavaScript в `tool_call(code_exec)` ДОЛЖЕН использовать прозрачный фон, при этом цветовая подсветка синтаксиса JavaScript ДОЛЖНА оставаться видимой.
 
 7.4.7. Для `tool_call(code_exec)` UI ДОЛЖЕН иметь отдельные тестовые идентификаторы:
   - `data-testid="message-code-exec-block"` для корневого блока,
-  - `data-testid="message-code-exec-header"` для заголовка блока,
-  - `data-testid="message-code-exec-icon"` для иконки в заголовке,
-  - `data-testid="message-code-exec-title"` для названия `Code`,
-  - `data-testid="message-code-exec-status"` для статуса,
-  - `data-testid="message-code-exec-status-icon"` для иконки статуса,
+  - `data-testid="message-code-exec-toggle"` для стандартного toggle заголовка,
   - `data-testid="message-code-exec-input"` для секции JavaScript,
   - `data-testid="message-code-exec-stdout"` для секции stdout,
-  - `data-testid="message-code-exec-stderr"` для секции stderr.
+  - `data-testid="message-code-exec-stderr"` для секции stderr,
+  - `data-testid="message-code-exec-error"` для секции error.
 
 7.4.8. КОГДА в одном run присутствуют и `kind: llm`, и `kind: tool_call`, UI ДОЛЖЕН отображать их по persisted-порядку шагов: pre-tool `kind: llm` (включая reasoning-фазу) -> `kind: tool_call` (`running`) -> post-tool `kind: llm`; terminal-обновление `tool_call` МОЖЕТ приходить позже и ДОЛЖНО применяться в том же блоке.
 
@@ -601,7 +620,7 @@
 
 7.4.8.5. Для вычисления persisted-порядка model-run UI ДОЛЖЕН использовать поля snapshot-сообщения `runId/attemptId/sequence` (проекция колонок `messages.run_id/attempt_id/sequence`) и НЕ ДОЛЖЕН читать порядок из `payload_json`.
 
-7.4.9. В явно выделенных text/code секциях tool-блоков (`Input`, `Output`, `JavaScript`, `stdout`, `stderr`) длинные строки НЕ ДОЛЖНЫ переноситься по ширине секции и ДОЛЖНЫ отображаться через горизонтальный скролл внутри соответствующего блока.
+7.4.9. В явно выделенных text/code секциях tool-блоков (`Input`, `Output`, `JavaScript`, `stdout`, `stderr`, `error`) длинные строки НЕ ДОЛЖНЫ переноситься по ширине секции и ДОЛЖНЫ отображаться через горизонтальный скролл внутри соответствующего блока.
 
 7.5. Сообщение `user` ДОЛЖНО содержать:
    ```json
@@ -616,10 +635,13 @@
 7.7. КОГДА `format = "markdown"`, ТО текст ДОЛЖЕН рендериться с поддержкой Markdown
 
 7.7.1. КОГДА в тексте встречаются математические делимитеры `\(...\)`, `\[...\]` или экранированные dollar-делимитеры `\$...\$` / `\$\$...\$\$`, ТО UI ДОЛЖЕН нормализовать их в KaTeX-совместимый формат (`$...$`/`$$...$$`) до рендера.
+7.7.1.1. КОГДА `llm`-текст содержит inline математические выражения в формате `$...$`, ТО UI ДОЛЖЕН рендерить их как KaTeX inline math (без отображения сырых `$`-делимитеров в пользовательском тексте).
 
 7.7.2. КОГДА `llm`-ответ содержит markdown code block, контейнеры code block в ответе ДОЛЖНЫ использовать прозрачный фон (`transparent`).
 
 7.7.3. КОГДА `llm`-ответ содержит markdown fenced code block (любой язык, включая `text`/`plaintext`), длинные строки в таком блоке НЕ ДОЛЖНЫ переноситься по ширине блока и ДОЛЖНЫ отображаться с горизонтальным скроллом внутри code block.
+7.7.4. КОГДА `format = "markdown"` и ответ содержит markdown footnotes (`[^id]` / `[^id]: ...`) в обычном тексте, UI НЕ ДОЛЖЕН отображать эти footnotes как отдельный пользовательский контент.
+7.7.4.1. КОГДА в inline code или fenced code block встречается literal `[^...]`, UI ДОЛЖЕН отображать этот literal без удаления.
 
 7.8. Все timestamps ДОЛЖНЫ включать timezone offset и храниться в часовом поясе пользователя
 
@@ -646,11 +668,13 @@
 - `tests/functional/llm-chat.spec.ts` - "should render markdown images"
 - `tests/functional/llm-chat.spec.ts` - "should render markdown mermaid diagrams"
 - `tests/functional/llm-chat.spec.ts` - "should render markdown inline math"
+- `tests/functional/llm-chat.spec.ts` - "should render single-dollar inline symbols in paragraphs and lists"
 - `tests/functional/llm-chat.spec.ts` - "should render markdown block math"
 - `tests/functional/llm-chat.spec.ts` - "should keep markdown fenced text code block lines unwrapped with horizontal scroll"
 - `tests/functional/llm-chat.spec.ts` - "should render math when model returns LaTeX delimiters"
 - `tests/functional/llm-chat.spec.ts` - "should render math when model returns escaped dollar delimiters"
 - `tests/functional/llm-chat.spec.ts` - "should avoid duplicate line breaks between markdown blocks"
+- `tests/functional/llm-chat.spec.ts` - "should not render footnotes while rendering other markdown elements"
 - `tests/functional/llm-chat.spec.ts` - "should render tool_call(final_answer) as checklist block"
 - `tests/functional/llm-chat.spec.ts` - "should render markdown inside tool_call(final_answer) checklist item"
 - `tests/functional/llm-chat.spec.ts` - "should render math inside tool_call(final_answer) checklist item"
@@ -660,8 +684,10 @@
 - `tests/functional/llm-chat.spec.ts` - "should show running code_exec before terminal when first model step has no post-tool text"
 - `tests/functional/llm-chat.spec.ts` - "should reject model response containing more than one tool_call and run repair"
 - `tests/functional/llm-chat.spec.ts` - "should render final_answer after all non-final tool steps of successful attempt"
-- `tests/functional/code_exec.spec.ts` - "should render tool_call(code_exec) message block with Code header/icon/status and transparent streams"
-- `tests/functional/code_exec.spec.ts` - "should render JavaScript syntax highlighting in code_exec input section"
+- `tests/functional/code_exec.spec.ts` - "should render tool_call(code_exec) message block with standard ToolHeader toggle and JavaScript input"
+- `tests/functional/code_exec.spec.ts` - "should render code_exec error section from structured output.error"
+- `tests/functional/code_exec.spec.ts` - "should keep standard code_exec toggle usable after reopen cycle"
+- `tests/functional/code_exec.spec.ts` - "should render JavaScript code block in code_exec input section"
 - `tests/functional/code_exec.spec.ts` - "should keep code_exec block within chat width with internal horizontal scroll"
 
 ---
@@ -714,10 +740,10 @@
      - `kind = 'llm'` и `done = true` → `awaiting-response`
      - `kind = 'tool_call'` и `done = false` → `in-progress`
      - `kind = 'tool_call'` и `toolName = 'final_answer'` и `done = true` → `completed`
-     - `kind = 'tool_call'` и `toolName = 'code_exec'` и `done = true` → определяется по правилам `llm-integration.9.4.1-9.4.2`
+     - `kind = 'tool_call'` и `toolName = 'code_exec'` и `done = true` → определяется по правилам `llm-integration.9.4.1-9.4.3`
      - `kind = 'error'` → `error`
 
-9.2.1. Детальная статусная семантика terminal `tool_call(code_exec)` ДОЛЖНА определяться в `llm-integration.9.4.1-9.4.2` и НЕ ДОЛЖНА дублироваться в данной спецификации.
+9.2.1. Детальная статусная семантика terminal `tool_call(code_exec)` ДОЛЖНА определяться в `llm-integration.9.4.1-9.4.3` и НЕ ДОЛЖНА дублироваться в данной спецификации.
 
 9.3. Статус ДОЛЖЕН пересчитываться при получении любого нового сообщения в чате агента
 
@@ -730,7 +756,7 @@
 - `tests/functional/agent-status-calculation.spec.ts` - "should keep in-progress status for done code_exec success tool_call"
 - `tests/functional/agent-status-calculation.spec.ts` - "should keep in-progress status from done code_exec error tool_call"
 - `tests/functional/agent-status-calculation.spec.ts` - "should keep in-progress status from done code_exec timeout tool_call"
-- `tests/functional/agent-status-calculation.spec.ts` - "should keep in-progress status from done code_exec cancelled tool_call"
+- `tests/functional/agent-status-calculation.spec.ts` - "should resolve awaiting-response status from done code_exec cancelled tool_call when pipeline is inactive"
 
 ---
 
@@ -988,7 +1014,7 @@
 ### React хуки
 - `useState` - управление состоянием компонента
 - `useRef` - ссылки на DOM элементы (chatListRef)
-- `useEffect` - побочные эффекты (resize listener, autofocus)
+- `useEffect` - побочные эффекты (resize listener)
 
 ## Ограничения
 

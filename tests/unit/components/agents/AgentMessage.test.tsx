@@ -4,10 +4,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import {
-  AgentMessage,
-  buildJavaScriptFence,
-} from '../../../../src/renderer/components/agents/AgentMessage';
+import { AgentMessage } from '../../../../src/renderer/components/agents/AgentMessage';
 import type { MessageSnapshot } from '../../../../src/shared/events/types';
 
 const mockRetryLast = jest.fn().mockResolvedValue({ success: true });
@@ -29,19 +26,6 @@ const baseMessage = (overrides: Partial<MessageSnapshot> = {}): MessageSnapshot 
     replyToMessageId: null,
     ...overrides,
   }) as MessageSnapshot;
-
-describe('buildJavaScriptFence', () => {
-  /* Preconditions: code contains triple backticks
-     Action: build fenced markdown for code_exec input
-     Assertions: fence length is expanded beyond content backtick run
-     Requirements: agents.7.4.6.8 */
-  it('uses a fence longer than any backtick run in code', () => {
-    const fenced = buildJavaScriptFence("console.log('a');\n```in-code```");
-    expect(fenced.startsWith('````javascript\n')).toBe(true);
-    expect(fenced.endsWith('\n````')).toBe(true);
-    expect(fenced).toContain('```in-code```');
-  });
-});
 
 describe('AgentMessage — user', () => {
   /* Preconditions: kind:user message
@@ -92,6 +76,7 @@ describe('AgentMessage — tool_call', () => {
 
     expect(screen.getByTestId('message-tool-call')).toBeInTheDocument();
     expect(screen.getByText('search_docs')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('message-tool-call-header'));
     expect(screen.getByTestId('message-tool-call-input')).toBeInTheDocument();
     expect(screen.queryByTestId('message-tool-call-output')).not.toBeInTheDocument();
   });
@@ -118,16 +103,18 @@ describe('AgentMessage — tool_call', () => {
       />
     );
 
+    fireEvent.click(screen.getByTestId('message-tool-call-header'));
+
     const output = screen.getByTestId('message-tool-call-output');
     expect(output).toBeInTheDocument();
     expect(output).toHaveTextContent('"content": "result"');
   });
 
   /* Preconditions: persisted kind:tool_call for code_exec with status/stdout/stderr
-     Action: render AgentMessage, verify default collapsed state, then expand by toggle
-     Assertions: dedicated code_exec block renders Code header with icon/status, starts collapsed with centered header spacing, and shows transparent stream sections after expand
-     Requirements: agents.7.4.5, agents.7.4.6, agents.7.4.6.9, agents.7.4.7 */
-  it('should render code_exec tool_call block with Code header, icon, status, and streams', () => {
+     Action: render AgentMessage, verify default collapsed state, expand by standard ToolHeader toggle, collapse, then reopen
+     Assertions: dedicated code_exec block uses standard ToolHeader toggle and shows JavaScript input plus persisted output sections after expand
+     Requirements: agents.7.4.5, agents.7.4.6, agents.7.4.7 */
+  it('should render code_exec tool_call block with standard ToolHeader toggle and JavaScript input section', () => {
     render(
       <AgentMessage
         message={baseMessage({
@@ -137,7 +124,10 @@ describe('AgentMessage — tool_call', () => {
             data: {
               callId: 'call-code',
               toolName: 'code_exec',
-              arguments: { code: "console.log('ok')" },
+              arguments: {
+                task_summary: 'Print ok to stdout',
+                code: "console.log('ok')",
+              },
               output: {
                 status: 'success',
                 stdout: 'ok\\n',
@@ -153,28 +143,333 @@ describe('AgentMessage — tool_call', () => {
 
     expect(screen.getByTestId('message-code-exec-block')).toBeInTheDocument();
     expect(screen.getByTestId('message-code-exec-block')).toHaveClass('bg-transparent');
-    expect(screen.getByTestId('message-code-exec-icon')).toBeInTheDocument();
-    expect(screen.getByTestId('message-code-exec-title')).toHaveTextContent('Code');
-    expect(screen.getByTestId('message-code-exec-status')).toHaveTextContent('success');
-    expect(screen.getByTestId('message-code-exec-status')).toHaveClass('bg-transparent');
-    expect(screen.getByTestId('message-code-exec-status-icon')).toBeInTheDocument();
-    expect(screen.getByTestId('message-code-exec-status-icon')).toHaveClass('text-emerald-600');
-    expect(screen.getByTestId('message-code-exec-header')).toHaveClass('mb-0');
-    expect(screen.getByTestId('message-code-exec-header')).toHaveClass('items-center');
+    expect(screen.getByTestId('message-code-exec-block')).toHaveClass('min-w-0');
+    expect(screen.getByTestId('message-code-exec-block')).toHaveClass('max-w-full');
+    expect(screen.getByTestId('message-code-exec-block')).toHaveClass('overflow-hidden');
     expect(screen.getByTestId('message-code-exec-toggle')).toBeInTheDocument();
+    expect(screen.getByTestId('message-code-exec-toggle')).toHaveTextContent('Print ok to stdout');
+    expect(screen.getByTestId('message-code-exec-toggle')).toHaveClass('relative');
+    expect(screen.getByTestId('message-code-exec-toggle')).toHaveClass('z-10');
+    expect(screen.getByTestId('message-code-exec-toggle')).toHaveClass('items-start');
+    expect(screen.getByTestId('message-code-exec-toggle')).toHaveClass('text-left');
+    expect(screen.getByTestId('message-code-exec-status-icon')).toHaveClass('mt-0.5');
+    expect(screen.getByTestId('message-code-exec-status-icon')).toHaveClass('h-4');
+    expect(screen.getByTestId('message-code-exec-status-icon')).toHaveClass('w-4');
+    expect(screen.getByTestId('message-code-exec-status-icon')).toHaveAttribute(
+      'data-status',
+      'success'
+    );
+    expect(
+      screen.getByTestId('message-code-exec-toggle').querySelector('.lucide-wrench')
+    ).toBeNull();
     expect(screen.queryByTestId('message-code-exec-input')).not.toBeInTheDocument();
     expect(screen.queryByTestId('message-code-exec-stdout')).not.toBeInTheDocument();
     expect(screen.queryByTestId('message-code-exec-stderr')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('message-code-exec-error')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('message-code-exec-toggle'));
 
-    expect(screen.getByTestId('message-code-exec-header')).toHaveClass('mb-2');
-    expect(screen.queryByText('JavaScript')).not.toBeInTheDocument();
-    expect(screen.getByTestId('message-code-exec-input')).toHaveClass('bg-transparent');
+    expect(screen.getByTestId('message-code-exec-content')).toHaveClass('min-w-0');
+    expect(screen.getByTestId('message-code-exec-content')).toHaveClass('max-w-full');
+    expect(screen.getByTestId('message-code-exec-content')).toHaveClass('overflow-hidden');
+    expect(screen.getByTestId('message-code-exec-content')).toHaveClass(
+      'data-[state=closed]:pointer-events-none'
+    );
+    expect(screen.getByTestId('message-code-exec-input')).toHaveTextContent("console.log('ok')");
+    expect(screen.getByTestId('message-code-exec-input')).toHaveTextContent('```JavaScript');
+    expect(
+      screen
+        .getByTestId('message-code-exec-input')
+        .querySelectorAll('[data-testid="mock-code-block"]')
+    ).toHaveLength(0);
     expect(screen.getByTestId('message-code-exec-stdout')).toHaveTextContent('ok');
-    expect(screen.getByTestId('message-code-exec-stdout')).toHaveClass('bg-transparent');
+    expect(screen.getByTestId('message-code-exec-stdout')).toHaveTextContent('```Output');
     expect(screen.getByTestId('message-code-exec-stderr')).toHaveTextContent('warn');
-    expect(screen.getByTestId('message-code-exec-stderr')).toHaveClass('bg-transparent');
+    expect(screen.getByTestId('message-code-exec-stderr')).toHaveTextContent('```Output');
+
+    fireEvent.click(screen.getByTestId('message-code-exec-toggle'));
+
+    expect(screen.queryByTestId('message-code-exec-input')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('message-code-exec-stdout')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('message-code-exec-stderr')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('message-code-exec-error')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('message-code-exec-toggle'));
+
+    expect(screen.getByTestId('message-code-exec-input')).toHaveTextContent("console.log('ok')");
+    expect(screen.getByTestId('message-code-exec-stdout')).toHaveTextContent('ok');
+    expect(screen.getByTestId('message-code-exec-stderr')).toHaveTextContent('warn');
+  });
+
+  /* Preconditions: persisted kind:tool_call for code_exec with terminal error payload
+     Action: render AgentMessage, then expand by toggle
+     Assertions: renderer shows separate code_exec error section from structured output.error
+     Requirements: agents.7.4.6, agents.7.4.6.5.1, agents.7.4.6.5.2, agents.7.4.7 */
+  it('should render separate code_exec error section from structured output.error', () => {
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'tool_call',
+          done: true,
+          payload: {
+            data: {
+              callId: 'call-code-error',
+              toolName: 'code_exec',
+              arguments: {
+                task_summary: 'Attempt forbidden request',
+                code: "window.open('https://example.com')",
+              },
+              output: {
+                status: 'error',
+                stdout: '',
+                stderr: 'console.error fallback\\n',
+                stdout_truncated: false,
+                stderr_truncated: false,
+                error: {
+                  code: 'policy_denied',
+                  message: 'Tool is not allowed in sandbox allowlist.',
+                },
+              },
+            },
+          },
+        })}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('message-code-exec-toggle'));
+
+    expect(screen.getByTestId('message-code-exec-status-icon')).toHaveAttribute(
+      'data-status',
+      'error'
+    );
+    expect(screen.getByTestId('message-code-exec-stderr')).toHaveTextContent(
+      'console.error fallback'
+    );
+    expect(screen.getByTestId('message-code-exec-error')).toHaveTextContent(
+      'policy_denied: Tool is not allowed in sandbox allowlist.'
+    );
+    expect(screen.getByTestId('message-code-exec-error')).toHaveTextContent('```Error');
+  });
+
+  /* Preconditions: persisted kind:tool_call for code_exec with running status
+     Action: render AgentMessage
+     Assertions: header shows running status icon without wrench icon
+     Requirements: agents.7.4.6.4, agents.7.4.6.4.1, agents.7.4.6.4.2 */
+  it('should render in-progress status icon for running code_exec block', () => {
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'tool_call',
+          done: false,
+          payload: {
+            data: {
+              callId: 'call-code-running',
+              toolName: 'code_exec',
+              arguments: {
+                task_summary: 'Still running',
+                code: "console.log('running')",
+              },
+              output: {
+                status: 'running',
+                stdout: '',
+                stderr: '',
+                stdout_truncated: false,
+                stderr_truncated: false,
+              },
+            },
+          },
+        })}
+      />
+    );
+
+    expect(screen.getByTestId('message-code-exec-status-icon')).toHaveAttribute(
+      'data-status',
+      'running'
+    );
+    expect(
+      screen.getByTestId('message-code-exec-toggle').querySelector('.lucide-wrench')
+    ).toBeNull();
+  });
+
+  /* Preconditions: persisted kind:tool_call for code_exec with cancelled status
+     Action: render AgentMessage
+     Assertions: header shows cancelled status icon without wrench icon
+     Requirements: agents.7.4.6.4, agents.7.4.6.4.1, agents.7.4.6.4.6 */
+  it('should render cancelled status icon for cancelled code_exec block', () => {
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'tool_call',
+          done: true,
+          payload: {
+            data: {
+              callId: 'call-code-cancelled',
+              toolName: 'code_exec',
+              arguments: {
+                task_summary: 'Cancelled run',
+                code: "console.log('cancelled')",
+              },
+              output: {
+                status: 'cancelled',
+                stdout: '',
+                stderr: '',
+                stdout_truncated: false,
+                stderr_truncated: false,
+              },
+            },
+          },
+        })}
+      />
+    );
+
+    expect(screen.getByTestId('message-code-exec-status-icon')).toHaveAttribute(
+      'data-status',
+      'cancelled'
+    );
+    expect(
+      screen.getByTestId('message-code-exec-toggle').querySelector('.lucide-wrench')
+    ).toBeNull();
+  });
+
+  /* Preconditions: persisted kind:tool_call for code_exec with timeout status
+     Action: render AgentMessage
+     Assertions: header shows timeout status icon without wrench icon
+     Requirements: agents.7.4.6.4, agents.7.4.6.4.1, agents.7.4.6.4.5 */
+  it('should render timeout status icon for timed out code_exec block', () => {
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'tool_call',
+          done: true,
+          payload: {
+            data: {
+              callId: 'call-code-timeout',
+              toolName: 'code_exec',
+              arguments: {
+                task_summary: 'Timed out run',
+                code: 'while (true) {}',
+              },
+              output: {
+                status: 'timeout',
+                stdout: '',
+                stderr: '',
+                stdout_truncated: false,
+                stderr_truncated: false,
+              },
+            },
+          },
+        })}
+      />
+    );
+
+    expect(screen.getByTestId('message-code-exec-status-icon')).toHaveAttribute(
+      'data-status',
+      'timeout'
+    );
+    expect(
+      screen.getByTestId('message-code-exec-toggle').querySelector('.lucide-wrench')
+    ).toBeNull();
+    expect(
+      screen.getByTestId('message-code-exec-toggle').querySelector('.lucide-clock-alert')
+    ).not.toBeNull();
+  });
+
+  /* Preconditions: persisted historical kind:tool_call for code_exec without task_summary
+     Action: render AgentMessage
+     Assertions: renderer falls back to "Code" title for backward compatibility
+     Requirements: agents.7.4.6.3, agents.7.4.6.3.1 */
+  it('should render fallback Code title for historical code_exec payload without task_summary', () => {
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'tool_call',
+          done: true,
+          payload: {
+            data: {
+              callId: 'call-code-legacy',
+              toolName: 'code_exec',
+              arguments: {
+                code: "console.log('legacy')",
+              },
+              output: {
+                status: 'success',
+                stdout: 'legacy\\n',
+                stderr: '',
+                stdout_truncated: false,
+                stderr_truncated: false,
+              },
+            },
+          },
+        })}
+      />
+    );
+
+    expect(screen.getByTestId('message-code-exec-toggle')).toHaveTextContent('Code');
+  });
+
+  /* Preconditions: persisted historical tool_call payloads contain auto-title metadata comments in visible tool text fields
+     Action: render AgentMessage for code_exec header and final_answer checklist
+     Assertions: renderer strips metadata comments from persisted tool text before display
+     Requirements: agents.7.4.2.2.1, agents.7.4.6.3, agents.14.5 */
+  it('should strip auto-title metadata comments from persisted tool payload text', () => {
+    const codeExecMessage = baseMessage({
+      kind: 'tool_call',
+      done: true,
+      payload: {
+        data: {
+          callId: 'call-code-title-meta-render',
+          toolName: 'code_exec',
+          arguments: {
+            task_summary:
+              'Attempt <!-- clerkly:title-meta: {"title":"Hidden","rename_need_score":90} --> request',
+          },
+          output: {
+            status: 'error',
+            stdout: 'stdout\n',
+            stderr: 'stderr\n',
+            error: {
+              code: 'sandbox_runtime_error',
+              message:
+                'Visible <!-- clerkly:title-meta: {"title":"Hidden","rename_need_score":90} --> error',
+            },
+            stdout_truncated: false,
+            stderr_truncated: false,
+          },
+        },
+      },
+    });
+
+    const finalAnswerMessage = baseMessage({
+      kind: 'tool_call',
+      done: true,
+      payload: {
+        data: {
+          callId: 'call-final-title-meta-render',
+          toolName: 'final_answer',
+          arguments: {
+            summary_points: [
+              'Visible <!-- clerkly:title-meta: {"title":"Hidden","rename_need_score":90} --> point',
+              '<!-- clerkly:title-meta: {"title":"Hidden","rename_need_score":90} -->',
+            ],
+          },
+        },
+      },
+    });
+
+    const { rerender } = render(<AgentMessage message={codeExecMessage} />);
+
+    expect(screen.getByTestId('message-code-exec-toggle')).toHaveTextContent('Attempt request');
+    fireEvent.click(screen.getByTestId('message-code-exec-toggle'));
+    expect(screen.getByTestId('message-code-exec-error')).toHaveTextContent(
+      'sandbox_runtime_error: Visible error'
+    );
+    expect(screen.queryByText(/clerkly:title-meta:/)).not.toBeInTheDocument();
+
+    rerender(<AgentMessage message={finalAnswerMessage} />);
+
+    expect(screen.getAllByTestId('message-final-answer-item')).toHaveLength(1);
+    expect(screen.getByTestId('message-final-answer-summary')).toHaveTextContent(/Visible\s+point/);
+    expect(screen.queryByText(/clerkly:title-meta:/)).not.toBeInTheDocument();
   });
 
   /* Preconditions: persisted kind:tool_call for final_answer with summary_points
@@ -320,6 +615,44 @@ describe('AgentMessage — llm', () => {
     expect(screen.getByText('Response text')).toBeInTheDocument();
   });
 
+  /* Preconditions: kind:llm markdown includes footnote reference/definition plus literal [^...] inside inline and fenced code
+     Action: render AgentMessage
+     Assertions: footnote reference/definition are removed from prose, but literal [^...] inside code stays visible
+     Requirements: agents.7.7, agents.7.7.4 */
+  it('should keep literal footnote markers inside code while removing markdown footnotes from prose', () => {
+    const markdown = [
+      'Footnote reference[^1].',
+      '',
+      '`inline [^1] literal`',
+      '',
+      '```js',
+      'const token = "[^1]";',
+      '```',
+      '',
+      '[^1]: Hidden footnote text.',
+    ].join('\n');
+
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'llm',
+          payload: {
+            data: {
+              text: markdown,
+              format: 'markdown',
+            },
+          },
+        })}
+      />
+    );
+
+    const action = screen.getByTestId('message-llm-action');
+    expect(action).toHaveTextContent('Footnote reference.');
+    expect(action).not.toHaveTextContent('Hidden footnote text.');
+    expect(action).toHaveTextContent('inline [^1] literal');
+    expect(action).toHaveTextContent('const token = "[^1]";');
+  });
+
   /* Preconditions: kind:llm without data.text and without reasoning
      Action: render AgentMessage
      Assertions: no loading indicator and no response text content
@@ -352,6 +685,33 @@ describe('AgentMessage — llm', () => {
     expect(screen.getByTestId('message-llm-reasoning')).toBeInTheDocument();
     expect(screen.getByTestId('reasoning-root')).toHaveAttribute('data-streaming', 'false');
     expect(screen.getByTestId('message-llm-action')).toBeInTheDocument();
+  });
+
+  /* Preconditions: kind:llm with reasoning and non-streaming state
+     Action: click reasoning trigger twice
+     Assertions: reasoning content toggles open/closed states
+     Requirements: llm-integration.2, llm-integration.7.2 */
+  it('should toggle reasoning content visibility state on trigger clicks', () => {
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'llm',
+          payload: {
+            data: {
+              reasoning: { text: 'Thinking...' },
+              text: 'Answer',
+            },
+          },
+        })}
+      />
+    );
+
+    const trigger = screen.getByTestId('message-llm-reasoning-trigger');
+    fireEvent.click(trigger);
+    expect(screen.getByTestId('reasoning-root')).toHaveAttribute('data-state', 'open');
+
+    fireEvent.click(trigger);
+    expect(screen.getByTestId('reasoning-root')).toHaveAttribute('data-state', 'closed');
   });
 
   /* Preconditions: kind:llm reasoning text has glued bold opener after plain text

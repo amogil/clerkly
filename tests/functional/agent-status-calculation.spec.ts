@@ -251,7 +251,7 @@ test.describe('Agent Status Calculation', () => {
         data: {
           callId: 'code-success-1',
           toolName: 'code_exec',
-          arguments: { code: 'console.log(1)' },
+          arguments: { task_summary: 'Run code', code: 'console.log(1)' },
           output: { status: 'success', stdout: '1\n', stderr: '' },
         },
       });
@@ -291,7 +291,7 @@ test.describe('Agent Status Calculation', () => {
         data: {
           callId: 'code-success-transition-1',
           toolName: 'code_exec',
-          arguments: { code: 'console.log(1)' },
+          arguments: { task_summary: 'Run code', code: 'console.log(1)' },
           output: { status: 'success', stdout: '1\n', stderr: '' },
         },
       });
@@ -322,7 +322,7 @@ test.describe('Agent Status Calculation', () => {
      Action: Create terminal code_exec tool_call message for each status
      Assertions: Status remains in-progress in header and avatar color
      Requirements: agents.9.2, llm-integration.9.4.2 */
-  for (const terminalStatus of ['error', 'timeout', 'cancelled'] as const) {
+  for (const terminalStatus of ['error', 'timeout'] as const) {
     test(`should keep in-progress status from done code_exec ${terminalStatus} tool_call`, async () => {
       const firstAgentDataTestId = await window
         .locator('[data-testid^="agent-icon-"]')
@@ -338,7 +338,7 @@ test.describe('Agent Status Calculation', () => {
             data: {
               callId: `code-${status}-1`,
               toolName: 'code_exec',
-              arguments: { code: 'throw new Error("x")' },
+              arguments: { task_summary: 'Run code', code: 'throw new Error("x")' },
               output: {
                 status,
                 stdout: '',
@@ -367,4 +367,49 @@ test.describe('Agent Status Calculation', () => {
       await expect(headerStatus).toHaveText('In progress');
     });
   }
+
+  /* Preconditions: Agent exists and receives persisted done tool_call(code_exec) with output.status=cancelled and no active pipeline
+     Action: Create terminal cancelled code_exec tool_call message
+     Assertions: Status resolves to awaiting-response in header and avatar color
+     Requirements: agents.9.2, llm-integration.9.4.3 */
+  test('should resolve awaiting-response status from done code_exec cancelled tool_call when pipeline is inactive', async () => {
+    const firstAgentDataTestId = await window
+      .locator('[data-testid^="agent-icon-"]')
+      .first()
+      .getAttribute('data-testid');
+    const agentId = firstAgentDataTestId?.replace('agent-icon-', '');
+    expect(agentId).toBeTruthy();
+
+    await window.evaluate(async (id) => {
+      const api = (window as unknown as { api: any }).api;
+      const result = await api.messages.create(id, 'tool_call', {
+        data: {
+          callId: 'code-cancelled-1',
+          toolName: 'code_exec',
+          arguments: { task_summary: 'Run code', code: 'while (true) {}' },
+          output: {
+            status: 'cancelled',
+            stdout: '',
+            stderr: 'execution cancelled',
+            error: { code: 'sandbox_cancelled' },
+          },
+        },
+      });
+      if (!result?.success) {
+        throw new Error(result?.error || 'Failed to create code_exec tool_call');
+      }
+    }, agentId as string);
+
+    const agentAvatar = window
+      .locator('[data-testid^="agent-icon-"]')
+      .first()
+      .locator('[data-testid="agent-avatar-icon"]');
+    await expect
+      .poll(async () => await agentAvatar.getAttribute('class'), { timeout: 5000 })
+      .toContain('bg-amber-500');
+
+    const headerStatus = window.locator('[data-testid="agent-status-text"]').first();
+    await expect(headerStatus).toBeVisible();
+    await expect(headerStatus).toHaveText('Awaiting response');
+  });
 });

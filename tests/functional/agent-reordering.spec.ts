@@ -8,6 +8,7 @@
 
 import { test, expect, ElectronApplication, Page } from '@playwright/test';
 import {
+  closeElectron,
   createMockOAuthServer,
   activeChat,
   launchElectronWithMockOAuth,
@@ -32,6 +33,7 @@ test.afterAll(async () => {
 test.describe('Agent Reordering', () => {
   let electronApp: ElectronApplication;
   let window: Page;
+  let testDataPath: string;
 
   test.beforeEach(async () => {
     // Set user profile data for tests
@@ -46,13 +48,14 @@ test.describe('Agent Reordering', () => {
     const context = await launchElectronWithMockOAuth(mockServer);
     electronApp = context.app;
     window = context.window;
+    testDataPath = context.testDataPath;
 
     // Complete OAuth flow
     await completeOAuthFlow(electronApp, window);
   });
 
   test.afterEach(async () => {
-    await electronApp.close();
+    await closeElectron({ app: electronApp, window, testDataPath }, true, false);
   });
 
   /* Preconditions: Multiple agents created with different updatedAt times

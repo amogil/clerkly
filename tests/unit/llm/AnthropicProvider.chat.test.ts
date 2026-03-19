@@ -11,7 +11,7 @@ jest.mock('ai', () => ({
   streamText: jest.fn(),
   tool: jest.fn((definition) => ({ ...definition })),
   jsonSchema: jest.fn((schema) => schema),
-  stepCountIs: jest.fn(() => ({ kind: 'step-count' })),
+  stepCountIs: jest.fn((stepCount) => ({ type: 'step-count-is', stepCount })),
 }));
 
 jest.mock('@ai-sdk/anthropic', () => ({
@@ -51,6 +51,7 @@ describe('AnthropicProvider.chat()', () => {
     (aiModule.streamText as unknown as jest.Mock).mockReset();
     (aiModule.tool as unknown as jest.Mock).mockClear();
     (aiModule.jsonSchema as unknown as jest.Mock).mockClear();
+    (aiModule.stepCountIs as unknown as jest.Mock).mockClear();
   });
 
   afterEach(() => {
@@ -79,6 +80,12 @@ describe('AnthropicProvider.chat()', () => {
     expect(chunks).toContainEqual({ type: 'reasoning', delta: 'Think ' });
     expect(chunks).toContainEqual({ type: 'text', delta: 'Anthropic' });
     expect(chunks).toContainEqual({ type: 'text', delta: ' answer' });
+    expect(aiModule.stepCountIs).toHaveBeenCalledWith(100000);
+    expect(aiModule.streamText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stopWhen: { type: 'step-count-is', stepCount: 100000 },
+      })
+    );
   });
 
   it('emits tool_call chunks for multiple calls in one turn', async () => {
@@ -218,6 +225,27 @@ describe('AnthropicProvider.chat()', () => {
     await expect(provider.chat(mockMessages, mockOptions, () => {})).rejects.toBeInstanceOf(
       LLMRequestAbortedError
     );
+  });
+
+  /* Preconditions: External abort signal is already aborted before provider chat call starts
+     Action: Start provider chat with pre-aborted signal
+     Assertions: Provider throws LLMRequestAbortedError and does not continue normal streaming
+     Requirements: llm-integration.5.1, llm-integration.12.4 */
+  it('throws LLMRequestAbortedError when external signal is already aborted before chat starts', async () => {
+    (aiModule.streamText as unknown as jest.Mock).mockImplementation(({ abortSignal }) => {
+      if (abortSignal?.aborted) {
+        const abortError = new Error('aborted before start');
+        (abortError as Error & { name: string }).name = 'AbortError';
+        throw abortError;
+      }
+      return { fullStream: toAsyncIterable([]), totalUsage: Promise.resolve({}) };
+    });
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(
+      provider.chat(mockMessages, mockOptions, () => {}, controller.signal)
+    ).rejects.toBeInstanceOf(LLMRequestAbortedError);
   });
 
   it('uses CHAT_TIMEOUT_MS for abort controller timer', async () => {

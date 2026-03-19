@@ -681,6 +681,19 @@ Correct approach: provide a short verbal summary at the end (2-3 sentences).
 
 Exceptions: variable already exists in code, user explicitly asked, standard variables (`NODE_ENV`, `PATH`).
 
+### AI Elements and UI vendor components
+
+**ABSOLUTE PROHIBITION** - do not manually edit library-managed components in:
+- `src/renderer/components/ai-elements/**`
+- `src/renderer/components/ui/**`
+
+These files are vendor scope and will be overwritten by library updates.
+
+Allowed update path:
+1. Update components only via the official CLI flow (`npm run ai-elements:update-all`).
+2. Apply product customizations only in app-owned layers outside those directories.
+3. If a change appears to require editing vendor files, stop and request explicit user approval first.
+
 ---
 
 ## 9. Priority in Case of Conflicts

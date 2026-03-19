@@ -8,6 +8,7 @@
 import { test, expect, ElectronApplication, Page } from '@playwright/test';
 import {
   completeOAuthFlow,
+  closeElectron,
   createMockOAuthServer,
   activeChat,
   launchElectronWithMockOAuth,
@@ -18,6 +19,7 @@ import type { MockOAuthServer } from './helpers/mock-oauth-server';
 
 let electronApp: ElectronApplication;
 let window: Page;
+let testDataPath: string;
 let mockServer: MockOAuthServer;
 
 test.beforeAll(async () => {
@@ -37,13 +39,14 @@ test.beforeEach(async () => {
   });
   electronApp = context.app;
   window = context.window;
+  testDataPath = context.testDataPath;
 
   await completeOAuthFlow(electronApp, window);
   await expectAgentsVisible(window, 10000);
 });
 
 test.afterEach(async () => {
-  await electronApp.close();
+  await closeElectron({ app: electronApp, window, testDataPath }, true, false);
 });
 
 test.describe('All Agents Page', () => {
