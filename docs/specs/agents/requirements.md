@@ -640,6 +640,8 @@
 7.7.2. КОГДА `llm`-ответ содержит markdown code block, контейнеры code block в ответе ДОЛЖНЫ использовать прозрачный фон (`transparent`).
 
 7.7.3. КОГДА `llm`-ответ содержит markdown fenced code block (любой язык, включая `text`/`plaintext`), длинные строки в таком блоке НЕ ДОЛЖНЫ переноситься по ширине блока и ДОЛЖНЫ отображаться с горизонтальным скроллом внутри code block.
+7.7.4. КОГДА `format = "markdown"` и ответ содержит markdown footnotes (`[^id]` / `[^id]: ...`) в обычном тексте, UI НЕ ДОЛЖЕН отображать эти footnotes как отдельный пользовательский контент.
+7.7.4.1. КОГДА в inline code или fenced code block встречается literal `[^...]`, UI ДОЛЖЕН отображать этот literal без удаления.
 
 7.8. Все timestamps ДОЛЖНЫ включать timezone offset и храниться в часовом поясе пользователя
 
@@ -672,6 +674,7 @@
 - `tests/functional/llm-chat.spec.ts` - "should render math when model returns LaTeX delimiters"
 - `tests/functional/llm-chat.spec.ts` - "should render math when model returns escaped dollar delimiters"
 - `tests/functional/llm-chat.spec.ts` - "should avoid duplicate line breaks between markdown blocks"
+- `tests/functional/llm-chat.spec.ts` - "should not render footnotes while rendering other markdown elements"
 - `tests/functional/llm-chat.spec.ts` - "should render tool_call(final_answer) as checklist block"
 - `tests/functional/llm-chat.spec.ts` - "should render markdown inside tool_call(final_answer) checklist item"
 - `tests/functional/llm-chat.spec.ts` - "should render math inside tool_call(final_answer) checklist item"

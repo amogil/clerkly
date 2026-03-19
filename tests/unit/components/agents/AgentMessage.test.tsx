@@ -615,6 +615,44 @@ describe('AgentMessage — llm', () => {
     expect(screen.getByText('Response text')).toBeInTheDocument();
   });
 
+  /* Preconditions: kind:llm markdown includes footnote reference/definition plus literal [^...] inside inline and fenced code
+     Action: render AgentMessage
+     Assertions: footnote reference/definition are removed from prose, but literal [^...] inside code stays visible
+     Requirements: agents.7.7, agents.7.7.4 */
+  it('should keep literal footnote markers inside code while removing markdown footnotes from prose', () => {
+    const markdown = [
+      'Footnote reference[^1].',
+      '',
+      '`inline [^1] literal`',
+      '',
+      '```js',
+      'const token = "[^1]";',
+      '```',
+      '',
+      '[^1]: Hidden footnote text.',
+    ].join('\n');
+
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'llm',
+          payload: {
+            data: {
+              text: markdown,
+              format: 'markdown',
+            },
+          },
+        })}
+      />
+    );
+
+    const action = screen.getByTestId('message-llm-action');
+    expect(action).toHaveTextContent('Footnote reference.');
+    expect(action).not.toHaveTextContent('Hidden footnote text.');
+    expect(action).toHaveTextContent('inline [^1] literal');
+    expect(action).toHaveTextContent('const token = "[^1]";');
+  });
+
   /* Preconditions: kind:llm without data.text and without reasoning
      Action: render AgentMessage
      Assertions: no loading indicator and no response text content

@@ -30,8 +30,6 @@ import type { AgentDialogActionItem } from './AgentDialog';
 import { AgentReasoningTrigger } from './AgentReasoningTrigger';
 
 const TITLE_META_COMMENT_RENDER_PATTERN = /<!--\s*clerkly:title-meta:[\s\S]*?(?:-->|$)/g;
-const MARKDOWN_FOOTNOTE_DEFINITION_PATTERN = /^\[\^[^\]\r\n]+\]:.*(?:\r?\n(?:[ \t]{2,}.*|\s*))*/gm;
-const MARKDOWN_FOOTNOTE_REFERENCE_PATTERN = /\[\^[^\]\r\n]+\]/g;
 
 interface AgentMessageProps {
   message: MessageSnapshot;
@@ -95,9 +93,111 @@ function sanitizeInlineToolText(text: string): string {
 
 // Requirements: agents.7.7
 function stripMarkdownFootnotes(text: string): string {
-  return text
-    .replace(MARKDOWN_FOOTNOTE_DEFINITION_PATTERN, '')
-    .replace(MARKDOWN_FOOTNOTE_REFERENCE_PATTERN, '')
+  const lines = text.split(/\r?\n/);
+  const output: string[] = [];
+  let inFence = false;
+  let fenceChar: '`' | '~' | null = null;
+  let fenceLength = 0;
+
+  const toggleFence = (line: string): void => {
+    const match = line.match(/^\s*([`~]{3,})/);
+    if (!match) {
+      return;
+    }
+
+    const marker = match[1];
+    if (!marker) {
+      return;
+    }
+    const markerChar = marker[0] as '`' | '~';
+    const markerLength = marker.length;
+
+    if (!inFence) {
+      inFence = true;
+      fenceChar = markerChar;
+      fenceLength = markerLength;
+      return;
+    }
+
+    if (fenceChar === markerChar && markerLength >= fenceLength) {
+      inFence = false;
+      fenceChar = null;
+      fenceLength = 0;
+    }
+  };
+
+  const stripFootnoteRefsOutsideInlineCode = (line: string): string => {
+    let result = '';
+    let index = 0;
+    let inlineCodeFenceLength = 0;
+
+    while (index < line.length) {
+      if (line.charAt(index) === '`') {
+        let tickCount = 1;
+        while (index + tickCount < line.length && line.charAt(index + tickCount) === '`') {
+          tickCount += 1;
+        }
+
+        result += line.slice(index, index + tickCount);
+
+        if (inlineCodeFenceLength === 0) {
+          inlineCodeFenceLength = tickCount;
+        } else if (inlineCodeFenceLength === tickCount) {
+          inlineCodeFenceLength = 0;
+        }
+
+        index += tickCount;
+        continue;
+      }
+
+      if (
+        inlineCodeFenceLength === 0 &&
+        line.charAt(index) === '[' &&
+        line.charAt(index + 1) === '^'
+      ) {
+        let end = index + 2;
+        while (end < line.length && line.charAt(end) !== ']') {
+          end += 1;
+        }
+        if (end < line.length && end > index + 2) {
+          index = end + 1;
+          continue;
+        }
+      }
+
+      result += line.charAt(index);
+      index += 1;
+    }
+
+    return result;
+  };
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i] ?? '';
+    const isDefinitionLine = !inFence && /^\[\^[^\]\r\n]+\]:/.test(line);
+
+    if (isDefinitionLine) {
+      while (
+        i + 1 < lines.length &&
+        (/^[ \t]{2,}/.test(lines[i + 1] ?? '') || (lines[i + 1] ?? '') === '')
+      ) {
+        i += 1;
+      }
+      continue;
+    }
+
+    if (inFence) {
+      output.push(line);
+      toggleFence(line);
+      continue;
+    }
+
+    output.push(stripFootnoteRefsOutsideInlineCode(line));
+    toggleFence(line);
+  }
+
+  return output
+    .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }

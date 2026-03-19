@@ -1026,6 +1026,7 @@ User отправляет сообщение
 | llm-integration.11.1 | ✓ | ✓ |
 | llm-integration.11.1.1 | ✓ | ✓ |
 | llm-integration.11.1.2 | ✓ | ✓ |
+| llm-integration.11.1.2.1 | ✓ | ✓ |
 | llm-integration.11.1.3 | ✓ | ✓ |
 | llm-integration.11.1.3.1 | ✓ | ✓ |
 | llm-integration.11.1.4 | ✓ | ✓ |
