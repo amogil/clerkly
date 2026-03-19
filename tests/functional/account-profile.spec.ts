@@ -627,30 +627,19 @@ test.describe('Account Profile', () => {
 
     console.log('[TEST] Auth success triggered');
 
-    // Wait a short moment for navigation to occur
-    await context.window.waitForTimeout(500);
-
     // Requirements: navigation.1.3 - After successful authentication, user should see main app
     // NOT a loading screen or login screen
     const loginButton = context.window.locator('text=/continue with google/i');
-    const hasLoginScreen = await loginButton.isVisible().catch(() => false);
-
-    console.log('[TEST] Is on login screen:', hasLoginScreen);
-    expect(hasLoginScreen).toBe(false);
-
-    // Check if app loading overlay is shown (it should NOT be shown)
     const loadingScreen = context.window.locator('[data-testid="app-loading-screen"]');
-    const hasLoadingScreen = await loadingScreen.isVisible().catch(() => false);
-
-    console.log('[TEST] Is on loading screen:', hasLoadingScreen);
-    expect(hasLoadingScreen).toBe(false);
-
-    // Verify main app (Agents screen) is shown
-    // Requirements: navigation.1.3 - Main app should be shown immediately after authentication
-    // Profile was already loaded synchronously during OAuth flow
     const mainAppElement = context.window.locator('[data-testid="agents"]').first();
-    await mainAppElement.waitFor({ state: 'visible', timeout: 5000 });
-    expect(await mainAppElement.isVisible()).toBe(true);
+    await expect(mainAppElement).toBeVisible({ timeout: 5000 });
+    await expect(loginButton).toBeHidden({ timeout: 5000 });
+    await expect(loadingScreen).toBeHidden({ timeout: 5000 });
+
+    const hasLoginScreen = await loginButton.isVisible().catch(() => false);
+    const hasLoadingScreen = await loadingScreen.isVisible().catch(() => false);
+    console.log('[TEST] Is on login screen:', hasLoginScreen);
+    console.log('[TEST] Is on loading screen:', hasLoadingScreen);
 
     console.log(
       '✓ Main app (Agents) is shown immediately after authentication (not loading screen)'
