@@ -244,6 +244,10 @@ describe('OpenAIProvider.chat()', () => {
     );
   });
 
+  /* Preconditions: External abort signal is already aborted before provider chat call starts
+     Action: Start provider chat with pre-aborted signal
+     Assertions: Provider throws LLMRequestAbortedError and does not continue normal streaming
+     Requirements: llm-integration.5.1, llm-integration.12.4 */
   it('throws LLMRequestAbortedError when external signal is already aborted before chat starts', async () => {
     (aiModule.streamText as unknown as jest.Mock).mockImplementation(({ abortSignal }) => {
       if (abortSignal?.aborted) {

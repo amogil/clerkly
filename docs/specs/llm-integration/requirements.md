@@ -437,6 +437,7 @@
 - `tests/functional/agent-status-calculation.spec.ts` - "should keep in-progress status from done code_exec error tool_call"
 - `tests/functional/agent-status-calculation.spec.ts` - "should keep in-progress status from done code_exec timeout tool_call"
 - `tests/functional/llm-chat.spec.ts` — "should cancel active request via stop button without creating error message"
+- `tests/functional/agent-status-calculation.spec.ts` - "should resolve awaiting-response status from done code_exec cancelled tool_call when pipeline is inactive"
 
 ---
 
