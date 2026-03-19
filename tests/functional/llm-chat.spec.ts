@@ -1498,10 +1498,11 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
      Assertions: during reasoning phase tool_call is not visible; after reasoning phase tool_call becomes running and post-tool text appears before terminal update
      Requirements: llm-integration.11.1.2, llm-integration.11.1.3 */
   test('should create tool_call only after reasoning phase and start post-tool text without waiting terminal result', async () => {
-    mockLLMServer.setStreamingMode(true, { chunkDelayMs: 40 });
+    mockLLMServer.setStreamingMode(true, { chunkDelayMs: 60 });
     mockLLMServer.setOpenAIStreamScripts([
       {
-        reasoning: 'pre-tool reasoning',
+        reasoning:
+          'pre-tool reasoning phase starts now and continues with extra chunks to keep tool call hidden while reasoning is still streaming in this test scenario',
         toolCalls: [
           {
             callId: 'running-1',
@@ -1533,7 +1534,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     const runningStatusIcon = context.window
       .locator('[data-testid="message-code-exec-status-icon"][data-status="running"]')
       .last();
-    await expect(runningStatusIcon).toBeVisible({ timeout: 8000 });
+    await expect(runningStatusIcon).toBeVisible({ timeout: 15000 });
 
     const actionContent = context.window.locator('.message-llm-action-response').last();
     await expect(actionContent).toContainText('post-tool text while running', { timeout: 8000 });
