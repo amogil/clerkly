@@ -28,6 +28,7 @@ import { SandboxHttpRequestHandler } from './SandboxHttpRequestHandler';
 const POLICY_DENIED_NETWORK_MESSAGE =
   'Browser-level network APIs are not allowed in sandbox runtime.';
 const POLICY_DENIED_MULTITHREAD_MESSAGE = 'Multithreading APIs are not allowed in sandbox runtime.';
+const POLICY_DENIED_NODE_GLOBALS_MESSAGE = 'Node.js globals are not available in sandbox runtime.';
 const LIMIT_EXCEEDED_MEMORY_MESSAGE = `code_exec memory limit exceeded (${Math.round(
   CODE_EXEC_LIMITS.sandboxMemoryLimitBytes / (1024 * 1024 * 1024)
 )} GiB).`;
@@ -321,7 +322,12 @@ export class SandboxSessionManager {
                   code: 'policy_denied' as const,
                   message: POLICY_DENIED_NETWORK_MESSAGE,
                 }
-              : normalized.error
+              : this.isNodeGlobalsPolicyLikeError(normalized.error.message)
+                ? {
+                    code: 'policy_denied' as const,
+                    message: POLICY_DENIED_NODE_GLOBALS_MESSAGE,
+                  }
+                : normalized.error
           : normalized.error;
       const base = {
         ...normalized,
@@ -379,6 +385,16 @@ export class SandboxSessionManager {
           error: {
             code: 'limit_exceeded',
             message: `${LIMIT_EXCEEDED_MEMORY_MESSAGE} ${message}`,
+          },
+        };
+      }
+      if (this.isNodeGlobalsPolicyLikeError(message)) {
+        const base = this.finalizeOutput('error', stdoutChunks, stderrChunks);
+        return {
+          ...base,
+          error: {
+            code: 'policy_denied',
+            message: POLICY_DENIED_NODE_GLOBALS_MESSAGE,
           },
         };
       }
@@ -628,6 +644,15 @@ export class SandboxSessionManager {
       lower.includes('websocket') ||
       lower.includes('sendbeacon') ||
       lower.includes('network apis are not allowed')
+    );
+  }
+
+  // Requirements: code_exec.2.4, code_exec.3.5
+  private isNodeGlobalsPolicyLikeError(message: string): boolean {
+    const lower = message.toLowerCase();
+    return (
+      /\b(process|require|module|buffer|__dirname|__filename)\b is not defined/.test(lower) ||
+      lower.includes('node.js globals are not available')
     );
   }
 

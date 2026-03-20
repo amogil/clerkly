@@ -493,6 +493,7 @@ export class CodeExecFeature implements AgentFeature {
       '- `invalid_tool_arguments` is defensive/runtime-local only (direct runtime calls) and is not persisted as chat `tool_call(code_exec)` output.',
       `- Limits: code <= ${CODE_EXEC_LIMITS.maxCodeBytes} bytes (30 KiB), stdout <= ${CODE_EXEC_LIMITS.maxStdoutBytes} bytes (10 KiB), stderr <= ${CODE_EXEC_LIMITS.maxStderrBytes} bytes (10 KiB), CPU limit ${CODE_EXEC_LIMITS.sandboxCpuLimit} vCPU, RAM limit 2 GiB.`,
       '- Allowed runtime API: console.log/info/warn/error and tools/window.tools (sandbox allowlist only).',
+      '- Node.js globals are unavailable in sandbox: process, require, module, Buffer, __dirname, __filename.',
       buildHttpRequestPromptSection(),
       '- Browser-level network APIs are denied: fetch, XMLHttpRequest, WebSocket, sendBeacon, window.open, location.assign, location.replace.',
       '- Multithreading APIs are denied: Worker, SharedWorker, ServiceWorker, Worklet.',

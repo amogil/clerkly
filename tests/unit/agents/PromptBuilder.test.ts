@@ -228,6 +228,9 @@ describe('PromptBuilder.build()', () => {
         'This does not change the outer chat-flow rule: each model response may request at most one top-level tool call'
       );
       expect(result.systemPrompt).toContain(
+        'Node.js globals are unavailable in sandbox: process, require, module, Buffer, __dirname, __filename.'
+      );
+      expect(result.systemPrompt).toContain(
         'Before making another tool call, check whether the available tool results are already sufficient to answer the user'
       );
       expect(result.systemPrompt).toContain(

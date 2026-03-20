@@ -135,6 +135,7 @@ Lifecycle:
 - Прямой `fs` доступ: запрещён.
 - Прямой network доступ: запрещён.
 - Доступ к БД: запрещён.
+- Node.js globals в sandbox runtime недоступны (`process`, `require`, `module`, `Buffer`, `__dirname`, `__filename`).
 - Неизвестные IPC каналы: запрещены.
 - Лимит времени исполнения обязателен.
 - Многопоточность JavaScript запрещена (`Worker`, `SharedWorker`, `ServiceWorker`, `Worklet`).
@@ -202,6 +203,12 @@ Lifecycle:
 - prompt/tool-инструкция явно сообщает, что `code_exec` является основным рабочим инструментом turn для программной обработки, а не вспомогательной опцией “на случай необходимости”.
 - prompt/tool-инструкция явно требует оценивать достаточность уже полученных tool results перед новым exploratory вызовом.
 - prompt/tool-инструкция явно сообщает, что несколько allowlisted helper-вызовов внутри одного `code_exec` допустимы и что независимые helper-вызовы могут выполняться конкурентно через обычные async-механизмы JavaScript.
+- prompt/tool-инструкция явно сообщает, что Node.js globals (`process`, `require`, `module`, `Buffer`, `__dirname`, `__filename`) недоступны в sandbox runtime.
+
+Политика классификации ошибок sandbox policy:
+- распознаваемые нарушения sandbox policy нормализуются в terminal `status=error` с `error.code='policy_denied'`;
+- попытки использования Node.js globals возвращаются как контролируемый `policy_denied`;
+- обычные runtime-ошибки пользовательского JavaScript-кода остаются `sandbox_runtime_error`.
 
 Политика превышения CPU/памяти:
 Политика превышения CPU/памяти в текущей реализации:
@@ -249,6 +256,7 @@ Lifecycle:
 - `tests/unit/code_exec/SandboxBridge.test.ts` — allowlist enforcement, запрет main-pipeline-only tools, `policy_denied`.
 - `tests/unit/code_exec/SandboxPolicy.test.ts` — browser/session policy hardening (`webRequest`, permissions, navigation, CSP/network deny).
 - `tests/unit/code_exec/SandboxSessionManager.test.ts` — capture `console.*`, раздельные `stdout/stderr`, запрет multithreading API.
+- `tests/unit/code_exec/SandboxSessionManager.test.ts` — policy mapping для Node.js globals (`process`, `require`, `module`, `Buffer`, `__dirname`, `__filename`) в `policy_denied`.
 - `tests/unit/code_exec/OutputLimiter.test.ts` — лимиты `stdout/stderr`, truncation, флаги `stdout_truncated`/`stderr_truncated`.
 - `tests/unit/code_exec/CodeExecToolSchema.test.ts` — валидация `task_summary` (1..200 символов), `code`, `timeout_ms` диапазона и `additionalProperties=false`.
 - `tests/unit/code_exec/CodeExecPersistenceMapper.test.ts` — запись `started_at`, `finished_at`, `duration_ms`, переход `done=false/true`.
@@ -260,6 +268,7 @@ Lifecycle:
 - `tests/functional/code_exec.spec.ts` — несколько вызовов в одном turn (включая параллельные) и корреляция по `callId`.
 - `tests/functional/code_exec.spec.ts` — persisted lifecycle/audit поля (`started_at`, `finished_at`, `duration_ms`) для terminal `code_exec`.
 - `tests/functional/code_exec.spec.ts` — browser-level безопасность (`policy_denied` для `window.open`, `location.assign`, `location.replace`).
+- `tests/functional/code_exec.spec.ts` — sandbox Node.js globals safety (`policy_denied` для `process`/`require`/`module`/`Buffer`/`__dirname`/`__filename`).
 - `tests/functional/code_exec.spec.ts` — browser-level network egress enforcement (`fetch`, `XMLHttpRequest`, `WebSocket`, `navigator.sendBeacon`, `window.open`, `location.assign`, `location.replace` блокируются с `policy_denied`, без исходящих запросов).
 - `tests/functional/code_exec.spec.ts` — лимиты `code`/`stdout`/`stderr` и truncated-флаги.
 - `tests/functional/code_exec.spec.ts` — timeout/cancel/shutdown lifecycle и `limit_exceeded` сигналы по ресурсоёмким сценариям.
@@ -275,7 +284,8 @@ Lifecycle:
 | code_exec.1.2-1.3 | `tests/unit/agents/MainPipeline.test.ts` | `tests/functional/code_exec.spec.ts` |
 | code_exec.1.4-1.4.2 | `tests/unit/agents/MainPipeline.test.ts` | `tests/functional/code_exec.spec.ts` |
 | code_exec.1.5-1.5.1 | `tests/unit/code_exec/SandboxSessionManager.test.ts` | `tests/functional/code_exec.spec.ts` |
-| code_exec.2.1-2.4 | `tests/unit/code_exec/SandboxBridge.test.ts` | `tests/functional/code_exec.spec.ts` |
+| code_exec.2.1-2.4 | `tests/unit/code_exec/SandboxBridge.test.ts`, `tests/unit/code_exec/SandboxSessionManager.test.ts` | `tests/functional/code_exec.spec.ts` |
+| code_exec.2.4.1 | `tests/unit/code_exec/SandboxSessionManager.test.ts` | `tests/functional/code_exec.spec.ts` |
 | code_exec.2.5-2.6 | `tests/unit/code_exec/SandboxSessionManager.test.ts` | - |
 | code_exec.2.7-2.8.2 | `tests/unit/code_exec/SandboxBridge.test.ts` | - |
 | code_exec.2.9-2.9.1 | `tests/unit/code_exec/SandboxSessionManager.test.ts` | - |
