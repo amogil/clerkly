@@ -3333,6 +3333,55 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expectNoToastError(context.window);
   });
 
+  /* Preconditions: Current title is default, first user message is meaningful, model returns score at default-title boundary (50)
+     Action: User sends message and waits for stream completion
+     Assertions: Rename is skipped because default-title threshold requires score > 50
+     Requirements: llm-integration.16.10 */
+  test('should keep default name when default-title rename_need_score is 50', async () => {
+    mockLLMServer.setStreamingMode(true, {
+      content:
+        'Body <!-- clerkly:title-meta: {"title":"Incident response checklist","rename_need_score":50} -->',
+      chunkDelayMs: 0,
+    });
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    const headerTitle = context.window.locator('[data-testid="agent-header-title"]');
+    await expect(headerTitle).toHaveText('New Agent');
+
+    await messageInput.fill('Explain incident response checklist phases');
+    await messageInput.press('Enter');
+
+    await expect(context.window.locator('.message-llm-action-response').last()).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(headerTitle).toHaveText('New Agent');
+    await expectNoToastError(context.window);
+  });
+
+  /* Preconditions: Current title is default, first user message is meaningful, model returns score above default-title boundary (51)
+     Action: User sends message and waits for stream completion
+     Assertions: Rename is applied because default-title threshold allows scores > 50
+     Requirements: llm-integration.16.10 */
+  test('should apply rename when default-title rename_need_score is 51', async () => {
+    const expectedTitle = 'Incident response checklist';
+    mockLLMServer.setStreamingMode(true, {
+      content: `Body <!-- clerkly:title-meta: {"title":"${expectedTitle}","rename_need_score":51} -->`,
+      chunkDelayMs: 0,
+    });
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    const headerTitle = context.window.locator('[data-testid="agent-header-title"]');
+    await expect(headerTitle).toHaveText('New Agent');
+
+    await messageInput.fill('Explain incident response checklist phases');
+    await messageInput.press('Enter');
+
+    await expect(headerTitle).toHaveText(expectedTitle, { timeout: 10000 });
+    await expectNoToastError(context.window);
+  });
+
   /* Preconditions: Title is still default, history already contains meaningful user message, current triggering message is non-meaningful
      Action: User sends meaningful message without title metadata, then sends non-meaningful message with valid title metadata
      Assertions: Rename is applied on second turn because meaningful history already exists

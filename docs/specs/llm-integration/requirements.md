@@ -696,12 +696,13 @@
 16.10. Перед применением rename система ДОЛЖНА выполнять anti-flapping guards:
   - exact-match guard на нормализованных строках;
   - score guard:
-    - КОГДА текущий заголовок равен `New Agent`, rename ДОЛЖЕН применяться только при `rename_need_score > 50`;
-    - КОГДА текущий заголовок НЕ равен `New Agent`, rename ДОЛЖЕН применяться только при `rename_need_score >= 80`;
+    - default-title ДОЛЖЕН определяться по нормализованному case-insensitive сравнению (`normalize(currentTitle)` эквивалентен `New Agent`);
+    - КОГДА title является default-title, rename ДОЛЖЕН применяться только при `rename_need_score > 50`;
+    - КОГДА title НЕ является default-title, rename ДОЛЖЕН применяться только при `rename_need_score >= 80`;
   - cooldown guard: не чаще одного rename за 5 user-turns для одного агента;
   - cooldown replay ДОЛЖЕН учитывать только успешно применённые rename (не просто наличие comment в тексте ответа);
-  - initial-rename guard: ПОКА текущий заголовок агента равен `New Agent`, ЕСЛИ в истории агента ещё нет meaningful user-message (>=3 буквенно-цифровых символов), auto-rename ДОЛЖЕН выполняться только на meaningful triggering user-message;
-  - ПОКА текущий заголовок агента равен `New Agent`, ЕСЛИ в истории агента уже есть meaningful user-message, auto-rename МОЖЕТ выполняться и на turn с не-meaningful triggering user-message.
+  - initial-rename guard: ПОКА title является default-title (по нормализованному case-insensitive сравнению), ЕСЛИ в истории агента ещё нет meaningful user-message (>=3 буквенно-цифровых символов), auto-rename ДОЛЖЕН выполняться только на meaningful triggering user-message;
+  - ПОКА title является default-title (по нормализованному case-insensitive сравнению), ЕСЛИ в истории агента уже есть meaningful user-message, auto-rename МОЖЕТ выполняться и на turn с не-meaningful triggering user-message.
 
 16.10.1. ЕСЛИ `rename_need_score` отсутствует, невалиден или вне диапазона `0..100`, ТО rename ДОЛЖЕН быть пропущен для текущего turn.
 
