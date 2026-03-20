@@ -80,10 +80,39 @@ const mockAgentMessage = jest.fn(
   )
 );
 
-jest.mock('../../../../src/renderer/components/agents/AgentMessage', () => ({
-  AgentMessage: (props: { message: MessageSnapshot; isReasoningStreaming?: boolean }) =>
-    mockAgentMessage(props),
-}));
+jest.mock('../../../../src/renderer/components/agents/AgentMessage', () => {
+  const React = require('react') as typeof import('react');
+  const MockAgentMessage = (props: {
+    message: MessageSnapshot;
+    isReasoningStreaming?: boolean;
+    onNavigate?: (screen: string) => void;
+  }) => mockAgentMessage(props);
+  MockAgentMessage.displayName = 'MockAgentMessage';
+
+  const MemoizedMockAgentMessage = React.memo(
+    MockAgentMessage,
+    (
+      prev: {
+        message: MessageSnapshot;
+        isReasoningStreaming?: boolean;
+        onNavigate?: (screen: string) => void;
+      },
+      next: {
+        message: MessageSnapshot;
+        isReasoningStreaming?: boolean;
+        onNavigate?: (screen: string) => void;
+      }
+    ) =>
+      prev.message === next.message &&
+      prev.isReasoningStreaming === next.isReasoningStreaming &&
+      prev.onNavigate === next.onNavigate
+  );
+  MemoizedMockAgentMessage.displayName = 'MemoizedMockAgentMessage';
+
+  return {
+    AgentMessage: MemoizedMockAgentMessage,
+  };
+});
 
 jest.mock('../../../../src/renderer/components/agents/AgentWelcome', () => ({
   AgentWelcome: ({ onPromptClick }: { onPromptClick: (p: string) => void }) => (
@@ -480,6 +509,47 @@ describe('AgentChat — messages rendering', () => {
     const rendered = screen.getAllByTestId('agent-message');
     expect(rendered).toHaveLength(2);
     expect(rendered[1]).toHaveAttribute('data-reasoning-streaming', 'true');
+  });
+
+  /* Preconditions: chat contains persisted messages and user edits prompt input only
+     Action: render AgentChat, then change textarea value
+     Assertions: existing AgentMessage items are not re-rendered for input-only state changes
+     Requirements: llm-integration.14.5, realtime-events.6.2 */
+  it('should not re-render message list on prompt input-only updates', async () => {
+    mockUseAgentChatState.rawMessages = [makeMessage(1), makeMessage(2)];
+    render(<AgentChat {...defaultProps} />);
+    expect(mockAgentMessage).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('auto-expanding-textarea'), {
+        target: { value: 'Draft text' },
+      });
+    });
+
+    expect(mockAgentMessage).toHaveBeenCalledTimes(2);
+  });
+
+  /* Preconditions: chat has two messages and only one message object changes on update
+     Action: re-render AgentChat with the second message updated and first message preserved by reference
+     Assertions: only one AgentMessage re-renders
+     Requirements: llm-integration.14.5, realtime-events.6.2 */
+  it('should re-render only changed message item when one snapshot updates', () => {
+    const first = makeMessage(1, 'user');
+    const second = makeMessage(2, 'llm');
+    mockUseAgentChatState.rawMessages = [first, second];
+    const { rerender } = render(<AgentChat {...defaultProps} />);
+    expect(mockAgentMessage).toHaveBeenCalledTimes(2);
+
+    mockUseAgentChatState.rawMessages = [
+      first,
+      {
+        ...second,
+        payload: { data: { text: 'updated' } },
+      },
+    ];
+    rerender(<AgentChat {...defaultProps} />);
+
+    expect(mockAgentMessage).toHaveBeenCalledTimes(3);
   });
 });
 
