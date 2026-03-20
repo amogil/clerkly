@@ -224,7 +224,7 @@ function getCodeExecStatusIcon(status: string): React.ReactNode {
 }
 
 // Requirements: llm-integration.7, llm-integration.3.4.1, llm-integration.3.4.4, agents.4.22, agents.4.9, agents.4.10.1, agents.4.10.2
-export function AgentMessage({
+function AgentMessageComponent({
   message,
   isReasoningStreaming = false,
   onNavigate,
@@ -543,3 +543,15 @@ export function AgentMessage({
 
   return null;
 }
+
+// Requirements: llm-integration.14.5, realtime-events.6.2
+function areAgentMessagePropsEqual(prev: AgentMessageProps, next: AgentMessageProps): boolean {
+  return (
+    prev.message === next.message &&
+    prev.isReasoningStreaming === next.isReasoningStreaming &&
+    prev.onNavigate === next.onNavigate
+  );
+}
+
+// Requirements: llm-integration.14.5, realtime-events.6.2
+export const AgentMessage = React.memo(AgentMessageComponent, areAgentMessagePropsEqual);

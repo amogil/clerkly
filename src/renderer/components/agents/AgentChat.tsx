@@ -52,11 +52,27 @@ interface AgentChatInnerProps {
   onNavigate?: (screen: string) => void;
 }
 
+// Requirements: llm-integration.14.5, realtime-events.6.2
+function areAgentChatInnerPropsEqual(
+  prev: AgentChatInnerProps,
+  next: AgentChatInnerProps
+): boolean {
+  return (
+    prev.agent === next.agent &&
+    prev.rateLimitBanner === next.rateLimitBanner &&
+    prev.onRateLimitDismiss === next.onRateLimitDismiss &&
+    prev.rawMessages === next.rawMessages &&
+    prev.streamingReasoningMessageId === next.streamingReasoningMessageId &&
+    prev.onPromptClick === next.onPromptClick &&
+    prev.onNavigate === next.onNavigate
+  );
+}
+
 /**
  * Inner component — lives inside <Conversation> so it can access useStickToBottomContext.
  * Does not force manual scroll on send; Conversation controls autoscroll behavior (agents.4.13.2).
  */
-function AgentChatInner({
+const AgentChatInner = React.memo(function AgentChatInner({
   agent,
   rateLimitBanner,
   onRateLimitDismiss,
@@ -103,7 +119,7 @@ function AgentChatInner({
       )}
     </>
   );
-}
+}, areAgentChatInnerPropsEqual);
 
 /**
  * AgentChat — independent chat component per agent.
@@ -314,6 +330,13 @@ export function AgentChat({
     },
     [sendMessage]
   );
+  // Requirements: agents.4, llm-integration.14.5
+  const handleNavigate = useCallback(
+    (screen: string) => {
+      onNavigate?.(screen);
+    },
+    [onNavigate]
+  );
 
   const handleStop = useCallback(async () => {
     await cancelCurrentRequest();
@@ -355,7 +378,7 @@ export function AgentChat({
           rawMessages={rawMessages}
           streamingReasoningMessageId={streamingReasoningMessageId}
           onPromptClick={handlePromptClick}
-          onNavigate={onNavigate}
+          onNavigate={handleNavigate}
         />
         <ConversationScrollButton data-testid="scroll-to-bottom" />
       </Conversation>

@@ -80,9 +80,12 @@ export class RendererEventBus {
     }
   }
 
+  // Requirements: llm-integration.14.5, realtime-events.3.8.1, realtime-events.6.3.1
   private isNonCoalescedStreamingType(type: EventType): boolean {
     return (
-      type === EVENT_TYPES.MESSAGE_UPDATED || type === EVENT_TYPES.MESSAGE_LLM_REASONING_UPDATED
+      type === EVENT_TYPES.MESSAGE_UPDATED ||
+      type === EVENT_TYPES.MESSAGE_LLM_REASONING_UPDATED ||
+      type === EVENT_TYPES.MESSAGE_LLM_TEXT_UPDATED
     );
   }
 
