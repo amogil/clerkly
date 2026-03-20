@@ -625,6 +625,10 @@
 
 14.4. В активном стриминге delta/source-of-truth (`message.llm.reasoning.updated`, `message.llm.text.updated`) и snapshot (`message.updated`) ДОЛЖНЫ координироваться через общий буфер с частотой не чаще 100ms между промежуточными flush-циклами.
 
+14.5. Runtime-слой доставки realtime-событий (main + renderer EventBus) ДОЛЖЕН обрабатывать `message.llm.reasoning.updated` и `message.llm.text.updated` симметрично: события с одинаковым timestamp НЕ ДОЛЖНЫ отбрасываться как outdated, чтобы исключить визуальные паузы и burst-рендеринг текста.
+
+14.6. Renderer-слой списка сообщений ДОЛЖЕН обновляться инкрементально во время стриминга: КОГДА происходят input-only state updates (без изменения message snapshot), ТО система НЕ ДОЛЖНА выполнять массовый повторный ререндер списка сообщений; КОГДА обновляется snapshot одного сообщения, ТО ДОЛЖЕН ререндериться только соответствующий элемент списка.
+
 #### Функциональные Тесты
 
 - `tests/functional/llm-chat.spec.ts` — "should continue single-tool model -> tool -> model flow with persisted tool_call blocks"
