@@ -1076,6 +1076,7 @@ User отправляет сообщение
 | llm-integration.14.3 | ✓ | ✓ |
 | llm-integration.14.4 | ✓ | ✓ |
 | llm-integration.14.5 | ✓ | ✓ |
+| llm-integration.14.6 | ✓ | - |
 | llm-integration.15 | ✓ | - |
 | llm-integration.15.1 | ✓ | - |
 | llm-integration.15.2 | ✓ | - |
