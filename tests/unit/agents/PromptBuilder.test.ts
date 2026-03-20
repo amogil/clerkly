@@ -152,7 +152,7 @@ describe('PromptBuilder.build()', () => {
     /* Preconditions: FinalAnswerFeature configured
        Action: Call build()
        Assertions: final_answer tool and guidance section are present
-       Requirements: llm-integration.9.2, llm-integration.9.5.1.1.1, llm-integration.9.5.1.1.2, llm-integration.9.5.1.1.3, llm-integration.11.2.1 */
+       Requirements: llm-integration.9.2, llm-integration.9.5.1.1, llm-integration.9.5.1.2, llm-integration.9.5.1.3, llm-integration.11.2.1 */
     it('should include final_answer tool and prompt guidance from FinalAnswerFeature', () => {
       const feature = new FinalAnswerFeature();
       const result = makeBuilder('Base.', [feature]).build();

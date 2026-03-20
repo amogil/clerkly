@@ -3173,7 +3173,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
   /* Preconditions: App uses mock provider and sends first chat request
      Action: User sends a message, test inspects provider request body
      Assertions: System prompt forbids both raw payload mirroring and plain-text summary duplication before final_answer
-     Requirements: llm-integration.9.5.3.3, llm-integration.9.5.6 */
+     Requirements: llm-integration.9.5.1.1, llm-integration.9.5.1.2, llm-integration.9.5.1.3, llm-integration.9.5.6 */
   test('should include final_answer non-duplication rules in system prompt', async () => {
     mockLLMServer.setStreamingMode(true, {
       content: 'Simple answer',

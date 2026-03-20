@@ -407,6 +407,12 @@
   - КОГДА пункт `summary_points` содержит математическое выражение, модель ДОЛЖНА использовать KaTeX-совместимые markdown-делимитеры `$...$` (inline) или `$$...$$` (block);
   - `summary_points` соблюдает лимиты `llm-integration.9.5.2-9.5.3.1` и перечисляет решённые задачи.
 
+9.5.1.2. КОГДА модель завершает текущий turn, ТО она ДОЛЖНА выбирать ровно один исход:
+  - либо вызвать `final_answer`;
+  - либо задать пользователю явный следующий вопрос для продолжения.
+
+9.5.1.3. КОГДА запрос пользователя полностью выполним в пределах текущего turn (например, прямой generation/edit/transform без дополнительных входных данных), ТО модель ДОЛЖНА вызвать `final_answer` в этом же turn и НЕ ДОЛЖНА оставлять turn в `awaiting-response` без явного вопроса пользователю.
+
 9.5.2. `summary_points` ДОЛЖЕН содержать от 1 до 10 пунктов.
 
 9.5.3. КАЖДЫЙ пункт `summary_points` ДОЛЖЕН иметь длину не более 200 символов.
@@ -438,6 +444,7 @@
 - `tests/functional/agent-status-calculation.spec.ts` - "should keep in-progress status from done code_exec timeout tool_call"
 - `tests/functional/llm-chat.spec.ts` — "should cancel active request via stop button without creating error message"
 - `tests/functional/agent-status-calculation.spec.ts` - "should resolve awaiting-response status from done code_exec cancelled tool_call when pipeline is inactive"
+- `tests/functional/llm-chat.spec.ts` — "should include final_answer non-duplication rules in system prompt"
 
 ---
 
