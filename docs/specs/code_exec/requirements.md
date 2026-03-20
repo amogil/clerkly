@@ -123,6 +123,7 @@
 - `tests/functional/code_exec.spec.ts` — "should deny main-pipeline-only and non-allowlisted sandbox tools"
 - `tests/functional/code_exec.spec.ts` — "should return policy_denied for window.open and perform no network request"
 - `tests/functional/code_exec.spec.ts` — "should return policy_denied for location.assign/replace and perform no network request"
+- `tests/functional/code_exec.spec.ts` — "should return policy_denied for Node.js globals in sandbox runtime"
 - `tests/functional/code_exec.spec.ts` — "should deny fetch/xhr/websocket/sendBeacon and perform no network request"
 - `tests/functional/code_exec.spec.ts` — "should deny multithreading APIs in sandbox runtime"
 - `tests/functional/code_exec.spec.ts` — "should shutdown without hanging when code_exec is active"

@@ -268,6 +268,7 @@ Lifecycle:
 - `tests/functional/code_exec.spec.ts` — несколько вызовов в одном turn (включая параллельные) и корреляция по `callId`.
 - `tests/functional/code_exec.spec.ts` — persisted lifecycle/audit поля (`started_at`, `finished_at`, `duration_ms`) для terminal `code_exec`.
 - `tests/functional/code_exec.spec.ts` — browser-level безопасность (`policy_denied` для `window.open`, `location.assign`, `location.replace`).
+- `tests/functional/code_exec.spec.ts` — sandbox Node.js globals safety (`policy_denied` для `process`/`require`/`module`/`Buffer`/`__dirname`/`__filename`).
 - `tests/functional/code_exec.spec.ts` — browser-level network egress enforcement (`fetch`, `XMLHttpRequest`, `WebSocket`, `navigator.sendBeacon`, `window.open`, `location.assign`, `location.replace` блокируются с `policy_denied`, без исходящих запросов).
 - `tests/functional/code_exec.spec.ts` — лимиты `code`/`stdout`/`stderr` и truncated-флаги.
 - `tests/functional/code_exec.spec.ts` — timeout/cancel/shutdown lifecycle и `limit_exceeded` сигналы по ресурсоёмким сценариям.
@@ -284,6 +285,7 @@ Lifecycle:
 | code_exec.1.4-1.4.2 | `tests/unit/agents/MainPipeline.test.ts` | `tests/functional/code_exec.spec.ts` |
 | code_exec.1.5-1.5.1 | `tests/unit/code_exec/SandboxSessionManager.test.ts` | `tests/functional/code_exec.spec.ts` |
 | code_exec.2.1-2.4 | `tests/unit/code_exec/SandboxBridge.test.ts`, `tests/unit/code_exec/SandboxSessionManager.test.ts` | `tests/functional/code_exec.spec.ts` |
+| code_exec.2.4.1 | `tests/unit/code_exec/SandboxSessionManager.test.ts` | `tests/functional/code_exec.spec.ts` |
 | code_exec.2.5-2.6 | `tests/unit/code_exec/SandboxSessionManager.test.ts` | - |
 | code_exec.2.7-2.8.2 | `tests/unit/code_exec/SandboxBridge.test.ts` | - |
 | code_exec.2.9-2.9.1 | `tests/unit/code_exec/SandboxSessionManager.test.ts` | - |
