@@ -4,7 +4,7 @@
 
 План работ по Issue #78: корректировка anti-flapping score guard для auto-title, чтобы первый rename для дефолтного названия `New Agent` проходил при меньшем пороге, а для уже переименованных чатов сохранялось текущее anti-flap поведение.
 
-**Текущий статус:** Фаза 3 — Спецификации синхронизированы, ожидается реализация runtime/tests
+**Текущий статус:** Фаза 4 — Runtime/tests завершены, functional run отложен по запросу пользователя
 
 ---
 
@@ -26,27 +26,41 @@
 - ✅ Обновлён `llm-integration/requirements.md`: критерий `16.10` синхронизирован под split threshold (`New Agent` -> `> 50`, non-default -> `>= 80`).
 - ✅ Обновлён `llm-integration/design.md`: anti-flapping дизайн и тестовое покрытие синхронизированы под split threshold.
 - ✅ Кросс-спек consistency проверен с `agents/requirements.md` и `agents/design.md`: изменения UI-контракта не требуются.
+- ✅ Обновлён runtime score guard в `src/main/agents/AgentTitleRuntime.ts`:
+  - для `New Agent` применяется порог `rename_need_score > 50`;
+  - для non-default title сохраняется порог `rename_need_score >= 80`.
+- ✅ Расширен unit coverage anti-flapping в `tests/unit/agents/AgentTitleAntiFlap.test.ts`:
+  - default title: score `50` -> skip;
+  - default title: score `51` -> allow;
+  - non-default title: score `79` -> skip.
+- ✅ Дополнен `tests/unit/agents/MainPipeline.test.ts`:
+  - pipeline применяет rename для default-title при score `51`;
+  - pipeline пропускает rename для non-default при score `79`.
+- ✅ Прогнаны targeted unit tests:
+  - `tests/unit/agents/AgentTitleAntiFlap.test.ts`
+  - `tests/unit/agents/MainPipeline.test.ts`
+- ✅ Прогнан `npm run validate` (успешно).
 
 ### В работе
-- 🔄 Ожидается реализация runtime и тестов (Фаза 2), без дополнительных изменений в спецификациях на текущем шаге.
+- 🔄 Полный `npm run test:functional` отложен по явному запросу пользователя для текущего шага.
 
 ### Запланировано
 
 #### Фаза 2: Реализация split threshold для auto-title
 
-- [ ] Обновить runtime score guard в `src/main/agents/AgentTitleRuntime.ts`.
-  - [ ] Ввести явный split-порог для default/non-default title.
-  - [ ] Для текущего title `New Agent` разрешать rename только при `rename_need_score > 50`.
-  - [ ] Для non-default title сохранить текущее правило `rename_need_score >= 80`.
+- [x] Обновить runtime score guard в `src/main/agents/AgentTitleRuntime.ts`.
+  - [x] Ввести явный split-порог для default/non-default title.
+  - [x] Для текущего title `New Agent` разрешать rename только при `rename_need_score > 50`.
+  - [x] Для non-default title сохранить текущее правило `rename_need_score >= 80`.
 
-- [ ] Расширить unit coverage anti-flapping в `tests/unit/agents/AgentTitleAntiFlap.test.ts`.
-  - [ ] Добавить кейс default title: score `50` -> skip.
-  - [ ] Добавить кейс default title: score `51` -> allow.
-  - [ ] Оставить regression для non-default title: score `79` -> skip.
+- [x] Расширить unit coverage anti-flapping в `tests/unit/agents/AgentTitleAntiFlap.test.ts`.
+  - [x] Добавить кейс default title: score `50` -> skip.
+  - [x] Добавить кейс default title: score `51` -> allow.
+  - [x] Оставить regression для non-default title: score `79` -> skip.
 
-- [ ] Проверить и при необходимости дополнить `tests/unit/agents/MainPipeline.test.ts`.
-  - [ ] Зафиксировать, что pipeline применяет rename для default-title сценария при score `51`.
-  - [ ] Зафиксировать, что для non-default сценария score < `80` остаётся блокирующим.
+- [x] Проверить и при необходимости дополнить `tests/unit/agents/MainPipeline.test.ts`.
+  - [x] Зафиксировать, что pipeline применяет rename для default-title сценария при score `51`.
+  - [x] Зафиксировать, что для non-default сценария score < `80` остаётся блокирующим.
 
 #### Фаза 3: Синхронизация спецификаций
 
@@ -61,8 +75,8 @@
 
 #### Фаза 4: Проверка
 
-- [ ] Прогнать targeted unit tests:
-  - [ ] `tests/unit/agents/AgentTitleAntiFlap.test.ts`
-  - [ ] `tests/unit/agents/MainPipeline.test.ts`
-- [ ] Прогнать `npm run validate`.
+- [x] Прогнать targeted unit tests:
+  - [x] `tests/unit/agents/AgentTitleAntiFlap.test.ts`
+  - [x] `tests/unit/agents/MainPipeline.test.ts`
+- [x] Прогнать `npm run validate`.
 - [ ] Отдельно запросить подтверждение пользователя перед запуском `npm run test:functional`.

@@ -813,6 +813,66 @@ describe('MainPipeline.run()', () => {
     expect(agentTitleUpdater.rename).toHaveBeenCalledWith('agent-1', 'Sprint planning board');
   });
 
+  /* Preconditions: Current title is default, triggering message is meaningful, metadata score is 51
+     Action: Run MainPipeline with valid auto-title metadata
+     Assertions: Rename is applied for default title with lower threshold
+     Requirements: llm-integration.16.10 */
+  it('applies auto-rename for default title when rename_need_score is 51', async () => {
+    const { pipeline, llmProvider, messageManager, agentTitleUpdater } = makeMocks();
+    const meaningfulUser = makeMessage(1, 'user');
+    meaningfulUser.payloadJson = JSON.stringify({
+      data: { text: 'Plan incident response checklist' },
+    });
+    (messageManager.list as jest.Mock).mockReturnValue([meaningfulUser]);
+    (messageManager.listForModelHistory as jest.Mock).mockReturnValue([meaningfulUser]);
+    agentTitleUpdater.getCurrentTitle.mockReturnValue('New Agent');
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'text',
+          delta:
+            '<!-- clerkly:title-meta: {"title":"Incident response checklist","rename_need_score":51} --> answer',
+        });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(agentTitleUpdater.rename).toHaveBeenCalledWith('agent-1', 'Incident response checklist');
+  });
+
+  /* Preconditions: Current title is non-default and metadata score is 79
+     Action: Run MainPipeline with valid auto-title metadata
+     Assertions: Rename is skipped because non-default threshold remains 80
+     Requirements: llm-integration.16.10 */
+  it('skips auto-rename for non-default title when rename_need_score is 79', async () => {
+    const { pipeline, llmProvider, messageManager, agentTitleUpdater } = makeMocks();
+    const meaningfulUser = makeMessage(1, 'user');
+    meaningfulUser.payloadJson = JSON.stringify({
+      data: { text: 'Review release retro action items' },
+    });
+    (messageManager.list as jest.Mock).mockReturnValue([meaningfulUser]);
+    (messageManager.listForModelHistory as jest.Mock).mockReturnValue([meaningfulUser]);
+    agentTitleUpdater.getCurrentTitle.mockReturnValue('Sprint planning board');
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'text',
+          delta:
+            '<!-- clerkly:title-meta: {"title":"Release retrospective","rename_need_score":79} --> answer',
+        });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(agentTitleUpdater.rename).not.toHaveBeenCalled();
+  });
+
   /* Preconditions: Persisted history already contains a recent successful rename in fewer than 5 user turns
      Action: Run MainPipeline in a fresh pipeline instance and process new title candidate
      Assertions: Cooldown guard skips rename based on persisted history replay

@@ -6,6 +6,8 @@ export const TITLE_META_PAYLOAD_MAX_LENGTH = 260;
 export const AGENT_TITLE_MAX_LENGTH = 200;
 export const TITLE_RENAME_MIN_USER_TURN_GAP = 5;
 export const TITLE_RENAME_NEED_SCORE_THRESHOLD = 80;
+export const TITLE_RENAME_NEED_SCORE_THRESHOLD_DEFAULT_TITLE = 50;
+export const DEFAULT_AGENT_TITLE = 'New Agent';
 
 type ParserMode = 'search' | 'capture';
 
@@ -205,7 +207,8 @@ export function evaluateAgentTitleGuards(input: {
     return { allow: false, reason: 'exact_match' };
   }
 
-  if (input.renameNeedScore < TITLE_RENAME_NEED_SCORE_THRESHOLD) {
+  const scorePassesThreshold = passesRenameNeedScoreThreshold(input.renameNeedScore, current);
+  if (!scorePassesThreshold) {
     return { allow: false, reason: 'score_below_threshold' };
   }
 
@@ -222,6 +225,14 @@ export function evaluateAgentTitleGuards(input: {
 // Requirements: llm-integration.16.10.1
 export function isValidRenameNeedScore(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 100;
+}
+
+// Requirements: llm-integration.16.10
+function passesRenameNeedScoreThreshold(renameNeedScore: number, currentTitle: string): boolean {
+  if (currentTitle.toLocaleLowerCase() === DEFAULT_AGENT_TITLE.toLocaleLowerCase()) {
+    return renameNeedScore > TITLE_RENAME_NEED_SCORE_THRESHOLD_DEFAULT_TITLE;
+  }
+  return renameNeedScore >= TITLE_RENAME_NEED_SCORE_THRESHOLD;
 }
 
 // Requirements: llm-integration.16.4.1, llm-integration.16.8.2

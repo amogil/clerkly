@@ -23,11 +23,45 @@ describe('evaluateAgentTitleGuards', () => {
     expect(decision.reason).toBe('exact_match');
   });
 
-  /* Preconditions: Score is below rename threshold
+  /* Preconditions: Current title is default and score equals default threshold boundary
      Action: Evaluate anti-flapping guards
      Assertions: Rename is skipped by score guard
      Requirements: llm-integration.16.10 */
-  it('skips rename when score is below threshold', () => {
+  it('skips rename for default title when score is 50', () => {
+    const decision = evaluateAgentTitleGuards({
+      currentTitle: 'New Agent',
+      nextTitle: 'Quarterly roadmap review',
+      renameNeedScore: 50,
+      currentUserTurn: 10,
+      lastRenameUserTurn: null,
+    });
+
+    expect(decision.allow).toBe(false);
+    expect(decision.reason).toBe('score_below_threshold');
+  });
+
+  /* Preconditions: Current title is default and score is above default threshold boundary
+     Action: Evaluate anti-flapping guards
+     Assertions: Rename is allowed
+     Requirements: llm-integration.16.10 */
+  it('allows rename for default title when score is 51', () => {
+    const decision = evaluateAgentTitleGuards({
+      currentTitle: 'New Agent',
+      nextTitle: 'Quarterly roadmap review',
+      renameNeedScore: 51,
+      currentUserTurn: 10,
+      lastRenameUserTurn: null,
+    });
+
+    expect(decision.allow).toBe(true);
+    expect(decision.reason).toBe('allow');
+  });
+
+  /* Preconditions: Current title is non-default and score is below non-default threshold
+     Action: Evaluate anti-flapping guards
+     Assertions: Rename is skipped by score guard
+     Requirements: llm-integration.16.10 */
+  it('skips rename for non-default title when score is 79', () => {
     const decision = evaluateAgentTitleGuards({
       currentTitle: 'Sprint bug triage',
       nextTitle: 'Quarterly roadmap review',
