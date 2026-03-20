@@ -152,7 +152,7 @@ describe('PromptBuilder.build()', () => {
     /* Preconditions: FinalAnswerFeature configured
        Action: Call build()
        Assertions: final_answer tool and guidance section are present
-       Requirements: llm-integration.9.2, llm-integration.9.5.1.1.1, llm-integration.9.5.1.1.2, llm-integration.9.5.1.1.3, llm-integration.11.2.1 */
+       Requirements: llm-integration.9.2, llm-integration.9.5.1.1, llm-integration.9.5.1.2, llm-integration.9.5.1.3, llm-integration.11.2.1 */
     it('should include final_answer tool and prompt guidance from FinalAnswerFeature', () => {
       const feature = new FinalAnswerFeature();
       const result = makeBuilder('Base.', [feature]).build();
@@ -165,12 +165,18 @@ describe('PromptBuilder.build()', () => {
       expect(result.systemPrompt).toContain(
         'explicitly ask the user what information or confirmation you need next'
       );
+      expect(result.systemPrompt).toContain(
+        'Never end a turn in ambiguous state: each turn must do exactly one of these outcomes'
+      );
+      expect(result.systemPrompt).toContain(
+        'If the user request can be fully completed within the current turn'
+      );
       expect(result.systemPrompt).toContain('Call `final_answer` alone');
       expect(result.systemPrompt).toContain(
         'Do not duplicate tool payload as plain assistant text'
       );
       expect(result.systemPrompt).toContain(
-        'do not first emit a normal assistant summary, bullet list, or checklist that repeats the same solved tasks'
+        'do not emit assistant summary/bullet/checklist content that duplicates solved tasks from `final_answer.summary_points` (including paraphrased duplicates)'
       );
       expect(result.systemPrompt).toContain('list solved tasks');
       expect(result.systemPrompt).toContain('1 to 10 non-empty points');

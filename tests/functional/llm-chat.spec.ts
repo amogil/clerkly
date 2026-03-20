@@ -3173,7 +3173,7 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
   /* Preconditions: App uses mock provider and sends first chat request
      Action: User sends a message, test inspects provider request body
      Assertions: System prompt forbids both raw payload mirroring and plain-text summary duplication before final_answer
-     Requirements: llm-integration.9.5.3.3, llm-integration.9.5.6 */
+     Requirements: llm-integration.9.5.1.1, llm-integration.9.5.1.2, llm-integration.9.5.1.3, llm-integration.9.5.6 */
   test('should include final_answer non-duplication rules in system prompt', async () => {
     mockLLMServer.setStreamingMode(true, {
       content: 'Simple answer',
@@ -3198,7 +3198,13 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
       'Do not duplicate tool payload as plain assistant text: never output raw JSON that mirrors `final_answer` arguments/output.'
     );
     expect(systemPrompt).toContain(
-      'do not first emit a normal assistant summary, bullet list, or checklist that repeats the same solved tasks'
+      'do not emit assistant summary/bullet/checklist content that duplicates solved tasks from `final_answer.summary_points` (including paraphrased duplicates)'
+    );
+    expect(systemPrompt).toContain(
+      'Never end a turn in ambiguous state: each turn must do exactly one of these outcomes'
+    );
+    expect(systemPrompt).toContain(
+      'If the user request can be fully completed within the current turn'
     );
   });
 
