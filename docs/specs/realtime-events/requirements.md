@@ -153,6 +153,8 @@
 
 3.8. События `message.llm.reasoning.updated` и `message.llm.text.updated` ДОЛЖНЫ передавать инкрементальные delta-данные и идентификатор сообщения, к которому относится update
 
+3.8.1. Для событий `message.llm.reasoning.updated` и `message.llm.text.updated` timestamp-based filtering в подписчиках ДОЛЖЕН считать устаревшими только события с меньшим timestamp (`<`), а события с одинаковым timestamp ДОЛЖНЫ обрабатываться (не отбрасываться).
+
 3.9. Состояние сообщений `kind: tool_call` ДОЛЖНО доставляться подписчикам через persisted snapshot-события `message.created`/`message.updated`.
 
 **Примечание:** Целевой список типов событий определяется этой спецификацией; `src/shared/events/types.ts` ДОЛЖЕН быть синхронизирован с данным контрактом.
@@ -255,6 +257,8 @@
 6.2. Система ДОЛЖНА поддерживать минимум 100 событий в секунду без деградации производительности
 
 6.3. События одного типа для одной сущности МОГУТ объединяться (batching) в пределах одного tick event loop
+
+6.3.1. Исключение для streaming-контракта: события `message.updated`, `message.llm.reasoning.updated` и `message.llm.text.updated` SHALL NOT коалесцироваться внутри одного tick, чтобы не терять промежуточные чанки активного стриминга.
 
 6.4. Неиспользуемые подписки ДОЛЖНЫ очищаться через явный lifecycle (`unsubscribe`, unmount cleanup, `destroy()`/`resetInstance()` в тестах)
 

@@ -745,7 +745,7 @@ interface AgentRateLimitPayload {
 Технические контракты realtime-событий фиксируются на уровне дизайна и синхронизируются с `realtime-events` спецификацией:
 
 ```typescript
-// Requirements: llm-integration.2, realtime-events.5.5
+// Requirements: llm-integration.2, llm-integration.14.5, realtime-events.5.5, realtime-events.3.8.1, realtime-events.6.3.1
 type EventName =
   | 'message.llm.reasoning.updated'
   | 'message.llm.text.updated';
@@ -770,6 +770,7 @@ interface MessageLlmTextUpdatedPayload {
 Правило обработки timestamp для стриминговых типов (`message.updated`, `message.llm.reasoning.updated`, `message.llm.text.updated`):
 - события с одинаковым timestamp НЕ коалесцируются;
 - устаревшим считается только событие с меньшим timestamp (`<`), чтобы не терять чанки в одном миллисекундном тике.
+- правило применяется симметрично в `MainEventBus` и `RendererEventBus` для `reasoning/text` stream-событий.
 
 Правило источников данных в runtime:
 - `message.llm.reasoning.updated` и `message.llm.text.updated` используются как primary source для delta-стриминга.

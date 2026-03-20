@@ -8,7 +8,7 @@
 - оставшимися follow-up задачами после Issue #65 (`sandbox-http-request`) в части LLM/code_exec интеграции;
 - миграцией `code_exec` renderer на стандартный AI Elements `Tool` contract.
 
-**Текущий статус:** Фаза 5 — Awaiting full functional suite approval
+**Текущий статус:** Фаза 8 — Streaming dedupe parity (Issue #74)
 
 ---
 
@@ -51,6 +51,7 @@
 
 ### В работе
 - 🔄 Фаза 5: содержательные работы завершены; ожидается только отдельное подтверждение пользователя на полный `npm run test:functional`.
+- 🔄 Фаза 8: выполнен spec-анализ задержек стриминга; зафиксирован новый контракт симметричной timestamp-дедупликации `message.llm.reasoning.updated` / `message.llm.text.updated` для main/renderer EventBus.
 
 ### Запланировано
 
@@ -138,3 +139,11 @@
 - [x] Прогнать релевантные unit tests по `MainPipeline`, `AgentMessage`, `PromptInput`, провайдерам при необходимости.
 - [x] Прогнать `npm run validate`.
 - [ ] После завершения запросить подтверждение на полный `npm run test:functional`.
+
+#### Фаза 8: Streaming Dedupe Parity (Issue #74)
+
+- [x] Выполнить cross-spec анализ контракта стриминга (`llm-integration`, `realtime-events`, `agents`) для симптома "пауза -> burst paragraph".
+- [x] Зафиксировать в `llm-integration/requirements.md` требование симметричной обработки equal-timestamp для `reasoning/text` stream-событий.
+- [x] Зафиксировать в `realtime-events/requirements.md` исключение из coalescing для stream-событий и правило outdated `<` (не `<=`) для `message.llm.reasoning.updated` / `message.llm.text.updated`.
+- [x] Синхронизировать `llm-integration/design.md` и `realtime-events/design.md` с новым контрактом доставки.
+- [ ] Реализовать runtime-фикс в renderer EventBus и unit regressions (отдельный этап, без изменений в этой задаче).

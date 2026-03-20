@@ -217,7 +217,7 @@ export interface LLMPipelineDiagnosticPayload extends BaseEvent {
 
 #### Streaming-события LLM чата
 
-**Requirements:** realtime-events.3.7, realtime-events.3.8, realtime-events.3.9
+**Requirements:** realtime-events.3.7, realtime-events.3.8, realtime-events.3.8.1, realtime-events.3.9, realtime-events.6.3.1
 
 Для streaming-режима чата используются отдельные типизированные события:
 
@@ -242,6 +242,7 @@ export interface MessageLlmTextUpdatedPayload extends BaseEvent {
 Правило использования:
 - `message.llm.reasoning.updated` и `message.llm.text.updated` — инкрементальные чанки для UI-стриминга.
 - Состояние `kind: tool_call` доставляется через persisted snapshot-события `message.created`/`message.updated`; данный документ описывает только transport/доставку, без UI-правил.
+- Для timestamp-based filtering стриминговых событий (`message.llm.reasoning.updated`, `message.llm.text.updated`) используется правило `outdated = timestamp < lastTimestamp`; события с одинаковым timestamp сохраняются и доставляются.
 
 #### Генерация снапшотов
 
@@ -1171,6 +1172,7 @@ eventBus.publish('user.login', { userId: 'user-123' }, { local: true });
 
 - mitt: ~200 bytes, O(1) для emit
 - Timestamp-based deduplication для предотвращения обработки устаревших событий
+- Для stream-событий (`message.updated`, `message.llm.reasoning.updated`, `message.llm.text.updated`) включён non-coalesced режим в EventBus main/renderer, чтобы не терять delta-чанки в одном tick.
 - Lazy initialization для singleton EventBus
 - Для transport-диагностики допускаются internal debug-логи EventBus; при выводе в renderer Developer Log применяется порог `warn` (уровни `info`/`debug` отфильтрованы).
 
