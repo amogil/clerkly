@@ -254,6 +254,22 @@ console.log(first.status, second.status);`,
     expect(result.error?.code).toBe('policy_denied');
   });
 
+  /* Preconditions: Sandbox code attempts to use Node.js global that is unavailable in runtime
+     Action: Execute code that calls process.exit(0)
+     Assertions: Execution fails with policy_denied and normalized Node.js globals message
+     Requirements: code_exec.2.1, code_exec.2.4, code_exec.3.5 */
+  it('returns policy_denied for Node.js globals access in sandbox runtime', async () => {
+    const manager = new SandboxSessionManager();
+    const result = await manager.execute('agent-1', 'call-1', {
+      task_summary: 'Try process exit',
+      code: 'process.exit(0)',
+    });
+
+    expect(result.status).toBe('error');
+    expect(result.error?.code).toBe('policy_denied');
+    expect(result.error?.message).toContain('Node.js globals');
+  });
+
   /* Preconditions: Abort signal is already aborted before execution starts
      Action: Execute sandbox code with the aborted signal
      Assertions: Execution returns cancelled without running user code

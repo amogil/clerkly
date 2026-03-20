@@ -84,6 +84,8 @@
 
 2.4. КОГДА sandbox-код пытается вызвать неразрешённый API, ТО система ДОЛЖНА блокировать доступ и возвращать контролируемую ошибку.
 
+2.4.1. КОГДА sandbox-код пытается использовать недоступные Node.js globals (`process`, `require`, `module`, `Buffer`, `__dirname`, `__filename`), ТО вызов ДОЛЖЕН завершаться контролируемой ошибкой с `status = "error"` и `error.code = "policy_denied"`.
+
 2.5. КОГДА истекает лимит времени исполнения, ТО система ДОЛЖНА прерывать выполнение и возвращать статус timeout.
 
 2.6. КОГДА запрос на выполнение отменён пользователем или системой, ТО активное выполнение ДОЛЖНО быть остановлено корректно.
@@ -131,6 +133,7 @@
 
 - `tests/unit/code_exec/SandboxBridge.test.ts` — "should enforce allowlist and return policy_denied for forbidden APIs"
 - `tests/unit/code_exec/SandboxSessionManager.test.ts` — "should deny multithreading APIs and capture stdout/stderr output channels"
+- `tests/unit/code_exec/SandboxSessionManager.test.ts` — "returns policy_denied for Node.js globals access in sandbox runtime"
 - `tests/unit/code_exec/SandboxSessionManager.test.ts` — "should enforce timeout/cancel/cleanup and shutdown forced-kill fallback"
 
 ### 3. Контракт bridge API для модели
@@ -213,6 +216,8 @@
 
 3.2.4. Prompt/tool-инструкция для модели ДОЛЖНА явно указывать, что независимые allowlisted helper-вызовы внутри одного `code_exec` МОГУТ выполняться конкурентно через стандартные async-паттерны JavaScript (например, `await Promise.all(...)`), если это не нарушает sandbox policy и лимиты.
 
+3.2.5. Prompt/tool-инструкция для модели ДОЛЖНА явно указывать, что Node.js globals (`process`, `require`, `module`, `Buffer`, `__dirname`, `__filename`) недоступны в sandbox runtime.
+
 3.3. Система ДОЛЖНА содержать минимум один позитивный и один негативный пример использования API для модели.
 
 3.4. КОГДА модель использует только разрешённый API, ТО исполнение ДОЛЖНО завершаться без ошибки `error.code = "policy_denied"`.
@@ -257,6 +262,7 @@ return await window.api.saveData('x', 'y');
 - `tests/unit/code_exec/CodeExecToolSchema.test.ts` — "should reject missing or empty task_summary in code_exec input"
 - `tests/unit/code_exec/CodeExecToolSchema.test.ts` — "should reject task_summary longer than 200 characters"
 - `tests/unit/agents/PromptBuilder.test.ts` — "should include allowed API, examples and console usage guidance for code_exec"
+- `tests/unit/agents/PromptBuilder.test.ts` — "should include async execution guidance for code_exec"
 
 ### 4. Контракт хранения и realtime-события
 
