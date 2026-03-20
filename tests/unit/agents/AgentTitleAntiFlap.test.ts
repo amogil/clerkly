@@ -57,6 +57,41 @@ describe('evaluateAgentTitleGuards', () => {
     expect(decision.reason).toBe('allow');
   });
 
+  /* Preconditions: Current title is default with formatting/case artifacts and score equals default threshold boundary
+     Action: Evaluate anti-flapping guards
+     Assertions: Title is treated as default and rename is skipped
+     Requirements: llm-integration.16.10 */
+  it('skips rename for normalized default-title variant when score is 50', () => {
+    const decision = evaluateAgentTitleGuards({
+      currentTitle: '  NEW AGENT!!!  ',
+      nextTitle: 'Quarterly roadmap review',
+      renameNeedScore: 50,
+      currentUserTurn: 10,
+      lastRenameUserTurn: null,
+    });
+
+    expect(decision.allow).toBe(false);
+    expect(decision.reason).toBe('score_below_threshold');
+  });
+
+  /* Preconditions: Current title is default with formatting/case artifacts and score is above default threshold boundary
+     Action: Evaluate anti-flapping guards
+     Assertions: Title is treated as default and rename is allowed
+     Requirements: llm-integration.16.10 */
+  it('allows rename for normalized default-title variant when score is 51', () => {
+    const decision = evaluateAgentTitleGuards({
+      currentTitle: ' new agent ',
+      nextTitle: 'Quarterly roadmap review',
+      renameNeedScore: 51,
+      currentUserTurn: 10,
+      lastRenameUserTurn: null,
+    });
+
+    expect(decision.allow).toBe(true);
+    expect(decision.reason).toBe('allow');
+  });
+
+
   /* Preconditions: Current title is non-default and score is below non-default threshold
      Action: Evaluate anti-flapping guards
      Assertions: Rename is skipped by score guard

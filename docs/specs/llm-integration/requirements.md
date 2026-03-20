@@ -696,7 +696,7 @@
 16.10. Перед применением rename система ДОЛЖНА выполнять anti-flapping guards:
   - exact-match guard на нормализованных строках;
   - score guard:
-    - default-title ДОЛЖЕН определяться по нормализованному case-insensitive сравнению (`normalize(currentTitle)` эквивалентен `New Agent`);
+    - default-title ДОЛЖЕН определяться без учёта регистра и артефактов форматирования (лишние пробелы и краевая пунктуация НЕ ДОЛЖНЫ менять результат сравнения с `New Agent`);
     - КОГДА title является default-title, rename ДОЛЖЕН применяться только при `rename_need_score > 50`;
     - КОГДА title НЕ является default-title, rename ДОЛЖЕН применяться только при `rename_need_score >= 80`;
   - cooldown guard: не чаще одного rename за 5 user-turns для одного агента;
