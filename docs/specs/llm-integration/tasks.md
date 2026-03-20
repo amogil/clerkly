@@ -8,7 +8,7 @@
 - оставшимися follow-up задачами после Issue #65 (`sandbox-http-request`) в части LLM/code_exec интеграции;
 - миграцией `code_exec` renderer на стандартный AI Elements `Tool` contract.
 
-**Текущий статус:** Фаза 5 — Awaiting full functional suite approval
+**Текущий статус:** Фаза 8 — Spec reframe completed, runtime implementation pending
 
 ---
 
@@ -48,9 +48,10 @@
 - ✅ `code_exec` header использует status-icon-first contract без `wrench`: иконка берётся напрямую из persisted source status (`running`, `success`, `error`, `timeout`, `cancelled`), при этом `running` использует тот же фиолетовый акцент, что и action buttons prompt area.
 - ✅ `code_exec` content renderer частично возвращён к целевому app-owned виду поверх standard `Tool`: секция исходного кода отображается как один `JavaScript` code block с видимой JS-подсветкой, а `Output`/`Error` секции используют standard text code-block control с внутренними заголовками.
 - ✅ Исправлен markdown math runtime-контракт для inline `$...$`: в app-owned markdown renderer внутри `AgentMessage` включён `singleDollarTextMath: true` (без ручной правки vendor AI Elements), добавлен functional regression на `$\\pi$` и `$|\\Delta|$` в обычном тексте.
+- ✅ Переформулированы `llm-integration` requirements/design: обычный `kind: llm` текст при `final_answer` разрешён, а недублирование с `summary_points` задаётся инструкцией модели (prompt/tool contract) без отдельной selective runtime-дедупликации narrative-сегментов.
 
 ### В работе
-- 🔄 Фаза 5: содержательные работы завершены; ожидается только отдельное подтверждение пользователя на полный `npm run test:functional`.
+- 🔄 Фаза 8: завершён только spec-level reframe; runtime/prompt/tests alignment не запускался и ожидает отдельного согласования.
 
 ### Запланировано
 
@@ -138,3 +139,39 @@
 - [x] Прогнать релевантные unit tests по `MainPipeline`, `AgentMessage`, `PromptInput`, провайдерам при необходимости.
 - [x] Прогнать `npm run validate`.
 - [ ] После завершения запросить подтверждение на полный `npm run test:functional`.
+
+#### Фаза 8: Non-duplicating `llm text` + `final_answer` (spec reframe)
+
+- [x] Переформулировать `docs/specs/llm-integration/requirements.md`:
+  - [x] Разрешить обычный текстовый ответ вместе с `final_answer`, если он не дублирует `summary_points`.
+  - [x] Зафиксировать instruction-only policy: недублирование задаётся модельной инструкцией, а не selective runtime-постобработкой narrative-текста.
+- [x] Переформулировать `docs/specs/llm-integration/design.md`:
+  - [x] Синхронизировать prompt-instruction и pipeline-алгоритм с новой моделью без дублирования.
+  - [x] Зафиксировать отсутствие отдельной selective runtime-дедупликации для narrative markdown/text по `final_answer.summary_points`.
+- [ ] Отдельно согласовать runtime/prompt/test implementation по обновлённым спецификациям (вне текущей задачи).
+
+#### Фаза 9: Runtime alignment with instruction-only contract
+
+- [ ] Подтвердить финальный контракт перед implementation.
+  - [ ] Сверить `docs/specs/llm-integration/requirements.md` (`9.5.*`, `9.5.6.*`) и `docs/specs/llm-integration/design.md` (prompt/pipeline sections).
+  - [ ] Сверить тестовые правила из `docs/specs/testing-infrastructure/requirements.md` и `docs/specs/testing-infrastructure/design.md`.
+- [ ] Обновить prompt-инструкции `final_answer` в `src/main/agents/PromptBuilder.ts`.
+  - [ ] Разрешить обычный `kind: llm` текст при `final_answer`.
+  - [ ] Явно запретить смысловое дублирование `final_answer.summary_points`.
+  - [ ] Сохранить запрет raw JSON/tool-envelope дублей.
+- [ ] Привести pipeline к instruction-only модели в `src/main/agents/MainPipeline.ts`.
+  - [ ] Удалить/ослабить selective runtime-дедупликацию narrative markdown/checklist по `summary_points`.
+  - [ ] Сохранить технический guard против raw JSON/tool payload дублей.
+- [ ] Обновить unit tests.
+  - [ ] `tests/unit/agents/MainPipeline.test.ts`: добавить кейс `final_answer + explanatory text` (текст сохраняется).
+  - [ ] `tests/unit/agents/MainPipeline.test.ts`: пересобрать кейсы, ожидавшие runtime-вырезание narrative duplicate checklist.
+  - [ ] `tests/unit/agents/PromptBuilder.test.ts` (или эквивалент): зафиксировать обновлённую prompt-инструкцию.
+- [ ] Обновить functional regressions в `tests/functional/llm-chat.spec.ts`.
+  - [ ] Сохранить проверку отсутствия raw JSON дублей при наличии `tool_call(final_answer)`.
+  - [ ] Пересобрать сценарий про duplicate markdown summary в соответствии с instruction-only контрактом.
+- [ ] Выполнить валидацию после code changes.
+  - [ ] `npm run rebuild:node`
+  - [ ] Прогнать таргетные unit tests по изменённым файлам.
+  - [ ] `npm run validate`
+  - [ ] После завершения запросить подтверждение на полный `npm run test:functional`.
+- [ ] Обновить traceability в `docs/specs/llm-integration/tasks.md` после завершения implementation.
