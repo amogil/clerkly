@@ -749,6 +749,67 @@ describe('MainEventBus', () => {
       expect(handler.mock.calls[1][0].delta).toBe('b');
     });
 
+    /* Preconditions: EventBus has subscriber for message.llm.text.updated
+       Action: Deliver a newer text delta then an older one for same message via IPC
+       Assertions: Older text delta is ignored
+       Requirements: realtime-events.3.8.1, llm-integration.14.5 */
+    it('should ignore out-of-order older message.llm.text.updated events', async () => {
+      const bus = MainEventBus.getInstance();
+      const handler = jest.fn();
+      bus.subscribe('message.llm.text.updated', handler);
+
+      bus.deliverFromIPC('message.llm.text.updated', {
+        messageId: 7,
+        agentId: 'agent-1',
+        delta: 'new',
+        accumulatedText: 'new',
+        timestamp: 2000,
+      });
+      bus.deliverFromIPC('message.llm.text.updated', {
+        messageId: 7,
+        agentId: 'agent-1',
+        delta: 'old',
+        accumulatedText: 'old',
+        timestamp: 1000,
+      });
+
+      await Promise.resolve();
+
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(handler.mock.calls[0][0].delta).toBe('new');
+    });
+
+    /* Preconditions: EventBus has subscriber for message.llm.text.updated
+       Action: Deliver two text deltas with equal timestamp via IPC
+       Assertions: Both text deltas are delivered (streaming path uses `<` for outdated checks)
+       Requirements: realtime-events.3.8.1, realtime-events.6.3.1, llm-integration.14.5 */
+    it('should keep equal-timestamp message.llm.text.updated events', async () => {
+      const bus = MainEventBus.getInstance();
+      const handler = jest.fn();
+      bus.subscribe('message.llm.text.updated', handler);
+
+      bus.deliverFromIPC('message.llm.text.updated', {
+        messageId: 7,
+        agentId: 'agent-1',
+        delta: 'a',
+        accumulatedText: 'a',
+        timestamp: 2000,
+      });
+      bus.deliverFromIPC('message.llm.text.updated', {
+        messageId: 7,
+        agentId: 'agent-1',
+        delta: 'b',
+        accumulatedText: 'ab',
+        timestamp: 2000,
+      });
+
+      await Promise.resolve();
+
+      expect(handler).toHaveBeenCalledTimes(2);
+      expect(handler.mock.calls[0][0].delta).toBe('a');
+      expect(handler.mock.calls[1][0].delta).toBe('b');
+    });
+
     /* Preconditions: EventBus receives user.profile.updated via IPC with unsorted/duplicated changedFields
        Action: deliverFromIPC for user.profile.updated
        Assertions: subscriber gets normalized changedFields (unique, sorted)

@@ -1091,6 +1091,10 @@ eventBus.publish('user.login', { userId: 'user-123' }, { local: true });
 | should not duplicate events | realtime-events.4.3 |
 | should serialize events correctly | realtime-events.4.6 |
 | should ignore outdated events based on timestamp | realtime-events.5.5 |
+| should keep equal-timestamp message.llm.text.updated events (MainEventBus) | realtime-events.3.8.1, realtime-events.6.3.1 |
+| should ignore out-of-order older message.llm.text.updated events (MainEventBus) | realtime-events.3.8.1 |
+| should not drop message.llm.text.updated events with equal timestamp (RendererEventBus) | realtime-events.3.8.1, realtime-events.6.3.1 |
+| should ignore out-of-order older message.llm.text.updated events (RendererEventBus) | realtime-events.3.8.1 |
 | should handle 100 events per second | realtime-events.6.2 |
 | should cleanup subscriptions on clear() | realtime-events.6.5 |
 | should support internal debug logging for event bus diagnostics | Нефункциональные |
