@@ -82,7 +82,9 @@ export class RendererEventBus {
 
   private isNonCoalescedStreamingType(type: EventType): boolean {
     return (
-      type === EVENT_TYPES.MESSAGE_UPDATED || type === EVENT_TYPES.MESSAGE_LLM_REASONING_UPDATED
+      type === EVENT_TYPES.MESSAGE_UPDATED ||
+      type === EVENT_TYPES.MESSAGE_LLM_REASONING_UPDATED ||
+      type === EVENT_TYPES.MESSAGE_LLM_TEXT_UPDATED
     );
   }
 

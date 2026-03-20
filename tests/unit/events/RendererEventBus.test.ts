@@ -455,6 +455,50 @@ describe('RendererEventBus', () => {
       nowSpy.mockRestore();
     });
 
+    /* Preconditions: Same text key receives two events in the same millisecond
+       Action: Publish two MessageLlmTextUpdatedEvent with equal timestamp
+       Assertions: Both text deltas are delivered
+       Requirements: realtime-events.3.8.1, realtime-events.5.5, llm-integration.14.5 */
+    it('should not drop message.llm.text.updated events with equal timestamp', () => {
+      const bus = RendererEventBus.getInstance();
+      const handler = jest.fn();
+      const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(1234567890);
+
+      bus.subscribe('message.llm.text.updated', handler);
+      bus.publish(new MessageLlmTextUpdatedEvent(7, 'agent-1', 'a', 'a'));
+      bus.publish(new MessageLlmTextUpdatedEvent(7, 'agent-1', 'b', 'ab'));
+
+      expect(handler).toHaveBeenCalledTimes(2);
+      nowSpy.mockRestore();
+    });
+
+    /* Preconditions: Text stream receives newer event first, then older one
+       Action: Publish MessageLlmTextUpdatedEvent with timestamp 2000 then 1000
+       Assertions: Older text event is ignored
+       Requirements: realtime-events.3.8.1, realtime-events.5.5, llm-integration.14.5 */
+    it('should ignore out-of-order older message.llm.text.updated events', () => {
+      const bus = RendererEventBus.getInstance();
+      const handler = jest.fn();
+      const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(2000);
+
+      bus.subscribe('message.llm.text.updated', handler);
+      bus.publish(new MessageLlmTextUpdatedEvent(7, 'agent-1', 'new', 'new'));
+      nowSpy.mockReturnValue(1000);
+      bus.publish(new MessageLlmTextUpdatedEvent(7, 'agent-1', 'old', 'old'));
+
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(handler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messageId: 7,
+          agentId: 'agent-1',
+          delta: 'new',
+          accumulatedText: 'new',
+          timestamp: 2000,
+        })
+      );
+      nowSpy.mockRestore();
+    });
+
     /* Preconditions: Same message receives reasoning and text updates in the same millisecond
        Action: Publish MessageLlmReasoningUpdatedEvent and MessageLlmTextUpdatedEvent with equal timestamp
        Assertions: Both events are delivered (no cross-type coalescing)
