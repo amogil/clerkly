@@ -695,7 +695,9 @@
 
 16.10. Перед применением rename система ДОЛЖНА выполнять anti-flapping guards:
   - exact-match guard на нормализованных строках;
-  - score guard: rename ДОЛЖЕН применяться только при `rename_need_score >= 80`;
+  - score guard:
+    - КОГДА текущий заголовок равен `New Agent`, rename ДОЛЖЕН применяться только при `rename_need_score > 50`;
+    - КОГДА текущий заголовок НЕ равен `New Agent`, rename ДОЛЖЕН применяться только при `rename_need_score >= 80`;
   - cooldown guard: не чаще одного rename за 5 user-turns для одного агента;
   - cooldown replay ДОЛЖЕН учитывать только успешно применённые rename (не просто наличие comment в тексте ответа);
   - initial-rename guard: ПОКА текущий заголовок агента равен `New Agent`, ЕСЛИ в истории агента ещё нет meaningful user-message (>=3 буквенно-цифровых символов), auto-rename ДОЛЖЕН выполняться только на meaningful triggering user-message;
@@ -717,6 +719,8 @@
 - `tests/functional/llm-chat.spec.ts` - "should ignore unterminated title metadata comment when payload exceeds 260 chars"
 - `tests/functional/llm-chat.spec.ts` - "should reject title-meta inside tool payload and repair without rendering metadata comment"
 - `tests/functional/llm-chat.spec.ts` - "should keep default name when first user message is non-meaningful"
+- `tests/functional/llm-chat.spec.ts` - "should keep default name when default-title rename_need_score is 50"
+- `tests/functional/llm-chat.spec.ts` - "should apply rename when default-title rename_need_score is 51"
 - `tests/functional/llm-chat.spec.ts` - "should skip rename when rename_need_score is below threshold"
 - `tests/functional/llm-chat.spec.ts` - "should skip rename when rename_need_score is invalid"
 - `tests/functional/llm-chat.spec.ts` - "should apply rename for new intent after 5-turn cooldown"
