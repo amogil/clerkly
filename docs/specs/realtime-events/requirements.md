@@ -211,8 +211,8 @@
 - `tests/unit/App.ipc-integration.test.tsx` - "should log llm.pipeline.diagnostic events to renderer console"
 - `tests/unit/App.ipc-integration.test.tsx` - "should log chat kind:error messages from message.created to renderer console"
 - `tests/unit/App.ipc-integration.test.tsx` - "should not log non-error message.created events to renderer console"
-- `tests/functional/llm-chat.spec.ts` - "reasoning and text stream simultaneously"
-- `tests/functional/llm-chat.spec.ts` - "multiple tool calls in one turn and final response continues"
+- `tests/functional/llm-chat.spec.ts` - "should display reasoning streaming after sending message"
+- `tests/functional/llm-chat.spec.ts` - "should continue single-tool model -> tool -> model flow with persisted tool_call blocks"
 
 ### Требование 5: Обработка событий в подписчиках данных
 
