@@ -3198,7 +3198,13 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
       'Do not duplicate tool payload as plain assistant text: never output raw JSON that mirrors `final_answer` arguments/output.'
     );
     expect(systemPrompt).toContain(
-      'do not first emit a normal assistant summary, bullet list, or checklist that repeats the same solved tasks'
+      'do not emit assistant summary/bullet/checklist content that duplicates solved tasks from `final_answer.summary_points` (including paraphrased duplicates)'
+    );
+    expect(systemPrompt).toContain(
+      'Never end a turn in ambiguous state: each turn must do exactly one of these outcomes'
+    );
+    expect(systemPrompt).toContain(
+      'If the user request can be fully completed within the current turn'
     );
   });
 

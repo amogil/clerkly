@@ -165,12 +165,18 @@ describe('PromptBuilder.build()', () => {
       expect(result.systemPrompt).toContain(
         'explicitly ask the user what information or confirmation you need next'
       );
+      expect(result.systemPrompt).toContain(
+        'Never end a turn in ambiguous state: each turn must do exactly one of these outcomes'
+      );
+      expect(result.systemPrompt).toContain(
+        'If the user request can be fully completed within the current turn'
+      );
       expect(result.systemPrompt).toContain('Call `final_answer` alone');
       expect(result.systemPrompt).toContain(
         'Do not duplicate tool payload as plain assistant text'
       );
       expect(result.systemPrompt).toContain(
-        'do not first emit a normal assistant summary, bullet list, or checklist that repeats the same solved tasks'
+        'do not emit assistant summary/bullet/checklist content that duplicates solved tasks from `final_answer.summary_points` (including paraphrased duplicates)'
       );
       expect(result.systemPrompt).toContain('list solved tasks');
       expect(result.systemPrompt).toContain('1 to 10 non-empty points');
