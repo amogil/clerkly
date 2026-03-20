@@ -1643,6 +1643,48 @@ console.log(JSON.stringify(result));`,
     }
   });
 
+  /* Preconditions: mock model emits code_exec call that tries Node.js global access via process.exit
+     Action: user sends a message that triggers Node.js globals usage in sandbox runtime
+     Assertions: terminal result is policy_denied with Node.js globals diagnostic message
+     Requirements: code_exec.2.1, code_exec.2.4, code_exec.2.4.1, code_exec.3.5 */
+  test('should return policy_denied for Node.js globals in sandbox runtime', async () => {
+    mockLLMServer.setStreamingMode(true);
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        toolCalls: [
+          {
+            callId: 'deny-node-globals',
+            toolName: 'code_exec',
+            arguments: {
+              task_summary: 'Try Node globals',
+              code: 'process.exit(0)',
+              timeout_ms: 10000,
+            },
+          },
+        ],
+      },
+      {
+        content: '{"action":{"type":"text","content":"node globals denied"}}',
+      },
+    ]);
+
+    await launchWithMockLLM();
+    await sendUserMessage('Try Node.js globals in code_exec');
+    await expect(window.locator('.message-llm-action-response').last()).toContainText(
+      'node globals denied',
+      {
+        timeout: 15000,
+      }
+    );
+
+    const agentId = (await getAgentIdsFromApi(window))[0];
+    const denied = await findCodeExecCallByCallId(agentId, 'deny-node-globals');
+    expect(denied).toBeDefined();
+    expect(denied?.payload?.data?.output?.error?.code).toBe('policy_denied');
+    expect(denied?.payload?.data?.output?.error?.message ?? '').toContain('Node.js globals');
+    await expectNoToastError(window);
+  });
+
   /* Preconditions: local server tracks incoming requests, mock model emits fetch/xhr/websocket/sendBeacon in separate code_exec calls
      Action: user sends a message that triggers browser-level network APIs inside sandbox runtime
      Assertions: each terminal result is policy_denied and no outbound request reaches local server
