@@ -279,6 +279,32 @@ describe('PromptBuilder.build()', () => {
       expect(result.systemPrompt).toContain('Response example:');
     });
 
+    /* Preconditions: CodeExecFeature enabled with specific provider
+       Action: build() is called with openai/google/anthropic
+       Assertions: system prompt contains provider-native web search guidance
+       Requirements: sandbox-web-search.1.5, sandbox-web-search.2.3, sandbox-web-search.2.4, sandbox-web-search.2.5 */
+    it('should include provider-native web_search guidance in code_exec feature', () => {
+      const sandboxManager = {} as SandboxSessionManager;
+      const feature = new CodeExecFeature(sandboxManager);
+      const builder = makeBuilder('Base.', [feature]);
+
+      // OpenAI
+      const openAiResult = builder.build('openai');
+      expect(openAiResult.systemPrompt).toContain('Web Search inside code_exec:');
+      expect(openAiResult.systemPrompt).toContain('OpenAI-native capability');
+      expect(openAiResult.systemPrompt).toContain('queries: ["query1", "query2"]');
+
+      // Google
+      const googleResult = builder.build('google');
+      expect(googleResult.systemPrompt).toContain('Google Search Grounding');
+      expect(googleResult.systemPrompt).toContain('grounding metadata');
+
+      // Anthropic
+      const anthropicResult = builder.build('anthropic');
+      expect(anthropicResult.systemPrompt).toContain('Anthropic-native capability');
+      expect(anthropicResult.systemPrompt).toContain('query: "search query"');
+    });
+
     /* Preconditions: CodeExecFeature is enabled for the model-facing tool registry
        Action: build() collects LLM tools
        Assertions: code_exec tool description explicitly advertises public URL/API fetching via tools.http_request

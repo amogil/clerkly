@@ -1,5 +1,7 @@
 // Requirements: settings.3, llm-integration.3
 
+import { LLMProvider } from '../../types';
+
 /**
  * Result of testing connection to LLM provider
  */
@@ -54,7 +56,11 @@ export interface LLMTool {
   name: string;
   description: string;
   parameters: Record<string, unknown>;
-  execute?: (args: Record<string, unknown>, signal?: AbortSignal) => Promise<unknown> | unknown;
+  execute?: (
+    args: Record<string, unknown>,
+    signal?: AbortSignal,
+    provider?: LLMProvider
+  ) => Promise<unknown> | unknown;
 }
 
 /**

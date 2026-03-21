@@ -2364,23 +2364,28 @@ describe('MainPipeline.run()', () => {
     const bind = (
       pipeline as unknown as {
         bindToolExecutors: (
-          tools: NonNullable<ChatOptions['tools']>
+          tools: NonNullable<ChatOptions['tools']>,
+          provider?: 'openai' | 'google' | 'anthropic',
+          fallbackSignal?: AbortSignal
         ) => NonNullable<ChatOptions['tools']>;
       }
     ).bindToolExecutors.bind(pipeline);
 
-    const [bound] = bind([
-      {
-        name: 'custom_tool',
-        description: 'Custom tool',
-        parameters: { type: 'object' },
-        execute: toolExecute,
-      },
-    ]);
+    const [bound] = bind(
+      [
+        {
+          name: 'custom_tool',
+          description: 'Custom tool',
+          parameters: { type: 'object' },
+          execute: toolExecute,
+        },
+      ],
+      'openai'
+    );
 
     const output = await bound.execute?.({ x: 1 });
     expect(output).toEqual({ ok: true });
-    expect(toolExecute).toHaveBeenCalledWith({ x: 1 }, undefined);
+    expect(toolExecute).toHaveBeenCalledWith({ x: 1 }, undefined, 'openai');
   });
 
   it('falls back to ToolRunner execution for tools without execute', async () => {
@@ -3622,8 +3627,13 @@ describe('MainPipeline.run()', () => {
         bindToolExecutors: (
           tools: Array<{
             name: string;
-            execute?: (args: Record<string, unknown>, signal?: AbortSignal) => Promise<unknown>;
+            execute?: (
+              args: Record<string, unknown>,
+              signal?: AbortSignal,
+              provider?: 'openai' | 'google' | 'anthropic'
+            ) => Promise<unknown>;
           }>,
+          provider?: 'openai' | 'google' | 'anthropic',
           fallbackSignal?: AbortSignal
         ) => Array<{
           execute: (args: Record<string, unknown>, opts?: unknown) => Promise<unknown>;
@@ -3639,10 +3649,11 @@ describe('MainPipeline.run()', () => {
     const executeSpy = jest.fn(async () => ({ ok: true }));
     const boundWithFallbackSignal = bindToolExecutors(
       [{ name: 'code_exec', execute: executeSpy }],
+      'openai',
       signal
     );
     await boundWithFallbackSignal[0].execute({});
-    expect(executeSpy).toHaveBeenCalledWith({}, signal);
+    expect(executeSpy).toHaveBeenCalledWith({}, signal, 'openai');
 
     const limiter = createLimiter(1);
     const order: string[] = [];

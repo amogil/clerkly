@@ -21,9 +21,10 @@ import {
   MAIN_PIPELINE_ONLY_TOOL_NAMES,
   POLICY_DENIED_MAIN_PIPELINE_TOOL_MESSAGE,
   POLICY_DENIED_TOOL_MESSAGE,
-  SANDBOX_TOOLS_ALLOWLIST,
 } from './SandboxBridge';
 import { SandboxHttpRequestHandler } from './SandboxHttpRequestHandler';
+import { SandboxWebSearchHandler } from './SandboxWebSearchHandler';
+import { LLMProvider } from '../../types';
 
 const POLICY_DENIED_NETWORK_MESSAGE =
   'Browser-level network APIs are not allowed in sandbox runtime.';
@@ -94,6 +95,7 @@ export class SandboxSessionManager {
     agentId: string,
     callId: string,
     args: Record<string, unknown>,
+    provider: LLMProvider,
     signal?: AbortSignal
   ): Promise<CodeExecToolOutput> {
     const validated = validateCodeExecInput(args);
@@ -120,6 +122,7 @@ export class SandboxSessionManager {
         validated.value as { taskSummary: string; code: string; timeoutMs: number },
         {
           sessionId,
+          provider,
           signal: cancelController.signal,
         }
       );
@@ -185,12 +188,20 @@ export class SandboxSessionManager {
     const sessionId = typeof payload.sessionId === 'string' ? payload.sessionId : '';
     const toolName = typeof payload.toolName === 'string' ? payload.toolName : '';
     const invokers = this.activeSandboxToolInvokers.get(sessionId);
-    const invoker = invokers?.get(toolName);
-    if (!invoker) {
+    if (!invokers) {
       return {
         error: {
           code: 'internal_error',
           message: 'Sandbox tool invocation is not available for this session.',
+        },
+      };
+    }
+    const invoker = invokers.get(toolName);
+    if (!invoker) {
+      return {
+        error: {
+          code: 'policy_denied',
+          message: 'Tool is not available for the active provider capability.',
         },
       };
     }
@@ -200,7 +211,7 @@ export class SandboxSessionManager {
 
   private async executeInOneSandbox(
     input: { taskSummary: string; code: string; timeoutMs: number },
-    context: { sessionId: string; signal: AbortSignal }
+    context: { sessionId: string; provider: LLMProvider; signal: AbortSignal }
   ): Promise<CodeExecToolOutput> {
     const stdoutChunks: string[] = [];
     const stderrChunks: string[] = [];
@@ -227,12 +238,18 @@ export class SandboxSessionManager {
       },
     });
     attachSandboxNavigationGuards(sandboxWindow.webContents);
-    this.activeSandboxToolInvokers.set(
-      context.sessionId,
-      new Map<string, SandboxToolInvoker>([
-        ['http_request', async (toolInput: unknown) => this.httpRequestHandler.execute(toolInput)],
-      ])
-    );
+
+    const invokers = new Map<string, SandboxToolInvoker>([
+      ['http_request', async (toolInput: unknown) => this.httpRequestHandler.execute(toolInput)],
+    ]);
+
+    // Requirements: sandbox-web-search.1.6
+    if (this.isWebSearchSupported(context.provider)) {
+      const webSearchHandler = new SandboxWebSearchHandler(context.provider);
+      invokers.set('web_search', async (toolInput: unknown) => webSearchHandler.execute(toolInput));
+    }
+
+    this.activeSandboxToolInvokers.set(context.sessionId, invokers);
 
     const destroySandboxWindow = () => {
       try {
@@ -278,7 +295,10 @@ export class SandboxSessionManager {
         },
       });
 
-      const executionScript = this.buildSandboxExecutionScript(input.code);
+      const executionScript = this.buildSandboxExecutionScript(
+        input.code,
+        Array.from(invokers.keys())
+      );
       const timeoutPromise = new Promise<never>((_, reject) => {
         timeoutHandle = setTimeout(() => reject(new Error('code_exec_timeout')), input.timeoutMs);
       });
@@ -417,7 +437,7 @@ export class SandboxSessionManager {
   }
 
   // Requirements: code_exec.2.3, code_exec.2.7-2.9, code_exec.3.7
-  private buildSandboxExecutionScript(code: string): string {
+  private buildSandboxExecutionScript(code: string, allowedTools: string[]): string {
     const escapedCode = JSON.stringify(code);
     return `
       (async () => {
@@ -426,7 +446,7 @@ export class SandboxSessionManager {
         const POLICY_DENIED_MAIN_PIPELINE_TOOL_MESSAGE = ${JSON.stringify(POLICY_DENIED_MAIN_PIPELINE_TOOL_MESSAGE)};
         const POLICY_DENIED_TOOL_ALLOWLIST_MESSAGE = ${JSON.stringify(POLICY_DENIED_TOOL_MESSAGE)};
         const MAIN_PIPELINE_ONLY_TOOLS = new Set(${JSON.stringify(MAIN_PIPELINE_ONLY_TOOL_NAMES)});
-        const SANDBOX_TOOLS_ALLOWLIST = new Set(${JSON.stringify(SANDBOX_TOOLS_ALLOWLIST)});
+        const SANDBOX_TOOLS_ALLOWLIST = new Set(${JSON.stringify(allowedTools)});
         const sandboxBridge =
           typeof globalThis.__sandboxBridge === 'object' &&
           globalThis.__sandboxBridge &&
@@ -770,6 +790,23 @@ export class SandboxSessionManager {
       stdout_truncated: limited.stdout_truncated,
       stderr_truncated: limited.stderr_truncated,
     };
+  }
+
+  // Requirements: sandbox-web-search.1.6
+  private isWebSearchSupported(provider: LLMProvider): boolean {
+    const disabledProvidersRaw = process.env.CLERKLY_DISABLE_WEB_SEARCH_PROVIDERS ?? '';
+    const disabledProviders = new Set(
+      disabledProvidersRaw
+        .split(',')
+        .map((value) => value.trim())
+        .filter((value): value is LLMProvider => {
+          return value === 'openai' || value === 'google' || value === 'anthropic';
+        })
+    );
+    if (disabledProviders.has(provider)) {
+      return false;
+    }
+    return provider === 'openai' || provider === 'google' || provider === 'anthropic';
   }
 }
 

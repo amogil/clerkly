@@ -25,10 +25,11 @@ let mockLLMServer: MockLLMServer;
 let mockLLMPort: number;
 let appClosedInTest: boolean;
 
-async function launchWithMockLLM() {
+async function launchWithMockLLM(extraEnv?: Record<string, string>) {
   const context = await launchElectronWithMockOAuth(mockOAuthServer, {
     CLERKLY_OPENAI_API_URL: `http://localhost:${mockLLMPort}/v1/responses`,
     CLERKLY_OPENAI_API_KEY: 'mock-key-for-code-exec-tests',
+    ...(extraEnv ?? {}),
   });
   electronApp = context.app;
   window = context.window;
@@ -895,6 +896,261 @@ console.log(JSON.stringify(result));`,
     } finally {
       await new Promise<void>((resolve) => localServer.close(() => resolve()));
     }
+  });
+
+  /* Preconditions: mock model emits code_exec that calls tools.web_search with OpenAI-native contract
+     Action: user sends a message that triggers sandbox web_search helper
+     Assertions: helper returns OpenAI-native response and matches provider capability
+     Requirements: sandbox-web-search.1.1, sandbox-web-search.1.4, sandbox-web-search.2.3 */
+  test('should allow sandbox code to call tools.web_search', async () => {
+    mockLLMServer.setStreamingMode(true);
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        toolCalls: [
+          {
+            callId: 'search-ok-1',
+            toolName: 'code_exec',
+            arguments: {
+              task_summary: 'Perform web search',
+              code: `const result = await tools.web_search({
+  queries: ["test query"]
+});
+console.log(JSON.stringify(result));`,
+              timeout_ms: 10000,
+            },
+          },
+        ],
+      },
+      {
+        content: '{"action":{"type":"text","content":"search helper done"}}',
+      },
+    ]);
+
+    await launchWithMockLLM();
+    await sendUserMessage('Search the web');
+    await expect(window.locator('.message-llm-action-response').last()).toContainText(
+      'search helper done',
+      {
+        timeout: 15000,
+      }
+    );
+
+    const agentId = (await getAgentIdsFromApi(window))[0];
+    const output = await getCodeExecOutputByCallId(agentId, 'search-ok-1');
+    expect(output).toBeDefined();
+    expect(output?.status).toBe('success');
+    const stdout = typeof output?.stdout === 'string' ? output.stdout.trim() : '';
+    const payload = JSON.parse(stdout) as Record<string, unknown>;
+
+    // Check OpenAI-native response structure (from SandboxWebSearchHandler.ts)
+    expect(Array.isArray(payload.output)).toBe(true);
+    const results = payload.output as any[];
+    expect(results).toHaveLength(2);
+    expect(results[0]).toMatchObject({
+      title: 'Search Result 1',
+      url: 'https://example.com/1',
+    });
+
+    await expectNoToastError(window);
+  });
+
+  /* Preconditions: mock model emits code_exec that calls tools.web_search with invalid arguments
+     Action: user sends a message that triggers sandbox web_search helper
+     Assertions: helper returns structured invalid_input error to sandbox code
+     Requirements: sandbox-web-search.2.1, sandbox-web-search.4.1 */
+  test('should return invalid_input for provider-native validation failure', async () => {
+    mockLLMServer.setStreamingMode(true);
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        toolCalls: [
+          {
+            callId: 'search-invalid-1',
+            toolName: 'code_exec',
+            arguments: {
+              task_summary: 'Validate search input',
+              code: `const result = await tools.web_search({
+  invalid_param: "test"
+});
+console.log(JSON.stringify(result));`,
+              timeout_ms: 10000,
+            },
+          },
+        ],
+      },
+      {
+        content: '{"action":{"type":"text","content":"invalid search done"}}',
+      },
+    ]);
+
+    await launchWithMockLLM();
+    await sendUserMessage('Search with invalid params');
+    await expect(window.locator('.message-llm-action-response').last()).toContainText(
+      'invalid search done',
+      {
+        timeout: 15000,
+      }
+    );
+
+    const agentId = (await getAgentIdsFromApi(window))[0];
+    const output = await getCodeExecOutputByCallId(agentId, 'search-invalid-1');
+    const stdout = typeof output?.stdout === 'string' ? output.stdout.trim() : '';
+    const payload = JSON.parse(stdout) as Record<string, unknown>;
+    expect(payload).toMatchObject({
+      error: { code: 'invalid_input' },
+    });
+    await expectNoToastError(window);
+  });
+
+  /* Preconditions: mock model emits code_exec that calls tools.web_search with provider-error trigger marker
+     Action: user sends a message that triggers sandbox web_search runtime failure path
+     Assertions: helper returns structured provider_error and pipeline continues without crash
+     Requirements: sandbox-web-search.4.1, sandbox-web-search.4.2, sandbox-web-search.4.4 */
+  test('should surface tools.web_search runtime error without pipeline crash', async () => {
+    mockLLMServer.setStreamingMode(true);
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        toolCalls: [
+          {
+            callId: 'search-provider-error-1',
+            toolName: 'code_exec',
+            arguments: {
+              task_summary: 'Trigger provider error path',
+              code: `const result = await tools.web_search({
+  queries: ["__provider_error__"]
+});
+console.log(JSON.stringify(result));`,
+              timeout_ms: 10000,
+            },
+          },
+        ],
+      },
+      {
+        content: '{"action":{"type":"text","content":"provider error handled"}}',
+      },
+    ]);
+
+    await launchWithMockLLM();
+    await sendUserMessage('Trigger web search provider error');
+    await expect(window.locator('.message-llm-action-response').last()).toContainText(
+      'provider error handled',
+      {
+        timeout: 15000,
+      }
+    );
+
+    const agentId = (await getAgentIdsFromApi(window))[0];
+    const output = await getCodeExecOutputByCallId(agentId, 'search-provider-error-1');
+    expect(output?.status).toBe('success');
+    const stdout = typeof output?.stdout === 'string' ? output.stdout.trim() : '';
+    const payload = JSON.parse(stdout) as Record<string, unknown>;
+    expect(payload).toMatchObject({
+      error: { code: 'provider_error' },
+    });
+
+    const allMessages = await getAllMessages(agentId);
+    const hasPipelineError = allMessages.some((entry) => entry.kind === 'error');
+    expect(hasPipelineError).toBe(false);
+    await expectNoToastError(window);
+  });
+
+  /* Preconditions: mock model emits code_exec that calls tools.web_search and code_exec completes terminally
+     Action: user sends a message that triggers web_search helper within code_exec lifecycle
+     Assertions: persisted tool_call messages include code_exec only and exclude web_search
+     Requirements: sandbox-web-search.5.1, sandbox-web-search.5.2, sandbox-web-search.5.4 */
+  test('should keep persisted lifecycle in code_exec while using tools.web_search', async () => {
+    mockLLMServer.setStreamingMode(true);
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        toolCalls: [
+          {
+            callId: 'search-persisted-1',
+            toolName: 'code_exec',
+            arguments: {
+              task_summary: 'Run web_search and inspect persisted lifecycle',
+              code: `const result = await tools.web_search({
+  queries: ["persisted lifecycle"]
+});
+console.log(JSON.stringify(result));`,
+              timeout_ms: 10000,
+            },
+          },
+        ],
+      },
+      {
+        content: '{"action":{"type":"text","content":"persisted lifecycle checked"}}',
+      },
+    ]);
+
+    await launchWithMockLLM();
+    await sendUserMessage('Check persisted lifecycle for web_search');
+    await expect(window.locator('.message-llm-action-response').last()).toContainText(
+      'persisted lifecycle checked',
+      {
+        timeout: 15000,
+      }
+    );
+
+    const agentId = (await getAgentIdsFromApi(window))[0];
+    const toolCalls = await getToolCallMessages(agentId);
+    const toolNames = toolCalls.map((entry) => {
+      const payload = entry.payload as { data?: { toolName?: string } };
+      return payload?.data?.toolName;
+    });
+    expect(toolNames).toContain('code_exec');
+    expect(toolNames).not.toContain('web_search');
+
+    const codeExecCall = await findCodeExecCallByCallId(agentId, 'search-persisted-1');
+    expect(codeExecCall?.kind).toBe('tool_call');
+    expect(codeExecCall?.done).toBe(true);
+    await expectNoToastError(window);
+  });
+
+  /* Preconditions: mock model emits code_exec that calls tools.web_search while openai web_search capability is disabled by env
+     Action: user sends a message that triggers web_search helper call
+     Assertions: sandbox runtime does not expose tools.web_search and returns policy_denied structured error
+     Requirements: sandbox-web-search.1.6, sandbox-web-search.6.2 */
+  test('should not expose tools.web_search when active provider lacks web search capability', async () => {
+    mockLLMServer.setStreamingMode(true);
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        toolCalls: [
+          {
+            callId: 'search-capability-off-1',
+            toolName: 'code_exec',
+            arguments: {
+              task_summary: 'Use web_search when capability disabled',
+              code: `const result = await tools.web_search({
+  queries: ["disabled capability"]
+});
+console.log(JSON.stringify(result));`,
+              timeout_ms: 10000,
+            },
+          },
+        ],
+      },
+      {
+        content: '{"action":{"type":"text","content":"capability fallback checked"}}',
+      },
+    ]);
+
+    await launchWithMockLLM({
+      CLERKLY_DISABLE_WEB_SEARCH_PROVIDERS: 'openai',
+    });
+    await sendUserMessage('Try web_search with disabled capability');
+    await expect(window.locator('.message-llm-action-response').last()).toContainText(
+      'capability fallback checked',
+      {
+        timeout: 15000,
+      }
+    );
+
+    const agentId = (await getAgentIdsFromApi(window))[0];
+    const output = await getCodeExecOutputByCallId(agentId, 'search-capability-off-1');
+    expect(output?.status).toBe('error');
+    expect(output?.error).toMatchObject({
+      code: 'policy_denied',
+    });
+    await expectNoToastError(window);
   });
 
   /* Preconditions: mock model emits code_exec that calls tools.http_request with follow_redirects disabled
