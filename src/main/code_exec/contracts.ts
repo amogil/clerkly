@@ -21,6 +21,12 @@ export type CodeExecErrorCode =
   | 'limit_exceeded'
   | 'internal_error';
 
+export type SandboxWebSearchErrorCode =
+  | 'invalid_input'
+  | 'provider_error'
+  | 'timeout'
+  | 'internal_error';
+
 export type CodeExecStatus = 'running' | 'success' | 'error' | 'timeout' | 'cancelled';
 
 export interface CodeExecToolInput {

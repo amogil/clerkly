@@ -4,6 +4,7 @@
 
 import type { Message } from '../db/schema';
 import type { LLMTool, ChatMessage } from '../llm/ILLMProvider';
+import { LLMProvider } from '../../types';
 import {
   CODE_EXEC_LIMITS,
   CODE_EXEC_TOOL_SCHEMA,
@@ -148,7 +149,7 @@ function buildHttpRequestPromptSection(): string {
  */
 export interface AgentFeature {
   name: string;
-  getSystemPromptSection(): string;
+  getSystemPromptSection(provider?: LLMProvider): string;
   getTools(): LLMTool[];
 }
 
@@ -202,9 +203,9 @@ export class PromptBuilder {
    * Build provider-agnostic prompt metadata
    * Requirements: llm-integration.4.3
    */
-  build(): BuiltPrompt {
+  build(provider?: LLMProvider): BuiltPrompt {
     return {
-      systemPrompt: this.buildSystemPrompt(),
+      systemPrompt: this.buildSystemPrompt(provider),
       tools: this.collectTools(),
     };
   }
@@ -213,17 +214,17 @@ export class PromptBuilder {
    * Build provider-ready ChatMessage[] for the LLM API
    * Requirements: llm-integration.10
    */
-  buildMessages(messages: Message[]): ChatMessage[] {
+  buildMessages(messages: Message[], provider?: LLMProvider): ChatMessage[] {
     return [
-      { role: 'system', content: this.buildSystemPrompt() },
+      { role: 'system', content: this.buildSystemPrompt(provider) },
       ...this.buildHistoryMessages(messages),
     ];
   }
 
-  private buildSystemPrompt(): string {
+  private buildSystemPrompt(provider?: LLMProvider): string {
     const parts = [this.systemPrompt];
     for (const feature of this.features) {
-      const section = feature.getSystemPromptSection();
+      const section = feature.getSystemPromptSection(provider);
       if (section) parts.push(section);
     }
     return normalizePromptWhitespace(parts.join('\n\n'));
@@ -473,7 +474,7 @@ export class CodeExecFeature implements AgentFeature {
 
   constructor(private readonly sandboxSessionManager: SandboxSessionManager) {}
 
-  getSystemPromptSection(): string {
+  getSystemPromptSection(provider?: LLMProvider): string {
     return [
       'Tool priority and completion rules:',
       '- `code_exec` is your primary work tool for computation, extraction, transformation, structured analysis, verification, and other tasks that benefit from sandbox code.',
@@ -492,9 +493,10 @@ export class CodeExecFeature implements AgentFeature {
       '- Error codes in normal chat-flow outputs: policy_denied | sandbox_runtime_error | limit_exceeded | internal_error.',
       '- `invalid_tool_arguments` is defensive/runtime-local only (direct runtime calls) and is not persisted as chat `tool_call(code_exec)` output.',
       `- Limits: code <= ${CODE_EXEC_LIMITS.maxCodeBytes} bytes (30 KiB), stdout <= ${CODE_EXEC_LIMITS.maxStdoutBytes} bytes (10 KiB), stderr <= ${CODE_EXEC_LIMITS.maxStderrBytes} bytes (10 KiB), CPU limit ${CODE_EXEC_LIMITS.sandboxCpuLimit} vCPU, RAM limit 2 GiB.`,
-      '- Allowed runtime API: console.log/info/warn/error and tools/window.tools (sandbox allowlist only).',
+      '- allowed runtime API: console.log/info/warn/error and tools/window.tools (sandbox allowlist only).',
       '- Node.js globals are unavailable in sandbox: process, require, module, Buffer, __dirname, __filename.',
       buildHttpRequestPromptSection(),
+      provider ? buildWebSearchPromptSection(provider) : '',
       '- Browser-level network APIs are denied: fetch, XMLHttpRequest, WebSocket, sendBeacon, window.open, location.assign, location.replace.',
       '- Multithreading APIs are denied: Worker, SharedWorker, ServiceWorker, Worklet.',
       '- Positive example: compute values, print diagnostics via console.*.',
@@ -512,7 +514,11 @@ export class CodeExecFeature implements AgentFeature {
         description:
           'Execute JavaScript in isolated sandbox runtime with strict policy and resource limits; use it as the primary work tool for computation, extraction, transformation, analysis, and verification.',
         parameters: CODE_EXEC_TOOL_SCHEMA,
-        execute: async (args: Record<string, unknown>, signal?: AbortSignal) => {
+        execute: async (
+          args: Record<string, unknown>,
+          signal?: AbortSignal,
+          provider?: LLMProvider
+        ) => {
           const validated = validateCodeExecInput(args);
           if (!validated.ok) {
             throw new Error(validated.error?.message ?? 'Invalid code_exec arguments.');
@@ -523,6 +529,7 @@ export class CodeExecFeature implements AgentFeature {
             'runtime',
             toolCallId,
             args,
+            provider ?? 'openai',
             signal
           );
           return output;
@@ -530,4 +537,42 @@ export class CodeExecFeature implements AgentFeature {
       },
     ];
   }
+}
+
+const WEB_SEARCH_PROMPT_SPEC = {
+  openai: {
+    invocation: '`const result = await tools.web_search({ queries: ["query1", "query2"] })`',
+    behavior:
+      'Search the web using OpenAI-native capability. Use multiple queries to cover different aspects of the task.',
+    input: '`queries`: required array of strings.',
+    output: 'Array of search results in OpenAI-native format.',
+  },
+  google: {
+    invocation: '`const result = await tools.web_search({ queries: ["query1", "query2"] })`',
+    behavior:
+      'Search the web using Google Search Grounding. Results include snippets and grounding metadata.',
+    input: '`queries`: required array of strings.',
+    output: 'Grounding metadata object in Gemini-native format.',
+  },
+  anthropic: {
+    invocation: '`const result = await tools.web_search({ query: "search query" })`',
+    behavior: 'Search the web using Anthropic-native capability.',
+    input: '`query`: required string.',
+    output: 'Search results object in Anthropic-native format.',
+  },
+};
+
+function buildWebSearchPromptSection(provider: LLMProvider): string {
+  const spec = WEB_SEARCH_PROMPT_SPEC[provider];
+  if (!spec) return '';
+
+  return [
+    'Web Search inside code_exec:',
+    `- Call form: ${spec.invocation}.`,
+    `- Behavior: ${spec.behavior}`,
+    `- Input: ${spec.input}`,
+    `- Output: ${spec.output}`,
+    '- Error codes: `invalid_input`, `provider_error`, `timeout`, `internal_error`.',
+    '- All web search calls are performed strictly within the runtime of the current `code_exec` tool call.',
+  ].join('\n');
 }

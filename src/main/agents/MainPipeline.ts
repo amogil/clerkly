@@ -262,14 +262,14 @@ export class MainPipeline {
     const messages = this.messageManager.listForModelHistory(agentId);
     const autoTitleInstruction = this.buildAutoTitleSystemInstruction(agentId, messages);
     const baseChatMessages = this.injectSystemMessage(
-      this.promptBuilder.buildMessages(messages),
+      this.promptBuilder.buildMessages(messages, provider),
       autoTitleInstruction
     );
-    const builtPrompt = this.promptBuilder.build();
+    const builtPrompt = this.promptBuilder.build(provider);
     const replyToMessageId = userMessageId;
     const options = {
       ...this.resolveOptions(provider),
-      tools: this.bindToolExecutors(builtPrompt.tools, signal),
+      tools: this.bindToolExecutors(builtPrompt.tools, provider, signal),
     };
     const llmProvider = this.createProvider(provider, apiKey);
 
@@ -2206,6 +2206,7 @@ export class MainPipeline {
    */
   private bindToolExecutors(
     tools: NonNullable<ChatOptions['tools']>,
+    provider: LLMProvider,
     fallbackSignal?: AbortSignal
   ): NonNullable<ChatOptions['tools']> {
     const runLimited = this.createConcurrencyLimiter(3);
@@ -2216,7 +2217,12 @@ export class MainPipeline {
           const abortSignal = this.extractToolAbortSignal(executeOptions) ?? fallbackSignal;
           const toolCallId = this.extractToolCallId(executeOptions);
           if (toolDef.execute) {
-            return toolDef.execute(args, abortSignal);
+            type ToolExecuteFn = (
+              args: Record<string, unknown>,
+              signal?: AbortSignal,
+              provider?: LLMProvider
+            ) => Promise<unknown>;
+            return (toolDef.execute as ToolExecuteFn)(args, abortSignal, provider);
           }
 
           const [result] = await this.toolExecutor.executeBatch(
