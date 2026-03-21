@@ -88,6 +88,7 @@ test.describe('Agent Messaging', () => {
 
     const userMessages = activeChat(window).userMessages;
     await expect(userMessages).toHaveCount(1, { timeout: 5000 });
+    await expect(userMessages.first()).toContainText(/Click send messag[eEЕе]/, { timeout: 5000 });
   });
 
   /* Preconditions: Last visible message is llm(done=false), so agent is in-progress and stop mode is visible
