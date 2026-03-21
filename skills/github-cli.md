@@ -1,115 +1,115 @@
 # GitHub CLI Skill
 
-Этот skill описывает работу с GitHub через CLI инструмент `gh`.
+This skill describes working with GitHub using the `gh` CLI tool.
 
-## Установка
+## Installation
 
 ```bash
-# Проверить установлен ли gh
+# Check if gh is installed
 gh --version
 
-# Если не установлен, установить через Homebrew (macOS)
+# If not installed, install via Homebrew (macOS)
 brew install gh
 
-# Авторизация
+# Authentication
 gh auth login
 ```
 
-## Работа с Issues
+## Working with Issues
 
-### Просмотр Issues
+### Viewing Issues
 
 ```bash
-# Список всех открытых issues в текущем репозитории
+# List all open issues in the current repository
 gh issue list
 
-# Список issues с фильтрами
-gh issue list --state open          # Только открытые
-gh issue list --state closed        # Только закрытые
-gh issue list --state all           # Все issues
-gh issue list --assignee @me        # Назначенные на меня
-gh issue list --label bug           # С меткой "bug"
-gh issue list --author username     # Созданные пользователем
+# List issues with filters
+gh issue list --state open          # Open only
+gh issue list --state closed        # Closed only
+gh issue list --state all           # All issues
+gh issue list --assignee @me        # Assigned to me
+gh issue list --label bug           # With label "bug"
+gh issue list --author username     # Created by user
 
-# Просмотр конкретного issue
-gh issue view 123                   # По номеру
-gh issue view 123 --web             # Открыть в браузере
+# Viewing a specific issue
+gh issue view 123                   # By number
+gh issue view 123 --web             # Open in browser
 
-# Просмотр с комментариями
+# View with comments
 gh issue view 123 --comments
 ```
 
-### Создание Issues
+### Creating Issues
 
 ```bash
-# Интерактивное создание
+# Interactive creation
 gh issue create
 
-# Создание с параметрами
+# Creation with parameters
 gh issue create --title "Bug title" --body "Description"
 
-# С метками и назначением
+# With labels and assignees
 gh issue create --title "Feature" --label enhancement --assignee username
 
-# Из файла
+# From a file
 gh issue create --title "Title" --body-file description.md
 ```
 
-### Управление Issues
+### Managing Issues
 
 ```bash
-# Закрыть issue
+# Close issue
 gh issue close 123
 
-# Открыть заново
+# Reopen issue
 gh issue reopen 123
 
-# Добавить комментарий
+# Add a comment
 gh issue comment 123 --body "Comment text"
 
-# Редактировать issue
+# Edit issue
 gh issue edit 123 --title "New title"
 gh issue edit 123 --add-label bug
 gh issue edit 123 --remove-label enhancement
 gh issue edit 123 --add-assignee username
 ```
 
-## Работа с Pull Requests
+## Working with Pull Requests
 
-### Просмотр PR
+### Viewing PRs
 
 ```bash
-# Список PR
+# PR list
 gh pr list
 gh pr list --state open
 gh pr list --state merged
 gh pr list --author @me
 
-# Просмотр конкретного PR
+# Viewing a specific PR
 gh pr view 456
 gh pr view 456 --web
 gh pr view 456 --comments
 
-# Проверить статус CI/CD
+# Check CI/CD status
 gh pr checks 456
 ```
 
-### Создание PR
+### Creating PRs
 
 ```bash
-# Интерактивное создание
+# Interactive creation
 gh pr create
 
-# С параметрами
+# Creation with parameters
 gh pr create --title "PR title" --body "Description"
-gh pr create --draft                # Создать как draft
-gh pr create --base main            # Указать базовую ветку
+gh pr create --draft                # Create as draft
+gh pr create --base main            # Specify base branch
 ```
 
-### Управление PR
+### Managing PRs
 
 ```bash
-# Checkout PR локально
+# Checkout PR locally
 gh pr checkout 456
 
 # Merge PR
@@ -117,7 +117,7 @@ gh pr merge 456
 gh pr merge 456 --squash            # Squash merge
 gh pr merge 456 --rebase            # Rebase merge
 
-# Закрыть без merge
+# Close without merge
 gh pr close 456
 
 # Review PR
@@ -126,161 +126,161 @@ gh pr review 456 --request-changes --body "Comments"
 gh pr review 456 --comment --body "General comment"
 ```
 
-## Работа с Репозиториями
+## Working with Repositories
 
 ```bash
-# Просмотр информации о репозитории
+# View repository information
 gh repo view
 gh repo view owner/repo
 
-# Клонирование
+# Cloning
 gh repo clone owner/repo
 
-# Создание репозитория
+# Creating a repository
 gh repo create my-repo --public
 gh repo create my-repo --private
 
-# Fork репозитория
+# Forking a repository
 gh repo fork owner/repo
 ```
 
-## Работа с Releases
+## Working with Releases
 
 ```bash
-# Список релизов
+# Release list
 gh release list
 
-# Просмотр релиза
+# View release
 gh release view v1.0.0
 
-# Создание релиза
+# Create release
 gh release create v1.0.0 --title "Version 1.0.0" --notes "Release notes"
 
-# Загрузка файлов в релиз
+# Upload files to release
 gh release upload v1.0.0 dist/*.zip
 ```
 
-## Работа с Gists
+## Working with Gists
 
 ```bash
-# Список gists
+# Gist list
 gh gist list
 
-# Создание gist
+# Create gist
 gh gist create file.txt
 gh gist create file.txt --public
 
-# Просмотр gist
+# View gist
 gh gist view gist-id
 ```
 
-## Полезные Команды
+## Useful Commands
 
 ```bash
-# Открыть репозиторий в браузере
+# Open repository in browser
 gh repo view --web
 
-# Открыть issue/PR в браузере
+# Open issue/PR in browser
 gh issue view 123 --web
 gh pr view 456 --web
 
-# Поиск issues
+# Search issues
 gh issue list --search "bug in:title"
 
-# Статус текущей ветки
+# Current branch status
 gh pr status
 
-# Просмотр workflow runs (GitHub Actions)
+# View workflow runs (GitHub Actions)
 gh run list
 gh run view run-id
-gh run watch run-id              # Следить за выполнением
+gh run watch run-id              # Watch execution
 ```
 
-## Форматирование Вывода
+## Output Formatting
 
 ```bash
-# JSON формат
+# JSON format
 gh issue list --json number,title,state
 
-# Кастомный формат с jq
+# Custom format with jq
 gh issue list --json number,title | jq '.[] | "\(.number): \(.title)"'
 
-# Ограничение количества результатов
+# Limit number of results
 gh issue list --limit 10
 ```
 
-## Алиасы
+## Aliases
 
-Создание алиасов для частых команд:
+Creating aliases for frequent commands:
 
 ```bash
-# Создать алиас
+# Create alias
 gh alias set issues 'issue list --assignee @me'
 
-# Использовать
+# Use
 gh issues
 
-# Список алиасов
+# Alias list
 gh alias list
 ```
 
-## Конфигурация
+## Configuration
 
 ```bash
-# Просмотр конфигурации
+# View configuration
 gh config list
 
-# Установка редактора по умолчанию
+# Set default editor
 gh config set editor vim
 
-# Установка браузера
+# Set browser
 gh config set browser firefox
 
-# Установка протокола (https/ssh)
+# Set protocol (https/ssh)
 gh config set git_protocol ssh
 ```
 
-## Примеры Workflow
+## Workflow Examples
 
-### Работа с Issue
+### Working with an Issue
 
 ```bash
-# 1. Посмотреть список issues
+# 1. View issue list
 gh issue list --label bug
 
-# 2. Открыть конкретный issue
+# 2. Open a specific issue
 gh issue view 123
 
-# 3. Назначить на себя
+# 3. Assign to self
 gh issue edit 123 --add-assignee @me
 
-# 4. Добавить комментарий
+# 4. Add a comment
 gh issue comment 123 --body "Working on this"
 
-# 5. Закрыть после исправления
+# 5. Close after fix
 gh issue close 123 --comment "Fixed in PR #456"
 ```
 
-### Создание PR из Issue
+### Creating a PR from an Issue
 
 ```bash
-# 1. Создать ветку для issue
+# 1. Create branch for issue
 git checkout -b fix-issue-123
 
-# 2. Сделать изменения и commit
+# 2. Make changes and commit
 git add .
 git commit -m "Fix issue #123"
 
-# 3. Push ветки
+# 3. Push branch
 git push -u origin fix-issue-123
 
-# 4. Создать PR, связанный с issue
+# 4. Create PR linked to issue
 gh pr create --title "Fix: Issue #123" --body "Closes #123"
 ```
 
-## Автоматизация
+## Automation
 
-### Скрипт для просмотра своих задач
+### Script to view your tasks
 
 ```bash
 #!/bin/bash
@@ -294,7 +294,7 @@ echo -e "\n=== PRs Waiting for My Review ==="
 gh pr list --search "review-requested:@me"
 ```
 
-### Скрипт для создания issue из шаблона
+### Script to create an issue from a template
 
 ```bash
 #!/bin/bash
@@ -308,30 +308,20 @@ gh issue create \
   --assignee @me
 ```
 
-## Интеграция с Kiro
-
-При работе с GitHub issues через Kiro:
-
-1. Используй `gh issue list` для просмотра списка задач
-2. Используй `gh issue view <number>` для детального просмотра
-3. Создавай issues через `gh issue create` с понятными заголовками
-4. Связывай PR с issues через "Closes #123" в описании PR
-5. Используй метки для категоризации (bug, enhancement, documentation)
-
 ## Troubleshooting
 
 ```bash
-# Проблемы с авторизацией
+# Authentication issues
 gh auth status
 gh auth refresh
 
-# Переавторизация
+# Re-authentication
 gh auth logout
 gh auth login
 
-# Проверка версии
+# Check version
 gh --version
 
-# Обновление gh
+# Update gh
 brew upgrade gh
 ```
