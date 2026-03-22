@@ -29,6 +29,10 @@ async function launchWithMockLLM(extraEnv?: Record<string, string>) {
   const context = await launchElectronWithMockOAuth(mockOAuthServer, {
     CLERKLY_OPENAI_API_URL: `http://localhost:${mockLLMPort}/v1/responses`,
     CLERKLY_OPENAI_API_KEY: 'mock-key-for-code-exec-tests',
+    CLERKLY_ANTHROPIC_API_URL: `http://localhost:${mockLLMPort}/v1/messages`,
+    CLERKLY_ANTHROPIC_API_KEY: 'mock-anthropic-key-for-code-exec-tests',
+    CLERKLY_GOOGLE_LLM_API_URL: `http://localhost:${mockLLMPort}/v1beta/models/gemini-3-flash:generateContent`,
+    CLERKLY_GOOGLE_API_KEY: 'mock-google-key-for-code-exec-tests',
     ...(extraEnv ?? {}),
   });
   electronApp = context.app;
@@ -70,6 +74,39 @@ async function getAllMessages(agentId: string): Promise<Array<Record<string, unk
     }
     return result.data as Array<Record<string, unknown>>;
   }, agentId);
+}
+
+async function invokeTestWebSearch(
+  provider: 'openai' | 'anthropic' | 'google',
+  args: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  return window.evaluate(
+    async ({ providerName, toolArgs }) => {
+      const electron = (
+        window as unknown as {
+          electron?: {
+            ipcRenderer?: {
+              invoke: (
+                channel: string,
+                provider: 'openai' | 'anthropic' | 'google',
+                args: Record<string, unknown>
+              ) => Promise<{ success: boolean; error?: string; data?: Record<string, unknown> }>;
+            };
+          };
+        }
+      ).electron;
+      const invoke = electron?.ipcRenderer?.invoke;
+      if (!invoke) {
+        throw new Error('test:web-search-execute unavailable: ipcRenderer.invoke is missing');
+      }
+      const result = await invoke('test:web-search-execute', providerName, toolArgs);
+      if (!result?.success) {
+        throw new Error(result?.error || 'test:web-search-execute failed');
+      }
+      return result.data as Record<string, unknown>;
+    },
+    { providerName: provider, toolArgs: args }
+  );
 }
 
 // Requirements: sandbox-http-request.3, sandbox-http-request.4
@@ -900,7 +937,7 @@ console.log(JSON.stringify(result));`,
 
   /* Preconditions: mock model emits code_exec that calls tools.web_search with OpenAI-native contract
      Action: user sends a message that triggers sandbox web_search helper
-     Assertions: helper returns OpenAI-native response and matches provider capability
+     Assertions: helper returns OpenAI-native response envelope and no stubbed example.com payload
      Requirements: sandbox-web-search.1.1, sandbox-web-search.1.4, sandbox-web-search.2.3 */
   test('should allow sandbox code to call tools.web_search', async () => {
     mockLLMServer.setStreamingMode(true);
@@ -942,15 +979,62 @@ console.log(JSON.stringify(result));`,
     const stdout = typeof output?.stdout === 'string' ? output.stdout.trim() : '';
     const payload = JSON.parse(stdout) as Record<string, unknown>;
 
-    // Check OpenAI-native response structure (from SandboxWebSearchHandler.ts)
+    expect(payload.provider).toBe('openai');
     expect(Array.isArray(payload.output)).toBe(true);
-    const results = payload.output as any[];
-    expect(results).toHaveLength(2);
-    expect(results[0]).toMatchObject({
-      title: 'Search Result 1',
-      url: 'https://example.com/1',
+    const results = payload.output as Array<{ query?: unknown; response?: unknown }>;
+    expect(results.length).toBeGreaterThan(0);
+    expect(typeof results[0].query).toBe('string');
+    expect(results[0].response).toBeDefined();
+    expect(stdout).not.toContain('https://example.com/1');
+    expect(stdout).not.toContain('Search Result 1');
+
+    await expectNoToastError(window);
+  });
+
+  /* Preconditions: authenticated app with mock LLM server for provider endpoints
+     Action: execute sandbox web_search helper for Anthropic via test IPC bridge
+     Assertions: returns provider-native Anthropic payload from mock endpoint and no runtime crash
+     Exception Rationale (testing.3.13): this test validates provider adapter/runtime integration for sandbox web_search
+     without relying on external Anthropic API availability; LLM+UI web_search orchestration is covered by openai-based
+     tool-loop scenarios in this suite.
+     Requirements: sandbox-web-search.2.4, sandbox-web-search.3.1, sandbox-web-search.4.4 */
+  test('should execute anthropic web_search helper against mocked provider endpoint', async () => {
+    await launchWithMockLLM();
+
+    const payload = await invokeTestWebSearch('anthropic', {
+      query: 'latest Iran news',
     });
 
+    expect(payload.provider).toBe('anthropic');
+    expect(payload.output).toBeDefined();
+    const output = payload.output as { id?: string; content?: unknown[] };
+    expect(typeof output.id).toBe('string');
+    expect(Array.isArray(output.content)).toBe(true);
+    expect(JSON.stringify(payload)).toContain('Mock Anthropic Search Result');
+    await expectNoToastError(window);
+  });
+
+  /* Preconditions: authenticated app with mock LLM server for provider endpoints
+     Action: execute sandbox web_search helper for Google via test IPC bridge
+     Assertions: returns provider-native Google payload from mock endpoint and no runtime crash
+     Exception Rationale (testing.3.13): this test validates provider adapter/runtime integration for sandbox web_search
+     without relying on external Google API availability; LLM+UI web_search orchestration is covered by openai-based
+     tool-loop scenarios in this suite.
+     Requirements: sandbox-web-search.2.5, sandbox-web-search.3.1, sandbox-web-search.4.4 */
+  test('should execute google web_search helper against mocked provider endpoint', async () => {
+    await launchWithMockLLM();
+
+    const payload = await invokeTestWebSearch('google', {
+      queries: ['latest Iran news'],
+    });
+
+    expect(payload.provider).toBe('google');
+    expect(Array.isArray(payload.output)).toBe(true);
+    const output = payload.output as Array<{ query?: unknown; response?: unknown }>;
+    expect(output.length).toBeGreaterThan(0);
+    expect(output[0].query).toBe('latest Iran news');
+    expect(output[0].response).toBeDefined();
+    expect(JSON.stringify(payload)).toContain('Mock Google Search Result');
     await expectNoToastError(window);
   });
 

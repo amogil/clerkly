@@ -110,11 +110,11 @@ export class MockLLMServer {
 
       // Route to appropriate handler
       if (pathname === '/v1/responses') {
-        this.handleOpenAI(res);
+        this.handleOpenAI(res, parsedBody);
       } else if (pathname === '/v1/messages') {
-        this.handleAnthropic(res);
+        this.handleAnthropic(res, parsedBody);
       } else if (pathname.startsWith('/v1beta/models/') && pathname.includes('generateContent')) {
-        this.handleGoogle(res);
+        this.handleGoogle(res, parsedBody);
       } else {
         res.writeHead(404, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Not found' }));
@@ -122,10 +122,39 @@ export class MockLLMServer {
     });
   }
 
-  private handleOpenAI(res: http.ServerResponse): void {
+  private handleOpenAI(res: http.ServerResponse, body?: any): void {
     console.log('[MOCK LLM] OpenAI request received');
 
+    const hasWebSearchTool =
+      Array.isArray(body?.tools) &&
+      body.tools.some(
+        (tool: unknown) =>
+          tool &&
+          typeof tool === 'object' &&
+          (tool as { type?: unknown }).type === 'web_search_preview'
+      );
+
     const sendResponse = () => {
+      if (hasWebSearchTool) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            id: `resp_${Date.now()}`,
+            output: [
+              {
+                type: 'web_search_call',
+                status: 'completed',
+              },
+              {
+                type: 'message',
+                content: [{ type: 'output_text', text: 'Mock web search payload' }],
+              },
+            ],
+          })
+        );
+        return;
+      }
+
       // Rate limit mode takes priority
       if (this.rateLimitEnabled) {
         res.writeHead(429, {
@@ -421,10 +450,40 @@ export class MockLLMServer {
     }
   }
 
-  private handleAnthropic(res: http.ServerResponse): void {
+  private handleAnthropic(res: http.ServerResponse, body?: any): void {
     console.log('[MOCK LLM] Anthropic request received');
+    const hasWebSearchTool =
+      Array.isArray(body?.tools) &&
+      body.tools.some(
+        (tool: unknown) =>
+          tool &&
+          typeof tool === 'object' &&
+          (tool as { type?: unknown }).type === 'web_search_20250305'
+      );
 
     const sendResponse = () => {
+      if (hasWebSearchTool) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            id: `msg_${Date.now()}`,
+            content: [
+              {
+                type: 'web_search_tool_result',
+                content: [
+                  {
+                    type: 'web_search_result',
+                    title: 'Mock Anthropic Search Result',
+                    url: 'https://news.example.com/anthropic',
+                  },
+                ],
+              },
+            ],
+          })
+        );
+        return;
+      }
+
       if (this.shouldSucceed) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(
@@ -449,10 +508,44 @@ export class MockLLMServer {
     }
   }
 
-  private handleGoogle(res: http.ServerResponse): void {
+  private handleGoogle(res: http.ServerResponse, body?: any): void {
     console.log('[MOCK LLM] Google request received');
+    const hasGoogleSearchTool =
+      Array.isArray(body?.tools) &&
+      body.tools.some(
+        (tool: unknown) =>
+          tool &&
+          typeof tool === 'object' &&
+          typeof (tool as { googleSearch?: unknown }).googleSearch === 'object'
+      );
 
     const sendResponse = () => {
+      if (hasGoogleSearchTool) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            candidates: [
+              {
+                content: {
+                  parts: [{ text: 'Mock Google Search Result' }],
+                },
+                groundingMetadata: {
+                  groundingChunks: [
+                    {
+                      web: {
+                        uri: 'https://news.example.com/google',
+                        title: 'Mock Google Search Result',
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          })
+        );
+        return;
+      }
+
       if (this.shouldSucceed) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(

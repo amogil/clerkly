@@ -157,7 +157,8 @@ describe('SandboxSessionManager.execute', () => {
         task_summary: 'Fetch URL through bridge',
         code: 'const response = await window.tools.http_request({ url: "https://example.com" }); console.log(response.status);',
       },
-      'openai'
+      'openai',
+      ''
     );
 
     const lastInstance = electronMocks.browserWindowInstances.at(-1);
@@ -189,7 +190,8 @@ describe('SandboxSessionManager.execute', () => {
 ]);
 console.log(first.status, second.status);`,
       },
-      'openai'
+      'openai',
+      ''
     );
 
     expect(electronMocks.sandboxBridgeInvokeTool).toHaveBeenCalledTimes(2);
@@ -216,7 +218,8 @@ console.log(first.status, second.status);`,
         task_summary: 'Print hello',
         code: "console.log('hello')",
       },
-      'openai'
+      'openai',
+      ''
     );
 
     expect(result.status).toBe('success');
@@ -237,7 +240,8 @@ console.log(first.status, second.status);`,
         task_summary: 'Try fetch',
         code: 'fetch("https://example.com")',
       },
-      'openai'
+      'openai',
+      ''
     );
 
     expect(result.status).toBe('error');
@@ -257,7 +261,8 @@ console.log(first.status, second.status);`,
         task_summary: 'Try global fetch',
         code: 'globalThis.fetch("https://example.com")',
       },
-      'openai'
+      'openai',
+      ''
     );
 
     expect(result.status).toBe('error');
@@ -277,7 +282,8 @@ console.log(first.status, second.status);`,
         task_summary: 'Create worker',
         code: 'new Worker("a.js")',
       },
-      'openai'
+      'openai',
+      ''
     );
 
     expect(result.status).toBe('error');
@@ -297,7 +303,8 @@ console.log(first.status, second.status);`,
         task_summary: 'Try process exit',
         code: 'process.exit(0)',
       },
-      'openai'
+      'openai',
+      ''
     );
 
     expect(result.status).toBe('error');
@@ -322,6 +329,7 @@ console.log(first.status, second.status);`,
         code: "console.log('x')",
       },
       'openai',
+      '',
       controller.signal
     );
 
@@ -338,7 +346,8 @@ console.log(first.status, second.status);`,
       'agent-1',
       'call-1',
       {} as Record<string, unknown>,
-      'openai'
+      'openai',
+      ''
     );
 
     expect(result.status).toBe('error');
@@ -358,7 +367,8 @@ console.log(first.status, second.status);`,
         task_summary: 'Write warnings',
         code: "console.warn('w'); console.error('e');",
       },
-      'openai'
+      'openai',
+      ''
     );
 
     expect(result.status).toBe('success');
@@ -379,7 +389,8 @@ console.log(first.status, second.status);`,
         task_summary: 'Call unknown tool',
         code: 'window.tools.someUnknownTool()',
       },
-      'openai'
+      'openai',
+      ''
     );
 
     expect(result.status).toBe('error');
@@ -396,12 +407,22 @@ console.log(first.status, second.status);`,
       manager as unknown as {
         executeInOneSandbox: (
           input: { taskSummary: string; code: string; timeoutMs: number },
-          context: { sessionId: string; signal: AbortSignal }
+          context: {
+            sessionId: string;
+            provider: 'openai' | 'google' | 'anthropic';
+            apiKey: string;
+            signal: AbortSignal;
+          }
         ) => Promise<{ status: string; error?: { code?: string } }>;
       }
     ).executeInOneSandbox(
       { taskSummary: 'Loop forever', code: 'while (true) {}', timeoutMs: 1 },
-      { sessionId: 'timeout-test', signal: new AbortController().signal }
+      {
+        sessionId: 'timeout-test',
+        provider: 'openai',
+        apiKey: '',
+        signal: new AbortController().signal,
+      }
     );
 
     expect(result.status).toBe('timeout');
@@ -421,7 +442,8 @@ console.log(first.status, second.status);`,
         task_summary: 'Allocate large string',
         code: "const huge = 'x'.repeat(2 ** 31)",
       },
-      'openai'
+      'openai',
+      ''
     );
 
     expect(result.status).toBe('error');
@@ -442,7 +464,8 @@ console.log(first.status, second.status);`,
         task_summary: 'Throw boom',
         code: 'throw new Error("boom")',
       },
-      'openai'
+      'openai',
+      ''
     );
 
     expect(result.status).toBe('error');
@@ -471,7 +494,8 @@ console.log(first.status, second.status);`,
         code: `const result = await tools.http_request({ url: "http://localhost:3000/blocked" });
 console.log(JSON.stringify(result));`,
       },
-      'openai'
+      'openai',
+      ''
     );
 
     expect(result.status).toBe('success');
@@ -502,6 +526,7 @@ console.log(JSON.stringify(result));`,
         code: 'await new Promise((resolve) => setTimeout(resolve, 30)); console.log("done")',
       },
       'openai',
+      '',
       controller.signal
     );
 
@@ -532,7 +557,8 @@ console.log(JSON.stringify(result));`,
         task_summary: 'Wait and log ok',
         code: 'await new Promise((resolve) => setTimeout(resolve, 250)); console.log("ok")',
       },
-      'openai'
+      'openai',
+      ''
     );
 
     expect(result.status).toBe('success');
@@ -562,7 +588,8 @@ console.log(JSON.stringify(result));`,
         code: 'await new Promise((resolve) => setTimeout(resolve, 250)); console.log("ok")',
         timeout_ms: 10000,
       },
-      'openai'
+      'openai',
+      ''
     );
 
     expect(result.status).toBe('error');

@@ -269,7 +269,7 @@ export class MainPipeline {
     const replyToMessageId = userMessageId;
     const options = {
       ...this.resolveOptions(provider),
-      tools: this.bindToolExecutors(builtPrompt.tools, provider, signal),
+      tools: this.bindToolExecutors(builtPrompt.tools, provider, apiKey, signal),
     };
     const llmProvider = this.createProvider(provider, apiKey);
 
@@ -2207,6 +2207,7 @@ export class MainPipeline {
   private bindToolExecutors(
     tools: NonNullable<ChatOptions['tools']>,
     provider: LLMProvider,
+    apiKey: string,
     fallbackSignal?: AbortSignal
   ): NonNullable<ChatOptions['tools']> {
     const runLimited = this.createConcurrencyLimiter(3);
@@ -2220,9 +2221,10 @@ export class MainPipeline {
             type ToolExecuteFn = (
               args: Record<string, unknown>,
               signal?: AbortSignal,
-              provider?: LLMProvider
+              provider?: LLMProvider,
+              apiKey?: string
             ) => Promise<unknown>;
-            return (toolDef.execute as ToolExecuteFn)(args, abortSignal, provider);
+            return (toolDef.execute as ToolExecuteFn)(args, abortSignal, provider, apiKey);
           }
 
           const [result] = await this.toolExecutor.executeBatch(

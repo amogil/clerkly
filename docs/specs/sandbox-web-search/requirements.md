@@ -38,6 +38,9 @@ Helper НЕ задаёт единый кросс-провайдерный search
 #### Функциональные Тесты
 
 - `tests/functional/code_exec.spec.ts` — "should allow sandbox code to call tools.web_search"
+- `tests/functional/code_exec-real.spec.ts` — "should execute tools.web_search against real OpenAI and return non-stub payload"
+- `tests/functional/code_exec-real.spec.ts` — "should execute tools.web_search against real Anthropic and return non-stub payload"
+- `tests/functional/code_exec-real.spec.ts` — "should execute tools.web_search against real Google and return non-stub payload"
 
 ### 2. Контракт helper-а
 
@@ -63,6 +66,9 @@ Helper НЕ задаёт единый кросс-провайдерный search
 
 - `tests/functional/code_exec.spec.ts` — "should pass provider-native web_search input through helper"
 - `tests/functional/code_exec.spec.ts` — "should return invalid_input for provider-native validation failure"
+- `tests/functional/code_exec-real.spec.ts` — "should execute tools.web_search against real OpenAI and return non-stub payload"
+- `tests/functional/code_exec-real.spec.ts` — "should execute tools.web_search against real Anthropic and return non-stub payload"
+- `tests/functional/code_exec-real.spec.ts` — "should execute tools.web_search against real Google and return non-stub payload"
 
 ### 3. Выходной контракт
 
@@ -87,6 +93,9 @@ Helper НЕ задаёт единый кросс-провайдерный search
 #### Функциональные Тесты
 
 - `tests/functional/code_exec.spec.ts` — "should return provider-native web_search output for active provider"
+- `tests/functional/code_exec-real.spec.ts` — "should execute tools.web_search against real OpenAI and return non-stub payload"
+- `tests/functional/code_exec-real.spec.ts` — "should execute tools.web_search against real Anthropic and return non-stub payload"
+- `tests/functional/code_exec-real.spec.ts` — "should execute tools.web_search against real Google and return non-stub payload"
 
 ### 4. Ошибки и capability fallback
 
@@ -159,3 +168,6 @@ Helper НЕ задаёт единый кросс-провайдерный search
 - `tests/functional/code_exec.spec.ts` — "should pass provider-native web_search input through helper"
 - `tests/functional/code_exec.spec.ts` — "should return provider-native web_search output for active provider"
 - `tests/functional/code_exec.spec.ts` — "should not expose tools.web_search when active provider lacks web search capability"
+- `tests/functional/code_exec-real.spec.ts` — "should execute tools.web_search against real OpenAI and return non-stub payload"
+- `tests/functional/code_exec-real.spec.ts` — "should execute tools.web_search against real Anthropic and return non-stub payload"
+- `tests/functional/code_exec-real.spec.ts` — "should execute tools.web_search against real Google and return non-stub payload"

@@ -2306,6 +2306,7 @@ describe('MainPipeline.run()', () => {
         bindToolExecutors: (
           tools: NonNullable<ChatOptions['tools']>,
           provider?: 'openai' | 'google' | 'anthropic',
+          apiKey?: string,
           fallbackSignal?: AbortSignal
         ) => NonNullable<ChatOptions['tools']>;
       }
@@ -2325,7 +2326,7 @@ describe('MainPipeline.run()', () => {
 
     const output = await bound.execute?.({ x: 1 });
     expect(output).toEqual({ ok: true });
-    expect(toolExecute).toHaveBeenCalledWith({ x: 1 }, undefined, 'openai');
+    expect(toolExecute).toHaveBeenCalledWith({ x: 1 }, undefined, 'openai', undefined);
   });
 
   it('falls back to ToolRunner execution for tools without execute', async () => {
@@ -3570,10 +3571,12 @@ describe('MainPipeline.run()', () => {
             execute?: (
               args: Record<string, unknown>,
               signal?: AbortSignal,
-              provider?: 'openai' | 'google' | 'anthropic'
+              provider?: 'openai' | 'google' | 'anthropic',
+              apiKey?: string
             ) => Promise<unknown>;
           }>,
           provider?: 'openai' | 'google' | 'anthropic',
+          apiKey?: string,
           fallbackSignal?: AbortSignal
         ) => Array<{
           execute: (args: Record<string, unknown>, opts?: unknown) => Promise<unknown>;
@@ -3590,10 +3593,11 @@ describe('MainPipeline.run()', () => {
     const boundWithFallbackSignal = bindToolExecutors(
       [{ name: 'code_exec', execute: executeSpy }],
       'openai',
+      'sk-test-key',
       signal
     );
     await boundWithFallbackSignal[0].execute({});
-    expect(executeSpy).toHaveBeenCalledWith({}, signal, 'openai');
+    expect(executeSpy).toHaveBeenCalledWith({}, signal, 'openai', 'sk-test-key');
 
     const limiter = createLimiter(1);
     const order: string[] = [];

@@ -124,6 +124,11 @@ Helper не вводит общий обязательный provider-agnostic s
 - `tests/functional/code_exec.spec.ts` — provider-native validation failure.
 - `tests/functional/code_exec.spec.ts` — отсутствие `tools.web_search` при неподдерживаемом capability.
 - `tests/functional/code_exec.spec.ts` — корректность persisted lifecycle в рамках `tool_call(code_exec)`.
+- `tests/functional/code_exec.spec.ts` — mock-provider e2e для Anthropic web_search adapter path.
+- `tests/functional/code_exec.spec.ts` — mock-provider e2e для Google web_search adapter path.
+- `tests/functional/code_exec-real.spec.ts` — e2e путь с реальным OpenAI API key и реальным ответом provider web search (без stub payload).
+- `tests/functional/code_exec-real.spec.ts` — e2e путь с реальным Anthropic API key и реальным ответом provider web search (без stub payload).
+- `tests/functional/code_exec-real.spec.ts` — e2e путь с реальным Google API key и реальным ответом provider web search (без stub payload).
 
 ### Покрытие требований
 

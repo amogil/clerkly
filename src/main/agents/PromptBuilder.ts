@@ -517,7 +517,8 @@ export class CodeExecFeature implements AgentFeature {
         execute: async (
           args: Record<string, unknown>,
           signal?: AbortSignal,
-          provider?: LLMProvider
+          provider?: LLMProvider,
+          apiKey?: string
         ) => {
           const validated = validateCodeExecInput(args);
           if (!validated.ok) {
@@ -530,6 +531,7 @@ export class CodeExecFeature implements AgentFeature {
             toolCallId,
             args,
             provider ?? 'openai',
+            apiKey ?? '',
             signal
           );
           return output;

@@ -59,7 +59,8 @@ export interface LLMTool {
   execute?: (
     args: Record<string, unknown>,
     signal?: AbortSignal,
-    provider?: LLMProvider
+    provider?: LLMProvider,
+    apiKey?: string
   ) => Promise<unknown> | unknown;
 }
 

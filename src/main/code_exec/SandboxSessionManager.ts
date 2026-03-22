@@ -96,6 +96,7 @@ export class SandboxSessionManager {
     callId: string,
     args: Record<string, unknown>,
     provider: LLMProvider,
+    apiKey: string,
     signal?: AbortSignal
   ): Promise<CodeExecToolOutput> {
     const validated = validateCodeExecInput(args);
@@ -123,6 +124,7 @@ export class SandboxSessionManager {
         {
           sessionId,
           provider,
+          apiKey,
           signal: cancelController.signal,
         }
       );
@@ -211,7 +213,7 @@ export class SandboxSessionManager {
 
   private async executeInOneSandbox(
     input: { taskSummary: string; code: string; timeoutMs: number },
-    context: { sessionId: string; provider: LLMProvider; signal: AbortSignal }
+    context: { sessionId: string; provider: LLMProvider; apiKey: string; signal: AbortSignal }
   ): Promise<CodeExecToolOutput> {
     const stdoutChunks: string[] = [];
     const stderrChunks: string[] = [];
@@ -245,7 +247,7 @@ export class SandboxSessionManager {
 
     // Requirements: sandbox-web-search.1.6
     if (this.isWebSearchSupported(context.provider)) {
-      const webSearchHandler = new SandboxWebSearchHandler(context.provider);
+      const webSearchHandler = new SandboxWebSearchHandler(context.provider, context.apiKey);
       invokers.set('web_search', async (toolInput: unknown) => webSearchHandler.execute(toolInput));
     }
 
