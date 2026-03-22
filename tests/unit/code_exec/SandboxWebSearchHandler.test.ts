@@ -205,6 +205,22 @@ describe('SandboxWebSearchHandler', () => {
       });
     });
 
+    it('should return invalid_input for whitespace-only query string', async () => {
+      /* Preconditions: Anthropic handler initialized
+         Action: call execute with whitespace-only query
+         Assertions: returns invalid_input error and does not call provider
+         Requirements: sandbox-web-search.2.4, sandbox-web-search.2.6 */
+      const handler = new SandboxWebSearchHandler('anthropic');
+      const result = await handler.execute({ query: '   ' });
+      expect(result).toMatchObject({
+        error: {
+          code: 'invalid_input',
+          message: expect.stringContaining('non-empty string'),
+        },
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
     it('should return provider_error on Anthropic non-OK response without message', async () => {
       /* Preconditions: Anthropic handler initialized with api key
          Action: execute web_search when provider returns non-OK without error.message

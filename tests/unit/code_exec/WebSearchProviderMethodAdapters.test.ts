@@ -49,6 +49,22 @@ describe('WebSearchProviderMethodAdapters', () => {
     });
   });
 
+  /* Preconditions: Anthropic adapter is initialized
+     Action: validate payload with whitespace-only "query"
+     Assertions: adapter returns invalid_input validation error
+     Requirements: sandbox-web-search.2.4, sandbox-web-search.2.6 */
+  it('validates Anthropic whitespace-only query as invalid_input', () => {
+    const adapter = getAdapter('anthropic');
+    const result = adapter.validate({ query: '   ' });
+    expect(result).toMatchObject({
+      success: false,
+      error: {
+        code: 'invalid_input',
+        message: expect.stringContaining('non-empty string'),
+      },
+    });
+  });
+
   /* Preconditions: Google adapter is initialized with endpoint containing query string
      Action: execute validated input
      Assertions: request URL appends key using "&" and returns provider-native payload list

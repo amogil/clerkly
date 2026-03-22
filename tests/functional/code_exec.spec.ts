@@ -1015,6 +1015,27 @@ console.log(JSON.stringify(result));`,
   });
 
   /* Preconditions: authenticated app with mock LLM server for provider endpoints
+     Action: execute sandbox web_search helper for Anthropic with whitespace-only query via test IPC bridge
+     Assertions: helper returns structured invalid_input and avoids provider runtime path
+     Exception Rationale (testing.3.13): this test validates provider-native validation contract branch in sandbox web_search
+     adapter path that is hard to make deterministic via external provider availability.
+     Requirements: sandbox-web-search.2.4, sandbox-web-search.2.6, sandbox-web-search.4.1 */
+  test('should return invalid_input for Anthropic whitespace-only query in web_search helper', async () => {
+    await launchWithMockLLM();
+
+    const payload = await invokeTestWebSearch('anthropic', {
+      query: '   ',
+    });
+
+    expect(payload).toMatchObject({
+      error: {
+        code: 'invalid_input',
+      },
+    });
+    await expectNoToastError(window);
+  });
+
+  /* Preconditions: authenticated app with mock LLM server for provider endpoints
      Action: execute sandbox web_search helper for Google via test IPC bridge
      Assertions: returns provider-native Google payload from mock endpoint and no runtime crash
      Exception Rationale (testing.3.13): this test validates provider adapter/runtime integration for sandbox web_search

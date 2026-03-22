@@ -85,6 +85,14 @@ Helper не вводит общий обязательный provider-agnostic s
 - **Gemini**: используется нативный google_search/grounding контракт Gemini.
 - **Fallback**: при отсутствии web search capability у активного провайдера helper `web_search` не публикуется в доступный sandbox tool registry.
 
+### Runtime Capability Gating
+
+- По умолчанию capability `web_search` включён для `openai`, `anthropic`, `google`.
+- Runtime-gating поддерживает env override `CLERKLY_DISABLE_WEB_SEARCH_PROVIDERS`.
+- Формат override: CSV-список provider ids (например: `openai,google`).
+- Scope override: применяется только к публикации/доступности sandbox helper-а `web_search` для текущего процесса runtime.
+- Если провайдер указан в override, `ProviderMethodRegistry` считает method недоступным, helper не регистрируется в sandbox tools, и вызов `tools.web_search` возвращает policy/capability denial path.
+
 ## Поток выполнения
 
 1. Модель вызывает `code_exec`.

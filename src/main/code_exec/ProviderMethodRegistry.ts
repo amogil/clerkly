@@ -19,6 +19,7 @@ const BASE_PROVIDER_METHOD_CAPABILITIES: ProviderMethodCapabilityMatrix = {
 
 const ALL_PROVIDER_METHOD_ADAPTERS = createWebSearchProviderMethodAdapters();
 
+// Requirements: sandbox-web-search.6.1
 function makeRegistryKey(provider: LLMProvider, method: ProviderMethod): string {
   return `${provider}:${method}`;
 }

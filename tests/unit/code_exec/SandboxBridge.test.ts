@@ -45,6 +45,15 @@ describe('validateSandboxToolPolicy', () => {
     const result = validateSandboxToolPolicy('http_request');
     expect(result.ok).toBe(true);
   });
+
+  /* Preconditions: web_search is registered as an allowlisted sandbox helper
+     Action: validate the web_search tool name
+     Assertions: policy allows the helper
+     Requirements: code_exec.2.8, sandbox-web-search.1.1 */
+  it('allows web_search sandbox helper', () => {
+    const result = validateSandboxToolPolicy('web_search');
+    expect(result.ok).toBe(true);
+  });
 });
 
 describe('createSandboxToolsProxy', () => {

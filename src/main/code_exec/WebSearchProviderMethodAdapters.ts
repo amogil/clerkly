@@ -138,12 +138,12 @@ class AnthropicWebSearchAdapter implements ProviderMethodAdapter<AnthropicWebSea
       };
     }
     const raw = input as { query?: unknown };
-    if (typeof raw.query !== 'string') {
+    if (typeof raw.query !== 'string' || raw.query.trim().length === 0) {
       return {
         success: false,
         error: {
           code: 'invalid_input',
-          message: 'Anthropic web_search requires "query" as a string.',
+          message: 'Anthropic web_search requires "query" as a non-empty string.',
         },
       };
     }
@@ -160,9 +160,6 @@ class AnthropicWebSearchAdapter implements ProviderMethodAdapter<AnthropicWebSea
     }
     if (!context.apiKey) {
       throw new Error('Anthropic API key is not set for sandbox web_search.');
-    }
-    if (input.query.trim().length === 0) {
-      throw new Error('Anthropic web_search requires "query" as a non-empty string.');
     }
 
     const env = process.env.NODE_ENV === 'test' ? 'test' : 'prod';
