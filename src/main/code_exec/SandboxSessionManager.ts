@@ -24,6 +24,10 @@ import {
 } from './SandboxBridge';
 import { SandboxHttpRequestHandler } from './SandboxHttpRequestHandler';
 import { SandboxWebSearchHandler } from './SandboxWebSearchHandler';
+import {
+  assertProviderMethodRegistryConsistency,
+  isProviderMethodSupported,
+} from './ProviderMethodRegistry';
 import { LLMProvider } from '../../types';
 
 const POLICY_DENIED_NETWORK_MESSAGE =
@@ -74,6 +78,7 @@ const TEST_HTTP_REQUEST_LOOPBACK_ALLOWLIST = ['127.0.0.1'];
 // Requirements: code_exec.1.5, code_exec.2.5-2.6, code_exec.2.10
 export class SandboxSessionManager {
   private static isSandboxToolHandlerRegistered = false;
+  private static isProviderMethodRegistryValidated = false;
   private logger = Logger.create('SandboxSessionManager');
   private activeSessions = new Map<string, SessionHandle>();
   private activeSandboxToolInvokers = new Map<string, Map<string, SandboxToolInvoker>>();
@@ -87,6 +92,10 @@ export class SandboxSessionManager {
         : new Set<string>()
     )
   ) {
+    if (!SandboxSessionManager.isProviderMethodRegistryValidated) {
+      assertProviderMethodRegistryConsistency();
+      SandboxSessionManager.isProviderMethodRegistryValidated = true;
+    }
     this.registerSandboxToolHandler();
   }
 
@@ -796,19 +805,7 @@ export class SandboxSessionManager {
 
   // Requirements: sandbox-web-search.1.6
   private isWebSearchSupported(provider: LLMProvider): boolean {
-    const disabledProvidersRaw = process.env.CLERKLY_DISABLE_WEB_SEARCH_PROVIDERS ?? '';
-    const disabledProviders = new Set(
-      disabledProvidersRaw
-        .split(',')
-        .map((value) => value.trim())
-        .filter((value): value is LLMProvider => {
-          return value === 'openai' || value === 'google' || value === 'anthropic';
-        })
-    );
-    if (disabledProviders.has(provider)) {
-      return false;
-    }
-    return provider === 'openai' || provider === 'google' || provider === 'anthropic';
+    return isProviderMethodSupported(provider, 'web_search');
   }
 }
 

@@ -14,11 +14,16 @@ Helper не является отдельным инструментом main LL
   - проверяет доступность helper-а `web_search` через централизованный allowlist.
 - **"SandboxWebSearchHandler"**
   - main-process handler helper-а;
-  - определяет активного провайдера;
-  - вызывает provider-specific web search путь;
+  - получает adapter из provider-method registry;
+  - валидирует вход через adapter contract;
+  - выполняет вызов через adapter execute;
   - возвращает provider-native output/error.
+- **"ProviderMethodRegistry"**
+  - хранит capability matrix и adapter registrations;
+  - выполняет lookup по `(provider, method)` и runtime capability gating;
+  - выполняет fail-fast consistency check capability ↔ adapter registration.
 - **"Provider Adapter Layer"**
-  - содержит отдельные адаптеры вызова для OpenAI / Anthropic / Gemini;
+  - содержит provider-method adapters для OpenAI / Anthropic / Gemini;
   - не унифицирует нативный формат результата между провайдерами.
 - **"PromptBuilder" / code_exec prompt section**
   - сообщает модели, что `tools.web_search(...)` использует контракт активного провайдера;
@@ -85,12 +90,26 @@ Helper не вводит общий обязательный provider-agnostic s
 1. Модель вызывает `code_exec`.
 2. Sandbox-код внутри `code_exec` выполняет `await tools.web_search(input)`.
 3. `SandboxBridge` проверяет allowlist и делегирует вызов в `SandboxWebSearchHandler`.
-4. Handler определяет активного провайдера.
+4. Handler выполняет lookup adapter-а в `ProviderMethodRegistry` по `(active provider, "web_search")`.
 5. Если capability недоступна, helper не регистрируется в sandbox registry для этого запуска.
-6. Handler валидирует input по provider-native правилам.
-7. Handler вызывает provider-specific web search adapter.
+6. Adapter валидирует input по provider-native правилам.
+7. Adapter вызывает provider-specific web search API.
 8. Handler возвращает provider-native `output` (или structured `error`).
 9. `code_exec` продолжает выполнение и завершает стандартный lifecycle.
+
+## Расширяемость Provider Methods
+
+### Provider Method Onboarding Checklist
+
+1. Добавить новый method в тип `ProviderMethod`.
+2. Обновить capability declaration (`provider -> method -> supported`).
+3. Реализовать provider adapters с контрактом `validate` + `execute`.
+4. Зарегистрировать adapters в `ProviderMethodRegistry`.
+5. Убедиться, что fail-fast consistency check проходит на старте runtime.
+6. Добавить/обновить unit tests:
+   - registry consistency и lookup;
+   - adapter contract tests (validation + execute/error mapping).
+7. Добавить/обновить functional tests для runtime routing через registry (mock path) и, при необходимости, real-provider path.
 
 ## Persisted поведение
 
@@ -115,7 +134,7 @@ Helper не вводит общий обязательный provider-agnostic s
 
 - `tests/unit/code_exec/SandboxBridge.test.ts` — allowlist и доступность `web_search` helper.
 - `tests/unit/code_exec/SandboxWebSearchHandler.test.ts` — provider routing, pass-through input/output, structured errors.
-- `tests/unit/code_exec/ProviderWebSearchAdapters.test.ts` — provider-specific invocation и mapping ошибок.
+- `tests/unit/code_exec/WebSearchProviderMethodAdapters.test.ts` — provider-specific invocation и mapping ошибок.
 - `tests/unit/agents/PromptBuilder.test.ts` — описание provider-native контракта helper-а в prompt-инструкции `code_exec`.
 
 ### Функциональные тесты

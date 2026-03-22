@@ -4,7 +4,7 @@
 
 Реализовать helper `web_search` как sandbox capability внутри `code_exec` (через `tools.web_search(...)`) с provider-native контрактом активного LLM-провайдера.
 
-**Current status:** Phase 3 - Testing & Validation
+**Current status:** Phase 4 - Provider Method Extensibility (implementation complete, final functional runs pending)
 
 ---
 
@@ -36,6 +36,11 @@
 - ✅ Прогнан real-provider functional тест `tests/functional/code_exec-real.spec.ts` (1/1 passed).
 - ✅ Добавлены mock-provider functional сценарии для Anthropic и Google в `tests/functional/code_exec.spec.ts`.
 - ✅ Прогнан точечный functional-прогон `tests/functional/code_exec.spec.ts --grep "mocked provider endpoint"` (2/2).
+- ✅ Внедрена расширяемая архитектура provider-method adapters (`ProviderMethodTypes`, `WebSearchProviderMethodAdapters`, `ProviderMethodRegistry`) с lookup по `(provider, method)`.
+- ✅ `SandboxWebSearchHandler` переведён на registry routing вместо provider-specific методов.
+- ✅ Добавлена fail-fast проверка consistency capability ↔ adapter registration при инициализации runtime.
+- ✅ Зафиксирован onboarding checklist для нового provider method в `design.md`.
+- ✅ Добавлены unit-тесты реестра и контрактные тесты provider adapters.
 
 ### In Progress
 - 🔄 Полный запуск всего функционального набора (`npm run test:functional`) остаётся отдельным шагом.
@@ -74,7 +79,7 @@
   - [x] Добавить real-provider e2e сценарии для Anthropic и Google в `tests/functional/code_exec-real.spec.ts` (key required, проверка non-stub payload).
   - [x] Добавить mock-provider e2e сценарии для Anthropic и Google в `tests/functional/code_exec.spec.ts` (без внешнего real API).
   - [x] Прогнать `tests/functional/code_exec.spec.ts --grep "mocked provider endpoint"` и подтвердить прохождение новых mock-кейсов.
-  - [ ] Прогнать `tests/functional/code_exec-real.spec.ts` для Anthropic и Google в real-provider режиме (запуск заблокирован sandbox-политикой без эскалации).
+  - [ ] Прогнать `tests/functional/code_exec-real.spec.ts` для Anthropic и Google в real-provider режиме (требуются `CLERKLY_ANTHROPIC_API_KEY` и `CLERKLY_GOOGLE_API_KEY` в окружении запуска).
   - [ ] Прогнать полный functional-набор `npm run test:functional` (не выполнялось в рамках текущего запроса).
 
 - [x] **Финальная проверка**
@@ -82,13 +87,13 @@
 
 #### Phase 4: Provider Method Extensibility
 
-- [ ] **Ввести расширяемую архитектуру provider-method adapters**
-  - [ ] Добавить типы `ProviderMethod` и декларативные provider capabilities (`web_search`, будущие методы).
-  - [ ] Ввести интерфейс адаптера метода провайдера (`validate` + `execute`).
-  - [ ] Реализовать `ProviderMethodRegistry` (lookup по `(provider, method)`).
-  - [ ] Перевести `SandboxWebSearchHandler` на использование реестра вместо provider-specific методов внутри handler-а.
-  - [ ] Добавить fail-fast проверку соответствия capability ↔ adapter registration при инициализации.
-- [ ] **Обеспечить понятный путь подключения нового провайдера/метода**
-  - [ ] Зафиксировать чеклист в design/spec: добавить provider, capability, adapter, registry wiring, тесты.
-  - [ ] Добавить unit-тесты на реестр и contract тесты адаптеров.
-  - [ ] Добавить/обновить functional mock-сценарии для проверки реестровой маршрутизации.
+- [x] **Ввести расширяемую архитектуру provider-method adapters**
+  - [x] Добавить типы `ProviderMethod` и декларативные provider capabilities (`web_search`, будущие методы).
+  - [x] Ввести интерфейс адаптера метода провайдера (`validate` + `execute`).
+  - [x] Реализовать `ProviderMethodRegistry` (lookup по `(provider, method)`).
+  - [x] Перевести `SandboxWebSearchHandler` на использование реестра вместо provider-specific методов внутри handler-а.
+  - [x] Добавить fail-fast проверку соответствия capability ↔ adapter registration при инициализации.
+- [x] **Обеспечить понятный путь подключения нового провайдера/метода**
+  - [x] Зафиксировать чеклист в design/spec: добавить provider, capability, adapter, registry wiring, тесты.
+  - [x] Добавить unit-тесты на реестр и contract тесты адаптеров.
+  - [x] Добавить/обновить functional mock-сценарии для проверки реестровой маршрутизации.
