@@ -151,39 +151,6 @@ describe('WebSearchProviderMethodAdapters', () => {
     });
   });
 
-  /* Preconditions: OpenAI and Google adapters are initialized
-     Action: execute payload that requests provider error simulation
-     Assertions: adapters throw simulated provider failure before network call
-     Requirements: sandbox-web-search.4.1 */
-  it('throws simulated provider error for OpenAI and Google adapters', async () => {
-    const openai = getAdapter('openai');
-    const google = getAdapter('google');
-    const openaiValidation = openai.validate({ queries: ['__provider_error__'] });
-    const googleValidation = google.validate({ queries: ['__provider_error__'] });
-
-    expect(openaiValidation.success).toBe(true);
-    expect(googleValidation.success).toBe(true);
-    if (!openaiValidation.success || !googleValidation.success) {
-      throw new Error('Validation failed unexpectedly');
-    }
-
-    await expect(
-      openai.execute(openaiValidation.input, {
-        provider: 'openai',
-        apiKey: 'sk-test',
-        timeoutMs: 30_000,
-      })
-    ).rejects.toThrow('Simulated provider web_search failure.');
-    await expect(
-      google.execute(googleValidation.input, {
-        provider: 'google',
-        apiKey: 'google-key',
-        timeoutMs: 30_000,
-      })
-    ).rejects.toThrow('Simulated provider web_search failure.');
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
   /* Preconditions: OpenAI adapter is initialized and provider request fails with timeout-like AbortError
      Action: execute validated input
      Assertions: adapter throws normalized TimeoutError with provider diagnostic fields

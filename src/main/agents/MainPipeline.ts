@@ -3,7 +3,11 @@
 // Orchestrates the LLM request/response cycle for a single agent message
 
 import { MessageManager } from './MessageManager';
-import { PromptBuilder, buildAutoTitleMetadataContractPrompt } from './PromptBuilder';
+import {
+  PromptBuilder,
+  buildAutoTitleMetadataContractPrompt,
+  CodeExecFeature,
+} from './PromptBuilder';
 import { AIAgentSettingsManager } from '../AIAgentSettingsManager';
 import { LLMProviderFactory } from '../llm/LLMProviderFactory';
 import { MainEventBus } from '../events/MainEventBus';
@@ -265,11 +269,12 @@ export class MainPipeline {
       this.promptBuilder.buildMessages(messages, provider),
       autoTitleInstruction
     );
+    this.injectFeatureCredentials(provider, apiKey);
     const builtPrompt = this.promptBuilder.build(provider);
     const replyToMessageId = userMessageId;
     const options = {
       ...this.resolveOptions(provider),
-      tools: this.bindToolExecutors(builtPrompt.tools, provider, apiKey, signal),
+      tools: this.bindToolExecutors(builtPrompt.tools, signal),
     };
     const llmProvider = this.createProvider(provider, apiKey);
 
@@ -2191,6 +2196,21 @@ export class MainPipeline {
   }
 
   /**
+   * Inject runtime credentials into features that need them (e.g. CodeExecFeature).
+   * Requirements: sandbox-web-search.1, sandbox-web-search.2
+   */
+  private injectFeatureCredentials(provider: LLMProvider, apiKey: string): void {
+    const features = (this.promptBuilder as unknown as { features: Array<{ name: string }> })
+      .features;
+    if (!features) return;
+    for (const feature of features) {
+      if (feature instanceof CodeExecFeature) {
+        feature.setCredentials(provider, apiKey);
+      }
+    }
+  }
+
+  /**
    * Resolve model and reasoning effort for a given provider.
    * Uses test config when NODE_ENV=test, prod config otherwise.
    * Requirements: llm-integration.5.1, llm-integration.5.8
@@ -2206,8 +2226,6 @@ export class MainPipeline {
    */
   private bindToolExecutors(
     tools: NonNullable<ChatOptions['tools']>,
-    provider: LLMProvider,
-    apiKey: string,
     fallbackSignal?: AbortSignal
   ): NonNullable<ChatOptions['tools']> {
     const runLimited = this.createConcurrencyLimiter(3);
@@ -2218,13 +2236,7 @@ export class MainPipeline {
           const abortSignal = this.extractToolAbortSignal(executeOptions) ?? fallbackSignal;
           const toolCallId = this.extractToolCallId(executeOptions);
           if (toolDef.execute) {
-            type ToolExecuteFn = (
-              args: Record<string, unknown>,
-              signal?: AbortSignal,
-              provider?: LLMProvider,
-              apiKey?: string
-            ) => Promise<unknown>;
-            return (toolDef.execute as ToolExecuteFn)(args, abortSignal, provider, apiKey);
+            return toolDef.execute(args, abortSignal);
           }
 
           const [result] = await this.toolExecutor.executeBatch(

@@ -893,30 +893,4 @@ describe('SandboxSessionManager private helpers', () => {
     expect(onHardLimitExceeded).not.toHaveBeenCalled();
     stop();
   });
-
-  /* Preconditions: provider capability toggle env disables openai web_search
-     Action: check runtime capability for openai and google providers
-     Assertions: openai is disabled, google remains enabled
-     Requirements: sandbox-web-search.1.6 */
-  it('supports env-based web_search capability disabling per provider', () => {
-    const previous = process.env.CLERKLY_DISABLE_WEB_SEARCH_PROVIDERS;
-    process.env.CLERKLY_DISABLE_WEB_SEARCH_PROVIDERS = 'openai';
-    try {
-      const manager = new SandboxSessionManager();
-      const isWebSearchSupported = (
-        manager as unknown as {
-          isWebSearchSupported: (provider: 'openai' | 'google' | 'anthropic') => boolean;
-        }
-      ).isWebSearchSupported.bind(manager);
-
-      expect(isWebSearchSupported('openai')).toBe(false);
-      expect(isWebSearchSupported('google')).toBe(true);
-    } finally {
-      if (previous === undefined) {
-        delete process.env.CLERKLY_DISABLE_WEB_SEARCH_PROVIDERS;
-      } else {
-        process.env.CLERKLY_DISABLE_WEB_SEARCH_PROVIDERS = previous;
-      }
-    }
-  });
 });

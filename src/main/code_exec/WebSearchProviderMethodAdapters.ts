@@ -27,28 +27,8 @@ interface ProviderFetchDebugContext {
   requestLabel: string;
 }
 
-// Requirements: sandbox-web-search.4.1, sandbox-web-search.4.4
-function shouldSimulateProviderError(input: unknown): boolean {
-  if (!input || typeof input !== 'object') {
-    return false;
-  }
-  const raw = input as { queries?: unknown; query?: unknown };
-  if (Array.isArray(raw.queries) && raw.queries.some((query) => query === '__provider_error__')) {
-    return true;
-  }
-  return raw.query === '__provider_error__';
-}
-
 // Requirements: sandbox-web-search.4.1
-function extractProviderMessageWithFallback(
-  errorData: unknown,
-  fallback: string,
-  path: 'openai' | 'anthropic' | 'google'
-): string {
-  if (path === 'google') {
-    const message = (errorData as { error?: { message?: unknown } }).error?.message;
-    return typeof message === 'string' ? message : fallback;
-  }
+function extractProviderMessageWithFallback(errorData: unknown, fallback: string): string {
   const message = (errorData as { error?: { message?: unknown } }).error?.message;
   return typeof message === 'string' ? message : fallback;
 }
@@ -150,9 +130,6 @@ class OpenAIWebSearchAdapter implements ProviderMethodAdapter<OpenAIWebSearchInp
     input: OpenAIWebSearchInput,
     context: ProviderMethodExecutionContext
   ): Promise<unknown> {
-    if (shouldSimulateProviderError(input)) {
-      throw new Error('Simulated provider web_search failure.');
-    }
     if (!context.apiKey) {
       throw new Error('OpenAI API key is not set for sandbox web_search.');
     }
@@ -189,7 +166,7 @@ class OpenAIWebSearchAdapter implements ProviderMethodAdapter<OpenAIWebSearchInp
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         const fallback = `OpenAI web_search request failed with status ${response.status}.`;
-        throw new Error(extractProviderMessageWithFallback(errorData, fallback, 'openai'));
+        throw new Error(extractProviderMessageWithFallback(errorData, fallback));
       }
 
       results.push({
@@ -235,9 +212,6 @@ class AnthropicWebSearchAdapter implements ProviderMethodAdapter<AnthropicWebSea
     input: AnthropicWebSearchInput,
     context: ProviderMethodExecutionContext
   ): Promise<unknown> {
-    if (shouldSimulateProviderError(input)) {
-      throw new Error('Simulated provider web_search failure.');
-    }
     if (!context.apiKey) {
       throw new Error('Anthropic API key is not set for sandbox web_search.');
     }
@@ -273,7 +247,7 @@ class AnthropicWebSearchAdapter implements ProviderMethodAdapter<AnthropicWebSea
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       const fallback = `Anthropic web_search request failed with status ${response.status}.`;
-      throw new Error(extractProviderMessageWithFallback(errorData, fallback, 'anthropic'));
+      throw new Error(extractProviderMessageWithFallback(errorData, fallback));
     }
 
     return await response.json();
@@ -313,9 +287,6 @@ class GoogleWebSearchAdapter implements ProviderMethodAdapter<GoogleWebSearchInp
     input: GoogleWebSearchInput,
     context: ProviderMethodExecutionContext
   ): Promise<unknown> {
-    if (shouldSimulateProviderError(input)) {
-      throw new Error('Simulated provider web_search failure.');
-    }
     if (!context.apiKey) {
       throw new Error('Google API key is not set for sandbox web_search.');
     }
@@ -354,7 +325,7 @@ class GoogleWebSearchAdapter implements ProviderMethodAdapter<GoogleWebSearchInp
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         const fallback = `Google web_search request failed with status ${response.status}.`;
-        throw new Error(extractProviderMessageWithFallback(errorData, fallback, 'google'));
+        throw new Error(extractProviderMessageWithFallback(errorData, fallback));
       }
 
       results.push({

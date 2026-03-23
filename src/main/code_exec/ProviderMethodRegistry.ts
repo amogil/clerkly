@@ -32,29 +32,12 @@ const PROVIDER_METHOD_ADAPTERS = new Map<string, ProviderMethodAdapter>(
 );
 
 // Requirements: sandbox-web-search.1.6
-function getEnvDisabledWebSearchProviders(): Set<LLMProvider> {
-  const disabledProvidersRaw = process.env.CLERKLY_DISABLE_WEB_SEARCH_PROVIDERS ?? '';
-  return new Set(
-    disabledProvidersRaw
-      .split(',')
-      .map((value) => value.trim())
-      .filter((value): value is LLMProvider => {
-        return value === 'openai' || value === 'google' || value === 'anthropic';
-      })
-  );
-}
-
-// Requirements: sandbox-web-search.1.6
 export function isProviderMethodSupported(provider: LLMProvider, method: ProviderMethod): boolean {
   if (!(provider in BASE_PROVIDER_METHOD_CAPABILITIES)) {
     return false;
   }
   if (!BASE_PROVIDER_METHOD_CAPABILITIES[provider][method]) {
     return false;
-  }
-  if (method === 'web_search') {
-    const disabledProviders = getEnvDisabledWebSearchProviders();
-    return !disabledProviders.has(provider);
   }
   return true;
 }

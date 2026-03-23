@@ -150,7 +150,7 @@ function buildHttpRequestPromptSection(): string {
 export interface AgentFeature {
   name: string;
   getSystemPromptSection(provider?: LLMProvider): string;
-  getTools(): LLMTool[];
+  getTools(provider?: LLMProvider): LLMTool[];
 }
 
 /**
@@ -206,7 +206,7 @@ export class PromptBuilder {
   build(provider?: LLMProvider): BuiltPrompt {
     return {
       systemPrompt: this.buildSystemPrompt(provider),
-      tools: this.collectTools(),
+      tools: this.collectTools(provider),
     };
   }
 
@@ -230,8 +230,8 @@ export class PromptBuilder {
     return normalizePromptWhitespace(parts.join('\n\n'));
   }
 
-  private collectTools(): LLMTool[] {
-    return this.features.flatMap((f) => f.getTools());
+  private collectTools(provider?: LLMProvider): LLMTool[] {
+    return this.features.flatMap((f) => f.getTools(provider));
   }
 
   private buildHistoryMessages(messages: Message[]): ChatMessage[] {
@@ -471,8 +471,16 @@ export class FinalAnswerFeature implements AgentFeature {
  */
 export class CodeExecFeature implements AgentFeature {
   name = 'code_exec';
+  private resolvedProvider: LLMProvider = 'openai';
+  private resolvedApiKey: string = '';
 
   constructor(private readonly sandboxSessionManager: SandboxSessionManager) {}
+
+  // Requirements: sandbox-web-search.1, sandbox-web-search.2
+  setCredentials(provider: LLMProvider, apiKey: string): void {
+    this.resolvedProvider = provider;
+    this.resolvedApiKey = apiKey;
+  }
 
   getSystemPromptSection(provider?: LLMProvider): string {
     return [
@@ -493,7 +501,7 @@ export class CodeExecFeature implements AgentFeature {
       '- Error codes in normal chat-flow outputs: policy_denied | sandbox_runtime_error | limit_exceeded | internal_error.',
       '- `invalid_tool_arguments` is defensive/runtime-local only (direct runtime calls) and is not persisted as chat `tool_call(code_exec)` output.',
       `- Limits: code <= ${CODE_EXEC_LIMITS.maxCodeBytes} bytes (30 KiB), stdout <= ${CODE_EXEC_LIMITS.maxStdoutBytes} bytes (10 KiB), stderr <= ${CODE_EXEC_LIMITS.maxStderrBytes} bytes (10 KiB), CPU limit ${CODE_EXEC_LIMITS.sandboxCpuLimit} vCPU, RAM limit 2 GiB.`,
-      '- allowed runtime API: console.log/info/warn/error and tools/window.tools (sandbox allowlist only).',
+      '- Allowed runtime API: console.log/info/warn/error and tools/window.tools (sandbox allowlist only).',
       '- Node.js globals are unavailable in sandbox: process, require, module, Buffer, __dirname, __filename.',
       buildHttpRequestPromptSection(),
       provider ? buildWebSearchPromptSection(provider) : '',
@@ -507,31 +515,29 @@ export class CodeExecFeature implements AgentFeature {
     ].join('\n');
   }
 
-  getTools(): LLMTool[] {
+  getTools(provider?: LLMProvider): LLMTool[] {
+    const sessionManager = this.sandboxSessionManager;
+    const resolvedProvider = provider ?? this.resolvedProvider;
+    const resolvedApiKey = this.resolvedApiKey;
     return [
       {
         name: 'code_exec',
         description:
           'Execute JavaScript in isolated sandbox runtime with strict policy and resource limits; use it as the primary work tool for computation, extraction, transformation, analysis, and verification.',
         parameters: CODE_EXEC_TOOL_SCHEMA,
-        execute: async (
-          args: Record<string, unknown>,
-          signal?: AbortSignal,
-          provider?: LLMProvider,
-          apiKey?: string
-        ) => {
+        execute: async (args: Record<string, unknown>, signal?: AbortSignal) => {
           const validated = validateCodeExecInput(args);
           if (!validated.ok) {
             throw new Error(validated.error?.message ?? 'Invalid code_exec arguments.');
           }
 
           const toolCallId = `code_exec_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-          const output = await this.sandboxSessionManager.execute(
+          const output = await sessionManager.execute(
             'runtime',
             toolCallId,
             args,
-            provider ?? 'openai',
-            apiKey ?? '',
+            resolvedProvider,
+            resolvedApiKey,
             signal
           );
           return output;
@@ -575,7 +581,7 @@ function buildWebSearchPromptSection(provider: LLMProvider): string {
     `- Input: ${spec.input}`,
     `- Output: ${spec.output}`,
     '- Error codes: `invalid_input`, `provider_error`, `timeout`, `internal_error`.',
-    '- Timing: one provider web_search request may take ~30-60s; when you plan multiple queries, set `code_exec.timeout_ms` high enough for all expected requests.',
+    '- Timing: one provider web_search request may take up to ~120s; when you plan multiple queries, set `code_exec.timeout_ms` high enough for all expected requests.',
     '- All web search calls are performed strictly within the runtime of the current `code_exec` tool call.',
   ].join('\n');
 }

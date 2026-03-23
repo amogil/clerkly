@@ -1106,12 +1106,13 @@ console.log(JSON.stringify(result));`,
     await expectNoToastError(window);
   });
 
-  /* Preconditions: mock model emits code_exec that calls tools.web_search with provider-error trigger marker
+  /* Preconditions: mock LLM server configured to return HTTP 500 for web_search adapter requests
      Action: user sends a message that triggers sandbox web_search runtime failure path
      Assertions: helper returns structured provider_error and pipeline continues without crash
      Requirements: sandbox-web-search.4.1, sandbox-web-search.4.2, sandbox-web-search.4.4 */
   test('should surface tools.web_search runtime error without pipeline crash', async () => {
     mockLLMServer.setStreamingMode(true);
+    mockLLMServer.setWebSearchErrorMode(500);
     mockLLMServer.setOpenAIStreamScripts([
       {
         toolCalls: [
@@ -1121,7 +1122,7 @@ console.log(JSON.stringify(result));`,
             arguments: {
               task_summary: 'Trigger provider error path',
               code: `const result = await tools.web_search({
-  queries: ["__provider_error__"]
+  queries: ["test query that triggers server error"]
 });
 console.log(JSON.stringify(result));`,
               timeout_ms: 10000,
@@ -1207,54 +1208,6 @@ console.log(JSON.stringify(result));`,
     const codeExecCall = await findCodeExecCallByCallId(agentId, 'search-persisted-1');
     expect(codeExecCall?.kind).toBe('tool_call');
     expect(codeExecCall?.done).toBe(true);
-    await expectNoToastError(window);
-  });
-
-  /* Preconditions: mock model emits code_exec that calls tools.web_search while openai web_search capability is disabled by env
-     Action: user sends a message that triggers web_search helper call
-     Assertions: sandbox runtime does not expose tools.web_search and returns policy_denied structured error
-     Requirements: sandbox-web-search.1.6, sandbox-web-search.6.2 */
-  test('should not expose tools.web_search when active provider lacks web search capability', async () => {
-    mockLLMServer.setStreamingMode(true);
-    mockLLMServer.setOpenAIStreamScripts([
-      {
-        toolCalls: [
-          {
-            callId: 'search-capability-off-1',
-            toolName: 'code_exec',
-            arguments: {
-              task_summary: 'Use web_search when capability disabled',
-              code: `const result = await tools.web_search({
-  queries: ["disabled capability"]
-});
-console.log(JSON.stringify(result));`,
-              timeout_ms: 10000,
-            },
-          },
-        ],
-      },
-      {
-        content: '{"action":{"type":"text","content":"capability fallback checked"}}',
-      },
-    ]);
-
-    await launchWithMockLLM({
-      CLERKLY_DISABLE_WEB_SEARCH_PROVIDERS: 'openai',
-    });
-    await sendUserMessage('Try web_search with disabled capability');
-    await expect(window.locator('.message-llm-action-response').last()).toContainText(
-      'capability fallback checked',
-      {
-        timeout: 15000,
-      }
-    );
-
-    const agentId = (await getAgentIdsFromApi(window))[0];
-    const output = await getCodeExecOutputByCallId(agentId, 'search-capability-off-1');
-    expect(output?.status).toBe('error');
-    expect(output?.error).toMatchObject({
-      code: 'policy_denied',
-    });
     await expectNoToastError(window);
   });
 

@@ -243,34 +243,6 @@ describe('SandboxWebSearchHandler', () => {
   });
 
   describe('Error handling', () => {
-    it('should return provider_error for simulated provider runtime failure', async () => {
-      /* Preconditions: handler initialized for openai provider
-         Action: call execute with provider-error simulation marker query
-         Assertions: returns structured provider_error without throwing
-         Requirements: sandbox-web-search.4.1, sandbox-web-search.4.2 */
-      const handler = new SandboxWebSearchHandler('openai');
-      const result = await handler.execute({ queries: ['__provider_error__'] });
-      expect(result).toMatchObject({
-        error: {
-          code: 'provider_error',
-        },
-      });
-    });
-
-    it('should return provider_error for simulated provider runtime failure in anthropic query contract', async () => {
-      /* Preconditions: Anthropic handler initialized
-         Action: call execute with query marker for provider-error simulation
-         Assertions: returns provider_error without throwing
-         Requirements: sandbox-web-search.4.1, sandbox-web-search.4.2 */
-      const handler = new SandboxWebSearchHandler('anthropic');
-      const result = await handler.execute({ query: '__provider_error__' });
-      expect(result).toMatchObject({
-        error: {
-          code: 'provider_error',
-        },
-      });
-    });
-
     it('should return internal_error for unsupported provider', async () => {
       /* Preconditions: handler initialized with unknown provider
          Action: call execute

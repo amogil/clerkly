@@ -2,8 +2,6 @@ import type { LLMProvider } from '../../../src/types';
 import {
   assertProviderMethodRegistryConsistency,
   getProviderMethodAdapter,
-  getProviderSupportedMethods,
-  isProviderMethodSupported,
   validateProviderMethodRegistryConsistency,
 } from '../../../src/main/code_exec/ProviderMethodRegistry';
 import type {
@@ -12,10 +10,6 @@ import type {
 } from '../../../src/main/code_exec/ProviderMethodTypes';
 
 describe('ProviderMethodRegistry', () => {
-  afterEach(() => {
-    delete process.env.CLERKLY_DISABLE_WEB_SEARCH_PROVIDERS;
-  });
-
   /* Preconditions: base capabilities and adapter registrations are aligned
      Action: run consistency assertion for provider-method registry
      Assertions: no exception is thrown
@@ -36,21 +30,6 @@ describe('ProviderMethodRegistry', () => {
       expect(typeof adapter?.validate).toBe('function');
       expect(typeof adapter?.execute).toBe('function');
     }
-  });
-
-  /* Preconditions: web_search capability is runtime-disabled for OpenAI via environment override
-     Action: query provider method support and adapter lookup
-     Assertions: OpenAI is disabled while Google remains enabled
-     Requirements: sandbox-web-search.1.6 */
-  it('honors env-based web_search capability disabling per provider', () => {
-    process.env.CLERKLY_DISABLE_WEB_SEARCH_PROVIDERS = 'openai';
-
-    expect(isProviderMethodSupported('openai', 'web_search')).toBe(false);
-    expect(getProviderMethodAdapter('openai', 'web_search')).toBeNull();
-
-    expect(isProviderMethodSupported('google', 'web_search')).toBe(true);
-    expect(getProviderMethodAdapter('google', 'web_search')).not.toBeNull();
-    expect(getProviderSupportedMethods('google')).toContain('web_search');
   });
 
   /* Preconditions: capability matrix enables web_search for all providers but one provider has no adapter

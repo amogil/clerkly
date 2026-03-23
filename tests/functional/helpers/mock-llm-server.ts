@@ -53,6 +53,7 @@ export class MockLLMServer {
   private openAIStreamScripts: MockOpenAIStreamScript[] = [];
   private rateLimitEnabled: boolean = false;
   private rateLimitRetryAfterSeconds: number = 10;
+  private webSearchErrorStatus: number = 0; // 0 = disabled, >0 = return this status for web_search requests
 
   constructor(config: MockLLMServerConfig) {
     this.port = config.port;
@@ -136,6 +137,15 @@ export class MockLLMServer {
 
     const sendResponse = () => {
       if (hasWebSearchTool) {
+        if (this.webSearchErrorStatus > 0) {
+          res.writeHead(this.webSearchErrorStatus, { 'Content-Type': 'application/json' });
+          res.end(
+            JSON.stringify({
+              error: { message: this.errorMessage },
+            })
+          );
+          return;
+        }
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(
           JSON.stringify({
@@ -463,6 +473,15 @@ export class MockLLMServer {
 
     const sendResponse = () => {
       if (hasWebSearchTool) {
+        if (this.webSearchErrorStatus > 0) {
+          res.writeHead(this.webSearchErrorStatus, { 'Content-Type': 'application/json' });
+          res.end(
+            JSON.stringify({
+              error: { message: this.errorMessage },
+            })
+          );
+          return;
+        }
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(
           JSON.stringify({
@@ -521,6 +540,15 @@ export class MockLLMServer {
 
     const sendResponse = () => {
       if (hasGoogleSearchTool) {
+        if (this.webSearchErrorStatus > 0) {
+          res.writeHead(this.webSearchErrorStatus, { 'Content-Type': 'application/json' });
+          res.end(
+            JSON.stringify({
+              error: { message: this.errorMessage },
+            })
+          );
+          return;
+        }
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(
           JSON.stringify({
@@ -638,7 +666,7 @@ export class MockLLMServer {
     this.openAIStreamScripts = [...scripts];
   }
 
-  /** Enable rate limit mode — server returns 429 with retry-after header */
+  /** Enable rate limit mode -- server returns 429 with retry-after header */
   setRateLimitMode(enabled: boolean, retryAfterSeconds: number = 10) {
     this.rateLimitEnabled = enabled;
     this.rateLimitRetryAfterSeconds = retryAfterSeconds;
@@ -646,6 +674,11 @@ export class MockLLMServer {
       this.streamingEnabled = false;
     }
     console.log(`[MOCK LLM] Rate limit mode: ${enabled}, retry-after: ${retryAfterSeconds}s`);
+  }
+
+  /** Make web_search adapter requests return HTTP error instead of success */
+  setWebSearchErrorMode(errorStatus: number) {
+    this.webSearchErrorStatus = errorStatus;
   }
 
   getBaseUrl(): string {
