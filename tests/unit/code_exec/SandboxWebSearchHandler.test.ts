@@ -347,7 +347,7 @@ describe('SandboxWebSearchHandler', () => {
     it('should map timeout-like provider errors to timeout code', async () => {
       /* Preconditions: OpenAI handler initialized with api key
          Action: provider fetch rejects with timeout-like error
-         Assertions: returns structured timeout code
+         Assertions: returns structured timeout code with provider diagnostics
          Requirements: sandbox-web-search.4.1, sandbox-web-search.4.2 */
       const timeoutError = new Error('Request timed out');
       timeoutError.name = 'TimeoutError';
@@ -358,9 +358,12 @@ describe('SandboxWebSearchHandler', () => {
       expect(result).toMatchObject({
         error: {
           code: 'timeout',
-          message: expect.stringContaining('timed out'),
+          message: expect.stringContaining('provider=openai'),
         },
       });
+      expect((result as { error?: { message?: string } }).error?.message ?? '').toContain(
+        'timeoutMs=120000'
+      );
     });
 
     it('should return provider_error on Google non-OK response without message', async () => {

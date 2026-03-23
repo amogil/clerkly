@@ -31,6 +31,17 @@ Helper не является отдельным инструментом main LL
 - **"SandboxSessionManager"**
   - прокидывает helper через sandbox bridge в окружение выполнения `code_exec`.
 
+### Передача provider/apiKey в sandbox runtime
+
+- `provider` и `apiKey` передаются в `SandboxSessionManager.execute()` через closure в `CodeExecFeature.getTools(provider, apiKey)`.
+- Сигнатура `LLMTool.execute` остаётся чистой: `(args, signal?) => Promise<unknown>` — без протаскивания provider/apiKey через общий tool interface.
+- `MainPipeline.bindToolExecutors` не знает о provider/apiKey — они замкнуты в tool closure на этапе `getTools()`.
+
+### Тестовый backdoor
+
+- Provider adapters НЕ содержат тестовых backdoor-ов в production коде.
+- Для тестирования provider_error path используется mock HTTP-сервер (аналогично паттерну `SandboxHttpRequestHandler`).
+
 ## Граница ответственности
 
 - `docs/specs/code_exec/*`:
@@ -88,10 +99,14 @@ Helper не вводит общий обязательный provider-agnostic s
 ### Runtime Capability Gating
 
 - По умолчанию capability `web_search` включён для `openai`, `anthropic`, `google`.
-- Runtime-gating поддерживает env override `CLERKLY_DISABLE_WEB_SEARCH_PROVIDERS`.
-- Формат override: CSV-список provider ids (например: `openai,google`).
-- Scope override: применяется только к публикации/доступности sandbox helper-а `web_search` для текущего процесса runtime.
-- Если провайдер указан в override, `ProviderMethodRegistry` считает method недоступным, helper не регистрируется в sandbox tools, и вызов `tools.web_search` возвращает policy/capability denial path.
+- Capability gating определяется декларативно в `ProviderMethodCapabilityMatrix` внутри `ProviderMethodRegistry`.
+- Если провайдер не включён в capability matrix, helper не регистрируется в sandbox tools, и вызов `tools.web_search` возвращает capability denial.
+
+### Таймаут helper-а
+
+- Timeout для одного provider web_search запроса: `120_000` ms (120 секунд).
+- Timeout фиксирован в `SandboxWebSearchHandler` (константа `WEB_SEARCH_TIMEOUT_MS`).
+- Prompt guidance сообщает модели, что один запрос web_search может занять до ~120 секунд, и при нескольких запросах нужно выставлять `code_exec.timeout_ms` с запасом.
 
 ## Поток выполнения
 

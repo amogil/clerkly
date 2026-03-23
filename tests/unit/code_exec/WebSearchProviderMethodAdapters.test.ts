@@ -132,4 +132,177 @@ describe('WebSearchProviderMethodAdapters', () => {
       })
     ).rejects.toThrow('Rate limit from provider');
   });
+
+  /* Preconditions: Anthropic and Google adapters are initialized
+     Action: validate non-object payload
+     Assertions: adapters return invalid_input validation error for object contract violation
+     Requirements: sandbox-web-search.2.4, sandbox-web-search.2.5, sandbox-web-search.2.6 */
+  it('returns invalid_input when Anthropic or Google payload is not an object', () => {
+    const anthropic = getAdapter('anthropic');
+    const google = getAdapter('google');
+
+    expect(anthropic.validate('bad-input')).toMatchObject({
+      success: false,
+      error: { code: 'invalid_input' },
+    });
+    expect(google.validate(null)).toMatchObject({
+      success: false,
+      error: { code: 'invalid_input' },
+    });
+  });
+
+  /* Preconditions: OpenAI and Google adapters are initialized
+     Action: execute payload that requests provider error simulation
+     Assertions: adapters throw simulated provider failure before network call
+     Requirements: sandbox-web-search.4.1 */
+  it('throws simulated provider error for OpenAI and Google adapters', async () => {
+    const openai = getAdapter('openai');
+    const google = getAdapter('google');
+    const openaiValidation = openai.validate({ queries: ['__provider_error__'] });
+    const googleValidation = google.validate({ queries: ['__provider_error__'] });
+
+    expect(openaiValidation.success).toBe(true);
+    expect(googleValidation.success).toBe(true);
+    if (!openaiValidation.success || !googleValidation.success) {
+      throw new Error('Validation failed unexpectedly');
+    }
+
+    await expect(
+      openai.execute(openaiValidation.input, {
+        provider: 'openai',
+        apiKey: 'sk-test',
+        timeoutMs: 30_000,
+      })
+    ).rejects.toThrow('Simulated provider web_search failure.');
+    await expect(
+      google.execute(googleValidation.input, {
+        provider: 'google',
+        apiKey: 'google-key',
+        timeoutMs: 30_000,
+      })
+    ).rejects.toThrow('Simulated provider web_search failure.');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  /* Preconditions: OpenAI adapter is initialized and provider request fails with timeout-like AbortError
+     Action: execute validated input
+     Assertions: adapter throws normalized TimeoutError with provider diagnostic fields
+     Requirements: sandbox-web-search.3.1, sandbox-web-search.4.2 */
+  it('normalizes timeout-like fetch errors for OpenAI adapter', async () => {
+    fetchMock.mockRejectedValue(new DOMException('The operation timed out', 'TimeoutError'));
+    const adapter = getAdapter('openai');
+    const validation = adapter.validate({ queries: ['timeout test'] });
+    expect(validation.success).toBe(true);
+    if (!validation.success) {
+      throw new Error('Validation failed unexpectedly');
+    }
+
+    await expect(
+      adapter.execute(validation.input, {
+        provider: 'openai',
+        apiKey: 'sk-test',
+        timeoutMs: 30_000,
+      })
+    ).rejects.toMatchObject({
+      name: 'TimeoutError',
+      message: expect.stringContaining('provider=openai'),
+    });
+  });
+
+  /* Preconditions: Anthropic adapter is initialized and endpoint is invalid URL string
+     Action: execute validated input with timeout-like rejection
+     Assertions: diagnostic timeout error keeps raw endpoint when URL sanitization cannot parse it
+     Requirements: sandbox-web-search.3.1, sandbox-web-search.4.2 */
+  it('keeps raw endpoint in timeout diagnostics when endpoint is not a URL', async () => {
+    const previousEndpoint = process.env.CLERKLY_ANTHROPIC_API_URL;
+    process.env.CLERKLY_ANTHROPIC_API_URL = '::invalid-endpoint::?token=secret';
+    fetchMock.mockRejectedValue(new Error('Request timed out at provider'));
+
+    try {
+      const adapter = getAdapter('anthropic');
+      const validation = adapter.validate({ query: 'latest status' });
+      expect(validation.success).toBe(true);
+      if (!validation.success) {
+        throw new Error('Validation failed unexpectedly');
+      }
+
+      await expect(
+        adapter.execute(validation.input, {
+          provider: 'anthropic',
+          apiKey: 'anthropic-key',
+          timeoutMs: 30_000,
+        })
+      ).rejects.toMatchObject({
+        name: 'TimeoutError',
+        message: expect.stringContaining('endpoint=::invalid-endpoint::?token=secret'),
+      });
+    } finally {
+      if (previousEndpoint === undefined) {
+        delete process.env.CLERKLY_ANTHROPIC_API_URL;
+      } else {
+        process.env.CLERKLY_ANTHROPIC_API_URL = previousEndpoint;
+      }
+    }
+  });
+
+  /* Preconditions: OpenAI adapter is initialized and fetch rejects with non-timeout error
+     Action: execute validated input
+     Assertions: adapter propagates original error without TimeoutError conversion
+     Requirements: sandbox-web-search.4.2 */
+  it('propagates non-timeout fetch errors without wrapping', async () => {
+    fetchMock.mockRejectedValue(new Error('socket closed unexpectedly'));
+    const adapter = getAdapter('openai');
+    const validation = adapter.validate({ queries: ['network error test'] });
+    expect(validation.success).toBe(true);
+    if (!validation.success) {
+      throw new Error('Validation failed unexpectedly');
+    }
+
+    await expect(
+      adapter.execute(validation.input, {
+        provider: 'openai',
+        apiKey: 'sk-test',
+        timeoutMs: 30_000,
+      })
+    ).rejects.toThrow('socket closed unexpectedly');
+  });
+
+  /* Preconditions: Google adapter is initialized and provider returns non-OK responses
+     Action: execute validated input for fallback and explicit provider message branches
+     Assertions: adapter uses fallback when message is absent and provider message when present
+     Requirements: sandbox-web-search.4.1 */
+  it('handles Google non-OK fallback and explicit provider error messages', async () => {
+    const adapter = getAdapter('google');
+    const validation = adapter.validate({ queries: ['google error path'] });
+    expect(validation.success).toBe(true);
+    if (!validation.success) {
+      throw new Error('Validation failed unexpectedly');
+    }
+
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 503,
+      json: async () => ({}),
+    });
+    await expect(
+      adapter.execute(validation.input, {
+        provider: 'google',
+        apiKey: 'google-key',
+        timeoutMs: 30_000,
+      })
+    ).rejects.toThrow('Google web_search request failed with status 503.');
+
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 429,
+      json: async () => ({ error: { message: 'Google quota exceeded' } }),
+    });
+    await expect(
+      adapter.execute(validation.input, {
+        provider: 'google',
+        apiKey: 'google-key',
+        timeoutMs: 30_000,
+      })
+    ).rejects.toThrow('Google quota exceeded');
+  });
 });

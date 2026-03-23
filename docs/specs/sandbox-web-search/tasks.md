@@ -4,7 +4,7 @@
 
 Реализовать helper `web_search` как sandbox capability внутри `code_exec` (через `tools.web_search(...)`) с provider-native контрактом активного LLM-провайдера.
 
-**Current status:** Phase 4 - Provider Method Extensibility (implementation complete, final functional runs pending)
+**Current status:** Phase 5 - Code Review Fixes (planned)
 
 ---
 
@@ -97,3 +97,34 @@
   - [x] Зафиксировать чеклист в design/spec: добавить provider, capability, adapter, registry wiring, тесты.
   - [x] Добавить unit-тесты на реестр и contract тесты адаптеров.
   - [x] Добавить/обновить functional mock-сценарии для проверки реестровой маршрутизации.
+
+#### Phase 5: Code Review Fixes
+
+- [ ] **5.1. Рефактор apiKey routing — убрать provider/apiKey из сигнатуры `LLMTool.execute`**
+  - [ ] Вернуть `LLMTool.execute` в `ILLMProvider.ts` к исходной сигнатуре `(args, signal?) => Promise<unknown>`.
+  - [ ] В `CodeExecFeature` замкнуть `provider`/`apiKey` через closure: `getTools()` принимает `provider?: LLMProvider, apiKey?: string` и передаёт их в `SandboxSessionManager.execute()` через замыкание внутри `execute` функции tool-а.
+  - [ ] Убрать `provider`/`apiKey` из `MainPipeline.bindToolExecutors` и type cast `ToolExecuteFn`.
+  - [ ] `PromptBuilder.build(provider)` и `buildMessages(messages, provider)` — оставить как есть (provider нужен для prompt section).
+  - [ ] `CodeExecFeature.getTools(provider, apiKey)` — новый контракт; `PromptBuilder` вызывает `feature.getTools(provider, apiKey)` из `build(provider, apiKey)`.
+  - [ ] Обновить `AgentFeature` interface: `getTools(provider?: LLMProvider, apiKey?: string): LLMTool[]`.
+  - [ ] Обновить тесты `MainPipeline.test.ts` и `PromptBuilder.test.ts`.
+- [ ] **5.2. Убрать тестовый backdoor `shouldSimulateProviderError` из production кода**
+  - [ ] Удалить функцию `shouldSimulateProviderError` и её вызовы из `WebSearchProviderMethodAdapters.ts`.
+  - [ ] В functional тестах (`code_exec.spec.ts`) для provider_error path использовать mock-LLM-server, который отвечает HTTP ошибкой на запрос web_search adapter-а; аналогично http_request тестирует ошибки через mock HTTP-сервер.
+  - [ ] Обновить unit-тесты `WebSearchProviderMethodAdapters.test.ts` — мокать `fetch` для симуляции ошибок (уже частично делается), убрать кейсы с `__provider_error__`.
+- [ ] **5.3. Убрать env variable `CLERKLY_DISABLE_WEB_SEARCH_PROVIDERS`**
+  - [ ] Удалить `getEnvDisabledWebSearchProviders()` и её использование из `ProviderMethodRegistry.ts`.
+  - [ ] Упростить `isProviderMethodSupported` — оставить только lookup в capability matrix.
+  - [ ] Убрать описание env override из `design.md` (секция "Runtime Capability Gating").
+  - [ ] Обновить тесты `ProviderMethodRegistry.test.ts` — убрать кейсы с env override.
+- [ ] **5.4. Зафиксировать timeout 120s и синхронизировать prompt**
+  - [ ] Подтвердить `WEB_SEARCH_TIMEOUT_MS = 120_000` в `SandboxWebSearchHandler.ts`.
+  - [ ] Обновить prompt guidance в `PromptBuilder.ts` (`buildWebSearchPromptSection`): заменить `~30-60s` на `up to ~120s`.
+  - [ ] Зафиксировать значение timeout в `design.md` (новая секция "Таймаут helper-а").
+- [ ] **5.5. Убрать мёртвый код и cosmetic issues**
+  - [ ] `extractProviderMessageWithFallback` — убрать бессмысленный параметр `path` и ветвление; оставить единственную реализацию.
+  - [ ] `PromptBuilder.ts` — исправить `'- allowed runtime API'` обратно на `'- Allowed runtime API'` для консистентности с другими bullet points.
+- [ ] **5.6. Финальная проверка**
+  - [ ] Запустить `npm run validate`.
+  - [ ] Прогнать точечные тесты: `SandboxWebSearchHandler.test.ts`, `WebSearchProviderMethodAdapters.test.ts`, `ProviderMethodRegistry.test.ts`, `MainPipeline.test.ts`, `PromptBuilder.test.ts`.
+  - [ ] Запросить у пользователя подтверждение перед `npm run test:functional`.

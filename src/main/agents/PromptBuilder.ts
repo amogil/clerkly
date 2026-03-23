@@ -575,6 +575,7 @@ function buildWebSearchPromptSection(provider: LLMProvider): string {
     `- Input: ${spec.input}`,
     `- Output: ${spec.output}`,
     '- Error codes: `invalid_input`, `provider_error`, `timeout`, `internal_error`.',
+    '- Timing: one provider web_search request may take ~30-60s; when you plan multiple queries, set `code_exec.timeout_ms` high enough for all expected requests.',
     '- All web search calls are performed strictly within the runtime of the current `code_exec` tool call.',
   ].join('\n');
 }

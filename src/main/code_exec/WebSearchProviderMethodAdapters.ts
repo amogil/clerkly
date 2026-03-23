@@ -19,6 +19,14 @@ interface AnthropicWebSearchInput {
   query: string;
 }
 
+interface ProviderFetchDebugContext {
+  provider: 'openai' | 'anthropic' | 'google';
+  endpoint: string;
+  model: string;
+  timeoutMs: number;
+  requestLabel: string;
+}
+
 // Requirements: sandbox-web-search.4.1, sandbox-web-search.4.4
 function shouldSimulateProviderError(input: unknown): boolean {
   if (!input || typeof input !== 'object') {
@@ -43,6 +51,70 @@ function extractProviderMessageWithFallback(
   }
   const message = (errorData as { error?: { message?: unknown } }).error?.message;
   return typeof message === 'string' ? message : fallback;
+}
+
+// Requirements: sandbox-web-search.4.2
+function isTimeoutLikeError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+  const maybeError = error as { name?: string; message?: string; code?: string };
+  const message = (maybeError.message ?? '').toLowerCase();
+  return (
+    maybeError.name === 'AbortError' ||
+    maybeError.name === 'TimeoutError' ||
+    maybeError.code === 'ETIMEDOUT' ||
+    message.includes('timed out') ||
+    message.includes('timeout')
+  );
+}
+
+// Requirements: sandbox-web-search.4.2
+function sanitizeEndpointForLogs(endpoint: string): string {
+  try {
+    const parsed = new URL(endpoint);
+    const redactedParams = ['key', 'api_key', 'token', 'access_token', 'client_secret'];
+    for (const param of redactedParams) {
+      if (parsed.searchParams.has(param)) {
+        parsed.searchParams.set(param, '<redacted>');
+      }
+    }
+    return parsed.toString();
+  } catch {
+    return endpoint;
+  }
+}
+
+// Requirements: sandbox-web-search.4.2
+function buildProviderTimeoutMessage(context: ProviderFetchDebugContext): string {
+  return [
+    'web_search timeout:',
+    `provider=${context.provider}`,
+    `request=${context.requestLabel}`,
+    `timeoutMs=${context.timeoutMs}`,
+    `model=${context.model}`,
+    `endpoint=${sanitizeEndpointForLogs(context.endpoint)}`,
+  ].join(' ');
+}
+
+// Requirements: sandbox-web-search.3.1, sandbox-web-search.4.2
+async function fetchWithProviderTimeoutDiagnostics(
+  context: ProviderFetchDebugContext,
+  init: RequestInit
+): Promise<Response> {
+  try {
+    return await fetch(context.endpoint, {
+      ...init,
+      signal: AbortSignal.timeout(context.timeoutMs),
+    });
+  } catch (error) {
+    if (isTimeoutLikeError(error)) {
+      const timeoutError = new Error(buildProviderTimeoutMessage(context));
+      timeoutError.name = 'TimeoutError';
+      throw timeoutError;
+    }
+    throw error;
+  }
 }
 
 // Requirements: sandbox-web-search.2.3, sandbox-web-search.3.1, sandbox-web-search.4.1
@@ -91,20 +163,28 @@ class OpenAIWebSearchAdapter implements ProviderMethodAdapter<OpenAIWebSearchInp
     const queries = input.queries.filter((query) => query.trim().length > 0);
     const results: unknown[] = [];
 
-    for (const query of queries) {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${context.apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+    for (const [index, query] of queries.entries()) {
+      const response = await fetchWithProviderTimeoutDiagnostics(
+        {
+          provider: 'openai',
+          endpoint,
           model,
-          input: query,
-          tools: [{ type: 'web_search_preview' }],
-        }),
-        signal: AbortSignal.timeout(context.timeoutMs),
-      });
+          timeoutMs: context.timeoutMs,
+          requestLabel: `query[${index + 1}/${queries.length}] chars=${query.length}`,
+        },
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${context.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model,
+            input: query,
+            tools: [{ type: 'web_search_preview' }],
+          }),
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -166,21 +246,29 @@ class AnthropicWebSearchAdapter implements ProviderMethodAdapter<AnthropicWebSea
     const model = LLM_CHAT_MODELS.anthropic[env].model;
     const endpoint = process.env.CLERKLY_ANTHROPIC_API_URL ?? LLM_PROVIDERS.anthropic.apiUrl;
 
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'x-api-key': context.apiKey,
-        'anthropic-version': '2023-06-01',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    const response = await fetchWithProviderTimeoutDiagnostics(
+      {
+        provider: 'anthropic',
+        endpoint,
         model,
-        max_tokens: 512,
-        messages: [{ role: 'user', content: input.query }],
-        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-      }),
-      signal: AbortSignal.timeout(context.timeoutMs),
-    });
+        timeoutMs: context.timeoutMs,
+        requestLabel: `query chars=${input.query.length}`,
+      },
+      {
+        method: 'POST',
+        headers: {
+          'x-api-key': context.apiKey,
+          'anthropic-version': '2023-06-01',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 512,
+          messages: [{ role: 'user', content: input.query }],
+          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        }),
+      }
+    );
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -241,19 +329,27 @@ class GoogleWebSearchAdapter implements ProviderMethodAdapter<GoogleWebSearchInp
     const queries = input.queries.filter((query) => query.trim().length > 0);
     const results: unknown[] = [];
 
-    for (const query of queries) {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+    for (const [index, query] of queries.entries()) {
+      const response = await fetchWithProviderTimeoutDiagnostics(
+        {
+          provider: 'google',
+          endpoint,
           model,
-          contents: [{ parts: [{ text: query }] }],
-          tools: [{ googleSearch: {} }],
-        }),
-        signal: AbortSignal.timeout(context.timeoutMs),
-      });
+          timeoutMs: context.timeoutMs,
+          requestLabel: `query[${index + 1}/${queries.length}] chars=${query.length}`,
+        },
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model,
+            contents: [{ parts: [{ text: query }] }],
+            tools: [{ googleSearch: {} }],
+          }),
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));

@@ -18,7 +18,7 @@ export interface SandboxWebSearchSuccess {
 
 export type SandboxWebSearchResult = SandboxWebSearchSuccess | SandboxWebSearchError;
 
-const WEB_SEARCH_TIMEOUT_MS = 30_000;
+const WEB_SEARCH_TIMEOUT_MS = 120_000;
 
 /**
  * Handler for web_search tool in sandbox runtime.
