@@ -90,7 +90,7 @@ Helper не вводит общий обязательный provider-agnostic s
 }
 ```
 
-`policy_denied` возвращается через fallback в `SandboxSessionManager.handleSandboxToolInvocation`, когда sandbox-код вызывает helper, не зарегистрированный для текущего провайдера.
+`policy_denied` возвращается при вызове `web_search` для провайдера без capability. Основной путь: helper исключается из sandbox allowlist (требование 1.6), и sandbox-скрипт возвращает стандартную ошибку `policy_denied: Tool is not allowed in sandbox allowlist.` до IPC-вызова в main process. Ветка `!invoker` в `SandboxSessionManager.handleSandboxToolInvocation` — defense-in-depth guard на случай, если вызов обойдёт sandbox-side проверку.
 
 ## Матрица провайдеров
 
@@ -105,13 +105,19 @@ Helper не вводит общий обязательный provider-agnostic s
 - По умолчанию capability `web_search` включён для `openai`, `anthropic`, `google`.
 - Capability gating определяется декларативно в `ProviderMethodCapabilityMatrix` внутри `ProviderMethodRegistry`.
 - Runtime env override отсутствует: capability определяется исключительно декларацией в capability matrix, без переменных окружения.
-- Если провайдер не включён в capability matrix, helper не регистрируется в sandbox tools, и вызов `tools.web_search` из sandbox-кода возвращает `policy_denied` (через fallback в `SandboxSessionManager.handleSandboxToolInvocation`).
+- Если провайдер не включён в capability matrix, helper не регистрируется в sandbox tools, и вызов `tools.web_search` из sandbox-кода блокируется sandbox allowlist с ошибкой `policy_denied: Tool is not allowed in sandbox allowlist.` (code_exec req 2.8.1). Ветка `!invoker` в `handleSandboxToolInvocation` — defense-in-depth guard.
 
 ### Таймаут helper-а
 
 - Timeout для одного provider web_search запроса: `120_000` ms (120 секунд).
 - Timeout фиксирован в `SandboxWebSearchHandler` (константа `WEB_SEARCH_TIMEOUT_MS`).
 - Prompt guidance сообщает модели, что один запрос web_search может занять до ~120 секунд, и при нескольких запросах нужно выставлять `code_exec.timeout_ms` с запасом.
+
+### Модель выполнения multi-query (OpenAI / Google)
+
+- OpenAI и Google адаптеры принимают массив `queries`. Запросы выполняются **последовательно** (sequential `for...of`).
+- При первой ошибке (non-OK HTTP status) выполнение прерывается немедленно (fail-fast): оставшиеся запросы не выполняются, частичные результаты не возвращаются.
+- Anthropic адаптер принимает одиночный `query`, поэтому вопрос multi-query для него не актуален.
 
 ## Поток выполнения
 
@@ -182,6 +188,7 @@ Helper не вводит общий обязательный provider-agnostic s
 |-------------|------------|------------------|
 | sandbox-web-search.1 (1.1-1.5) | ✓ | ✓ |
 | sandbox-web-search.1.6 (capability fallback) | ✓ | - (unit only) |
+| sandbox-web-search.1.7 (policy_denied for unsupported capability) | ✓ | - (covered by code_exec 2.8.1 functional test; defense-in-depth guard unit-tested) |
 | sandbox-web-search.2 | ✓ | ✓ |
 | sandbox-web-search.3 | ✓ | ✓ |
 | sandbox-web-search.4 | ✓ | ✓ |

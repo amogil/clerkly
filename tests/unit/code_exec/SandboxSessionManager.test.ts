@@ -397,6 +397,40 @@ console.log(first.status, second.status);`,
     expect(result.error?.code).toBe('policy_denied');
   });
 
+  /* Preconditions: handleSandboxToolInvocation receives a toolName not in invokers map
+     Action: Call handleSandboxToolInvocation directly with an unregistered tool name
+     Assertions: Returns policy_denied error (defense-in-depth guard)
+     Requirements: sandbox-web-search.1.7 */
+  it('returns policy_denied from handleSandboxToolInvocation for unregistered tool', async () => {
+    const manager = new SandboxSessionManager();
+    // Set up activeSandboxToolInvokers with a session that has no web_search
+    const invokers = new Map<string, (input: unknown) => Promise<unknown>>();
+    invokers.set('http_request', async () => ({ ok: true }));
+    (
+      manager as unknown as {
+        activeSandboxToolInvokers: Map<string, Map<string, (input: unknown) => Promise<unknown>>>;
+      }
+    ).activeSandboxToolInvokers.set('test-session', invokers);
+
+    const result = await (
+      manager as unknown as {
+        handleSandboxToolInvocation: (payload: {
+          sessionId: string;
+          toolName: string;
+          input: unknown;
+        }) => Promise<{ error?: { code: string; message: string } }>;
+      }
+    ).handleSandboxToolInvocation({
+      sessionId: 'test-session',
+      toolName: 'web_search',
+      input: { queries: ['test'] },
+    });
+
+    expect(result.error).toBeDefined();
+    expect(result.error!.code).toBe('policy_denied');
+    expect(result.error!.message).toContain('not available');
+  });
+
   /* Preconditions: VM execution path exceeds the configured execution limit
      Action: Invoke executeInOneSandbox with an infinite loop and very low timeout
      Assertions: Internal execution result is timeout with limit_exceeded

@@ -25,7 +25,8 @@ export type SandboxWebSearchErrorCode =
   | 'invalid_input'
   | 'provider_error'
   | 'timeout'
-  | 'internal_error';
+  | 'internal_error'
+  | 'policy_denied';
 
 // Requirements: sandbox-web-search.4.1, sandbox-web-search.4.2
 export function isTimeoutLikeError(error: unknown): boolean {

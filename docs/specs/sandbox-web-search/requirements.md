@@ -35,7 +35,7 @@ Helper НЕ задаёт единый кросс-провайдерный search
 
 1.6. КОГДА активный провайдер не предоставляет web search capability, helper `web_search` НЕ ДОЛЖЕН публиковаться в списке доступных sandbox tools.
 
-1.7. КОГДА sandbox-код вызывает `tools.web_search(...)`, но helper не зарегистрирован для текущего провайдера (не прошёл capability check), ТО sandbox runtime ДОЛЖЕН возвращать structured error `policy_denied` с сообщением о недоступности helper-а для активного провайдера.
+1.7. КОГДА sandbox-код вызывает `tools.web_search(...)`, но helper не зарегистрирован для текущего провайдера (не прошёл capability check), ТО sandbox runtime ДОЛЖЕН возвращать ошибку `policy_denied`. Реальный путь: helper исключается из sandbox allowlist (требование 1.6), и sandbox-скрипт возвращает стандартную ошибку `policy_denied: Tool is not allowed in sandbox allowlist.` (определено в `code_exec` требовании 2.8.1). Дополнительно, `SandboxSessionManager.handleSandboxToolInvocation` содержит defense-in-depth guard, возвращающий `policy_denied`, если вызов всё же дойдёт до main process.
 
 #### Функциональные Тесты
 

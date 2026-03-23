@@ -208,6 +208,9 @@ export class SandboxSessionManager {
       };
     }
     const invoker = invokers.get(toolName);
+    // Defense-in-depth: sandbox-side allowlist (line ~500) blocks unknown tools before IPC,
+    // so this branch is normally unreachable for web_search. Kept as a safety guard.
+    // Requirements: sandbox-web-search.1.7
     if (!invoker) {
       return {
         error: {
