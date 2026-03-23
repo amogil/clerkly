@@ -4,7 +4,7 @@
 
 Реализовать helper `web_search` как sandbox capability внутри `code_exec` (через `tools.web_search(...)`) с provider-native контрактом активного LLM-провайдера.
 
-**Current status:** Phase 5 - Code Review Fixes (done, functional run pending)
+**Current status:** Phase 6 - Second Code Review Fixes
 
 ---
 
@@ -20,6 +20,7 @@
 ## Current State
 
 ### Completed
+
 - ✅ Переписаны `requirements.md` и `design.md` под provider-native концепцию.
 - ✅ Зафиксирован provider routing (OpenAI / Anthropic / Gemini) и capability-gated публикация helper-а в registry.
 - ✅ Зафиксировано отсутствие отдельного persisted `tool_call(web_search)`.
@@ -42,92 +43,52 @@
 - ✅ Зафиксирован onboarding checklist для нового provider method в `design.md`.
 - ✅ Добавлены unit-тесты реестра и контрактные тесты provider adapters.
 
+#### Phase 2: Runtime Implementation (done)
+
+- ✅ Инфраструктура песочницы: `web_search` в allowlist, типы ошибок в contracts.
+- ✅ Реализация `SandboxWebSearchHandler`: роутинг, валидация, реальные provider API вызовы.
+- ✅ Интеграция в Runtime: `SandboxSessionManager` и `MainPipeline`.
+- ✅ Динамические промпты: `PromptBuilder.ts` (`CodeExecFeature`), секция `web_search`.
+
+#### Phase 3: Testing & Validation (done)
+
+- ✅ Unit-тесты: `SandboxWebSearchHandler.test.ts`, роутинг, валидация, маппинг ошибок.
+- ✅ Functional-тесты: success, `invalid_input`, provider-error, capability fallback, persisted lifecycle, mock-provider Anthropic/Google, real-provider OpenAI/Anthropic/Google.
+- ✅ Финальная проверка: `npm run validate`.
+
+#### Phase 4: Provider Method Extensibility (done)
+
+- ✅ Расширяемая архитектура provider-method adapters с lookup по `(provider, method)`.
+- ✅ Fail-fast consistency check capability ↔ adapter registration.
+- ✅ Onboarding checklist, unit-тесты реестра, contract тесты адаптеров.
+
+#### Phase 5: Code Review Fixes (done)
+
+- ✅ 5.1. Рефактор apiKey routing — closure вместо протаскивания через `LLMTool.execute`.
+- ✅ 5.2. Убран тестовый backdoor `shouldSimulateProviderError`.
+- ✅ 5.3. Убрана env variable `CLERKLY_DISABLE_WEB_SEARCH_PROVIDERS`.
+- ✅ 5.4. Зафиксирован timeout 120s, синхронизирован prompt.
+- ✅ 5.5. Убран мёртвый код и cosmetic issues.
+- ✅ 5.6. Финальная проверка: `npm run validate`, точечные тесты.
+
+#### Phase 6: Second Code Review Fixes
+
+- ✅ Унифицирована валидация пустых/пробельных запросов для OpenAI/Google (возврат `invalid_input` как у Anthropic).
+- ✅ Убрана фантомная ссылка на несуществующий functional тест capability fallback.
+- ✅ Документировано отсутствие env override в design.md.
+- ✅ Исправлен маппинг покрытия `SandboxBridge.test.ts` в design.md.
+- ✅ Убран обход private-поля `PromptBuilder.features` — добавлен публичный метод `forEachFeature`.
+- ✅ Документировано ограничение `max_tokens: 512` для Anthropic (константа + design.md).
+- ✅ Документирован `policy_denied` при вызове незарегистрированного helper-а.
+- ✅ Извлечена общая утилита `isTimeoutLikeError` в contracts.ts.
+- [ ] Прогнать `npm run validate`.
+- [ ] Запросить у пользователя подтверждение перед `npm run test:functional`.
+
 ### In Progress
+
 - 🔄 Полный запуск всего функционального набора (`npm run test:functional`) остаётся отдельным шагом.
 
 ### Planned
 
-#### Phase 2: Runtime Implementation
-
-- [x] **Инфраструктура песочницы**
-  - [x] Добавить `'web_search'` в `SANDBOX_TOOLS_ALLOWLIST` в `src/main/code_exec/SandboxBridge.ts`.
-  - [x] Добавить типы ошибок для поиска (`invalid_input`, `provider_error`, `timeout`, `internal_error`) в `src/main/code_exec/contracts.ts`.
-- [x] **Реализация `SandboxWebSearchHandler`**
-  - [x] Создать `src/main/code_exec/SandboxWebSearchHandler.ts`.
-  - [x] Реализовать роутинг по активному провайдеру (`openai`, `anthropic`, `google`).
-  - [x] Реализовать схемы валидации и адаптеры для OpenAI, Gemini, Anthropic.
-  - [x] Внедрить базовую реализацию поиска (заглушка/плагин).
-  - [x] Перевести OpenAI / Anthropic / Google helper-path на реальные provider API вызовы.
-- [x] **Интеграция в Runtime**
-  - [x] Обновить `SandboxSessionManager.ts` для поддержки передачи провайдера и регистрации `web_search`.
-  - [x] Обновить `MainPipeline.ts` для передачи активного провайдера в сессию.
-- [x] **Динамические промпты**
-  - [x] Обновить `PromptBuilder.ts` (`CodeExecFeature`), добавив динамическую секцию документации `web_search` в зависимости от провайдера.
-
-#### Phase 3: Testing & Validation
-
-- [x] **Unit-тесты**
-  - [x] Создать \`tests/unit/code_exec/SandboxWebSearchHandler.test.ts\`.
-  - [x] Проверить роутинг, валидацию контрактов и маппинг ошибок.
-- [ ] **Functional-тесты**
-  - [x] Добавить e2e сценарий успешного вызова helper-а `web_search`.
-  - [x] Добавить e2e сценарий structured `invalid_input` для helper-а `web_search`.
-  - [x] Расширить матрицу кейсов (provider-error path, capability fallback, persisted lifecycle assertions).
-  - [x] Прогнать точечный functional-прогон `tests/functional/code_exec.spec.ts --grep web_search`.
-  - [x] Добавить real-provider e2e сценарий `tests/functional/code_exec-real.spec.ts` (OpenAI key required, проверка non-stub payload).
-  - [x] Прогнать `tests/functional/code_exec-real.spec.ts` в real-provider режиме (`CLERKLY_OPENAI_API_KEY`) и подтвердить non-stub payload.
-  - [x] Добавить real-provider e2e сценарии для Anthropic и Google в `tests/functional/code_exec-real.spec.ts` (key required, проверка non-stub payload).
-  - [x] Добавить mock-provider e2e сценарии для Anthropic и Google в `tests/functional/code_exec.spec.ts` (без внешнего real API).
-  - [x] Прогнать `tests/functional/code_exec.spec.ts --grep "mocked provider endpoint"` и подтвердить прохождение новых mock-кейсов.
-  - [ ] Прогнать `tests/functional/code_exec-real.spec.ts` для Anthropic и Google в real-provider режиме (требуются `CLERKLY_ANTHROPIC_API_KEY` и `CLERKLY_GOOGLE_API_KEY` в окружении запуска).
-  - [ ] Прогнать полный functional-набор `npm run test:functional` (не выполнялось в рамках текущего запроса).
-
-- [x] **Финальная проверка**
-  - [x] Запустить `npm run validate`.
-
-#### Phase 4: Provider Method Extensibility
-
-- [x] **Ввести расширяемую архитектуру provider-method adapters**
-  - [x] Добавить типы `ProviderMethod` и декларативные provider capabilities (`web_search`, будущие методы).
-  - [x] Ввести интерфейс адаптера метода провайдера (`validate` + `execute`).
-  - [x] Реализовать `ProviderMethodRegistry` (lookup по `(provider, method)`).
-  - [x] Перевести `SandboxWebSearchHandler` на использование реестра вместо provider-specific методов внутри handler-а.
-  - [x] Добавить fail-fast проверку соответствия capability ↔ adapter registration при инициализации.
-- [x] **Обеспечить понятный путь подключения нового провайдера/метода**
-  - [x] Зафиксировать чеклист в design/spec: добавить provider, capability, adapter, registry wiring, тесты.
-  - [x] Добавить unit-тесты на реестр и contract тесты адаптеров.
-  - [x] Добавить/обновить functional mock-сценарии для проверки реестровой маршрутизации.
-
-#### Phase 5: Code Review Fixes
-
-- ✅ **5.1. Рефактор apiKey routing — убрать provider/apiKey из сигнатуры `LLMTool.execute`**
-  - ✅ Вернуть `LLMTool.execute` в `ILLMProvider.ts` к исходной сигнатуре `(args, signal?) => Promise<unknown>`.
-  - ✅ В `CodeExecFeature` замкнуть `provider`/`apiKey` через closure: `getTools(provider, apiKey)` передаёт их в `SandboxSessionManager.execute()` через замыкание.
-  - ✅ Убрать `provider`/`apiKey` из `MainPipeline.bindToolExecutors` и type cast `ToolExecuteFn`.
-  - ✅ `PromptBuilder.build(provider, apiKey)` — передаёт apiKey в `collectTools(provider, apiKey)`.
-  - ✅ `CodeExecFeature.getTools(provider, apiKey)` — новый контракт с closure.
-  - ✅ Обновить `AgentFeature` interface: `getTools(provider?: LLMProvider, apiKey?: string): LLMTool[]`.
-  - ✅ Обновить тесты `MainPipeline.test.ts` и `PromptBuilder.test.ts`.
-- ✅ **5.2. Убрать тестовый backdoor `shouldSimulateProviderError` из production кода**
-  - ✅ Удалить функцию `shouldSimulateProviderError` и её вызовы из `WebSearchProviderMethodAdapters.ts`.
-  - ✅ В functional тестах (`code_exec.spec.ts`) для provider_error path использовать `MockLLMServer.setWebSearchErrorMode(500)` вместо magic marker.
-  - ✅ Обновить unit-тесты `WebSearchProviderMethodAdapters.test.ts` — убрать кейсы с `__provider_error__`.
-  - ✅ Обновить unit-тесты `SandboxWebSearchHandler.test.ts` — убрать кейсы с `__provider_error__`.
-- ✅ **5.3. Убрать env variable `CLERKLY_DISABLE_WEB_SEARCH_PROVIDERS`**
-  - ✅ Удалить `getEnvDisabledWebSearchProviders()` и её использование из `ProviderMethodRegistry.ts`.
-  - ✅ Упростить `isProviderMethodSupported` — оставить только lookup в capability matrix.
-  - ✅ Убрать описание env override из `design.md` (секция "Runtime Capability Gating") — уже не содержит env override.
-  - ✅ Обновить тесты `ProviderMethodRegistry.test.ts` — убрать кейсы с env override.
-  - ✅ Удалить env-based тест из `SandboxSessionManager.test.ts`.
-  - ✅ Удалить functional тест с `CLERKLY_DISABLE_WEB_SEARCH_PROVIDERS` из `code_exec.spec.ts`.
-- ✅ **5.4. Зафиксировать timeout 120s и синхронизировать prompt**
-  - ✅ Подтвердить `WEB_SEARCH_TIMEOUT_MS = 120_000` в `SandboxWebSearchHandler.ts`.
-  - ✅ Обновить prompt guidance в `PromptBuilder.ts` (`buildWebSearchPromptSection`): заменить `~30-60s` на `up to ~120s`.
-  - ✅ Зафиксировать значение timeout в `design.md` (новая секция "Таймаут helper-а").
-- ✅ **5.5. Убрать мёртвый код и cosmetic issues**
-  - ✅ `extractProviderMessageWithFallback` — убрать бессмысленный параметр `path` и ветвление; оставить единственную реализацию.
-  - ✅ `PromptBuilder.ts` — исправить `'- allowed runtime API'` обратно на `'- Allowed runtime API'` для консистентности с другими bullet points.
-- ✅ **5.6. Финальная проверка**
-  - ✅ Запустить `npm run validate`.
-  - ✅ Прогнать точечные тесты: `SandboxWebSearchHandler.test.ts`, `WebSearchProviderMethodAdapters.test.ts`, `ProviderMethodRegistry.test.ts`, `MainPipeline.test.ts`, `PromptBuilder.test.ts`.
-  - [ ] Запросить у пользователя подтверждение перед `npm run test:functional`.
+- [ ] Прогнать `tests/functional/code_exec-real.spec.ts` для Anthropic и Google в real-provider режиме (требуются `CLERKLY_ANTHROPIC_API_KEY` и `CLERKLY_GOOGLE_API_KEY` в окружении запуска).
+- [ ] Прогнать полный functional-набор `npm run test:functional` (не выполнялось в рамках текущего запроса).

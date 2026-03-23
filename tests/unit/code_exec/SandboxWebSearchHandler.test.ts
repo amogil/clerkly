@@ -89,16 +89,18 @@ describe('SandboxWebSearchHandler', () => {
       });
     });
 
-    it('should ignore empty queries and return empty OpenAI output list', async () => {
+    it('should return invalid_input for whitespace-only OpenAI queries', async () => {
       /* Preconditions: OpenAI handler initialized with api key
          Action: execute web_search with whitespace-only queries
-         Assertions: returns success with empty output and performs no provider calls
-         Requirements: sandbox-web-search.3.1 */
+         Assertions: returns invalid_input error from validation and performs no provider calls
+         Requirements: sandbox-web-search.2.6 */
       const handler = new SandboxWebSearchHandler('openai', 'sk-test');
       const result = await handler.execute({ queries: ['   ', '\n'] });
       expect(result).toMatchObject({
-        provider: 'openai',
-        output: [],
+        error: {
+          code: 'invalid_input',
+          message: expect.stringContaining('non-empty query'),
+        },
       });
       expect(fetchMock).not.toHaveBeenCalled();
     });

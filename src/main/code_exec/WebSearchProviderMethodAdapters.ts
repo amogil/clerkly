@@ -1,6 +1,7 @@
 // Requirements: sandbox-web-search.2.3, sandbox-web-search.2.4, sandbox-web-search.2.5, sandbox-web-search.3.1, sandbox-web-search.4.1
 
 import { LLM_CHAT_MODELS, LLM_PROVIDERS } from '../llm/LLMConfig';
+import { isTimeoutLikeError } from './contracts';
 import type {
   ProviderMethodAdapter,
   ProviderMethodExecutionContext,
@@ -27,26 +28,16 @@ interface ProviderFetchDebugContext {
   requestLabel: string;
 }
 
+// Anthropic web_search requires max_tokens in every request.
+// 512 balances cost control with sufficient capacity for tool-use responses
+// where the primary payload is in the web_search tool result, not the model text.
+// Requirements: sandbox-web-search.2.4, sandbox-web-search.3.1
+const ANTHROPIC_WEB_SEARCH_MAX_TOKENS = 512;
+
 // Requirements: sandbox-web-search.4.1
 function extractProviderMessageWithFallback(errorData: unknown, fallback: string): string {
   const message = (errorData as { error?: { message?: unknown } }).error?.message;
   return typeof message === 'string' ? message : fallback;
-}
-
-// Requirements: sandbox-web-search.4.2
-function isTimeoutLikeError(error: unknown): boolean {
-  if (!error || typeof error !== 'object') {
-    return false;
-  }
-  const maybeError = error as { name?: string; message?: string; code?: string };
-  const message = (maybeError.message ?? '').toLowerCase();
-  return (
-    maybeError.name === 'AbortError' ||
-    maybeError.name === 'TimeoutError' ||
-    maybeError.code === 'ETIMEDOUT' ||
-    message.includes('timed out') ||
-    message.includes('timeout')
-  );
 }
 
 // Requirements: sandbox-web-search.4.2
@@ -122,6 +113,17 @@ class OpenAIWebSearchAdapter implements ProviderMethodAdapter<OpenAIWebSearchInp
         },
       };
     }
+    // Requirements: sandbox-web-search.2.6
+    const nonEmpty = raw.queries.filter((q: string) => q.trim().length > 0);
+    if (nonEmpty.length === 0) {
+      return {
+        success: false,
+        error: {
+          code: 'invalid_input',
+          message: 'OpenAI web_search requires at least one non-empty query string.',
+        },
+      };
+    }
     return { success: true, input: { queries: raw.queries } };
   }
 
@@ -137,17 +139,16 @@ class OpenAIWebSearchAdapter implements ProviderMethodAdapter<OpenAIWebSearchInp
     const env = process.env.NODE_ENV === 'test' ? 'test' : 'prod';
     const model = LLM_CHAT_MODELS.openai[env].model;
     const endpoint = process.env.CLERKLY_OPENAI_API_URL ?? LLM_PROVIDERS.openai.apiUrl;
-    const queries = input.queries.filter((query) => query.trim().length > 0);
     const results: unknown[] = [];
 
-    for (const [index, query] of queries.entries()) {
+    for (const [index, query] of input.queries.entries()) {
       const response = await fetchWithProviderTimeoutDiagnostics(
         {
           provider: 'openai',
           endpoint,
           model,
           timeoutMs: context.timeoutMs,
-          requestLabel: `query[${index + 1}/${queries.length}] chars=${query.length}`,
+          requestLabel: `query[${index + 1}/${input.queries.length}] chars=${query.length}`,
         },
         {
           method: 'POST',
@@ -237,7 +238,7 @@ class AnthropicWebSearchAdapter implements ProviderMethodAdapter<AnthropicWebSea
         },
         body: JSON.stringify({
           model,
-          max_tokens: 512,
+          max_tokens: ANTHROPIC_WEB_SEARCH_MAX_TOKENS,
           messages: [{ role: 'user', content: input.query }],
           tools: [{ type: 'web_search_20250305', name: 'web_search' }],
         }),
@@ -279,6 +280,17 @@ class GoogleWebSearchAdapter implements ProviderMethodAdapter<GoogleWebSearchInp
         },
       };
     }
+    // Requirements: sandbox-web-search.2.6
+    const nonEmpty = raw.queries.filter((q: string) => q.trim().length > 0);
+    if (nonEmpty.length === 0) {
+      return {
+        success: false,
+        error: {
+          code: 'invalid_input',
+          message: 'Gemini web_search requires at least one non-empty query string.',
+        },
+      };
+    }
     return { success: true, input: { queries: raw.queries } };
   }
 
@@ -297,17 +309,16 @@ class GoogleWebSearchAdapter implements ProviderMethodAdapter<GoogleWebSearchInp
     const endpoint = baseEndpoint.includes('?')
       ? `${baseEndpoint}&key=${encodeURIComponent(context.apiKey)}`
       : `${baseEndpoint}?key=${encodeURIComponent(context.apiKey)}`;
-    const queries = input.queries.filter((query) => query.trim().length > 0);
     const results: unknown[] = [];
 
-    for (const [index, query] of queries.entries()) {
+    for (const [index, query] of input.queries.entries()) {
       const response = await fetchWithProviderTimeoutDiagnostics(
         {
           provider: 'google',
           endpoint,
           model,
           timeoutMs: context.timeoutMs,
-          requestLabel: `query[${index + 1}/${queries.length}] chars=${query.length}`,
+          requestLabel: `query[${index + 1}/${input.queries.length}] chars=${query.length}`,
         },
         {
           method: 'POST',

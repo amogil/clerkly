@@ -109,6 +109,7 @@ function makeMocks() {
   const promptBuilder = {
     build: jest.fn().mockReturnValue({ systemPrompt: 'sys', history: '', tools: [] }),
     buildMessages: jest.fn().mockReturnValue([{ role: 'user', content: 'Hello' }]),
+    forEachFeature: jest.fn(),
   } as unknown as jest.Mocked<PromptBuilder>;
 
   const llmProvider: jest.Mocked<ILLMProvider> = {

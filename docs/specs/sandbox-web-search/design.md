@@ -36,6 +36,7 @@ Helper не является отдельным инструментом main LL
 - `provider` и `apiKey` передаются в `SandboxSessionManager.execute()` через closure в `CodeExecFeature.getTools(provider, apiKey)`.
 - Сигнатура `LLMTool.execute` остаётся чистой: `(args, signal?) => Promise<unknown>` — без протаскивания provider/apiKey через общий tool interface.
 - `MainPipeline.bindToolExecutors` не знает о provider/apiKey — они замкнуты в tool closure на этапе `getTools()`.
+- Инъекция credentials в features выполняется через публичный метод `PromptBuilder.forEachFeature(callback)`, без прямого доступа к приватному полю `features`.
 
 ### Тестовый backdoor
 
@@ -83,16 +84,19 @@ Helper не вводит общий обязательный provider-agnostic s
 ```json
 {
   "error": {
-    "code": "invalid_input | provider_error | timeout | internal_error",
+    "code": "invalid_input | provider_error | timeout | internal_error | policy_denied",
     "message": "Human-readable message"
   }
 }
 ```
 
+`policy_denied` возвращается через fallback в `SandboxSessionManager.handleSandboxToolInvocation`, когда sandbox-код вызывает helper, не зарегистрированный для текущего провайдера.
+
 ## Матрица провайдеров
 
 - **OpenAI**: используется нативный web search контракт OpenAI.
 - **Anthropic**: используется нативный web search контракт Anthropic.
+  - Каждый запрос к Anthropic API включает `max_tokens: 512` (константа `ANTHROPIC_WEB_SEARCH_MAX_TOKENS`). Ограничение задано для контроля стоимости; основной payload результата передаётся через tool result, а не через текст модели.
 - **Gemini**: используется нативный google_search/grounding контракт Gemini.
 - **Fallback**: при отсутствии web search capability у активного провайдера helper `web_search` не публикуется в доступный sandbox tool registry.
 
@@ -100,7 +104,8 @@ Helper не вводит общий обязательный provider-agnostic s
 
 - По умолчанию capability `web_search` включён для `openai`, `anthropic`, `google`.
 - Capability gating определяется декларативно в `ProviderMethodCapabilityMatrix` внутри `ProviderMethodRegistry`.
-- Если провайдер не включён в capability matrix, helper не регистрируется в sandbox tools, и вызов `tools.web_search` возвращает capability denial.
+- Runtime env override отсутствует: capability определяется исключительно декларацией в capability matrix, без переменных окружения.
+- Если провайдер не включён в capability matrix, helper не регистрируется в sandbox tools, и вызов `tools.web_search` из sandbox-кода возвращает `policy_denied` (через fallback в `SandboxSessionManager.handleSandboxToolInvocation`).
 
 ### Таймаут helper-а
 
@@ -155,7 +160,7 @@ Helper не вводит общий обязательный provider-agnostic s
 
 ### Модульные тесты
 
-- `tests/unit/code_exec/SandboxBridge.test.ts` — allowlist и доступность `web_search` helper.
+- `tests/unit/code_exec/SandboxBridge.test.ts` — allowlist-валидация `web_search` как допустимого sandbox tool name.
 - `tests/unit/code_exec/SandboxWebSearchHandler.test.ts` — provider routing, pass-through input/output, structured errors.
 - `tests/unit/code_exec/WebSearchProviderMethodAdapters.test.ts` — provider-specific invocation и mapping ошибок.
 - `tests/unit/agents/PromptBuilder.test.ts` — описание provider-native контракта helper-а в prompt-инструкции `code_exec`.
@@ -164,7 +169,6 @@ Helper не вводит общий обязательный provider-agnostic s
 
 - `tests/functional/code_exec.spec.ts` — вызов `tools.web_search(...)` из sandbox-кода.
 - `tests/functional/code_exec.spec.ts` — provider-native validation failure.
-- `tests/functional/code_exec.spec.ts` — отсутствие `tools.web_search` при неподдерживаемом capability.
 - `tests/functional/code_exec.spec.ts` — корректность persisted lifecycle в рамках `tool_call(code_exec)`.
 - `tests/functional/code_exec.spec.ts` — mock-provider e2e для Anthropic web_search adapter path.
 - `tests/functional/code_exec.spec.ts` — mock-provider e2e для Google web_search adapter path.
@@ -176,7 +180,8 @@ Helper не вводит общий обязательный provider-agnostic s
 
 | Requirement | Unit Tests | Functional Tests |
 |-------------|------------|------------------|
-| sandbox-web-search.1 | ✓ | ✓ |
+| sandbox-web-search.1 (1.1-1.5) | ✓ | ✓ |
+| sandbox-web-search.1.6 (capability fallback) | ✓ | - (unit only) |
 | sandbox-web-search.2 | ✓ | ✓ |
 | sandbox-web-search.3 | ✓ | ✓ |
 | sandbox-web-search.4 | ✓ | ✓ |

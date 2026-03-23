@@ -65,6 +65,38 @@ describe('WebSearchProviderMethodAdapters', () => {
     });
   });
 
+  /* Preconditions: OpenAI adapter is initialized
+     Action: validate payload where all queries are whitespace-only
+     Assertions: adapter returns invalid_input validation error
+     Requirements: sandbox-web-search.2.3, sandbox-web-search.2.6 */
+  it('validates OpenAI whitespace-only queries as invalid_input', () => {
+    const adapter = getAdapter('openai');
+    const result = adapter.validate({ queries: ['   ', '\n'] });
+    expect(result).toMatchObject({
+      success: false,
+      error: {
+        code: 'invalid_input',
+        message: expect.stringContaining('non-empty query'),
+      },
+    });
+  });
+
+  /* Preconditions: Google adapter is initialized
+     Action: validate payload where all queries are whitespace-only
+     Assertions: adapter returns invalid_input validation error
+     Requirements: sandbox-web-search.2.5, sandbox-web-search.2.6 */
+  it('validates Google whitespace-only queries as invalid_input', () => {
+    const adapter = getAdapter('google');
+    const result = adapter.validate({ queries: ['   ', '\t'] });
+    expect(result).toMatchObject({
+      success: false,
+      error: {
+        code: 'invalid_input',
+        message: expect.stringContaining('non-empty query'),
+      },
+    });
+  });
+
   /* Preconditions: Google adapter is initialized with endpoint containing query string
      Action: execute validated input
      Assertions: request URL appends key using "&" and returns provider-native payload list

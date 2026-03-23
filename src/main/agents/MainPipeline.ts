@@ -2200,14 +2200,11 @@ export class MainPipeline {
    * Requirements: sandbox-web-search.1, sandbox-web-search.2
    */
   private injectFeatureCredentials(provider: LLMProvider, apiKey: string): void {
-    const features = (this.promptBuilder as unknown as { features: Array<{ name: string }> })
-      .features;
-    if (!features) return;
-    for (const feature of features) {
+    this.promptBuilder.forEachFeature((feature) => {
       if (feature instanceof CodeExecFeature) {
         feature.setCredentials(provider, apiKey);
       }
-    }
+    });
   }
 
   /**

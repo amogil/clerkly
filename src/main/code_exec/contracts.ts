@@ -27,6 +27,22 @@ export type SandboxWebSearchErrorCode =
   | 'timeout'
   | 'internal_error';
 
+// Requirements: sandbox-web-search.4.1, sandbox-web-search.4.2
+export function isTimeoutLikeError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+  const maybeError = error as { name?: string; message?: string; code?: string };
+  const message = (maybeError.message ?? '').toLowerCase();
+  return (
+    maybeError.name === 'AbortError' ||
+    maybeError.name === 'TimeoutError' ||
+    maybeError.code === 'ETIMEDOUT' ||
+    message.includes('timed out') ||
+    message.includes('timeout')
+  );
+}
+
 export type CodeExecStatus = 'running' | 'success' | 'error' | 'timeout' | 'cancelled';
 
 export interface CodeExecToolInput {

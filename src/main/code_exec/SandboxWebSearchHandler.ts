@@ -1,6 +1,6 @@
 // Requirements: sandbox-web-search.2, sandbox-web-search.3, sandbox-web-search.4
 import { LLMProvider } from '../../types';
-import { SandboxWebSearchErrorCode } from './contracts';
+import { isTimeoutLikeError, SandboxWebSearchErrorCode } from './contracts';
 import { getProviderMethodAdapter } from './ProviderMethodRegistry';
 
 export interface SandboxWebSearchError {
@@ -62,7 +62,7 @@ export class SandboxWebSearchHandler {
         output,
       };
     } catch (error) {
-      const errorCode = this.isTimeoutError(error) ? 'timeout' : 'provider_error';
+      const errorCode = isTimeoutLikeError(error) ? 'timeout' : 'provider_error';
       // Requirements: sandbox-web-search.4.1, sandbox-web-search.4.2
       return {
         error: {
@@ -75,23 +75,5 @@ export class SandboxWebSearchHandler {
 
   private error(code: SandboxWebSearchErrorCode, message: string): SandboxWebSearchError {
     return { error: { code, message } };
-  }
-
-  // Requirements: sandbox-web-search.4.1, sandbox-web-search.4.2
-  private isTimeoutError(error: unknown): boolean {
-    if (!error || typeof error !== 'object') {
-      return false;
-    }
-
-    const maybeError = error as { name?: string; message?: string; code?: string };
-    const message = (maybeError.message ?? '').toLowerCase();
-
-    return (
-      maybeError.name === 'AbortError' ||
-      maybeError.name === 'TimeoutError' ||
-      maybeError.code === 'ETIMEDOUT' ||
-      message.includes('timed out') ||
-      message.includes('timeout')
-    );
   }
 }

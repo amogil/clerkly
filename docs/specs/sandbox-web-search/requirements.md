@@ -35,6 +35,8 @@ Helper НЕ задаёт единый кросс-провайдерный search
 
 1.6. КОГДА активный провайдер не предоставляет web search capability, helper `web_search` НЕ ДОЛЖЕН публиковаться в списке доступных sandbox tools.
 
+1.7. КОГДА sandbox-код вызывает `tools.web_search(...)`, но helper не зарегистрирован для текущего провайдера (не прошёл capability check), ТО sandbox runtime ДОЛЖЕН возвращать structured error `policy_denied` с сообщением о недоступности helper-а для активного провайдера.
+
 #### Функциональные Тесты
 
 - `tests/functional/code_exec.spec.ts` — "should allow sandbox code to call tools.web_search"
@@ -61,6 +63,8 @@ Helper НЕ задаёт единый кросс-провайдерный search
 2.5. КОГДА активный провайдер — Gemini, ТО helper ДОЛЖЕН использовать нативный контракт google_search/grounding Gemini.
 
 2.6. КОГДА вход helper-а невалиден относительно provider-native контракта активного провайдера, ТО helper ДОЛЖЕН возвращать structured error `invalid_input`.
+
+2.7. КОГДА все переданные запросы (queries/query) пусты или содержат только пробельные символы после trim, ТО helper ДОЛЖЕН возвращать structured error `invalid_input` для всех провайдеров (OpenAI, Anthropic, Google).
 
 #### Функциональные Тесты
 
@@ -117,6 +121,7 @@ Helper НЕ задаёт единый кросс-провайдерный search
 - `provider_error`
 - `timeout`
 - `internal_error`
+- `policy_denied` (при вызове helper-а, не зарегистрированного для текущего провайдера)
 
 4.3. Helper `web_search` SHALL NOT выполнять автоматический retry внутри handler-а; повторные попытки выполняются только внешним оркестратором/кодом вызывающей стороны.
 
@@ -164,8 +169,9 @@ Helper НЕ задаёт единый кросс-провайдерный search
 - успешный вызов `tools.web_search(...)` для активного провайдера;
 - provider-native validation failure;
 - runtime-сбой provider-helper path без crash pipeline;
-- отсутствие отдельного persisted `tool_call(web_search)`;
-- отсутствие `tools.web_search` в runtime при недоступной provider capability.
+- отсутствие отдельного persisted `tool_call(web_search)`.
+
+6.3. Отсутствие `tools.web_search` в runtime при недоступной provider capability покрывается unit-тестами (`SandboxSessionManager.test.ts`, `ProviderMethodRegistry.test.ts`).
 
 #### Функциональные Тесты
 
@@ -174,7 +180,6 @@ Helper НЕ задаёт единый кросс-провайдерный search
 - `tests/functional/code_exec.spec.ts` — "should execute google web_search helper against mocked provider endpoint"
 - `tests/functional/code_exec.spec.ts` — "should return invalid_input for provider-native validation failure"
 - `tests/functional/code_exec.spec.ts` — "should return invalid_input for Anthropic whitespace-only query in web_search helper"
-- `tests/functional/code_exec.spec.ts` — "should not expose tools.web_search when active provider lacks web search capability"
 - `tests/functional/code_exec-real.spec.ts` — "should execute tools.web_search against real OpenAI and return non-stub payload"
 - `tests/functional/code_exec-real.spec.ts` — "should execute tools.web_search against real Anthropic and return non-stub payload"
 - `tests/functional/code_exec-real.spec.ts` — "should execute tools.web_search against real Google and return non-stub payload"

@@ -221,6 +221,16 @@ export class PromptBuilder {
     ];
   }
 
+  /**
+   * Iterate over registered features and invoke callback for each.
+   * Requirements: sandbox-web-search.1, sandbox-web-search.2
+   */
+  forEachFeature(callback: (feature: AgentFeature) => void): void {
+    for (const feature of this.features) {
+      callback(feature);
+    }
+  }
+
   private buildSystemPrompt(provider?: LLMProvider): string {
     const parts = [this.systemPrompt];
     for (const feature of this.features) {
