@@ -4,7 +4,7 @@
 
 Реализовать helper `web_search` как sandbox capability внутри `code_exec` (через `tools.web_search(...)`) с provider-native контрактом активного LLM-провайдера.
 
-**Current status:** Phase 7 - Fourth Code Review Fixes
+**Current status:** Phase 8 - Test Strategy Refinement
 
 ---
 

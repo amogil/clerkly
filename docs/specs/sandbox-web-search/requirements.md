@@ -41,8 +41,6 @@ Helper НЕ задаёт единый кросс-провайдерный search
 
 - `tests/functional/code_exec.spec.ts` — "should allow sandbox code to call tools.web_search"
 - `tests/functional/code_exec-real.spec.ts` — "should execute tools.web_search against real OpenAI and return non-stub payload"
-- `tests/functional/code_exec-real.spec.ts` — "should execute tools.web_search against real Anthropic and return non-stub payload"
-- `tests/functional/code_exec-real.spec.ts` — "should execute tools.web_search against real Google and return non-stub payload"
 
 ### 2. Контракт helper-а
 
@@ -76,8 +74,6 @@ Helper НЕ задаёт единый кросс-провайдерный search
 - `tests/functional/code_exec.spec.ts` — "should return invalid_input for provider-native validation failure"
 - `tests/functional/code_exec.spec.ts` — "should return invalid_input for Anthropic whitespace-only query in web_search helper"
 - `tests/functional/code_exec-real.spec.ts` — "should execute tools.web_search against real OpenAI and return non-stub payload"
-- `tests/functional/code_exec-real.spec.ts` — "should execute tools.web_search against real Anthropic and return non-stub payload"
-- `tests/functional/code_exec-real.spec.ts` — "should execute tools.web_search against real Google and return non-stub payload"
 
 ### 3. Выходной контракт
 
@@ -105,8 +101,6 @@ Helper НЕ задаёт единый кросс-провайдерный search
 - `tests/functional/code_exec.spec.ts` — "should execute anthropic web_search helper against mocked provider endpoint"
 - `tests/functional/code_exec.spec.ts` — "should execute google web_search helper against mocked provider endpoint"
 - `tests/functional/code_exec-real.spec.ts` — "should execute tools.web_search against real OpenAI and return non-stub payload"
-- `tests/functional/code_exec-real.spec.ts` — "should execute tools.web_search against real Anthropic and return non-stub payload"
-- `tests/functional/code_exec-real.spec.ts` — "should execute tools.web_search against real Google and return non-stub payload"
 
 ### 4. Ошибки и capability fallback
 
@@ -183,5 +177,3 @@ Helper НЕ задаёт единый кросс-провайдерный search
 - `tests/functional/code_exec.spec.ts` — "should return invalid_input for provider-native validation failure"
 - `tests/functional/code_exec.spec.ts` — "should return invalid_input for Anthropic whitespace-only query in web_search helper"
 - `tests/functional/code_exec-real.spec.ts` — "should execute tools.web_search against real OpenAI and return non-stub payload"
-- `tests/functional/code_exec-real.spec.ts` — "should execute tools.web_search against real Anthropic and return non-stub payload"
-- `tests/functional/code_exec-real.spec.ts` — "should execute tools.web_search against real Google and return non-stub payload"
