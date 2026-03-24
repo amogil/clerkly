@@ -57,7 +57,6 @@
 
 #### Фаза 3: Unit-тесты
 
-- [ ] Добавить тесты в `tests/unit/agents/MainPipeline.test.ts`:
 - [x] Добавить тесты в `tests/unit/agents/MainPipeline.test.ts`:
   - [x] Timeout retry исчерпывает 3 retry (4 вызова `chat`), затем создаёт один `kind:error` с `type=timeout`.
   - [x] Timeout успешен на 2-м retry (2 вызова `chat`, нет `kind:error`).
