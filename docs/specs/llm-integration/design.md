@@ -153,6 +153,16 @@ CREATE TABLE messages (
 
 `kind: error` сообщения всегда сохраняются как завершённые (`done: true`).
 
+#### Последовательность hidden → error на renderer
+
+При ошибке во время стриминга (timeout, abort, невалидный ответ модели) `handleRunError` выполняет два действия:
+1. `hideIncompleteLlmMessage(messageId)` → `MESSAGE_UPDATED(hidden: true)` → renderer получает скрытие
+2. `messageManager.create('error', ...)` → `MESSAGE_CREATED(kind: error)` → renderer получает ошибку
+
+`IPCChatTransport` при получении `hidden: true` не закрывает stream немедленно, а вызывает `scheduleFinishIfIdle(200)` — idle delay 200ms. Это даёт время для доставки `kind: error` через IPC до закрытия stream. Если `kind: error` приходит в пределах 200ms, `cancelPendingFinish()` отменяет idle-закрытие, error message доставляется потребителю, и stream закрывается после обработки error.
+
+Без idle delay: `IPCChatTransport` закрывал stream при `hidden`, отписывался от событий, и `kind: error` терялся — UI зависал без error bubble.
+
 Для ошибок без action_link (network, provider, timeout):
 
 ```json
@@ -584,15 +594,28 @@ You are a helpful AI assistant. Always reply in the user's language (detected fr
 **Нормализация ошибок AI SDK в `LLMProvider.chat()`:**
 
 ```typescript
-// Requirements: llm-integration.3, llm-integration.3.10
-const TIMEOUT_MS = 300_000; // 5 минут
+// Requirements: llm-integration.3, llm-integration.3.6, llm-integration.3.10
+const TIMEOUT_MS = 120_000; // 2 минуты на каждый запрос к LLM API
+
+// Таймер сбрасывается при каждом onStepFinish (llm-integration.3.6.1):
+// - setTimeout(120s) при старте chat()
+// - clearTimeout + setTimeout(120s) в onStepFinish callback
+// - Время выполнения инструментов между запросами не учитывается
+let timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
 try {
-  // provider adapter запускает streaming через Vercel AI SDK
-  // и маппит AI SDK ошибки в единый доменный формат
-  await runProviderStreamWithTimeout({ timeoutMs: TIMEOUT_MS, signal });
+  await runProviderStreamWithTimeout({
+    timeoutMs: TIMEOUT_MS,
+    signal,
+    onStepFinish: () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    },
+  });
 } catch (error) {
   throw normalizeLLMError(error); // APICallError/RetryError/UIMessageStreamError/Tool*Error -> domain code
+} finally {
+  clearTimeout(timeoutId);
 }
 ```
 
@@ -675,6 +698,20 @@ class MainPipeline {
 - При невалидных аргументах pipeline возвращает модели диагностику ошибки валидации и запускает bounded retry/repair в рамках текущего turn (`maxRetries = 2`).
 - При невалидных аргументах persisted `kind: tool_call` не создаётся и не обновляется на всех попытках retry/repair.
 - Если после исчерпания retry/repair аргументы остаются невалидными, `MainPipeline` завершает turn через обычное `kind:error` сообщение (без terminal-ошибки `tool_call`).
+
+**Orphaned tool_call (SDK multi-step abort bug):**
+
+Vercel AI SDK (ai@5.1.5) может потерять ошибку при multi-step tool loop: step N TransformStream controller закрывается до того, как catch от `streamStep(N+1)` может enqueue error chunk. Provider возвращает `{ text: '' }` как успешный результат.
+
+`finalizeAttemptResult` детектирует это: `sawAnyToolCall === true`, но `finalLlmMessageId === null` и `finalAnswerCall === null` — модель вернула tool call, выполнила его, но не дала ответ.
+
+Pipeline обрабатывает это через `InvalidFinalAnswerContractError` — тот же путь retry, что и для невалидных аргументов. На retry pipeline пересылает разговор (включая tool result из первой попытки), давая модели ещё один шанс ответить. После `MAX_INVALID_TOOL_CALL_RETRIES` (2) безуспешных попыток — `kind:error`.
+
+```
+finalizeAttemptResult():
+  if sawAnyToolCall && !finalLlmMessageId && !finalAnswerCall:
+    throw InvalidFinalAnswerContractError  // → retry via handleAttemptFailure
+```
 
 **Обработка ошибок:**
 
@@ -859,6 +896,13 @@ User отправляет сообщение
 - `tests/unit/agents/MainPipeline.test.ts` — integration rename-flow: первое валидное вхождение, отсутствие модификации output-stream, fallback при invalid comment
 - `tests/unit/agents/MainPipeline.test.ts` — per-turn prompt injection: контракт auto-title добавляется только на eligible turn (cooldown/meaningful guards)
 - `tests/unit/agents/MainPipeline.test.ts` — runtime guard: `<!-- clerkly:title-meta: ... -->` отклоняется в аргументах tool_call до persist (`final_answer`, `code_exec.task_summary`)
+- `tests/unit/agents/MainPipeline.test.ts` — orphaned tool_call (SDK multi-step abort bug): retry при `sawAnyToolCall && !finalLlmMessageId && !finalAnswerCall`, затем `kind:error` после исчерпания retry
+- `tests/unit/agents/MainPipeline.test.ts` — handleRunError resilience: secondary error при создании error message логируется, не теряется
+- `tests/unit/agents/MainPipeline.test.ts` — per-step timeout: создание `kind:error` при internal timeout после multi-step tool execution
+- `tests/unit/llm/OpenAIProvider.chat.test.ts` — сброс таймера `CHAT_TIMEOUT_MS` при каждом `onStepFinish`
+- `tests/unit/llm/AnthropicProvider.chat.test.ts` — сброс таймера `CHAT_TIMEOUT_MS` при каждом `onStepFinish`
+- `tests/unit/llm/GoogleProvider.chat.test.ts` — сброс таймера `CHAT_TIMEOUT_MS` при каждом `onStepFinish`
+- `tests/unit/renderer/IPCChatTransport.test.ts` — hidden message + error message: error доставляется через idle delay окно до закрытия stream
 - `tests/unit/components/agents/AgentMessage.test.tsx` — renderer defense-in-depth: persisted historical `tool_call` payload с `<!-- clerkly:title-meta: ... -->` не показывает metadata comment в UI
 - `tests/unit/agents/AgentTitleNormalization.test.ts` — нормализация/валидация title (single-line, trim, punctuation, max 200)
 - `tests/unit/agents/AgentTitleAntiFlap.test.ts` — guards anti-flapping (exact match, split `rename_need_score` threshold для `New Agent`/non-default, cooldown)
@@ -902,6 +946,7 @@ User отправляет сообщение
 - `tests/functional/llm-chat.spec.ts` — "should skip rename when rename_need_score is below threshold"
 - `tests/functional/llm-chat.spec.ts` — "should skip rename when rename_need_score is invalid"
 - `tests/functional/llm-chat.spec.ts` — "should apply rename for new intent after 5-turn cooldown"
+- `tests/functional/llm-chat.spec.ts` — "should show error bubble after LLM stream failure (not a silent hang)"
 
 ### Покрытие Требований
 
@@ -948,6 +993,8 @@ User отправляет сообщение
 | llm-integration.3.4.4 | ✓ | ✓ |
 | llm-integration.3.5 | ✓ | ✓ |
 | llm-integration.3.6 | ✓ | ✓ |
+| llm-integration.3.6.1 | ✓ | - |
+| llm-integration.3.6.2 | ✓ | - |
 | llm-integration.3.7 | - | ✓ |
 | llm-integration.3.7.1 | - | ✓ |
 | llm-integration.3.7.2 | - | ✓ |
@@ -1059,6 +1106,7 @@ User отправляет сообщение
 | llm-integration.11.4.4 | ✓ | ✓ |
 | llm-integration.11.5 | ✓ | ✓ |
 | llm-integration.11.5.1 | ✓ | ✓ |
+| llm-integration.11.5.4 | ✓ | ✓ |
 | llm-integration.11.6 | ✓ | ✓ |
 | llm-integration.11.6.1 | ✓ | ✓ |
 | llm-integration.11.7 | ✓ | ✓ |

@@ -109,6 +109,7 @@ function makeMocks() {
   const promptBuilder = {
     build: jest.fn().mockReturnValue({ systemPrompt: 'sys', history: '', tools: [] }),
     buildMessages: jest.fn().mockReturnValue([{ role: 'user', content: 'Hello' }]),
+    forEachFeature: jest.fn(),
   } as unknown as jest.Mocked<PromptBuilder>;
 
   const llmProvider: jest.Mocked<ILLMProvider> = {
@@ -2364,7 +2365,8 @@ describe('MainPipeline.run()', () => {
     const bind = (
       pipeline as unknown as {
         bindToolExecutors: (
-          tools: NonNullable<ChatOptions['tools']>
+          tools: NonNullable<ChatOptions['tools']>,
+          fallbackSignal?: AbortSignal
         ) => NonNullable<ChatOptions['tools']>;
       }
     ).bindToolExecutors.bind(pipeline);
@@ -2668,6 +2670,116 @@ describe('MainPipeline.run()', () => {
     expect(messageManager.setUsage).toHaveBeenCalled();
   });
 
+  /* Preconditions: Multi-step provider stream with tool execution; internal CHAT_TIMEOUT_MS
+       fires after meaningful reasoning chunks, but external signal is NOT aborted.
+     Action: provider.chat resolves tool steps then throws LLMRequestAbortedError on the
+       post-tool LLM step (simulating internal timeout after tool execution consumed most budget)
+     Assertions: Pipeline creates kind:error with type=timeout (not silently swallowed)
+     Requirements: llm-integration.3.6, llm-integration.12.1 */
+  it('creates kind:error when internal provider timeout fires after multi-step tool execution (external signal not aborted)', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+    // Real AbortController like AgentIPCHandlers uses — but NOT aborted
+    const controller = new AbortController();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        // Step 1: normal tool_call + tool_result (simulates successful code_exec)
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-step1',
+          toolName: 'code_exec',
+          arguments: { task_summary: 'Run code', code: 'console.log(1)' },
+        });
+        onChunk({
+          type: 'tool_result',
+          callId: 'call-step1',
+          toolName: 'code_exec',
+          arguments: { task_summary: 'Run code', code: 'console.log(1)' },
+          output: { status: 'success', stdout: '1\n', stderr: '' },
+          status: 'success',
+        });
+        // Step 2: LLM starts reasoning but internal timeout fires
+        onChunk({ type: 'reasoning', delta: 'Rerunning queries for news...' });
+        // Internal timeout abort — NOT user cancel
+        throw new LLMRequestAbortedError(
+          'Model response timeout. The provider took too long to respond. Please try again later.',
+          new Error('aborted')
+        );
+      }
+    );
+
+    await pipeline.run('agent-1', 1, controller.signal);
+
+    // Must hide the in-flight llm message
+    expect(messageManager.hideAndMarkIncomplete).toHaveBeenCalled();
+    // Must create kind:error with type=timeout
+    const errorCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'error'
+    );
+    expect(errorCreates).toHaveLength(1);
+    expect(errorCreates[0][2]).toEqual(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          error: expect.objectContaining({ type: 'timeout' }),
+        }),
+      })
+    );
+  });
+
+  /* Preconditions: SDK multi-step tool loop runs tool_call(search_docs). SDK silently loses
+       abort error due to closed TransformStream controller bug (enqueue on closed controller
+       is a no-op). Provider returns normally with empty text and no error — pipeline sees
+       sawAnyToolCall=true but no finalLlmMessageId and no finalAnswerCall.
+     Action: pipeline.run() receives tool_call+tool_result but no text or final_answer
+     Assertions: pipeline retries (InvalidFinalAnswerContractError path) and after
+       MAX_INVALID_TOOL_CALL_RETRIES creates kind:error. This ensures the pipeline does not
+       silently complete when the model failed to respond after tool execution.
+     Requirements: llm-integration.3.6, llm-integration.11.1, llm-integration.11.5.4 */
+  it('retries and then creates kind:error when model emits tool_call but no text or final_answer (orphaned tool_call from silent SDK abort)', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    // Simulate the exact SDK bug — every attempt yields the same:
+    // tool_call + tool_result but no text and no final_answer.
+    // The pipeline treats this as InvalidFinalAnswerContractError (retryable).
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-orphan',
+          toolName: 'search_docs',
+          arguments: { query: 'broken' },
+        });
+        onChunk({
+          type: 'tool_result',
+          callId: 'call-orphan',
+          toolName: 'search_docs',
+          arguments: { query: 'broken' },
+          output: {
+            status: 'error',
+            error: { code: 'sandbox_runtime_error', message: '(results || []) is not iterable' },
+          },
+          status: 'error',
+        });
+        // No text, no final_answer — SDK silently ended the stream
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    // Pipeline retries via InvalidFinalAnswerContractError path:
+    // attempt 0 → orphaned tool_call → retry
+    // attempt 1 → orphaned tool_call → retry
+    // attempt 2 → orphaned tool_call → MAX_INVALID_TOOL_CALL_RETRIES exhausted → error
+    expect(llmProvider.chat).toHaveBeenCalledTimes(3);
+
+    // After retries exhausted, pipeline creates kind:error
+    const errorCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'error'
+    );
+    expect(errorCreates).toHaveLength(1);
+  });
+
   it('on aborted signal with thrown error hides in-flight message and skips kind:error', async () => {
     const { pipeline, llmProvider, messageManager } = makeMocks();
     const controller = new AbortController();
@@ -2687,6 +2799,46 @@ describe('MainPipeline.run()', () => {
       (call: unknown[]) => call[1] === 'error'
     );
     expect(errorCreates).toHaveLength(0);
+  });
+
+  /* Preconditions: LLM throws a non-abort error (e.g. timeout), external signal not aborted,
+       but messageManager.create throws when trying to persist the kind:error message.
+     Action: pipeline.run() — provider throws, handleRunError tries to create error message
+       but messageManager.create throws a secondary error.
+     Assertions: pipeline completes without propagating the secondary error (it is logged
+       internally). The incomplete LLM message is still hidden. The secondary error does NOT
+       crash the pipeline — this resilience prevents silent hangs when the error-handling path
+       itself fails.
+     Requirements: llm-integration.3.6, llm-integration.11.5.4 */
+  it('handleRunError resilience: secondary error during error message creation is logged, pipeline completes', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+    const controller = new AbortController();
+
+    // Provider throws non-abort error after reasoning chunks
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({ type: 'reasoning', delta: 'Thinking...' });
+        throw new LLMRequestAbortedError(
+          'Model response timeout. The provider took too long to respond.',
+          new Error('aborted')
+        );
+      }
+    );
+
+    // Make messageManager.create throw when trying to create kind:error
+    const originalCreate = messageManager.create as jest.Mock;
+    originalCreate.mockImplementation((agentId: string, kind: string) => {
+      if (kind === 'error') {
+        throw new Error('DB write failed — secondary error');
+      }
+      return { id: 999 };
+    });
+
+    // Pipeline should complete without throwing despite the secondary error
+    await expect(pipeline.run('agent-1', 1, controller.signal)).resolves.toBeUndefined();
+
+    // Incomplete LLM message was still hidden (this happens before the secondary error)
+    expect(messageManager.hideAndMarkIncomplete).toHaveBeenCalled();
   });
 
   it('ignores empty reasoning/text deltas and falls back to output.text', async () => {

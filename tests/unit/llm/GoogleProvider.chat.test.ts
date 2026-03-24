@@ -261,6 +261,47 @@ describe('GoogleProvider.chat()', () => {
     setTimeoutSpy.mockRestore();
   });
 
+  /* Preconditions: SDK invokes onStepFinish during multi-step tool loop
+     Action: provider.chat() completes with onStepFinish callback
+     Assertions: timeout timer is reset (clearTimeout + setTimeout called again) after each step
+     Requirements: llm-integration.3.6, llm-integration.3.6.1 */
+  it('resets timeout timer on each onStepFinish so tool execution does not eat model timeout', async () => {
+    const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
+    const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
+
+    (aiModule.streamText as unknown as jest.Mock).mockImplementation((options) => {
+      options.onStepFinish?.({
+        stepNumber: 0,
+        finishReason: 'tool-calls',
+        toolCalls: [{ id: 't1' }],
+        toolResults: [{ id: 't1' }],
+        usage: {},
+      });
+      options.onStepFinish?.({
+        stepNumber: 1,
+        finishReason: 'stop',
+        toolCalls: [],
+        toolResults: [],
+        usage: {},
+      });
+      return {
+        fullStream: toAsyncIterable([{ type: 'text-delta', text: 'ok' }]),
+        totalUsage: Promise.resolve({}),
+      };
+    });
+
+    await provider.chat(mockMessages, mockOptions, () => {});
+
+    const timeoutCalls = setTimeoutSpy.mock.calls.filter((call) => call[1] === CHAT_TIMEOUT_MS);
+    expect(timeoutCalls.length).toBeGreaterThanOrEqual(3);
+
+    const clearCalls = clearTimeoutSpy.mock.calls.length;
+    expect(clearCalls).toBeGreaterThanOrEqual(3);
+
+    setTimeoutSpy.mockRestore();
+    clearTimeoutSpy.mockRestore();
+  });
+
   it('collects per-step diagnostics from SDK onStep callbacks', async () => {
     (aiModule.streamText as unknown as jest.Mock).mockImplementation((options) => {
       options.experimental_onStepStart?.({ stepNumber: 0 });

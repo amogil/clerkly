@@ -98,6 +98,8 @@
 
 2.8.2. Allowlist тулов sandbox runtime ДОЛЖЕН определяться в одном централизованном месте и использоваться как единый источник истины для валидации вызовов.
 
+2.8.3. КОГДА helper `web_search` включён в allowlist sandbox runtime, его контракт, маршрутизация и error handling ДОЛЖНЫ определяться в `docs/specs/sandbox-web-search/*`.
+
 2.9. Sandbox runtime SHALL NOT поддерживать многопоточность JavaScript (запрещены `Worker`, `SharedWorker`, `ServiceWorker`, `Worklet`).
 
 2.9.1. КОГДА sandbox-код пытается использовать многопоточность, ТО система ДОЛЖНА завершать вызов контролируемой ошибкой с `status = "error"`, `error.code = "policy_denied"` и `error.message = "Multithreading APIs are not allowed in sandbox runtime."`.
@@ -212,6 +214,8 @@
 3.2.1. Разрешённые API консоли ДОЛЖНЫ быть перечислены явно: `console.log`, `console.info`, `console.warn`, `console.error`.
 
 3.2.2. КОГДА в allowlist sandbox runtime включён helper `http_request`, ТО система ДОЛЖНА документировать его для модели как разрешённый API `tools.http_request(...)`; детальный контракт данного helper-а ДОЛЖЕН определяться в `docs/specs/sandbox-http-request/*`.
+
+3.2.2.1. КОГДА в allowlist sandbox runtime включён helper `web_search`, ТО система ДОЛЖНА документировать его для модели как разрешённый API `tools.web_search(...)`; детальный контракт, provider-native маршрутизация и error handling ДОЛЖНЫ определяться в `docs/specs/sandbox-web-search/*`.
 
 3.2.3. Prompt/tool-инструкция для модели ДОЛЖНА явно указывать, что внутри одного вызова `code_exec` sandbox-код МОЖЕТ выполнять несколько вызовов allowlisted helper-ов, если это необходимо для решения задачи.
 

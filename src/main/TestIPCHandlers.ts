@@ -13,6 +13,8 @@ import type { AuthIPCHandlers } from './auth/AuthIPCHandlers';
 import type { OAuthClientManager } from './auth/OAuthClientManager';
 import { Logger } from './Logger';
 import { NO_USER_LOGGED_IN_ERROR } from '../shared/errors/userErrors';
+import { SandboxWebSearchHandler } from './code_exec/SandboxWebSearchHandler';
+import type { LLMProvider } from '../types';
 
 const logger = Logger.create('TestIPCHandlers');
 
@@ -473,6 +475,29 @@ export function registerTestIPCHandlers(
       } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         logger.error(`Test: Failed to set agent status: ${errorMessage}`);
+        return { success: false, error: errorMessage };
+      }
+    }
+  );
+
+  ipcMain.handle(
+    'test:web-search-execute',
+    async (_event: Electron.IpcMainInvokeEvent, provider: LLMProvider, args: unknown) => {
+      if (!isTestEnvironment()) {
+        throw new Error('test:web-search-execute can only be used in test environment');
+      }
+      try {
+        const envKeyName = `CLERKLY_${provider.toUpperCase()}_API_KEY`;
+        const envKey = process.env[envKeyName];
+        if (!envKey) {
+          return { success: false, error: `Missing ${envKeyName}` };
+        }
+
+        const result = await new SandboxWebSearchHandler(provider, envKey).execute(args);
+        return { success: true, data: result };
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        logger.error(`Test: Failed to execute web search for ${provider}: ${errorMessage}`);
         return { success: false, error: errorMessage };
       }
     }

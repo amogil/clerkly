@@ -90,8 +90,6 @@ describe('evaluateAgentTitleGuards', () => {
     expect(decision.allow).toBe(true);
     expect(decision.reason).toBe('allow');
   });
-
-
   /* Preconditions: Current title is non-default and score is below non-default threshold
      Action: Evaluate anti-flapping guards
      Assertions: Rename is skipped by score guard

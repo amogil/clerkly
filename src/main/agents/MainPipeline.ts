@@ -3,7 +3,11 @@
 // Orchestrates the LLM request/response cycle for a single agent message
 
 import { MessageManager } from './MessageManager';
-import { PromptBuilder, buildAutoTitleMetadataContractPrompt } from './PromptBuilder';
+import {
+  PromptBuilder,
+  buildAutoTitleMetadataContractPrompt,
+  CodeExecFeature,
+} from './PromptBuilder';
 import { AIAgentSettingsManager } from '../AIAgentSettingsManager';
 import { LLMProviderFactory } from '../llm/LLMProviderFactory';
 import { MainEventBus } from '../events/MainEventBus';
@@ -262,10 +266,11 @@ export class MainPipeline {
     const messages = this.messageManager.listForModelHistory(agentId);
     const autoTitleInstruction = this.buildAutoTitleSystemInstruction(agentId, messages);
     const baseChatMessages = this.injectSystemMessage(
-      this.promptBuilder.buildMessages(messages),
+      this.promptBuilder.buildMessages(messages, provider),
       autoTitleInstruction
     );
-    const builtPrompt = this.promptBuilder.build();
+    this.injectFeatureCredentials(provider, apiKey);
+    const builtPrompt = this.promptBuilder.build(provider);
     const replyToMessageId = userMessageId;
     const options = {
       ...this.resolveOptions(provider),
@@ -893,6 +898,22 @@ export class MainPipeline {
     if (state.finalLlmMessageId === null && !state.finalAnswerCall && !state.sawAnyToolCall) {
       throw new InvalidFinalAnswerContractError(
         'Model returned no assistant text and no completion tool call'
+      );
+    }
+    // Orphaned tool_call: model made a tool call (sawAnyToolCall) but returned no text
+    // and no final_answer afterward. This happens when Vercel AI SDK (ai@5.1.5) silently
+    // loses the abort error during multi-step tool loop — step N's TransformStream
+    // controller closes before streamStep(N+1) can enqueue the error. The provider returns
+    // { text: '' } as if the call succeeded.
+    //
+    // We use InvalidFinalAnswerContractError so that handleAttemptFailure retries the model
+    // call (up to MAX_INVALID_TOOL_CALL_RETRIES). On retry, the pipeline resends the
+    // conversation (including the tool result from the first attempt) and the model gets
+    // another chance to respond. If all retries fail the same way, the user sees an error.
+    // Requirements: llm-integration.11.5.4
+    if (state.sawAnyToolCall && state.finalLlmMessageId === null && !state.finalAnswerCall) {
+      throw new InvalidFinalAnswerContractError(
+        'Model returned a tool call but provided no response after the tool result. Retrying.'
       );
     }
     if (cycleState.invalidFinalAnswerSeen && !state.finalAnswerCall) {
@@ -2082,44 +2103,55 @@ export class MainPipeline {
 
     this.logger.error(`Pipeline error for agent ${agentId}: ${errorMessage}`);
 
-    if (lastLlmMessageId !== null) {
-      try {
-        this.hideIncompleteLlmMessage(lastLlmMessageId, agentId);
-      } catch {
-        // ignore
+    // Requirements: llm-integration.3.6
+    // Wrap non-abort error handling in try/catch for resilience: if DB operations
+    // (hideIncompleteLlmMessage, finalizePendingToolCallsForTurn, messageManager.create)
+    // throw, log the secondary error instead of letting it propagate and get silently
+    // swallowed by handleBackgroundError.
+    try {
+      if (lastLlmMessageId !== null) {
+        try {
+          this.hideIncompleteLlmMessage(lastLlmMessageId, agentId);
+        } catch {
+          // ignore
+        }
       }
-    }
-    this.finalizePendingToolCallsForTurn(agentId, userMessageId, normalizedError.message);
+      this.finalizePendingToolCallsForTurn(agentId, userMessageId, normalizedError.message);
 
-    const errorReplyTo = userMessageId;
+      const errorReplyTo = userMessageId;
 
-    if (errorType === 'rate_limit') {
-      const retryAfterSeconds = normalizedError.retryAfterSeconds ?? 10;
-      MainEventBus.getInstance().publish(
-        new AgentRateLimitEvent(agentId, userMessageId, retryAfterSeconds)
-      );
-      return;
-    }
+      if (errorType === 'rate_limit') {
+        const retryAfterSeconds = normalizedError.retryAfterSeconds ?? 10;
+        MainEventBus.getInstance().publish(
+          new AgentRateLimitEvent(agentId, userMessageId, retryAfterSeconds)
+        );
+        return;
+      }
 
-    const errorPayload: Record<string, unknown> = {
-      type: errorType,
-      message: normalizedError.message,
-    };
-    if (errorType === 'auth') {
-      errorPayload['action_link'] = { label: 'Open Settings', screen: 'settings' };
-    }
+      const errorPayload: Record<string, unknown> = {
+        type: errorType,
+        message: normalizedError.message,
+      };
+      if (errorType === 'auth') {
+        errorPayload['action_link'] = { label: 'Open Settings', screen: 'settings' };
+      }
 
-    this.messageManager.create(
-      agentId,
-      'error',
-      {
-        data: {
-          error: errorPayload,
+      this.messageManager.create(
+        agentId,
+        'error',
+        {
+          data: {
+            error: errorPayload,
+          },
         },
-      },
-      errorReplyTo,
-      true
-    );
+        errorReplyTo,
+        true
+      );
+    } catch (secondaryError) {
+      this.logger.error(
+        `Failed to create error message for agent ${agentId}: ${secondaryError instanceof Error ? secondaryError.message : String(secondaryError)}`
+      );
+    }
   }
 
   /**
@@ -2188,6 +2220,18 @@ export class MainPipeline {
         true
       );
     }
+  }
+
+  /**
+   * Inject runtime credentials into features that need them (e.g. CodeExecFeature).
+   * Requirements: sandbox-web-search.1, sandbox-web-search.2
+   */
+  private injectFeatureCredentials(provider: LLMProvider, apiKey: string): void {
+    this.promptBuilder.forEachFeature((feature) => {
+      if (feature instanceof CodeExecFeature) {
+        feature.setCredentials(provider, apiKey);
+      }
+    });
   }
 
   /**

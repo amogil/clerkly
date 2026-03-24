@@ -279,6 +279,32 @@ describe('PromptBuilder.build()', () => {
       expect(result.systemPrompt).toContain('Response example:');
     });
 
+    /* Preconditions: CodeExecFeature enabled with specific provider
+       Action: build() is called with openai/google/anthropic
+       Assertions: system prompt contains provider-native web search guidance
+       Requirements: sandbox-web-search.1.5, sandbox-web-search.2.3, sandbox-web-search.2.4, sandbox-web-search.2.5 */
+    it('should include provider-native web_search guidance in code_exec feature', () => {
+      const sandboxManager = {} as SandboxSessionManager;
+      const feature = new CodeExecFeature(sandboxManager);
+      const builder = makeBuilder('Base.', [feature]);
+
+      // OpenAI
+      const openAiResult = builder.build('openai');
+      expect(openAiResult.systemPrompt).toContain('Web Search inside code_exec:');
+      expect(openAiResult.systemPrompt).toContain('OpenAI-native capability');
+      expect(openAiResult.systemPrompt).toContain('queries: ["query1", "query2"]');
+
+      // Google
+      const googleResult = builder.build('google');
+      expect(googleResult.systemPrompt).toContain('Google Search Grounding');
+      expect(googleResult.systemPrompt).toContain('grounding metadata');
+
+      // Anthropic
+      const anthropicResult = builder.build('anthropic');
+      expect(anthropicResult.systemPrompt).toContain('Anthropic-native capability');
+      expect(anthropicResult.systemPrompt).toContain('query: "search query"');
+    });
+
     /* Preconditions: CodeExecFeature is enabled for the model-facing tool registry
        Action: build() collects LLM tools
        Assertions: code_exec tool description explicitly advertises public URL/API fetching via tools.http_request
@@ -291,6 +317,40 @@ describe('PromptBuilder.build()', () => {
       expect(result.tools.find((tool) => tool.name === 'code_exec')?.description).toContain(
         'primary work tool for computation, extraction, transformation, analysis, and verification'
       );
+    });
+  });
+
+  describe('forEachFeature', () => {
+    /* Preconditions: PromptBuilder with two features registered
+       Action: call forEachFeature(callback)
+       Assertions: callback is invoked once per feature in registration order
+       Requirements: sandbox-web-search.1, sandbox-web-search.2 */
+    it('should invoke callback for each registered feature', () => {
+      const feature1: AgentFeature = {
+        name: 'alpha',
+        getSystemPromptSection: () => '',
+        getTools: () => [],
+      };
+      const feature2: AgentFeature = {
+        name: 'beta',
+        getSystemPromptSection: () => '',
+        getTools: () => [],
+      };
+      const builder = makeBuilder('Base.', [feature1, feature2]);
+      const visited: string[] = [];
+      builder.forEachFeature((f) => visited.push(f.name));
+      expect(visited).toEqual(['alpha', 'beta']);
+    });
+
+    /* Preconditions: PromptBuilder with no features
+       Action: call forEachFeature(callback)
+       Assertions: callback is never invoked
+       Requirements: sandbox-web-search.1, sandbox-web-search.2 */
+    it('should not invoke callback when no features are registered', () => {
+      const builder = makeBuilder('Base.', []);
+      const spy = jest.fn();
+      builder.forEachFeature(spy);
+      expect(spy).not.toHaveBeenCalled();
     });
   });
 

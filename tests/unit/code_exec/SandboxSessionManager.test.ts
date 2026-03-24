@@ -150,10 +150,16 @@ describe('SandboxSessionManager.execute', () => {
      Requirements: code_exec.1.5, code_exec.2.2, sandbox-http-request.1.1, sandbox-http-request.1.2, sandbox-http-request.1.3 */
   it('uses preload bridge so sandbox code can call http_request', async () => {
     const manager = new SandboxSessionManager();
-    const result = await manager.execute('agent-1', 'call-bridge', {
-      task_summary: 'Fetch URL through bridge',
-      code: 'const response = await window.tools.http_request({ url: "https://example.com" }); console.log(response.status);',
-    });
+    const result = await manager.execute(
+      'agent-1',
+      'call-bridge',
+      {
+        task_summary: 'Fetch URL through bridge',
+        code: 'const response = await window.tools.http_request({ url: "https://example.com" }); console.log(response.status);',
+      },
+      'openai',
+      ''
+    );
 
     const lastInstance = electronMocks.browserWindowInstances.at(-1);
     expect(lastInstance?.options.webPreferences?.preload).toBe(mockPreloadPath);
@@ -173,14 +179,20 @@ describe('SandboxSessionManager.execute', () => {
      Requirements: sandbox-http-request.1.3, sandbox-http-request.1.3.1, sandbox-http-request.1.3.2 */
   it('supports multiple http_request calls within one sandbox execution', async () => {
     const manager = new SandboxSessionManager();
-    const result = await manager.execute('agent-1', 'call-multi', {
-      task_summary: 'Fetch multiple URLs through bridge',
-      code: `const [first, second] = await Promise.all([
+    const result = await manager.execute(
+      'agent-1',
+      'call-multi',
+      {
+        task_summary: 'Fetch multiple URLs through bridge',
+        code: `const [first, second] = await Promise.all([
   window.tools.http_request({ url: "https://example.com/one" }),
   window.tools.http_request({ url: "https://example.com/two" })
 ]);
 console.log(first.status, second.status);`,
-    });
+      },
+      'openai',
+      ''
+    );
 
     expect(electronMocks.sandboxBridgeInvokeTool).toHaveBeenCalledTimes(2);
     expect(electronMocks.sandboxBridgeInvokeTool).toHaveBeenNthCalledWith(1, 'http_request', {
@@ -199,10 +211,16 @@ console.log(first.status, second.status);`,
      Requirements: code_exec.3.7 */
   it('executes code and captures stdout', async () => {
     const manager = new SandboxSessionManager();
-    const result = await manager.execute('agent-1', 'call-1', {
-      task_summary: 'Print hello',
-      code: "console.log('hello')",
-    });
+    const result = await manager.execute(
+      'agent-1',
+      'call-1',
+      {
+        task_summary: 'Print hello',
+        code: "console.log('hello')",
+      },
+      'openai',
+      ''
+    );
 
     expect(result.status).toBe('success');
     expect(result.stdout).toContain('hello');
@@ -215,10 +233,16 @@ console.log(first.status, second.status);`,
      Requirements: code_exec.2.2 */
   it('returns policy_denied for forbidden browser network API', async () => {
     const manager = new SandboxSessionManager();
-    const result = await manager.execute('agent-1', 'call-1', {
-      task_summary: 'Try fetch',
-      code: 'fetch("https://example.com")',
-    });
+    const result = await manager.execute(
+      'agent-1',
+      'call-1',
+      {
+        task_summary: 'Try fetch',
+        code: 'fetch("https://example.com")',
+      },
+      'openai',
+      ''
+    );
 
     expect(result.status).toBe('error');
     expect(result.error?.code).toBe('policy_denied');
@@ -230,10 +254,16 @@ console.log(first.status, second.status);`,
      Requirements: code_exec.2.2 */
   it('returns policy_denied for globalThis browser network API access', async () => {
     const manager = new SandboxSessionManager();
-    const result = await manager.execute('agent-1', 'call-1', {
-      task_summary: 'Try global fetch',
-      code: 'globalThis.fetch("https://example.com")',
-    });
+    const result = await manager.execute(
+      'agent-1',
+      'call-1',
+      {
+        task_summary: 'Try global fetch',
+        code: 'globalThis.fetch("https://example.com")',
+      },
+      'openai',
+      ''
+    );
 
     expect(result.status).toBe('error');
     expect(result.error?.code).toBe('policy_denied');
@@ -245,10 +275,16 @@ console.log(first.status, second.status);`,
      Requirements: code_exec.2.2 */
   it('returns policy_denied for multithreading API', async () => {
     const manager = new SandboxSessionManager();
-    const result = await manager.execute('agent-1', 'call-1', {
-      task_summary: 'Create worker',
-      code: 'new Worker("a.js")',
-    });
+    const result = await manager.execute(
+      'agent-1',
+      'call-1',
+      {
+        task_summary: 'Create worker',
+        code: 'new Worker("a.js")',
+      },
+      'openai',
+      ''
+    );
 
     expect(result.status).toBe('error');
     expect(result.error?.code).toBe('policy_denied');
@@ -260,10 +296,16 @@ console.log(first.status, second.status);`,
      Requirements: code_exec.2.1, code_exec.2.4, code_exec.3.5 */
   it('returns policy_denied for Node.js globals access in sandbox runtime', async () => {
     const manager = new SandboxSessionManager();
-    const result = await manager.execute('agent-1', 'call-1', {
-      task_summary: 'Try process exit',
-      code: 'process.exit(0)',
-    });
+    const result = await manager.execute(
+      'agent-1',
+      'call-1',
+      {
+        task_summary: 'Try process exit',
+        code: 'process.exit(0)',
+      },
+      'openai',
+      ''
+    );
 
     expect(result.status).toBe('error');
     expect(result.error?.code).toBe('policy_denied');
@@ -286,6 +328,8 @@ console.log(first.status, second.status);`,
         task_summary: 'Print x',
         code: "console.log('x')",
       },
+      'openai',
+      '',
       controller.signal
     );
 
@@ -298,7 +342,13 @@ console.log(first.status, second.status);`,
      Requirements: code_exec.1.5 */
   it('returns invalid_tool_arguments when args are invalid', async () => {
     const manager = new SandboxSessionManager();
-    const result = await manager.execute('agent-1', 'call-1', {} as Record<string, unknown>);
+    const result = await manager.execute(
+      'agent-1',
+      'call-1',
+      {} as Record<string, unknown>,
+      'openai',
+      ''
+    );
 
     expect(result.status).toBe('error');
     expect(result.error?.code).toBe('invalid_tool_arguments');
@@ -310,10 +360,16 @@ console.log(first.status, second.status);`,
      Requirements: code_exec.3.7 */
   it('captures stderr from console.warn and console.error', async () => {
     const manager = new SandboxSessionManager();
-    const result = await manager.execute('agent-1', 'call-1', {
-      task_summary: 'Write warnings',
-      code: "console.warn('w'); console.error('e');",
-    });
+    const result = await manager.execute(
+      'agent-1',
+      'call-1',
+      {
+        task_summary: 'Write warnings',
+        code: "console.warn('w'); console.error('e');",
+      },
+      'openai',
+      ''
+    );
 
     expect(result.status).toBe('success');
     expect(result.stderr).toContain('w');
@@ -326,13 +382,53 @@ console.log(first.status, second.status);`,
      Requirements: code_exec.2.2 */
   it('returns policy_denied for forbidden tools allowlist access', async () => {
     const manager = new SandboxSessionManager();
-    const result = await manager.execute('agent-1', 'call-1', {
-      task_summary: 'Call unknown tool',
-      code: 'window.tools.someUnknownTool()',
-    });
+    const result = await manager.execute(
+      'agent-1',
+      'call-1',
+      {
+        task_summary: 'Call unknown tool',
+        code: 'window.tools.someUnknownTool()',
+      },
+      'openai',
+      ''
+    );
 
     expect(result.status).toBe('error');
     expect(result.error?.code).toBe('policy_denied');
+  });
+
+  /* Preconditions: handleSandboxToolInvocation receives a toolName not in invokers map
+     Action: Call handleSandboxToolInvocation directly with an unregistered tool name
+     Assertions: Returns policy_denied error (defense-in-depth guard)
+     Requirements: sandbox-web-search.1.7 */
+  it('returns policy_denied from handleSandboxToolInvocation for unregistered tool', async () => {
+    const manager = new SandboxSessionManager();
+    // Set up activeSandboxToolInvokers with a session that has no web_search
+    const invokers = new Map<string, (input: unknown) => Promise<unknown>>();
+    invokers.set('http_request', async () => ({ ok: true }));
+    (
+      manager as unknown as {
+        activeSandboxToolInvokers: Map<string, Map<string, (input: unknown) => Promise<unknown>>>;
+      }
+    ).activeSandboxToolInvokers.set('test-session', invokers);
+
+    const result = await (
+      manager as unknown as {
+        handleSandboxToolInvocation: (payload: {
+          sessionId: string;
+          toolName: string;
+          input: unknown;
+        }) => Promise<{ error?: { code: string; message: string } }>;
+      }
+    ).handleSandboxToolInvocation({
+      sessionId: 'test-session',
+      toolName: 'web_search',
+      input: { queries: ['test'] },
+    });
+
+    expect(result.error).toBeDefined();
+    expect(result.error!.code).toBe('policy_denied');
+    expect(result.error!.message).toContain('not available');
   });
 
   /* Preconditions: VM execution path exceeds the configured execution limit
@@ -345,12 +441,22 @@ console.log(first.status, second.status);`,
       manager as unknown as {
         executeInOneSandbox: (
           input: { taskSummary: string; code: string; timeoutMs: number },
-          context: { sessionId: string; signal: AbortSignal }
+          context: {
+            sessionId: string;
+            provider: 'openai' | 'google' | 'anthropic';
+            apiKey: string;
+            signal: AbortSignal;
+          }
         ) => Promise<{ status: string; error?: { code?: string } }>;
       }
     ).executeInOneSandbox(
       { taskSummary: 'Loop forever', code: 'while (true) {}', timeoutMs: 1 },
-      { sessionId: 'timeout-test', signal: new AbortController().signal }
+      {
+        sessionId: 'timeout-test',
+        provider: 'openai',
+        apiKey: '',
+        signal: new AbortController().signal,
+      }
     );
 
     expect(result.status).toBe('timeout');
@@ -363,10 +469,16 @@ console.log(first.status, second.status);`,
      Requirements: code_exec.3.7 */
   it('maps memory allocation failures to limit_exceeded', async () => {
     const manager = new SandboxSessionManager();
-    const result = await manager.execute('agent-1', 'call-1', {
-      task_summary: 'Allocate large string',
-      code: "const huge = 'x'.repeat(2 ** 31)",
-    });
+    const result = await manager.execute(
+      'agent-1',
+      'call-1',
+      {
+        task_summary: 'Allocate large string',
+        code: "const huge = 'x'.repeat(2 ** 31)",
+      },
+      'openai',
+      ''
+    );
 
     expect(result.status).toBe('error');
     expect(result.error?.code).toBe('limit_exceeded');
@@ -379,10 +491,16 @@ console.log(first.status, second.status);`,
      Requirements: code_exec.3.7 */
   it('returns sandbox_runtime_error for generic runtime exceptions', async () => {
     const manager = new SandboxSessionManager();
-    const result = await manager.execute('agent-1', 'call-1', {
-      task_summary: 'Throw boom',
-      code: 'throw new Error("boom")',
-    });
+    const result = await manager.execute(
+      'agent-1',
+      'call-1',
+      {
+        task_summary: 'Throw boom',
+        code: 'throw new Error("boom")',
+      },
+      'openai',
+      ''
+    );
 
     expect(result.status).toBe('error');
     expect(result.error?.code).toBe('sandbox_runtime_error');
@@ -402,11 +520,17 @@ console.log(first.status, second.status);`,
     });
 
     const manager = new SandboxSessionManager();
-    const result = await manager.execute('agent-1', 'call-1', {
-      task_summary: 'Reject localhost target',
-      code: `const result = await tools.http_request({ url: "http://localhost:3000/blocked" });
+    const result = await manager.execute(
+      'agent-1',
+      'call-1',
+      {
+        task_summary: 'Reject localhost target',
+        code: `const result = await tools.http_request({ url: "http://localhost:3000/blocked" });
 console.log(JSON.stringify(result));`,
-    });
+      },
+      'openai',
+      ''
+    );
 
     expect(result.status).toBe('success');
     expect(result.error).toBeUndefined();
@@ -435,6 +559,8 @@ console.log(JSON.stringify(result));`,
         task_summary: 'Wait and log done',
         code: 'await new Promise((resolve) => setTimeout(resolve, 30)); console.log("done")',
       },
+      'openai',
+      '',
       controller.signal
     );
 
@@ -458,10 +584,16 @@ console.log(JSON.stringify(result));`,
     ]);
 
     const manager = new SandboxSessionManager();
-    const result = await manager.execute('agent-1', 'call-1', {
-      task_summary: 'Wait and log ok',
-      code: 'await new Promise((resolve) => setTimeout(resolve, 250)); console.log("ok")',
-    });
+    const result = await manager.execute(
+      'agent-1',
+      'call-1',
+      {
+        task_summary: 'Wait and log ok',
+        code: 'await new Promise((resolve) => setTimeout(resolve, 250)); console.log("ok")',
+      },
+      'openai',
+      ''
+    );
 
     expect(result.status).toBe('success');
     expect(result.stderr).toContain('degraded mode');
@@ -482,11 +614,17 @@ console.log(JSON.stringify(result));`,
     ]);
 
     const manager = new SandboxSessionManager();
-    const result = await manager.execute('agent-1', 'call-1', {
-      task_summary: 'Stress CPU briefly',
-      code: 'await new Promise((resolve) => setTimeout(resolve, 250)); console.log("ok")',
-      timeout_ms: 10000,
-    });
+    const result = await manager.execute(
+      'agent-1',
+      'call-1',
+      {
+        task_summary: 'Stress CPU briefly',
+        code: 'await new Promise((resolve) => setTimeout(resolve, 250)); console.log("ok")',
+        timeout_ms: 10000,
+      },
+      'openai',
+      ''
+    );
 
     expect(result.status).toBe('error');
     expect(result.error?.code).toBe('limit_exceeded');

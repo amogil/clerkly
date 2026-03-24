@@ -4,6 +4,7 @@
 
 import type { Message } from '../db/schema';
 import type { LLMTool, ChatMessage } from '../llm/ILLMProvider';
+import { LLMProvider } from '../../types';
 import {
   CODE_EXEC_LIMITS,
   CODE_EXEC_TOOL_SCHEMA,
@@ -148,8 +149,8 @@ function buildHttpRequestPromptSection(): string {
  */
 export interface AgentFeature {
   name: string;
-  getSystemPromptSection(): string;
-  getTools(): LLMTool[];
+  getSystemPromptSection(provider?: LLMProvider): string;
+  getTools(provider?: LLMProvider): LLMTool[];
 }
 
 /**
@@ -202,10 +203,10 @@ export class PromptBuilder {
    * Build provider-agnostic prompt metadata
    * Requirements: llm-integration.4.3
    */
-  build(): BuiltPrompt {
+  build(provider?: LLMProvider): BuiltPrompt {
     return {
-      systemPrompt: this.buildSystemPrompt(),
-      tools: this.collectTools(),
+      systemPrompt: this.buildSystemPrompt(provider),
+      tools: this.collectTools(provider),
     };
   }
 
@@ -213,24 +214,34 @@ export class PromptBuilder {
    * Build provider-ready ChatMessage[] for the LLM API
    * Requirements: llm-integration.10
    */
-  buildMessages(messages: Message[]): ChatMessage[] {
+  buildMessages(messages: Message[], provider?: LLMProvider): ChatMessage[] {
     return [
-      { role: 'system', content: this.buildSystemPrompt() },
+      { role: 'system', content: this.buildSystemPrompt(provider) },
       ...this.buildHistoryMessages(messages),
     ];
   }
 
-  private buildSystemPrompt(): string {
+  /**
+   * Iterate over registered features and invoke callback for each.
+   * Requirements: sandbox-web-search.1, sandbox-web-search.2
+   */
+  forEachFeature(callback: (feature: AgentFeature) => void): void {
+    for (const feature of this.features) {
+      callback(feature);
+    }
+  }
+
+  private buildSystemPrompt(provider?: LLMProvider): string {
     const parts = [this.systemPrompt];
     for (const feature of this.features) {
-      const section = feature.getSystemPromptSection();
+      const section = feature.getSystemPromptSection(provider);
       if (section) parts.push(section);
     }
     return normalizePromptWhitespace(parts.join('\n\n'));
   }
 
-  private collectTools(): LLMTool[] {
-    return this.features.flatMap((f) => f.getTools());
+  private collectTools(provider?: LLMProvider): LLMTool[] {
+    return this.features.flatMap((f) => f.getTools(provider));
   }
 
   private buildHistoryMessages(messages: Message[]): ChatMessage[] {
@@ -470,10 +481,18 @@ export class FinalAnswerFeature implements AgentFeature {
  */
 export class CodeExecFeature implements AgentFeature {
   name = 'code_exec';
+  private resolvedProvider: LLMProvider = 'openai';
+  private resolvedApiKey: string = '';
 
   constructor(private readonly sandboxSessionManager: SandboxSessionManager) {}
 
-  getSystemPromptSection(): string {
+  // Requirements: sandbox-web-search.1, sandbox-web-search.2
+  setCredentials(provider: LLMProvider, apiKey: string): void {
+    this.resolvedProvider = provider;
+    this.resolvedApiKey = apiKey;
+  }
+
+  getSystemPromptSection(provider?: LLMProvider): string {
     return [
       'Tool priority and completion rules:',
       '- `code_exec` is your primary work tool for computation, extraction, transformation, structured analysis, verification, and other tasks that benefit from sandbox code.',
@@ -495,6 +514,7 @@ export class CodeExecFeature implements AgentFeature {
       '- Allowed runtime API: console.log/info/warn/error and tools/window.tools (sandbox allowlist only).',
       '- Node.js globals are unavailable in sandbox: process, require, module, Buffer, __dirname, __filename.',
       buildHttpRequestPromptSection(),
+      provider ? buildWebSearchPromptSection(provider) : '',
       '- Browser-level network APIs are denied: fetch, XMLHttpRequest, WebSocket, sendBeacon, window.open, location.assign, location.replace.',
       '- Multithreading APIs are denied: Worker, SharedWorker, ServiceWorker, Worklet.',
       '- Positive example: compute values, print diagnostics via console.*.',
@@ -505,7 +525,10 @@ export class CodeExecFeature implements AgentFeature {
     ].join('\n');
   }
 
-  getTools(): LLMTool[] {
+  getTools(provider?: LLMProvider): LLMTool[] {
+    const sessionManager = this.sandboxSessionManager;
+    const resolvedProvider = provider ?? this.resolvedProvider;
+    const resolvedApiKey = this.resolvedApiKey;
     return [
       {
         name: 'code_exec',
@@ -519,10 +542,12 @@ export class CodeExecFeature implements AgentFeature {
           }
 
           const toolCallId = `code_exec_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-          const output = await this.sandboxSessionManager.execute(
+          const output = await sessionManager.execute(
             'runtime',
             toolCallId,
             args,
+            resolvedProvider,
+            resolvedApiKey,
             signal
           );
           return output;
@@ -530,4 +555,43 @@ export class CodeExecFeature implements AgentFeature {
       },
     ];
   }
+}
+
+const WEB_SEARCH_PROMPT_SPEC = {
+  openai: {
+    invocation: '`const result = await tools.web_search({ queries: ["query1", "query2"] })`',
+    behavior:
+      'Search the web using OpenAI-native capability. Use multiple queries to cover different aspects of the task.',
+    input: '`queries`: required array of strings.',
+    output: 'Array of search results in OpenAI-native format.',
+  },
+  google: {
+    invocation: '`const result = await tools.web_search({ queries: ["query1", "query2"] })`',
+    behavior:
+      'Search the web using Google Search Grounding. Results include snippets and grounding metadata.',
+    input: '`queries`: required array of strings.',
+    output: 'Grounding metadata object in Gemini-native format.',
+  },
+  anthropic: {
+    invocation: '`const result = await tools.web_search({ query: "search query" })`',
+    behavior: 'Search the web using Anthropic-native capability.',
+    input: '`query`: required string.',
+    output: 'Search results object in Anthropic-native format.',
+  },
+};
+
+function buildWebSearchPromptSection(provider: LLMProvider): string {
+  const spec = WEB_SEARCH_PROMPT_SPEC[provider];
+  if (!spec) return '';
+
+  return [
+    'Web Search inside code_exec:',
+    `- Call form: ${spec.invocation}.`,
+    `- Behavior: ${spec.behavior}`,
+    `- Input: ${spec.input}`,
+    `- Output: ${spec.output}`,
+    '- Error codes: `invalid_input`, `provider_error`, `timeout`, `internal_error`.',
+    '- Timing: one provider web_search request may take up to ~120s; when you plan multiple queries, set `code_exec.timeout_ms` high enough for all expected requests.',
+    '- All web search calls are performed strictly within the runtime of the current `code_exec` tool call.',
+  ].join('\n');
 }

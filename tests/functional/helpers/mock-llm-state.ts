@@ -15,5 +15,6 @@ export function resetMockLLMServerState(mockLLMServer: MockLLMServer): void {
     chunkDelayMs: 0,
   });
   mockLLMServer.setOpenAIStreamScripts([]);
+  mockLLMServer.setWebSearchErrorMode(0);
   mockLLMServer.clearRequestLogs();
 }
