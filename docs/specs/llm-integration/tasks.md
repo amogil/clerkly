@@ -31,14 +31,14 @@
 
 #### Фаза 1: Обновление спецификаций
 
-- [ ] Обновить `docs/specs/llm-integration/requirements.md`
-  - [ ] Добавить требование `llm-integration.12.2.3`: КОГДА нормализованный тип ошибки = `timeout` И run не отменён пользователем И первый meaningful chunk ещё не получен, `MainPipeline` ДОЛЖЕН выполнить до 3 consecutive повторных попыток (4 attempts total включая начальную). Счётчик timeout-повторов ДОЛЖЕН сбрасываться при успешной попытке. После исчерпания retry ДОЛЖЕН создаваться ровно один `kind:error` с `type=timeout`.
-  - [ ] Добавить требование `llm-integration.12.2.4`: существующее поведение retry для non-timeout ошибок (1 повтор) ДОЛЖНО оставаться неизменным.
+- [x] Обновить `docs/specs/llm-integration/requirements.md`
+  - [x] Добавить требование `llm-integration.12.2.3`: КОГДА нормализованный тип ошибки = `timeout` И run не отменён пользователем И первый meaningful chunk ещё не получен, `MainPipeline` ДОЛЖЕН выполнить до 3 consecutive повторных попыток (4 attempts total включая начальную). Счётчик timeout-повторов ДОЛЖЕН сбрасываться при успешной попытке. После исчерпания retry ДОЛЖЕН создаваться ровно один `kind:error` с `type=timeout`.
+  - [x] Добавить требование `llm-integration.12.2.4`: существующее поведение retry для non-timeout ошибок (1 повтор) ДОЛЖНО оставаться неизменным.
 
-- [ ] Обновить `docs/specs/llm-integration/design.md`
-  - [ ] В секции "Retry policy (recoverable ошибки)" добавить timeout-specific policy: до 3 повторов для `timeout`-ошибок до первого meaningful chunk.
-  - [ ] Добавить записи unit-тестов в секцию тестирования.
-  - [ ] Обновить таблицу покрытия требований для новых ID.
+- [x] Обновить `docs/specs/llm-integration/design.md`
+  - [x] В секции "Retry policy (recoverable ошибки)" добавить timeout-specific policy: до 3 повторов для `timeout`-ошибок до первого meaningful chunk.
+  - [x] Добавить записи unit-тестов в секцию тестирования.
+  - [x] Обновить таблицу покрытия требований для новых ID.
 
 #### Фаза 2: Реализация в runtime
 
