@@ -585,12 +585,12 @@ You are a helpful AI assistant. Always reply in the user's language (detected fr
 
 ```typescript
 // Requirements: llm-integration.3, llm-integration.3.6, llm-integration.3.10
-const TIMEOUT_MS = 60_000; // 1 минута per model step
+const TIMEOUT_MS = 60_000; // 1 минута на каждый запрос к LLM API
 
 // Таймер сбрасывается при каждом onStepFinish (llm-integration.3.6.1):
 // - setTimeout(60s) при старте chat()
 // - clearTimeout + setTimeout(60s) в onStepFinish callback
-// - Время выполнения tool execute() не учитывается в таймере
+// - Время выполнения инструментов между запросами не учитывается
 let timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
 try {
