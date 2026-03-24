@@ -6,7 +6,7 @@
 
 Сейчас при timeout провайдера pipeline выполняет только 1 повтор в generic silent-failure ветке. Intermittent timeout часто восстанавливается при повторе, но одного недостаточно. Задача — выделить timeout в отдельную retry-ветку с лимитом 3 consecutive retry (4 попытки суммарно). Счётчик timeout-повторов сбрасывается при успешной попытке, то есть он не сквозной через весь run — каждая новая серия timeout получает свежие 3 retry.
 
-**Текущий статус:** Фаза 3 — Unit-тесты завершены
+**Текущий статус:** Фаза 4 — Валидация завершена
 
 ---
 
@@ -67,6 +67,6 @@
 
 #### Фаза 4: Валидация
 
-- [ ] Прогнать targeted unit tests: `tests/unit/agents/MainPipeline.test.ts`.
-- [ ] Прогнать `npm run validate`.
+- [x] Прогнать targeted unit tests: `tests/unit/agents/MainPipeline.test.ts`.
+- [x] Прогнать `npm run validate`.
 - [ ] Запросить подтверждение пользователя перед `npm run test:functional`.
