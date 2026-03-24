@@ -536,6 +536,10 @@
 
 11.5.3. КОГДА SDK-managed tool-loop выполняется внутри provider-layer, ТО provider-layer ДОЛЖЕН обеспечивать continuation после terminal `tool_result` до доменного завершения turn (`final_answer`, ошибка, abort/cancel`) в пределах явно задокументированного safety bound, а НЕ останавливаться после первого tool-result без такого задокументированного guard.
 
+11.5.4. ЕСЛИ модель вернула `tool_call` и его `tool_result` был получен, НО модель не предоставила ни текстового ответа, ни `final_answer` после tool result, ТО `MainPipeline` ДОЛЖЕН повторить запрос к модели (retry). ЕСЛИ после `MAX_INVALID_TOOL_CALL_RETRIES` попыток модель по-прежнему не отвечает, ТО pipeline ДОЛЖЕН показать ошибку пользователю.
+
+> Контекст: Vercel AI SDK (ai@5.1.5) может потерять ошибку abort при multi-step tool loop из-за бага с закрытым TransformStream controller. Provider возвращает пустой ответ как успешный. Retry даёт модели повторный шанс ответить.
+
 11.6. Runtime-поток tool-calling НЕ ДОЛЖЕН требовать отдельного realtime-сигнала; обработка ДОЛЖНА строиться по persisted `message.created`/`message.updated`.
 
 11.6.1. Система ДОЛЖНА гарантировать, что при завершении run/attempt не остаётся `tool_call` со статусом `running`: каждый такой вызов ДОЛЖЕН переходить в terminal-статус (`cancelled | error | timeout | success`) до завершения попытки.

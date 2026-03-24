@@ -900,6 +900,22 @@ export class MainPipeline {
         'Model returned no assistant text and no completion tool call'
       );
     }
+    // Orphaned tool_call: model made a tool call (sawAnyToolCall) but returned no text
+    // and no final_answer afterward. This happens when Vercel AI SDK (ai@5.1.5) silently
+    // loses the abort error during multi-step tool loop — step N's TransformStream
+    // controller closes before streamStep(N+1) can enqueue the error. The provider returns
+    // { text: '' } as if the call succeeded.
+    //
+    // We use InvalidFinalAnswerContractError so that handleAttemptFailure retries the model
+    // call (up to MAX_INVALID_TOOL_CALL_RETRIES). On retry, the pipeline resends the
+    // conversation (including the tool result from the first attempt) and the model gets
+    // another chance to respond. If all retries fail the same way, the user sees an error.
+    // Requirements: llm-integration.11.5.1
+    if (state.sawAnyToolCall && state.finalLlmMessageId === null && !state.finalAnswerCall) {
+      throw new InvalidFinalAnswerContractError(
+        'Model returned a tool call but provided no response after the tool result. Retrying.'
+      );
+    }
     if (cycleState.invalidFinalAnswerSeen && !state.finalAnswerCall) {
       throw new InvalidFinalAnswerContractError(
         'Model did not return final_answer after invalid completion retry. Please try again later.'

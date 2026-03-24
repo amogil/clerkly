@@ -316,6 +316,80 @@ describe('IPCChatTransport', () => {
       jest.useRealTimers();
     });
 
+    /* Preconditions: transport created for agent-1, llm message becomes hidden, then error message arrives
+       Action: emit MESSAGE_CREATED(llm), MESSAGE_UPDATED(hidden:true), then MESSAGE_CREATED(error) within 200ms
+       Assertions: stream delivers the error chunk before finishing (idle delay gives error time to arrive)
+       Requirements: llm-integration.3.6, llm-integration.11.5.4
+       Context: When handleRunError hides an incomplete LLM message and then creates a kind:error
+       message, the transport must not close the stream immediately on hidden — the 200ms idle
+       delay allows the subsequent error message to be received and enqueued before finish(). */
+    it('should deliver error message that arrives after hidden within idle delay window', async () => {
+      jest.useFakeTimers();
+      const streamPromise = transport.sendMessages(makeSendOptions());
+      await Promise.resolve();
+
+      // Step 1: LLM message created (streaming in progress)
+      emitEvent(EVENT_TYPES.MESSAGE_CREATED, {
+        message: {
+          id: 200,
+          agentId: 'agent-1',
+          kind: 'llm',
+          timestamp: Date.now(),
+          payload: { data: {} },
+          hidden: false,
+          done: false,
+        },
+        timestamp: Date.now(),
+      });
+
+      // Step 2: LLM message becomes hidden (pipeline detected error, hid incomplete message)
+      emitEvent(EVENT_TYPES.MESSAGE_UPDATED, {
+        message: {
+          id: 200,
+          agentId: 'agent-1',
+          kind: 'llm',
+          timestamp: Date.now(),
+          payload: { data: {} },
+          hidden: true,
+          done: false,
+        },
+        timestamp: Date.now(),
+      });
+
+      // Step 3: Error message arrives 50ms later (within the 200ms idle window)
+      jest.advanceTimersByTime(50);
+      emitEvent(EVENT_TYPES.MESSAGE_CREATED, {
+        message: {
+          id: 201,
+          agentId: 'agent-1',
+          kind: 'error',
+          timestamp: Date.now(),
+          payload: { data: { error: { message: 'Model response timeout' } } },
+          hidden: false,
+          done: true,
+        },
+        timestamp: Date.now(),
+      });
+
+      // Advance past the idle delay to ensure stream finishes
+      jest.advanceTimersByTime(300);
+
+      const stream = await streamPromise;
+      const chunks = await collectChunks(stream);
+      const types = chunks.map((c) => c.type);
+
+      // Error chunk must be present — the idle delay prevented premature stream close
+      expect(types).toContain('error');
+      expect(types).toContain('finish');
+
+      const errorChunk = chunks.find((c) => c.type === 'error') as {
+        type: 'error';
+        errorText: string;
+      };
+      expect(errorChunk?.errorText).toBe('Model response timeout');
+      jest.useRealTimers();
+    });
+
     /* Preconditions: transport created for agent-1, abortSignal already aborted
        Action: call sendMessages with aborted signal
        Assertions: stream closes immediately without calling window.api.messages.create

@@ -3484,4 +3484,74 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     await expect(headerTitle).toHaveText('New Agent');
     await expectNoToastError(context.window);
   });
+
+  /* Preconditions: MockLLMServer configured to return mid-stream error (SSE stream starts, then HTTP error on retry)
+     Action: User sends a message
+     Assertions: Error bubble appears with error text — not a silent hang.
+       This tests the full pipeline error recovery path: handleRunError hides the incomplete LLM
+       message (hidden=true), then creates a kind:error message. IPCChatTransport's 200ms idle
+       delay allows the error message to arrive before the stream closes.
+     Context: Before the fix, IPCChatTransport called finish() immediately on hidden message,
+       which unsubscribed all event listeners. The subsequent kind:error MESSAGE_CREATED event
+       was never received, causing the UI to silently hang.
+     Requirements: llm-integration.3.4, llm-integration.3.6, llm-integration.11.5.4 */
+  test('should show error bubble after LLM stream failure (not a silent hang)', async () => {
+    // First request: streaming starts, reasoning + partial content
+    // Second request (retry): returns HTTP error
+    mockLLMServer.setStreamingMode(true, { content: '' });
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        reasoning: 'Thinking about the query carefully',
+        content: '',
+        toolCalls: [
+          {
+            callId: 'fail-call-1',
+            toolName: 'final_answer',
+            arguments: {},
+          },
+        ],
+      },
+      {
+        toolCalls: [
+          {
+            callId: 'fail-call-2',
+            toolName: 'final_answer',
+            arguments: {},
+          },
+        ],
+      },
+      {
+        toolCalls: [
+          {
+            callId: 'fail-call-3',
+            toolName: 'final_answer',
+            arguments: {},
+          },
+        ],
+      },
+      {
+        toolCalls: [
+          {
+            callId: 'fail-call-4',
+            toolName: 'final_answer',
+            arguments: {},
+          },
+        ],
+      },
+    ]);
+
+    context = await launchWithMockLLM();
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+
+    await messageInput.fill('This should fail with error');
+    await messageInput.press('Enter');
+
+    // Error bubble must appear — not a silent hang
+    const errorBubble = context.window.locator('[data-testid="message-error"]').last();
+    await expect(errorBubble).toBeVisible({ timeout: 30000 });
+
+    // Error text should indicate the failure (not empty)
+    const errorText = await errorBubble.textContent();
+    expect(errorText?.trim().length).toBeGreaterThan(0);
+  });
 });
