@@ -1355,8 +1355,8 @@ export class MainPipeline {
     }
 
     // Requirements: llm-integration.12.2.3 — timeout-specific retry up to MAX_TIMEOUT_RETRIES
-    const normalizedError = normalizeLLMError(error);
-    const isTimeoutError = normalizedError.type === 'timeout';
+    const normalizedError = !isInvalidFinalAnswer ? normalizeLLMError(error) : null;
+    const isTimeoutError = normalizedError?.type === 'timeout';
     const shouldRetryTimeout =
       !isInvalidFinalAnswer &&
       isTimeoutError &&
@@ -1381,6 +1381,9 @@ export class MainPipeline {
       shouldRetryInvalidFinalAnswer || shouldRetryTimeout || shouldRetrySilentFailure;
 
     if (shouldRetryTimeout) {
+      this.logger.warn(
+        `Timeout retry ${cycleState.consecutiveTimeouts + 1}/${MAX_TIMEOUT_RETRIES} for agent ${agentId}`
+      );
       cycleState.consecutiveTimeouts += 1;
     }
 

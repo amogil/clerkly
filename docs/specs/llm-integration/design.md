@@ -910,8 +910,8 @@ User отправляет сообщение
 - `tests/unit/agents/MainPipeline.test.ts` — timeout retry policy: исчерпание 3 consecutive retry (4 вызова chat), затем один `kind:error` с `type=timeout`
 - `tests/unit/agents/MainPipeline.test.ts` — timeout retry policy: успешный retry на 2-й попытке (нет `kind:error`)
 - `tests/unit/agents/MainPipeline.test.ts` — timeout retry policy: non-timeout (network) по-прежнему max 1 retry
-- `tests/unit/agents/MainPipeline.test.ts` — timeout retry policy: user-aborted signal блокирует retry
-- `tests/unit/agents/MainPipeline.test.ts` — timeout retry policy: счётчик consecutive timeouts сбрасывается после успешной попытки
+- `tests/unit/agents/MainPipeline.test.ts` — timeout retry policy: user-aborted signal блокирует retry (early exit и mid-retry abort)
+- `tests/unit/agents/MainPipeline.test.ts` — timeout retry policy: счётчик timeout-повторов сбрасывается между runs (не сквозной)
 - `tests/unit/llm/OpenAIProvider.chat.test.ts` — сброс таймера `CHAT_TIMEOUT_MS` при каждом `onStepFinish`
 - `tests/unit/llm/AnthropicProvider.chat.test.ts` — сброс таймера `CHAT_TIMEOUT_MS` при каждом `onStepFinish`
 - `tests/unit/llm/GoogleProvider.chat.test.ts` — сброс таймера `CHAT_TIMEOUT_MS` при каждом `onStepFinish`

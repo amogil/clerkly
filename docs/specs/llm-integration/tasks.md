@@ -6,7 +6,7 @@
 
 Сейчас при timeout провайдера pipeline выполняет только 1 повтор в generic silent-failure ветке. Intermittent timeout часто восстанавливается при повторе, но одного недостаточно. Задача — выделить timeout в отдельную retry-ветку с лимитом 3 consecutive retry (4 попытки суммарно). Счётчик timeout-повторов сбрасывается при успешной попытке, то есть он не сквозной через весь run — каждая новая серия timeout получает свежие 3 retry.
 
-**Текущий статус:** Фаза 4 — Валидация завершена
+**Текущий статус:** Фаза 5 — Исправление замечаний code review
 
 ---
 
@@ -23,49 +23,24 @@
 ## Текущее состояние
 
 ### Выполнено
+- ✅ Фаза 1: Обновление спецификаций (`requirements.md`, `design.md`).
+- ✅ Фаза 2: Реализация timeout retry в `MainPipeline.ts` (`MAX_TIMEOUT_RETRIES`, `consecutiveTimeouts`, `shouldRetryTimeout`).
+- ✅ Фаза 3: Unit-тесты (6 тестов: exhaust retry, recover, non-timeout unchanged, abort guards, counter reset).
+- ✅ Фаза 4: Валидация (`npm run validate` passed).
 
 ### В работе
-- 🔄 Issue #84: retry timeout-ошибок модели до 3 раз.
+- 🔄 Фаза 5: Исправление замечаний code review (PR #85).
 
 ### Запланировано
 
-#### Фаза 1: Обновление спецификаций
+#### Фаза 5: Исправление замечаний code review
 
-- [x] Обновить `docs/specs/llm-integration/requirements.md`
-  - [x] Добавить требование `llm-integration.12.2.3`: КОГДА нормализованный тип ошибки = `timeout` И run не отменён пользователем И первый meaningful chunk ещё не получен, `MainPipeline` ДОЛЖЕН выполнить до 3 consecutive повторных попыток (4 attempts total включая начальную). Счётчик timeout-повторов ДОЛЖЕН сбрасываться при успешной попытке. После исчерпания retry ДОЛЖЕН создаваться ровно один `kind:error` с `type=timeout`.
-  - [x] Добавить требование `llm-integration.12.2.4`: существующее поведение retry для non-timeout ошибок (1 повтор) ДОЛЖНО оставаться неизменным.
-
-- [x] Обновить `docs/specs/llm-integration/design.md`
-  - [x] В секции "Retry policy (recoverable ошибки)" добавить timeout-specific policy: до 3 повторов для `timeout`-ошибок до первого meaningful chunk.
-  - [x] Добавить записи unit-тестов в секцию тестирования.
-  - [x] Обновить таблицу покрытия требований для новых ID.
-
-#### Фаза 2: Реализация в runtime
-
-- [x] Изменить `src/main/agents/MainPipeline.ts`
-  - [x] Добавить константу `MAX_TIMEOUT_RETRIES = 3`.
-  - [x] Добавить в `AttemptCycleState` поле `consecutiveTimeouts: number` (начальное значение `0`).
-  - [x] В `handleAttemptFailure()` добавить новую ветку `shouldRetryTimeout`:
-    - Ошибка нормализуется в `type: timeout` (через `normalizeLLMError`).
-    - run не отменён пользователем (`!signal?.aborted`).
-    - Нет meaningful chunks (`!state.meaningfulChunkSeen`).
-    - `cycleState.consecutiveTimeouts < MAX_TIMEOUT_RETRIES`.
-  - [x] При timeout-retry инкрементировать `cycleState.consecutiveTimeouts`.
-  - [x] При успешной попытке (возврат из `callProviderWithStreaming`) сбрасывать `cycleState.consecutiveTimeouts = 0` — счётчик не сквозной.
-  - [x] Исключить timeout из `shouldRetrySilentFailure` (чтобы timeout не расходовал generic retry).
-  - [x] Обновить `shouldRetry`: `shouldRetryInvalidFinalAnswer || shouldRetryTimeout || shouldRetrySilentFailure`.
-
-#### Фаза 3: Unit-тесты
-
-- [x] Добавить тесты в `tests/unit/agents/MainPipeline.test.ts`:
-  - [x] Timeout retry исчерпывает 3 retry (4 вызова `chat`), затем создаёт один `kind:error` с `type=timeout`.
-  - [x] Timeout успешен на 2-м retry (2 вызова `chat`, нет `kind:error`).
-  - [x] Non-timeout ошибка (network) по-прежнему retry max 1 раз (2 вызова `chat`).
-  - [x] Timeout при `signal.aborted` НЕ делает retry.
-  - [x] Счётчик timeout-retry сбрасывается после успешной попытки (timeout -> success -> timeout -> success — каждая серия получает свежие 3 retry).
-
-#### Фаза 4: Валидация
-
-- [x] Прогнать targeted unit tests: `tests/unit/agents/MainPipeline.test.ts`.
-- [x] Прогнать `npm run validate`.
-- [ ] Запросить подтверждение пользователя перед `npm run test:functional`.
+- [x] P0: Добавить недостающий unit-тест на сброс счётчика timeout-retry между runs.
+- [x] P0: Исправить ложное отмечание в tasks.md.
+- [x] P2: Убрать implementation details из `requirements.md` 12.2.3 (имена классов, `consecutive`).
+- [x] P2: Добавить `logger.warn` при timeout retry в `MainPipeline.ts`.
+- [x] P2: Обновить "Выполнено" / "В работе" секции tasks.md.
+- [x] P3: Guard `normalizeLLMError` вызов за `!isInvalidFinalAnswer`.
+- [x] P3: Переименовать тест "does not retry timeout when signal is already aborted" → "exits early without calling provider when signal is already aborted".
+- [ ] Прогнать `npm run validate`.
+- [ ] Push и ответить на review comments.
