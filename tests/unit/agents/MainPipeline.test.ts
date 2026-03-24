@@ -3814,4 +3814,130 @@ describe('MainPipeline.run()', () => {
     const bound = bindToolExecutors([{ name: 'tool_without_result' }]);
     await expect(bound[0].execute({})).rejects.toThrow('returned no result');
   });
+
+  /* Preconditions: provider rejects with LLMRequestAbortedError (timeout) 4 consecutive times, no meaningful chunks
+     Action: run pipeline
+     Assertions: chat called 4 times (1 initial + 3 retries), exactly 1 kind:error with type=timeout
+     Requirements: llm-integration.12.2.3 */
+  it('retries timeout errors up to 3 times before creating kind:error with type=timeout', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+    llmProvider.chat.mockRejectedValue(
+      new LLMRequestAbortedError('Model response timeout', new Error('aborted'))
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(llmProvider.chat).toHaveBeenCalledTimes(4);
+    const errorCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'error'
+    );
+    expect(errorCreates).toHaveLength(1);
+    expect(errorCreates[0][2]).toEqual(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          error: expect.objectContaining({ type: 'timeout' }),
+        }),
+      })
+    );
+  });
+
+  /* Preconditions: provider rejects with timeout once, then succeeds on second attempt
+     Action: run pipeline
+     Assertions: chat called 2 times, no kind:error, kind:llm persisted
+     Requirements: llm-integration.12.2.3 */
+  it('recovers from timeout on second attempt without creating kind:error', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+    llmProvider.chat
+      .mockRejectedValueOnce(
+        new LLMRequestAbortedError('Model response timeout', new Error('aborted'))
+      )
+      .mockResolvedValueOnce({ text: 'Recovered after timeout' });
+
+    await pipeline.run('agent-1', 1);
+
+    expect(llmProvider.chat).toHaveBeenCalledTimes(2);
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'llm',
+      expect.objectContaining({
+        data: expect.objectContaining({ text: 'Recovered after timeout' }),
+      }),
+      1,
+      true
+    );
+    const errorCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'error'
+    );
+    expect(errorCreates).toHaveLength(0);
+  });
+
+  /* Preconditions: provider rejects with non-timeout error (network) twice, no meaningful chunks
+     Action: run pipeline
+     Assertions: chat called 2 times (1 initial + 1 generic silent retry), kind:error with type=network
+     Requirements: llm-integration.12.2.4 */
+  it('limits non-timeout silent retry to 1 attempt (not affected by timeout retry budget)', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+    llmProvider.chat
+      .mockRejectedValueOnce(new Error('fetch failed'))
+      .mockRejectedValueOnce(new Error('fetch failed'));
+
+    await pipeline.run('agent-1', 1);
+
+    expect(llmProvider.chat).toHaveBeenCalledTimes(2);
+    const errorCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'error'
+    );
+    expect(errorCreates).toHaveLength(1);
+    expect(errorCreates[0][2]).toEqual(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          error: expect.objectContaining({ type: 'network' }),
+        }),
+      })
+    );
+  });
+
+  /* Preconditions: provider rejects with timeout, signal is already aborted
+     Action: run pipeline with aborted signal
+     Assertions: chat called 0 times (early exit), no retry, no kind:error
+     Requirements: llm-integration.12.2.3 */
+  it('does not retry timeout when signal is already aborted', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+    const controller = new AbortController();
+    controller.abort();
+
+    llmProvider.chat.mockRejectedValue(
+      new LLMRequestAbortedError('Model response timeout', new Error('aborted'))
+    );
+
+    await pipeline.run('agent-1', 1, controller.signal);
+
+    expect(llmProvider.chat).not.toHaveBeenCalled();
+    const errorCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'error'
+    );
+    expect(errorCreates).toHaveLength(0);
+  });
+
+  /* Preconditions: provider rejects with timeout once, signal is aborted mid-retry
+     Action: run pipeline with signal that gets aborted after first failure
+     Assertions: chat called 1 time, no retry due to aborted signal, no kind:error (abort path)
+     Requirements: llm-integration.12.2.3 */
+  it('does not retry timeout when signal is aborted after first failure', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+    const controller = new AbortController();
+
+    llmProvider.chat.mockImplementation(async () => {
+      controller.abort();
+      throw new LLMRequestAbortedError('Model response timeout', new Error('aborted'));
+    });
+
+    await pipeline.run('agent-1', 1, controller.signal);
+
+    expect(llmProvider.chat).toHaveBeenCalledTimes(1);
+    const errorCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'error'
+    );
+    expect(errorCreates).toHaveLength(0);
+  });
 });

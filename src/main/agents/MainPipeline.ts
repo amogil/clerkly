@@ -1377,7 +1377,8 @@ export class MainPipeline {
       !state.meaningfulChunkSeen &&
       !signal?.aborted;
 
-    const shouldRetry = shouldRetryInvalidFinalAnswer || shouldRetryTimeout || shouldRetrySilentFailure;
+    const shouldRetry =
+      shouldRetryInvalidFinalAnswer || shouldRetryTimeout || shouldRetrySilentFailure;
 
     if (shouldRetryTimeout) {
       cycleState.consecutiveTimeouts += 1;

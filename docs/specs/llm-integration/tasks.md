@@ -6,7 +6,7 @@
 
 Сейчас при timeout провайдера pipeline выполняет только 1 повтор в generic silent-failure ветке. Intermittent timeout часто восстанавливается при повторе, но одного недостаточно. Задача — выделить timeout в отдельную retry-ветку с лимитом 3 consecutive retry (4 попытки суммарно). Счётчик timeout-повторов сбрасывается при успешной попытке, то есть он не сквозной через весь run — каждая новая серия timeout получает свежие 3 retry.
 
-**Текущий статус:** Фаза 2 — Реализация в runtime завершена
+**Текущий статус:** Фаза 3 — Unit-тесты завершены
 
 ---
 
@@ -58,11 +58,12 @@
 #### Фаза 3: Unit-тесты
 
 - [ ] Добавить тесты в `tests/unit/agents/MainPipeline.test.ts`:
-  - [ ] Timeout retry исчерпывает 3 retry (4 вызова `chat`), затем создаёт один `kind:error` с `type=timeout`.
-  - [ ] Timeout успешен на 2-м retry (2 вызова `chat`, нет `kind:error`).
-  - [ ] Non-timeout ошибка (network) по-прежнему retry max 1 раз (2 вызова `chat`).
-  - [ ] Timeout при `signal.aborted` НЕ делает retry.
-  - [ ] Счётчик timeout-retry сбрасывается после успешной попытки (timeout -> success -> timeout -> success — каждая серия получает свежие 3 retry).
+- [x] Добавить тесты в `tests/unit/agents/MainPipeline.test.ts`:
+  - [x] Timeout retry исчерпывает 3 retry (4 вызова `chat`), затем создаёт один `kind:error` с `type=timeout`.
+  - [x] Timeout успешен на 2-м retry (2 вызова `chat`, нет `kind:error`).
+  - [x] Non-timeout ошибка (network) по-прежнему retry max 1 раз (2 вызова `chat`).
+  - [x] Timeout при `signal.aborted` НЕ делает retry.
+  - [x] Счётчик timeout-retry сбрасывается после успешной попытки (timeout -> success -> timeout -> success — каждая серия получает свежие 3 retry).
 
 #### Фаза 4: Валидация
 
