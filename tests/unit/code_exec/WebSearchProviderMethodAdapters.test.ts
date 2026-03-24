@@ -138,6 +138,54 @@ describe('WebSearchProviderMethodAdapters', () => {
     }
   });
 
+  /* Preconditions: Google adapter with API key in URL hits timeout during fetch
+     Action: timeout-like error is thrown during execute
+     Assertions: timeout diagnostic message redacts key=<value> from endpoint URL
+     Requirements: sandbox-web-search.4.2 */
+  it('redacts Google API key from timeout diagnostic endpoint URL', async () => {
+    const previousEndpoint = process.env.CLERKLY_GOOGLE_LLM_API_URL;
+    process.env.CLERKLY_GOOGLE_LLM_API_URL =
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini:generateContent';
+    fetchMock.mockRejectedValue(new Error('Request timed out at provider'));
+
+    try {
+      const adapter = getAdapter('google');
+      const validation = adapter.validate({ queries: ['redaction test'] });
+      expect(validation.success).toBe(true);
+      if (!validation.success) {
+        throw new Error('Validation failed unexpectedly');
+      }
+
+      await expect(
+        adapter.execute(validation.input, {
+          provider: 'google',
+          apiKey: 'super-secret-google-key',
+          timeoutMs: 30_000,
+        })
+      ).rejects.toMatchObject({
+        name: 'TimeoutError',
+        message: expect.stringContaining('key=%3Credacted%3E'),
+      });
+
+      // Verify the actual key value is NOT in the timeout message
+      try {
+        await adapter.execute(validation.input, {
+          provider: 'google',
+          apiKey: 'super-secret-google-key',
+          timeoutMs: 30_000,
+        });
+      } catch (error: unknown) {
+        expect((error as Error).message).not.toContain('super-secret-google-key');
+      }
+    } finally {
+      if (previousEndpoint === undefined) {
+        delete process.env.CLERKLY_GOOGLE_LLM_API_URL;
+      } else {
+        process.env.CLERKLY_GOOGLE_LLM_API_URL = previousEndpoint;
+      }
+    }
+  });
+
   /* Preconditions: OpenAI adapter executes provider request and provider returns non-OK response with message
      Action: execute validated input
      Assertions: adapter throws provider message for upper layer mapping
@@ -303,5 +351,67 @@ describe('WebSearchProviderMethodAdapters', () => {
         timeoutMs: 30_000,
       })
     ).rejects.toThrow('Google quota exceeded');
+  });
+
+  /* Preconditions: OpenAI adapter receives multi-query input; first query succeeds, second fails
+     Action: execute with two queries where server returns OK then 500
+     Assertions: error thrown (no partial results), fetch called only twice (third query skipped)
+     Requirements: sandbox-web-search.2.8 */
+  it('fails fast on second query error for OpenAI multi-query (no partial results)', async () => {
+    const adapter = getAdapter('openai');
+    const validation = adapter.validate({ queries: ['q1', 'q2', 'q3'] });
+    expect(validation.success).toBe(true);
+    if (!validation.success) throw new Error('Validation failed');
+
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ output: [{ type: 'web_search_call', status: 'completed' }] }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: async () => ({}),
+      });
+
+    await expect(
+      adapter.execute(validation.input, {
+        provider: 'openai',
+        apiKey: 'sk-test',
+        timeoutMs: 30_000,
+      })
+    ).rejects.toThrow();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  /* Preconditions: Google adapter receives multi-query input; first query succeeds, second fails
+     Action: execute with two queries where server returns OK then 503
+     Assertions: error thrown (no partial results), fetch called only twice (third query skipped)
+     Requirements: sandbox-web-search.2.8 */
+  it('fails fast on second query error for Google multi-query (no partial results)', async () => {
+    const adapter = getAdapter('google');
+    const validation = adapter.validate({ queries: ['q1', 'q2', 'q3'] });
+    expect(validation.success).toBe(true);
+    if (!validation.success) throw new Error('Validation failed');
+
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ candidates: [{ groundingMetadata: { groundingChunks: [] } }] }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        json: async () => ({}),
+      });
+
+    await expect(
+      adapter.execute(validation.input, {
+        provider: 'google',
+        apiKey: 'google-key',
+        timeoutMs: 30_000,
+      })
+    ).rejects.toThrow();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

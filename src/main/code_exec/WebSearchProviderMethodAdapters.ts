@@ -95,7 +95,7 @@ class OpenAIWebSearchAdapter implements ProviderMethodAdapter<OpenAIWebSearchInp
   // Requirements: sandbox-web-search.2.3
   readonly provider = 'openai' as const;
 
-  // Requirements: sandbox-web-search.2.3, sandbox-web-search.2.6
+  // Requirements: sandbox-web-search.2.3, sandbox-web-search.2.6, sandbox-web-search.2.7
   validate(input: unknown): ProviderMethodValidationResult<OpenAIWebSearchInput> {
     if (!input || typeof input !== 'object' || Array.isArray(input)) {
       return {
@@ -113,7 +113,7 @@ class OpenAIWebSearchAdapter implements ProviderMethodAdapter<OpenAIWebSearchInp
         },
       };
     }
-    // Requirements: sandbox-web-search.2.6
+    // Requirements: sandbox-web-search.2.6, sandbox-web-search.2.7
     const nonEmpty = raw.queries.filter((q: string) => q.trim().length > 0);
     if (nonEmpty.length === 0) {
       return {
@@ -127,7 +127,7 @@ class OpenAIWebSearchAdapter implements ProviderMethodAdapter<OpenAIWebSearchInp
     return { success: true, input: { queries: raw.queries } };
   }
 
-  // Requirements: sandbox-web-search.2.3, sandbox-web-search.3.1, sandbox-web-search.4.1
+  // Requirements: sandbox-web-search.2.3, sandbox-web-search.2.8, sandbox-web-search.3.1, sandbox-web-search.4.1
   async execute(
     input: OpenAIWebSearchInput,
     context: ProviderMethodExecutionContext
@@ -187,7 +187,7 @@ class AnthropicWebSearchAdapter implements ProviderMethodAdapter<AnthropicWebSea
   // Requirements: sandbox-web-search.2.4
   readonly provider = 'anthropic' as const;
 
-  // Requirements: sandbox-web-search.2.4, sandbox-web-search.2.6
+  // Requirements: sandbox-web-search.2.4, sandbox-web-search.2.6, sandbox-web-search.2.7
   validate(input: unknown): ProviderMethodValidationResult<AnthropicWebSearchInput> {
     if (!input || typeof input !== 'object' || Array.isArray(input)) {
       return {
@@ -262,7 +262,7 @@ class GoogleWebSearchAdapter implements ProviderMethodAdapter<GoogleWebSearchInp
   // Requirements: sandbox-web-search.2.5
   readonly provider = 'google' as const;
 
-  // Requirements: sandbox-web-search.2.5, sandbox-web-search.2.6
+  // Requirements: sandbox-web-search.2.5, sandbox-web-search.2.6, sandbox-web-search.2.7
   validate(input: unknown): ProviderMethodValidationResult<GoogleWebSearchInput> {
     if (!input || typeof input !== 'object' || Array.isArray(input)) {
       return {
@@ -280,7 +280,7 @@ class GoogleWebSearchAdapter implements ProviderMethodAdapter<GoogleWebSearchInp
         },
       };
     }
-    // Requirements: sandbox-web-search.2.6
+    // Requirements: sandbox-web-search.2.6, sandbox-web-search.2.7
     const nonEmpty = raw.queries.filter((q: string) => q.trim().length > 0);
     if (nonEmpty.length === 0) {
       return {
@@ -294,7 +294,7 @@ class GoogleWebSearchAdapter implements ProviderMethodAdapter<GoogleWebSearchInp
     return { success: true, input: { queries: raw.queries } };
   }
 
-  // Requirements: sandbox-web-search.2.5, sandbox-web-search.3.1, sandbox-web-search.4.1
+  // Requirements: sandbox-web-search.2.5, sandbox-web-search.2.8, sandbox-web-search.3.1, sandbox-web-search.4.1
   async execute(
     input: GoogleWebSearchInput,
     context: ProviderMethodExecutionContext

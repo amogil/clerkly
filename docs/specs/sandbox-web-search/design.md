@@ -157,6 +157,16 @@ Helper не вводит общий обязательный provider-agnostic s
 - Helper не выполняет внутренний automatic retry; retry остаётся ответственностью вызывающего кода/оркестратора.
 - Если sandbox-код не обработал ошибку helper-а, итоговый status `code_exec` определяется существующими правилами runtime/normalization.
 
+### Безопасность: API key в URL (Google adapter)
+
+Google Generative Language API требует передачу API key как URL query parameter (`?key=...`). Это создаёт риск утечки ключа через логи, диагностику ошибок или stack traces.
+
+**Меры защиты:**
+- `sanitizeEndpointForLogs(endpoint)` — редактирует query parameters `key`, `api_key`, `token`, `access_token`, `client_secret` перед записью в лог/диагностику.
+- Все timeout diagnostic сообщения используют `sanitizeEndpointForLogs` вместо raw endpoint.
+- Fallback: если endpoint не является валидным URL (`new URL()` throws), raw endpoint возвращается as-is (не содержит key, т.к. key добавляется только к валидным URL).
+- Unit test: `redacts Google API key from timeout diagnostic endpoint URL` верифицирует, что key НЕ попадает в текст ошибки.
+
 ## Ограничения UI
 
 - Нет прямых UI-кнопок/контролов для `web_search`.
@@ -184,13 +194,36 @@ Helper не вводит общий обязательный provider-agnostic s
 
 ### Покрытие требований
 
-| Requirement | Unit Tests | Functional Tests |
-|-------------|------------|------------------|
-| sandbox-web-search.1 (1.1-1.5) | ✓ | ✓ |
-| sandbox-web-search.1.6 (capability fallback) | ✓ | - (unit only) |
-| sandbox-web-search.1.7 (policy_denied for unsupported capability) | ✓ | - (covered by code_exec 2.8.1 functional test; defense-in-depth guard unit-tested) |
-| sandbox-web-search.2 | ✓ | ✓ |
-| sandbox-web-search.3 | ✓ | ✓ |
-| sandbox-web-search.4 | ✓ | ✓ |
-| sandbox-web-search.5 | ✓ | ✓ |
-| sandbox-web-search.6 | ✓ | ✓ |
+| Requirement | Unit Tests | Functional Tests | Примечание |
+|-------------|------------|------------------|------------|
+| sandbox-web-search.1.1 | ✓ SandboxBridge, SandboxSessionManager | ✓ code_exec.spec | helper доступен через bridge/allowlist |
+| sandbox-web-search.1.2 | ✓ SandboxBridge | ✓ code_exec.spec | вызов через bridge, не main-pipeline tool call |
+| sandbox-web-search.1.3 | ✓ SandboxWebSearchHandler | ✓ code_exec.spec | async API через await |
+| sandbox-web-search.1.4 | ✓ SandboxWebSearchHandler | ✓ code_exec.spec | multiple calls per execution |
+| sandbox-web-search.1.5 | ✓ PromptBuilder | — | prompt-инструкция с provider-native контрактом |
+| sandbox-web-search.1.6 | ✓ SandboxSessionManager, ProviderMethodRegistry | — | capability fallback (unit only) |
+| sandbox-web-search.1.7 | ✓ SandboxSessionManager (defense-in-depth guard) | — | policy_denied; primary path covered by code_exec 2.8.1 |
+| sandbox-web-search.2.1 | ✓ WebSearchProviderMethodAdapters | ✓ code_exec.spec | provider-native input |
+| sandbox-web-search.2.2 | ✓ WebSearchProviderMethodAdapters | ✓ code_exec.spec | no cross-provider schema |
+| sandbox-web-search.2.3 | ✓ WebSearchProviderMethodAdapters (OpenAI validate+execute) | ✓ code_exec.spec, code_exec-real.spec | OpenAI native contract |
+| sandbox-web-search.2.4 | ✓ WebSearchProviderMethodAdapters (Anthropic validate+execute) | ✓ code_exec.spec, code_exec-real.spec | Anthropic native contract |
+| sandbox-web-search.2.5 | ✓ WebSearchProviderMethodAdapters (Google validate+execute) | ✓ code_exec.spec, code_exec-real.spec | Google native contract |
+| sandbox-web-search.2.6 | ✓ WebSearchProviderMethodAdapters (validate) | ✓ code_exec.spec (invalid_input) | structured error invalid_input |
+| sandbox-web-search.2.7 | ✓ WebSearchProviderMethodAdapters (whitespace validate) | ✓ code_exec.spec (Anthropic whitespace) | all-whitespace → invalid_input |
+| sandbox-web-search.2.8 | ✓ WebSearchProviderMethodAdapters (fail-fast tests) | — | sequential fail-fast multi-query |
+| sandbox-web-search.3.1 | ✓ SandboxWebSearchHandler | ✓ code_exec.spec, code_exec-real.spec | provider-native payload |
+| sandbox-web-search.3.2 | ✓ WebSearchProviderMethodAdapters | ✓ code_exec.spec | no universal result fields |
+| sandbox-web-search.3.3 | ✓ SandboxWebSearchHandler | ✓ code_exec.spec | runtime envelope |
+| sandbox-web-search.3.4 | ✓ SandboxWebSearchHandler | ✓ code_exec-real.spec | payload preservation |
+| sandbox-web-search.3.5 | ✓ SandboxWebSearchHandler | ✓ code_exec.spec | optional meta object |
+| sandbox-web-search.4.1 | ✓ SandboxWebSearchHandler | ✓ code_exec.spec | structured error format |
+| sandbox-web-search.4.2 | ✓ SandboxWebSearchHandler, WebSearchProviderMethodAdapters | ✓ code_exec.spec | error.code values |
+| sandbox-web-search.4.3 | ✓ SandboxWebSearchHandler | — | no internal retry |
+| sandbox-web-search.4.4 | ✓ SandboxWebSearchHandler | ✓ code_exec.spec (runtime error) | no crash on error |
+| sandbox-web-search.5.1 | — | ✓ code_exec.spec (lifecycle) | no separate persisted message |
+| sandbox-web-search.5.2 | — | ✓ code_exec.spec (lifecycle) | lifecycle within code_exec |
+| sandbox-web-search.5.3 | ✓ SandboxWebSearchHandler | ✓ code_exec.spec | result as return value |
+| sandbox-web-search.5.4 | — | ✓ code_exec.spec (lifecycle) | terminal status correctness |
+| sandbox-web-search.6.1 | ✓ ProviderMethodRegistry | — | registry consistency |
+| sandbox-web-search.6.2 | — | ✓ code_exec.spec | functional test matrix |
+| sandbox-web-search.6.3 | ✓ SandboxSessionManager, ProviderMethodRegistry | — | capability fallback unit coverage |

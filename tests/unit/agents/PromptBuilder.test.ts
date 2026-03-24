@@ -320,6 +320,40 @@ describe('PromptBuilder.build()', () => {
     });
   });
 
+  describe('forEachFeature', () => {
+    /* Preconditions: PromptBuilder with two features registered
+       Action: call forEachFeature(callback)
+       Assertions: callback is invoked once per feature in registration order
+       Requirements: sandbox-web-search.1, sandbox-web-search.2 */
+    it('should invoke callback for each registered feature', () => {
+      const feature1: AgentFeature = {
+        name: 'alpha',
+        getSystemPromptSection: () => '',
+        getTools: () => [],
+      };
+      const feature2: AgentFeature = {
+        name: 'beta',
+        getSystemPromptSection: () => '',
+        getTools: () => [],
+      };
+      const builder = makeBuilder('Base.', [feature1, feature2]);
+      const visited: string[] = [];
+      builder.forEachFeature((f) => visited.push(f.name));
+      expect(visited).toEqual(['alpha', 'beta']);
+    });
+
+    /* Preconditions: PromptBuilder with no features
+       Action: call forEachFeature(callback)
+       Assertions: callback is never invoked
+       Requirements: sandbox-web-search.1, sandbox-web-search.2 */
+    it('should not invoke callback when no features are registered', () => {
+      const builder = makeBuilder('Base.', []);
+      const spy = jest.fn();
+      builder.forEachFeature(spy);
+      expect(spy).not.toHaveBeenCalled();
+    });
+  });
+
   describe('history serialization for provider messages', () => {
     /* Preconditions: User and LLM messages exist
        Action: Call build(messages)
