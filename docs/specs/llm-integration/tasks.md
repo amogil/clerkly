@@ -42,5 +42,5 @@
 - [x] P2: Обновить "Выполнено" / "В работе" секции tasks.md.
 - [x] P3: Guard `normalizeLLMError` вызов за `!isInvalidFinalAnswer`.
 - [x] P3: Переименовать тест "does not retry timeout when signal is already aborted" → "exits early without calling provider when signal is already aborted".
-- [ ] Прогнать `npm run validate`.
-- [ ] Push и ответить на review comments.
+- [x] Прогнать `npm run validate`.
+- [x] Push и ответить на review comments.
