@@ -584,15 +584,28 @@ You are a helpful AI assistant. Always reply in the user's language (detected fr
 **Нормализация ошибок AI SDK в `LLMProvider.chat()`:**
 
 ```typescript
-// Requirements: llm-integration.3, llm-integration.3.10
-const TIMEOUT_MS = 300_000; // 5 минут
+// Requirements: llm-integration.3, llm-integration.3.6, llm-integration.3.10
+const TIMEOUT_MS = 300_000; // 5 минут per model step
+
+// Таймер сбрасывается при каждом onStepFinish (llm-integration.3.6.1):
+// - setTimeout(300s) при старте chat()
+// - clearTimeout + setTimeout(300s) в onStepFinish callback
+// - Время выполнения tool execute() не учитывается в таймере
+let timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
 try {
-  // provider adapter запускает streaming через Vercel AI SDK
-  // и маппит AI SDK ошибки в единый доменный формат
-  await runProviderStreamWithTimeout({ timeoutMs: TIMEOUT_MS, signal });
+  await runProviderStreamWithTimeout({
+    timeoutMs: TIMEOUT_MS,
+    signal,
+    onStepFinish: () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    },
+  });
 } catch (error) {
   throw normalizeLLMError(error); // APICallError/RetryError/UIMessageStreamError/Tool*Error -> domain code
+} finally {
+  clearTimeout(timeoutId);
 }
 ```
 

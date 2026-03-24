@@ -90,7 +90,13 @@ export class OpenAIProvider implements ILLMProvider {
     }
     const abortFromExternalSignal = () => controller.abort();
     signal?.addEventListener('abort', abortFromExternalSignal);
-    const timeoutId = setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);
+    // Requirements: llm-integration.3.6, llm-integration.3.6.1
+    // Timer resets on each onStepFinish so tool execution time doesn't count toward model timeout
+    let timeoutId = setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);
+    const resetTimeout = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);
+    };
     const stepDiagnostics: Array<{
       stepIndex: number;
       finishReason?: string;
@@ -130,6 +136,9 @@ export class OpenAIProvider implements ILLMProvider {
         maxRetries: AI_SDK_MAX_RETRIES,
         abortSignal: controller.signal,
         onStepFinish: (event: Record<string, unknown>) => {
+          // Requirements: llm-integration.3.6.1
+          // Reset per-step timeout so tool execution time doesn't eat into model response time
+          resetTimeout();
           const stepIndex =
             typeof event.stepNumber === 'number'
               ? event.stepNumber

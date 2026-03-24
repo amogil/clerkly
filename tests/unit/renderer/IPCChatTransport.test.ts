@@ -270,9 +270,10 @@ describe('IPCChatTransport', () => {
 
     /* Preconditions: transport created for agent-1
        Action: emit MESSAGE_UPDATED with hidden: true for the llm message
-       Assertions: stream closes without emitting text chunks
-       Requirements: llm-integration.8.5 */
+       Assertions: stream closes without emitting text chunks, emits finish after idle delay
+       Requirements: llm-integration.3.6, llm-integration.8.5 */
     it('should close stream when llm message becomes hidden', async () => {
+      jest.useFakeTimers();
       const streamPromise = transport.sendMessages(makeSendOptions());
       await Promise.resolve();
 
@@ -302,12 +303,17 @@ describe('IPCChatTransport', () => {
         timestamp: Date.now(),
       });
 
+      // Advance timers to trigger the 200ms idle finish delay
+      jest.advanceTimersByTime(250);
+
       const stream = await streamPromise;
       const chunks = await collectChunks(stream);
       const types = chunks.map((c) => c.type);
 
       expect(types).not.toContain('text-delta');
-      expect(types).not.toContain('finish');
+      // Stream finishes after idle delay to allow potential error messages to arrive
+      expect(types).toContain('finish');
+      jest.useRealTimers();
     });
 
     /* Preconditions: transport created for agent-1, abortSignal already aborted

@@ -122,13 +122,13 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
           stepOpen = true;
         }
 
-        function scheduleFinishIfIdle(): void {
+        function scheduleFinishIfIdle(delayMs = 0): void {
           cancelPendingFinish();
           finishTimer = setTimeout(() => {
             closeCurrentStep();
             enqueue({ type: 'finish' });
             finish();
-          }, 0);
+          }, delayMs);
         }
 
         // Requirements: agents.12.7 — subscribe to MESSAGE_CREATED for llm/error messages
@@ -200,10 +200,16 @@ export class IPCChatTransport implements ChatTransport<UIMessage> {
             }
             if (msg.id !== activeLlmMessageId) return;
 
-            // Hidden = cancelled previous response, close stream without content
+            // Hidden = cancelled/failed previous response, close step but wait briefly for
+            // a follow-up error message from handleRunError before finishing the stream.
+            // Requirements: llm-integration.3.6
             if (msg.hidden) {
               closeCurrentStep();
-              finish();
+              activeLlmMessageId = null;
+              // Wait 200ms for potential kind:error message from handleRunError
+              // before closing the stream. The error MESSAGE_CREATED event arrives via
+              // IPC and may be queued after this handler returns.
+              scheduleFinishIfIdle(200);
               return;
             }
 

@@ -2670,6 +2670,62 @@ describe('MainPipeline.run()', () => {
     expect(messageManager.setUsage).toHaveBeenCalled();
   });
 
+  /* Preconditions: Multi-step provider stream with tool execution; internal CHAT_TIMEOUT_MS
+       fires after meaningful reasoning chunks, but external signal is NOT aborted.
+     Action: provider.chat resolves tool steps then throws LLMRequestAbortedError on the
+       post-tool LLM step (simulating internal timeout after tool execution consumed most budget)
+     Assertions: Pipeline creates kind:error with type=timeout (not silently swallowed)
+     Requirements: llm-integration.3.6, llm-integration.12.1 */
+  it('creates kind:error when internal provider timeout fires after multi-step tool execution (external signal not aborted)', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+    // Real AbortController like AgentIPCHandlers uses — but NOT aborted
+    const controller = new AbortController();
+
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        // Step 1: normal tool_call + tool_result (simulates successful code_exec)
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-step1',
+          toolName: 'code_exec',
+          arguments: { task_summary: 'Run code', code: 'console.log(1)' },
+        });
+        onChunk({
+          type: 'tool_result',
+          callId: 'call-step1',
+          toolName: 'code_exec',
+          arguments: { task_summary: 'Run code', code: 'console.log(1)' },
+          output: { status: 'success', stdout: '1\n', stderr: '' },
+          status: 'success',
+        });
+        // Step 2: LLM starts reasoning but internal timeout fires
+        onChunk({ type: 'reasoning', delta: 'Rerunning queries for news...' });
+        // Internal timeout abort — NOT user cancel
+        throw new LLMRequestAbortedError(
+          'Model response timeout. The provider took too long to respond. Please try again later.',
+          new Error('aborted')
+        );
+      }
+    );
+
+    await pipeline.run('agent-1', 1, controller.signal);
+
+    // Must hide the in-flight llm message
+    expect(messageManager.hideAndMarkIncomplete).toHaveBeenCalled();
+    // Must create kind:error with type=timeout
+    const errorCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'error'
+    );
+    expect(errorCreates).toHaveLength(1);
+    expect(errorCreates[0][2]).toEqual(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          error: expect.objectContaining({ type: 'timeout' }),
+        }),
+      })
+    );
+  });
+
   it('on aborted signal with thrown error hides in-flight message and skips kind:error', async () => {
     const { pipeline, llmProvider, messageManager } = makeMocks();
     const controller = new AbortController();

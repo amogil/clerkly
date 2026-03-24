@@ -2087,44 +2087,55 @@ export class MainPipeline {
 
     this.logger.error(`Pipeline error for agent ${agentId}: ${errorMessage}`);
 
-    if (lastLlmMessageId !== null) {
-      try {
-        this.hideIncompleteLlmMessage(lastLlmMessageId, agentId);
-      } catch {
-        // ignore
+    // Requirements: llm-integration.3.6
+    // Wrap non-abort error handling in try/catch for resilience: if DB operations
+    // (hideIncompleteLlmMessage, finalizePendingToolCallsForTurn, messageManager.create)
+    // throw, log the secondary error instead of letting it propagate and get silently
+    // swallowed by handleBackgroundError.
+    try {
+      if (lastLlmMessageId !== null) {
+        try {
+          this.hideIncompleteLlmMessage(lastLlmMessageId, agentId);
+        } catch {
+          // ignore
+        }
       }
-    }
-    this.finalizePendingToolCallsForTurn(agentId, userMessageId, normalizedError.message);
+      this.finalizePendingToolCallsForTurn(agentId, userMessageId, normalizedError.message);
 
-    const errorReplyTo = userMessageId;
+      const errorReplyTo = userMessageId;
 
-    if (errorType === 'rate_limit') {
-      const retryAfterSeconds = normalizedError.retryAfterSeconds ?? 10;
-      MainEventBus.getInstance().publish(
-        new AgentRateLimitEvent(agentId, userMessageId, retryAfterSeconds)
-      );
-      return;
-    }
+      if (errorType === 'rate_limit') {
+        const retryAfterSeconds = normalizedError.retryAfterSeconds ?? 10;
+        MainEventBus.getInstance().publish(
+          new AgentRateLimitEvent(agentId, userMessageId, retryAfterSeconds)
+        );
+        return;
+      }
 
-    const errorPayload: Record<string, unknown> = {
-      type: errorType,
-      message: normalizedError.message,
-    };
-    if (errorType === 'auth') {
-      errorPayload['action_link'] = { label: 'Open Settings', screen: 'settings' };
-    }
+      const errorPayload: Record<string, unknown> = {
+        type: errorType,
+        message: normalizedError.message,
+      };
+      if (errorType === 'auth') {
+        errorPayload['action_link'] = { label: 'Open Settings', screen: 'settings' };
+      }
 
-    this.messageManager.create(
-      agentId,
-      'error',
-      {
-        data: {
-          error: errorPayload,
+      this.messageManager.create(
+        agentId,
+        'error',
+        {
+          data: {
+            error: errorPayload,
+          },
         },
-      },
-      errorReplyTo,
-      true
-    );
+        errorReplyTo,
+        true
+      );
+    } catch (secondaryError) {
+      this.logger.error(
+        `Failed to create error message for agent ${agentId}: ${secondaryError instanceof Error ? secondaryError.message : String(secondaryError)}`
+      );
+    }
   }
 
   /**
