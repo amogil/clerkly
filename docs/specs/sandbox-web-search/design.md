@@ -186,11 +186,9 @@ Google Generative Language API требует передачу API key как UR
 - `tests/functional/code_exec.spec.ts` — вызов `tools.web_search(...)` из sandbox-кода.
 - `tests/functional/code_exec.spec.ts` — provider-native validation failure.
 - `tests/functional/code_exec.spec.ts` — корректность persisted lifecycle в рамках `tool_call(code_exec)`.
-- `tests/functional/code_exec.spec.ts` — mock-provider e2e для Anthropic web_search adapter path.
-- `tests/functional/code_exec.spec.ts` — mock-provider e2e для Google web_search adapter path.
-- `tests/functional/code_exec-real.spec.ts` — e2e путь с реальным OpenAI API key и реальным ответом provider web search (без stub payload).
-- `tests/functional/code_exec-real.spec.ts` — e2e путь с реальным Anthropic API key и реальным ответом provider web search (без stub payload).
-- `tests/functional/code_exec-real.spec.ts` — e2e путь с реальным Google API key и реальным ответом provider web search (без stub payload).
+- `tests/functional/code_exec.spec.ts` — mock-provider функциональный тест для Anthropic web_search adapter path.
+- `tests/functional/code_exec.spec.ts` — mock-provider функциональный тест для Google web_search adapter path.
+- `tests/functional/code_exec-real.spec.ts` — функциональный тест с реальным OpenAI API key (без stub payload).
 
 ### Покрытие требований
 
@@ -206,15 +204,15 @@ Google Generative Language API требует передачу API key как UR
 | sandbox-web-search.2.1 | ✓ WebSearchProviderMethodAdapters | ✓ code_exec.spec | provider-native input |
 | sandbox-web-search.2.2 | ✓ WebSearchProviderMethodAdapters | ✓ code_exec.spec | no cross-provider schema |
 | sandbox-web-search.2.3 | ✓ WebSearchProviderMethodAdapters (OpenAI validate+execute) | ✓ code_exec.spec, code_exec-real.spec | OpenAI native contract |
-| sandbox-web-search.2.4 | ✓ WebSearchProviderMethodAdapters (Anthropic validate+execute) | ✓ code_exec.spec, code_exec-real.spec | Anthropic native contract |
-| sandbox-web-search.2.5 | ✓ WebSearchProviderMethodAdapters (Google validate+execute) | ✓ code_exec.spec, code_exec-real.spec | Google native contract |
+| sandbox-web-search.2.4 | ✓ WebSearchProviderMethodAdapters (Anthropic validate+execute) | ✓ code_exec.spec | Anthropic native contract |
+| sandbox-web-search.2.5 | ✓ WebSearchProviderMethodAdapters (Google validate+execute) | ✓ code_exec.spec | Google native contract |
 | sandbox-web-search.2.6 | ✓ WebSearchProviderMethodAdapters (validate) | ✓ code_exec.spec (invalid_input) | structured error invalid_input |
 | sandbox-web-search.2.7 | ✓ WebSearchProviderMethodAdapters (whitespace validate) | ✓ code_exec.spec (Anthropic whitespace) | all-whitespace → invalid_input |
 | sandbox-web-search.2.8 | ✓ WebSearchProviderMethodAdapters (fail-fast tests) | — | sequential fail-fast multi-query |
 | sandbox-web-search.3.1 | ✓ SandboxWebSearchHandler | ✓ code_exec.spec, code_exec-real.spec | provider-native payload |
 | sandbox-web-search.3.2 | ✓ WebSearchProviderMethodAdapters | ✓ code_exec.spec | no universal result fields |
 | sandbox-web-search.3.3 | ✓ SandboxWebSearchHandler | ✓ code_exec.spec | runtime envelope |
-| sandbox-web-search.3.4 | ✓ SandboxWebSearchHandler | ✓ code_exec-real.spec | payload preservation |
+| sandbox-web-search.3.4 | ✓ SandboxWebSearchHandler | ✓ code_exec-real.spec | payload preservation (real API) |
 | sandbox-web-search.3.5 | ✓ SandboxWebSearchHandler | ✓ code_exec.spec | optional meta object |
 | sandbox-web-search.4.1 | ✓ SandboxWebSearchHandler | ✓ code_exec.spec | structured error format |
 | sandbox-web-search.4.2 | ✓ SandboxWebSearchHandler, WebSearchProviderMethodAdapters | ✓ code_exec.spec | error.code values |

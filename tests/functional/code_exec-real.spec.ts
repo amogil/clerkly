@@ -1,7 +1,7 @@
-/* Preconditions: Electron app is launched with real provider API keys and authenticated via mock OAuth
+/* Preconditions: Electron app is launched with real OpenAI API key and authenticated via mock OAuth
    Action: LLM triggers code_exec that calls tools.web_search and prints helper output
    Assertions: code_exec stdout contains real provider-backed payload and not stubbed placeholder data
-   Requirements: sandbox-web-search.1.1, sandbox-web-search.2.3, sandbox-web-search.2.4, sandbox-web-search.2.5, sandbox-web-search.3.1, sandbox-web-search.6.2, testing.12.1 */
+   Requirements: sandbox-web-search.1.1, sandbox-web-search.2.3, sandbox-web-search.3.1, sandbox-web-search.6.2, testing.12.1 */
 
 import { test, expect, ElectronApplication, Page } from '@playwright/test';
 import {
@@ -15,15 +15,12 @@ import {
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
 
 const OPENAI_REAL_API_KEY = process.env.CLERKLY_OPENAI_API_KEY;
-const ANTHROPIC_REAL_API_KEY = process.env.CLERKLY_ANTHROPIC_API_KEY;
-const GOOGLE_REAL_API_KEY = process.env.CLERKLY_GOOGLE_API_KEY;
 
+// Anthropic and Google web_search are tested via mock-based functional tests in code_exec.spec.ts
 type LLMProvider = 'openai' | 'anthropic' | 'google';
 const OPENAI_WEB_SEARCH_MAX_ATTEMPTS = 3;
 const OPENAI_WEB_SEARCH_WAIT_TIMEOUT_MS = 90_000;
 const OPENAI_REAL_TEST_TIMEOUT_MS = 330_000;
-const ANTHROPIC_REAL_TEST_TIMEOUT_MS = 180_000;
-const GOOGLE_REAL_TEST_TIMEOUT_MS = 180_000;
 
 let electronApp: ElectronApplication;
 let window: Page;
@@ -73,32 +70,6 @@ async function setLLMProvider(provider: LLMProvider): Promise<void> {
   }, provider);
 
   expect(saveResult.ok).toBe(true);
-}
-
-// Requirements: sandbox-web-search.5.2, sandbox-web-search.6.2
-async function getLastSuccessfulCodeExecStdout(): Promise<string> {
-  const agentId = (await getAgentIdsFromApi(window))[0];
-  expect(agentId).toBeTruthy();
-
-  const allMessages = await getAllMessages(agentId as string);
-  const toolCalls = allMessages.filter((entry) => entry.kind === 'tool_call');
-  const codeExecCalls = toolCalls.filter((entry) => {
-    const payload = entry.payload as { data?: { toolName?: string; output?: { status?: string } } };
-    return payload?.data?.toolName === 'code_exec' && payload?.data?.output?.status === 'success';
-  });
-
-  expect(codeExecCalls.length).toBeGreaterThan(0);
-  const lastCodeExec = codeExecCalls[codeExecCalls.length - 1];
-  const stdout = String(
-    (
-      lastCodeExec.payload as {
-        data?: { output?: { stdout?: unknown } };
-      }
-    )?.data?.output?.stdout ?? ''
-  ).trim();
-
-  expect(stdout.length).toBeGreaterThan(0);
-  return stdout;
 }
 
 // Requirements: sandbox-web-search.5.2, sandbox-web-search.6.2
@@ -271,119 +242,6 @@ test.describe('code_exec web_search (real OpenAI)', () => {
         `Real OpenAI web_search did not return non-timeout payload after retries. Last stdout: ${lastStdout}`
       );
     }
-
-    await expectNoToastError(window);
-  });
-});
-
-test.describe('code_exec web_search (real Anthropic)', () => {
-  test.beforeAll(() => {
-    test.skip(
-      !ANTHROPIC_REAL_API_KEY,
-      'CLERKLY_ANTHROPIC_API_KEY is required for real web_search test'
-    );
-  });
-
-  /* Preconditions: authenticated app with real Anthropic key in runtime env
-     Action: user asks model to run code_exec with Anthropic-native web_search input and print JSON result
-     Assertions: persisted code_exec output includes Anthropic provider-native payload and excludes stub values
-     Requirements: sandbox-web-search.1.1, sandbox-web-search.2.4, sandbox-web-search.3.1, sandbox-web-search.6.2, testing.12.1 */
-  test('should execute tools.web_search against real Anthropic and return non-stub payload', async () => {
-    test.setTimeout(ANTHROPIC_REAL_TEST_TIMEOUT_MS);
-
-    const context = await launchElectronWithMockOAuth(mockOAuthServer, {
-      CLERKLY_OPENAI_API_KEY: '',
-      CLERKLY_ANTHROPIC_API_KEY: ANTHROPIC_REAL_API_KEY ?? '',
-      CLERKLY_GOOGLE_API_KEY: '',
-    });
-    electronApp = context.app;
-    window = context.window;
-
-    await completeOAuthFlow(electronApp, window);
-    await expectAgentsVisible(window, 10000);
-    await setLLMProvider('anthropic');
-
-    await sendUserMessage(
-      [
-        'Use the code_exec tool exactly once.',
-        'Inside code_exec execute exactly this JavaScript:',
-        'const result = await tools.web_search({ query: "latest Iran news" });',
-        'console.log(JSON.stringify(result));',
-        'Then provide final_answer with one short summary point.',
-      ].join('\n')
-    );
-
-    await expect(window.locator('.message-llm-action-response').last()).toBeVisible({
-      timeout: 120000,
-    });
-
-    const stdout = await getLastSuccessfulCodeExecStdout();
-    const parsed = JSON.parse(stdout) as unknown;
-    const payload = normalizeProviderNativePayload<{ id?: unknown; content?: unknown }>(parsed);
-    if (payload.provider !== undefined) {
-      expect(payload.provider).toBe('anthropic');
-    }
-    expect(payload.output).toBeTruthy();
-    expect(payload.output?.id).toBeTruthy();
-
-    expect(stdout).not.toContain('Anthropic Result');
-    expect(stdout).not.toContain('Search Result 1');
-
-    await expectNoToastError(window);
-  });
-});
-
-test.describe('code_exec web_search (real Google)', () => {
-  test.beforeAll(() => {
-    test.skip(!GOOGLE_REAL_API_KEY, 'CLERKLY_GOOGLE_API_KEY is required for real web_search test');
-  });
-
-  /* Preconditions: authenticated app with real Google key in runtime env
-     Action: user asks model to run code_exec with Gemini-native web_search input and print JSON result
-     Assertions: persisted code_exec output includes Google provider-native payload and excludes stub values
-     Requirements: sandbox-web-search.1.1, sandbox-web-search.2.5, sandbox-web-search.3.1, sandbox-web-search.6.2, testing.12.1 */
-  test('should execute tools.web_search against real Google and return non-stub payload', async () => {
-    test.setTimeout(GOOGLE_REAL_TEST_TIMEOUT_MS);
-
-    const context = await launchElectronWithMockOAuth(mockOAuthServer, {
-      CLERKLY_OPENAI_API_KEY: '',
-      CLERKLY_ANTHROPIC_API_KEY: '',
-      CLERKLY_GOOGLE_API_KEY: GOOGLE_REAL_API_KEY ?? '',
-    });
-    electronApp = context.app;
-    window = context.window;
-
-    await completeOAuthFlow(electronApp, window);
-    await expectAgentsVisible(window, 10000);
-    await setLLMProvider('google');
-
-    await sendUserMessage(
-      [
-        'Use the code_exec tool exactly once.',
-        'Inside code_exec execute exactly this JavaScript:',
-        'const result = await tools.web_search({ queries: ["latest Iran news"] });',
-        'console.log(JSON.stringify(result));',
-        'Then provide final_answer with one short summary point.',
-      ].join('\n')
-    );
-
-    await expect(window.locator('.message-llm-action-response').last()).toBeVisible({
-      timeout: 120000,
-    });
-
-    const stdout = await getLastSuccessfulCodeExecStdout();
-    const parsed = JSON.parse(stdout) as unknown;
-    const payload =
-      normalizeProviderNativePayload<Array<{ query?: unknown; response?: unknown }>>(parsed);
-    if (payload.provider !== undefined) {
-      expect(payload.provider).toBe('google');
-    }
-    expect(Array.isArray(payload.output)).toBe(true);
-    expect((payload.output ?? []).length).toBeGreaterThan(0);
-    expect(payload.output?.[0]?.response).toBeTruthy();
-
-    expect(stdout).not.toContain('https://google.com/1');
-    expect(stdout).not.toContain('Search Result 1');
 
     await expectNoToastError(window);
   });

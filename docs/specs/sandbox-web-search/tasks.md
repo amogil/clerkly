@@ -99,11 +99,21 @@
 - ✅ Исправлена структура tasks.md: unchecked items из Phase 6 отмечены как done.
 - ✅ Прогнан `npm run validate`.
 
+**Текущий статус:** Phase 8 — Test strategy refinement (done)
+
+---
+
+#### Phase 8: Test Strategy Refinement (done)
+
+- ✅ Anthropic и Google real-API тесты удалены из `code_exec-real.spec.ts`; покрытие обеспечено mock-тестами в `code_exec.spec.ts`.
+- ✅ `code_exec-real.spec.ts` содержит только OpenAI real-API тест (требует `CLERKLY_OPENAI_API_KEY`).
+- ✅ Обновлена таблица покрытия в design.md: убраны ссылки на Anthropic/Google real-API тесты.
+- ✅ Прогнан `npm run validate`.
+
 ### In Progress
 
-- 🔄 Полный запуск всего функционального набора (`npm run test:functional`) остаётся отдельным шагом.
+_Нет задач в работе._
 
 ### Planned
 
-- [ ] Прогнать `tests/functional/code_exec-real.spec.ts` для Anthropic и Google в real-provider режиме (требуются `CLERKLY_ANTHROPIC_API_KEY` и `CLERKLY_GOOGLE_API_KEY` в окружении запуска).
 - [ ] Прогнать полный functional-набор `npm run test:functional` (не выполнялось в рамках текущего запроса).
