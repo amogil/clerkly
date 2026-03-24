@@ -93,7 +93,7 @@ export const LLM_CHAT_MODELS: Record<LLMProvider, LLMChatEnvConfig> = {
 // ─── Chat timeout ─────────────────────────────────────────────────────────────
 
 /** Timeout per individual LLM API request (from send to full response), in ms. Requirements: llm-integration.3.6 */
-export const CHAT_TIMEOUT_MS = 60_000;
+export const CHAT_TIMEOUT_MS = 120_000;
 
 // ─── Error messages ───────────────────────────────────────────────────────────
 
