@@ -2,81 +2,70 @@
 
 ## Обзор
 
-План работ по Issue #78: корректировка anti-flapping score guard для auto-title, чтобы первый rename для дефолтного названия `New Agent` проходил при меньшем пороге, а для уже переименованных чатов сохранялось текущее anti-flap поведение.
+План работ по Issue #84: retry timeout-ошибок модели до 3 раз в `MainPipeline`.
 
-**Текущий статус:** Фаза 4 — Runtime/tests завершены, functional run отложен по запросу пользователя
+Сейчас при timeout провайдера pipeline выполняет только 1 повтор в generic silent-failure ветке. Intermittent timeout часто восстанавливается при повторе, но одного недостаточно. Задача — выделить timeout в отдельную retry-ветку с лимитом 3 consecutive retry (4 попытки суммарно). Счётчик timeout-повторов сбрасывается при успешной попытке, то есть он не сквозной через весь run — каждая новая серия timeout получает свежие 3 retry.
+
+**Текущий статус:** Фаза 1 — План утверждён, реализация не начата
 
 ---
 
 ## CRITICAL RULES
 
-- Не нарушать существующие guard-правила auto-title (exact match, cooldown, invalid score).
-- Для `New Agent` использовать отдельный порог только в рамках score guard; остальные guard-и не ослаблять.
-- Не менять UI-контракт `agents`: отображение имени остаётся реакцией на `agent.updated`.
-- Не запускать полный `npm run test:functional` без отдельного подтверждения пользователя.
+- Не менять поведение retry для non-timeout ошибок (silent-failure: max 1 retry).
+- Не менять поведение retry для invalid tool call / final_answer (max 2 retry).
+- Timeout retry разрешён только до появления первого meaningful chunk.
+- Timeout retry НЕ выполняется при user-abort (`signal.aborted`).
+- Не запускать полный `npm run test:functional` без подтверждения пользователя.
 
 ---
 
 ## Текущее состояние
 
 ### Выполнено
-- ✅ Прочитан Issue #78 и подтверждён целевой продуктовый контракт: для `New Agent` rename должен применяться при `rename_need_score > 50`, для остальных заголовков порог остаётся `>= 80`.
-- ✅ Повторно проанализированы релевантные спецификации: `llm-integration` (requirements/design), `agents` (requirements/design), `testing-infrastructure` (requirements/design).
-- ✅ Подтверждено текущее runtime-поведение: единый score threshold (`80`) задан в `AgentTitleRuntime` без ветки для default-title сценария.
-- ✅ Обновлён `llm-integration/requirements.md`: критерий `16.10` синхронизирован под split threshold (`New Agent` -> `> 50`, non-default -> `>= 80`).
-- ✅ Обновлён `llm-integration/design.md`: anti-flapping дизайн и тестовое покрытие синхронизированы под split threshold.
-- ✅ Кросс-спек consistency проверен с `agents/requirements.md` и `agents/design.md`: изменения UI-контракта не требуются.
-- ✅ Обновлён runtime score guard в `src/main/agents/AgentTitleRuntime.ts`:
-  - для `New Agent` применяется порог `rename_need_score > 50`;
-  - для non-default title сохраняется порог `rename_need_score >= 80`.
-- ✅ Расширен unit coverage anti-flapping в `tests/unit/agents/AgentTitleAntiFlap.test.ts`:
-  - default title: score `50` -> skip;
-  - default title: score `51` -> allow;
-  - non-default title: score `79` -> skip.
-- ✅ Дополнен `tests/unit/agents/MainPipeline.test.ts`:
-  - pipeline применяет rename для default-title при score `51`;
-  - pipeline пропускает rename для non-default при score `79`.
-- ✅ Прогнаны targeted unit tests:
-  - `tests/unit/agents/AgentTitleAntiFlap.test.ts`
-  - `tests/unit/agents/MainPipeline.test.ts`
-- ✅ Прогнан `npm run validate` (успешно).
 
 ### В работе
-- 🔄 Полный `npm run test:functional` отложен по явному запросу пользователя для текущего шага.
+- 🔄 Issue #84: retry timeout-ошибок модели до 3 раз.
 
 ### Запланировано
 
-#### Фаза 2: Реализация split threshold для auto-title
+#### Фаза 1: Обновление спецификаций
 
-- [x] Обновить runtime score guard в `src/main/agents/AgentTitleRuntime.ts`.
-  - [x] Ввести явный split-порог для default/non-default title.
-  - [x] Для текущего title `New Agent` разрешать rename только при `rename_need_score > 50`.
-  - [x] Для non-default title сохранить текущее правило `rename_need_score >= 80`.
+- [ ] Обновить `docs/specs/llm-integration/requirements.md`
+  - [ ] Добавить требование `llm-integration.12.2.3`: КОГДА нормализованный тип ошибки = `timeout` И run не отменён пользователем И первый meaningful chunk ещё не получен, `MainPipeline` ДОЛЖЕН выполнить до 3 consecutive повторных попыток (4 attempts total включая начальную). Счётчик timeout-повторов ДОЛЖЕН сбрасываться при успешной попытке. После исчерпания retry ДОЛЖЕН создаваться ровно один `kind:error` с `type=timeout`.
+  - [ ] Добавить требование `llm-integration.12.2.4`: существующее поведение retry для non-timeout ошибок (1 повтор) ДОЛЖНО оставаться неизменным.
 
-- [x] Расширить unit coverage anti-flapping в `tests/unit/agents/AgentTitleAntiFlap.test.ts`.
-  - [x] Добавить кейс default title: score `50` -> skip.
-  - [x] Добавить кейс default title: score `51` -> allow.
-  - [x] Оставить regression для non-default title: score `79` -> skip.
+- [ ] Обновить `docs/specs/llm-integration/design.md`
+  - [ ] В секции "Retry policy (recoverable ошибки)" добавить timeout-specific policy: до 3 повторов для `timeout`-ошибок до первого meaningful chunk.
+  - [ ] Добавить записи unit-тестов в секцию тестирования.
+  - [ ] Обновить таблицу покрытия требований для новых ID.
 
-- [x] Проверить и при необходимости дополнить `tests/unit/agents/MainPipeline.test.ts`.
-  - [x] Зафиксировать, что pipeline применяет rename для default-title сценария при score `51`.
-  - [x] Зафиксировать, что для non-default сценария score < `80` остаётся блокирующим.
+#### Фаза 2: Реализация в runtime
 
-#### Фаза 3: Синхронизация спецификаций
+- [ ] Изменить `src/main/agents/MainPipeline.ts`
+  - [ ] Добавить константу `MAX_TIMEOUT_RETRIES = 3`.
+  - [ ] Добавить в `AttemptCycleState` поле `consecutiveTimeouts: number` (начальное значение `0`).
+  - [ ] В `handleAttemptFailure()` добавить новую ветку `shouldRetryTimeout`:
+    - Ошибка нормализуется в `type: timeout` (через `normalizeLLMError`).
+    - run не отменён пользователем (`!signal?.aborted`).
+    - Нет meaningful chunks (`!state.meaningfulChunkSeen`).
+    - `cycleState.consecutiveTimeouts < MAX_TIMEOUT_RETRIES`.
+  - [ ] При timeout-retry инкрементировать `cycleState.consecutiveTimeouts`.
+  - [ ] При успешной попытке (возврат из `callProviderWithStreaming`) сбрасывать `cycleState.consecutiveTimeouts = 0` — счётчик не сквозной.
+  - [ ] Исключить timeout из `shouldRetrySilentFailure` (чтобы timeout не расходовал generic retry).
+  - [ ] Обновить `shouldRetry`: `shouldRetryInvalidFinalAnswer || shouldRetryTimeout || shouldRetrySilentFailure`.
 
-- [x] Обновить `docs/specs/llm-integration/requirements.md`.
-  - [x] Уточнить критерий `16.10` для split threshold (default vs non-default title).
-  - [x] Согласовать формулировки с существующими initial-rename и cooldown guard.
+#### Фаза 3: Unit-тесты
 
-- [x] Обновить `docs/specs/llm-integration/design.md`.
-  - [x] Отразить split threshold в разделе anti-flapping и в списке unit/functional coverage.
+- [ ] Добавить тесты в `tests/unit/agents/MainPipeline.test.ts`:
+  - [ ] Timeout retry исчерпывает 3 retry (4 вызова `chat`), затем создаёт один `kind:error` с `type=timeout`.
+  - [ ] Timeout успешен на 2-м retry (2 вызова `chat`, нет `kind:error`).
+  - [ ] Non-timeout ошибка (network) по-прежнему retry max 1 раз (2 вызова `chat`).
+  - [ ] Timeout при `signal.aborted` НЕ делает retry.
+  - [ ] Счётчик timeout-retry сбрасывается после успешной попытки (timeout -> success -> timeout -> success — каждая серия получает свежие 3 retry).
 
-- [x] Проверить кросс-спек consistency с `docs/specs/agents/requirements.md` и `docs/specs/agents/design.md` (без изменения UI-контракта, только при необходимости traceability-уточнений).
+#### Фаза 4: Валидация
 
-#### Фаза 4: Проверка
-
-- [x] Прогнать targeted unit tests:
-  - [x] `tests/unit/agents/AgentTitleAntiFlap.test.ts`
-  - [x] `tests/unit/agents/MainPipeline.test.ts`
-- [x] Прогнать `npm run validate`.
-- [ ] Отдельно запросить подтверждение пользователя перед запуском `npm run test:functional`.
+- [ ] Прогнать targeted unit tests: `tests/unit/agents/MainPipeline.test.ts`.
+- [ ] Прогнать `npm run validate`.
+- [ ] Запросить подтверждение пользователя перед `npm run test:functional`.
