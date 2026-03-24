@@ -93,7 +93,7 @@ describe('SandboxWebSearchHandler', () => {
       /* Preconditions: OpenAI handler initialized with api key
          Action: execute web_search with whitespace-only queries
          Assertions: returns invalid_input error from validation and performs no provider calls
-         Requirements: sandbox-web-search.2.6 */
+         Requirements: sandbox-web-search.2.6, sandbox-web-search.2.7 */
       const handler = new SandboxWebSearchHandler('openai', 'sk-test');
       const result = await handler.execute({ queries: ['   ', '\n'] });
       expect(result).toMatchObject({
@@ -211,7 +211,7 @@ describe('SandboxWebSearchHandler', () => {
       /* Preconditions: Anthropic handler initialized
          Action: call execute with whitespace-only query
          Assertions: returns invalid_input error and does not call provider
-         Requirements: sandbox-web-search.2.4, sandbox-web-search.2.6 */
+         Requirements: sandbox-web-search.2.4, sandbox-web-search.2.6, sandbox-web-search.2.7 */
       const handler = new SandboxWebSearchHandler('anthropic');
       const result = await handler.execute({ query: '   ' });
       expect(result).toMatchObject({

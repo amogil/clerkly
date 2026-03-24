@@ -153,6 +153,16 @@ CREATE TABLE messages (
 
 `kind: error` сообщения всегда сохраняются как завершённые (`done: true`).
 
+#### Последовательность hidden → error на renderer
+
+При ошибке во время стриминга (timeout, abort, невалидный ответ модели) `handleRunError` выполняет два действия:
+1. `hideIncompleteLlmMessage(messageId)` → `MESSAGE_UPDATED(hidden: true)` → renderer получает скрытие
+2. `messageManager.create('error', ...)` → `MESSAGE_CREATED(kind: error)` → renderer получает ошибку
+
+`IPCChatTransport` при получении `hidden: true` не закрывает stream немедленно, а вызывает `scheduleFinishIfIdle(200)` — idle delay 200ms. Это даёт время для доставки `kind: error` через IPC до закрытия stream. Если `kind: error` приходит в пределах 200ms, `cancelPendingFinish()` отменяет idle-закрытие, error message доставляется потребителю, и stream закрывается после обработки error.
+
+Без idle delay: `IPCChatTransport` закрывал stream при `hidden`, отписывался от событий, и `kind: error` терялся — UI зависал без error bubble.
+
 Для ошибок без action_link (network, provider, timeout):
 
 ```json
@@ -936,7 +946,7 @@ User отправляет сообщение
 - `tests/functional/llm-chat.spec.ts` — "should skip rename when rename_need_score is below threshold"
 - `tests/functional/llm-chat.spec.ts` — "should skip rename when rename_need_score is invalid"
 - `tests/functional/llm-chat.spec.ts` — "should apply rename for new intent after 5-turn cooldown"
-- `tests/functional/llm-chat.spec.ts` — "should show error when model returns orphaned tool_call without follow-up response after retry limit"
+- `tests/functional/llm-chat.spec.ts` — "should show error bubble after LLM stream failure (not a silent hang)"
 
 ### Покрытие Требований
 

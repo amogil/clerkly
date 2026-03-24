@@ -25,7 +25,8 @@ UI-визуализация исполнения описывается в `docs
   - реализует timeout, cancel и гарантированную очистку после завершения вызова.
 - **"SandboxBridge" (Shared policy module)**
   - хранит централизованный allowlist/policy-правила sandbox tools;
-  - публикует разрешённые helper-ы sandbox runtime, включая `tools.http_request(...)`, когда он включён в allowlist;
+  - публикует разрешённые helper-ы sandbox runtime, включая `tools.http_request(...)` и `tools.web_search(...)`, когда они включены в allowlist;
+  - контракт и маршрутизация `web_search` helper-а описаны в `docs/specs/sandbox-web-search/*`;
   - используется runtime и unit-тестами как единый source of truth.
 - **"SandboxRuntime" (Sandbox Renderer)**
   - исполняет JavaScript-код;

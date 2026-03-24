@@ -2734,7 +2734,7 @@ describe('MainPipeline.run()', () => {
      Assertions: pipeline retries (InvalidFinalAnswerContractError path) and after
        MAX_INVALID_TOOL_CALL_RETRIES creates kind:error. This ensures the pipeline does not
        silently complete when the model failed to respond after tool execution.
-     Requirements: llm-integration.3.6, llm-integration.11.1, llm-integration.11.5.1 */
+     Requirements: llm-integration.3.6, llm-integration.11.1, llm-integration.11.5.4 */
   it('retries and then creates kind:error when model emits tool_call but no text or final_answer (orphaned tool_call from silent SDK abort)', async () => {
     const { pipeline, llmProvider, messageManager } = makeMocks();
 

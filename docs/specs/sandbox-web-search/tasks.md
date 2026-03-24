@@ -4,7 +4,7 @@
 
 Реализовать helper `web_search` как sandbox capability внутри `code_exec` (через `tools.web_search(...)`) с provider-native контрактом активного LLM-провайдера.
 
-**Current status:** Phase 6 - Second Code Review Fixes
+**Current status:** Phase 7 - Fourth Code Review Fixes
 
 ---
 
@@ -81,8 +81,23 @@
 - ✅ Документировано ограничение `max_tokens: 512` для Anthropic (константа + design.md).
 - ✅ Документирован `policy_denied` при вызове незарегистрированного helper-а.
 - ✅ Извлечена общая утилита `isTimeoutLikeError` в contracts.ts.
-- [ ] Прогнать `npm run validate`.
-- [ ] Запросить у пользователя подтверждение перед `npm run test:functional`.
+- ✅ Прогнан `npm run validate`.
+
+#### Phase 7: Third & Fourth Code Review Fixes (done)
+
+- ✅ Добавлен `policy_denied` в тип `SandboxWebSearchErrorCode` в contracts.ts.
+- ✅ Документирована sequential fail-fast execution для OpenAI/Google multi-query.
+- ✅ Уточнён `policy_denied` code path: sandbox allowlist = primary, `handleSandboxToolInvocation` = defense-in-depth.
+- ✅ Добавлен unit-тест для defense-in-depth `policy_denied` guard.
+- ✅ Добавлен `sandbox-web-search.2.8` requirement для fail-fast multi-query.
+- ✅ Добавлен `sandbox-web-search.2.7` в requirement-комментарии тестов.
+- ✅ Разбита таблица покрытия на 31 индивидуальную строку sub-requirements.
+- ✅ Документирована Google API key-in-URL security consideration + unit-тест redaction.
+- ✅ Добавлены unit-тесты для `PromptBuilder.forEachFeature`.
+- ✅ Исправлена ссылка `11.5.1 → 11.5.4` в MainPipeline.ts и тестах.
+- ✅ Убрана фантомная ссылка на несуществующий functional тест в design.md.
+- ✅ Исправлена структура tasks.md: unchecked items из Phase 6 отмечены как done.
+- ✅ Прогнан `npm run validate`.
 
 ### In Progress
 

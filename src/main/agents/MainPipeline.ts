@@ -910,7 +910,7 @@ export class MainPipeline {
     // call (up to MAX_INVALID_TOOL_CALL_RETRIES). On retry, the pipeline resends the
     // conversation (including the tool result from the first attempt) and the model gets
     // another chance to respond. If all retries fail the same way, the user sees an error.
-    // Requirements: llm-integration.11.5.1
+    // Requirements: llm-integration.11.5.4
     if (state.sawAnyToolCall && state.finalLlmMessageId === null && !state.finalAnswerCall) {
       throw new InvalidFinalAnswerContractError(
         'Model returned a tool call but provided no response after the tool result. Retrying.'

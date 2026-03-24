@@ -52,7 +52,7 @@ describe('WebSearchProviderMethodAdapters', () => {
   /* Preconditions: Anthropic adapter is initialized
      Action: validate payload with whitespace-only "query"
      Assertions: adapter returns invalid_input validation error
-     Requirements: sandbox-web-search.2.4, sandbox-web-search.2.6 */
+     Requirements: sandbox-web-search.2.4, sandbox-web-search.2.6, sandbox-web-search.2.7 */
   it('validates Anthropic whitespace-only query as invalid_input', () => {
     const adapter = getAdapter('anthropic');
     const result = adapter.validate({ query: '   ' });
@@ -68,7 +68,7 @@ describe('WebSearchProviderMethodAdapters', () => {
   /* Preconditions: OpenAI adapter is initialized
      Action: validate payload where all queries are whitespace-only
      Assertions: adapter returns invalid_input validation error
-     Requirements: sandbox-web-search.2.3, sandbox-web-search.2.6 */
+     Requirements: sandbox-web-search.2.3, sandbox-web-search.2.6, sandbox-web-search.2.7 */
   it('validates OpenAI whitespace-only queries as invalid_input', () => {
     const adapter = getAdapter('openai');
     const result = adapter.validate({ queries: ['   ', '\n'] });
@@ -84,7 +84,7 @@ describe('WebSearchProviderMethodAdapters', () => {
   /* Preconditions: Google adapter is initialized
      Action: validate payload where all queries are whitespace-only
      Assertions: adapter returns invalid_input validation error
-     Requirements: sandbox-web-search.2.5, sandbox-web-search.2.6 */
+     Requirements: sandbox-web-search.2.5, sandbox-web-search.2.6, sandbox-web-search.2.7 */
   it('validates Google whitespace-only queries as invalid_input', () => {
     const adapter = getAdapter('google');
     const result = adapter.validate({ queries: ['   ', '\t'] });
