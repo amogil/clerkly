@@ -6,7 +6,7 @@
 
 Сейчас при timeout провайдера pipeline выполняет только 1 повтор в generic silent-failure ветке. Intermittent timeout часто восстанавливается при повторе, но одного недостаточно. Задача — выделить timeout в отдельную retry-ветку с лимитом 3 consecutive retry (4 попытки суммарно). Счётчик timeout-повторов сбрасывается при успешной попытке, то есть он не сквозной через весь run — каждая новая серия timeout получает свежие 3 retry.
 
-**Текущий статус:** Фаза 1 — План утверждён, реализация не начата
+**Текущий статус:** Фаза 2 — Реализация в runtime завершена
 
 ---
 
@@ -42,18 +42,18 @@
 
 #### Фаза 2: Реализация в runtime
 
-- [ ] Изменить `src/main/agents/MainPipeline.ts`
-  - [ ] Добавить константу `MAX_TIMEOUT_RETRIES = 3`.
-  - [ ] Добавить в `AttemptCycleState` поле `consecutiveTimeouts: number` (начальное значение `0`).
-  - [ ] В `handleAttemptFailure()` добавить новую ветку `shouldRetryTimeout`:
+- [x] Изменить `src/main/agents/MainPipeline.ts`
+  - [x] Добавить константу `MAX_TIMEOUT_RETRIES = 3`.
+  - [x] Добавить в `AttemptCycleState` поле `consecutiveTimeouts: number` (начальное значение `0`).
+  - [x] В `handleAttemptFailure()` добавить новую ветку `shouldRetryTimeout`:
     - Ошибка нормализуется в `type: timeout` (через `normalizeLLMError`).
     - run не отменён пользователем (`!signal?.aborted`).
     - Нет meaningful chunks (`!state.meaningfulChunkSeen`).
     - `cycleState.consecutiveTimeouts < MAX_TIMEOUT_RETRIES`.
-  - [ ] При timeout-retry инкрементировать `cycleState.consecutiveTimeouts`.
-  - [ ] При успешной попытке (возврат из `callProviderWithStreaming`) сбрасывать `cycleState.consecutiveTimeouts = 0` — счётчик не сквозной.
-  - [ ] Исключить timeout из `shouldRetrySilentFailure` (чтобы timeout не расходовал generic retry).
-  - [ ] Обновить `shouldRetry`: `shouldRetryInvalidFinalAnswer || shouldRetryTimeout || shouldRetrySilentFailure`.
+  - [x] При timeout-retry инкрементировать `cycleState.consecutiveTimeouts`.
+  - [x] При успешной попытке (возврат из `callProviderWithStreaming`) сбрасывать `cycleState.consecutiveTimeouts = 0` — счётчик не сквозной.
+  - [x] Исключить timeout из `shouldRetrySilentFailure` (чтобы timeout не расходовал generic retry).
+  - [x] Обновить `shouldRetry`: `shouldRetryInvalidFinalAnswer || shouldRetryTimeout || shouldRetrySilentFailure`.
 
 #### Фаза 3: Unit-тесты
 

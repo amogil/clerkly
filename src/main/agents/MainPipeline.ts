@@ -117,6 +117,7 @@ type AttemptRuntimeState = {
 
 type AttemptCycleState = {
   attempts: number;
+  consecutiveTimeouts: number;
   invalidFinalAnswerSeen: boolean;
   validationFeedback: string | null;
   runId: string;
@@ -125,6 +126,8 @@ type AttemptCycleState = {
 const FINAL_ANSWER_RETRY_EXHAUSTED_MESSAGE =
   'Model returned invalid tool call arguments too many times. Please try again later.';
 const MAX_INVALID_TOOL_CALL_RETRIES = 2;
+// Requirements: llm-integration.12.2.3
+const MAX_TIMEOUT_RETRIES = 3;
 const STREAM_FLUSH_INTERVAL_MS = 100;
 
 class InvalidFinalAnswerContractError extends Error {
@@ -376,6 +379,7 @@ export class MainPipeline {
   ): Promise<StreamProcessingResult> {
     const cycleState: AttemptCycleState = {
       attempts: 0,
+      consecutiveTimeouts: 0,
       invalidFinalAnswerSeen: false,
       validationFeedback: null,
       runId: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
@@ -386,7 +390,7 @@ export class MainPipeline {
       const attemptId = cycleState.attempts + 1;
 
       try {
-        return await this.runProviderAttempt(
+        const result = await this.runProviderAttempt(
           context,
           agentId,
           signal,
@@ -395,6 +399,10 @@ export class MainPipeline {
           attemptState,
           attemptId
         );
+        // Requirements: llm-integration.12.2.3
+        // Reset consecutive timeout counter on successful attempt
+        cycleState.consecutiveTimeouts = 0;
+        return result;
       } catch (error) {
         const shouldRetry = this.handleAttemptFailure(
           error,
@@ -1317,7 +1325,7 @@ export class MainPipeline {
     return text.replace(/\s+/g, ' ').trim();
   }
 
-  // Requirements: llm-integration.11.3.1, llm-integration.11.1.5
+  // Requirements: llm-integration.11.3.1, llm-integration.11.1.5, llm-integration.12.2.3
   private handleAttemptFailure(
     error: unknown,
     context: StreamingCallContext,
@@ -1345,16 +1353,35 @@ export class MainPipeline {
       cycleState.validationFeedback =
         error instanceof Error ? error.message : 'Invalid tool call arguments.';
     }
+
+    // Requirements: llm-integration.12.2.3 — timeout-specific retry up to MAX_TIMEOUT_RETRIES
+    const normalizedError = normalizeLLMError(error);
+    const isTimeoutError = normalizedError.type === 'timeout';
+    const shouldRetryTimeout =
+      !isInvalidFinalAnswer &&
+      isTimeoutError &&
+      !state.meaningfulChunkSeen &&
+      !signal?.aborted &&
+      cycleState.consecutiveTimeouts < MAX_TIMEOUT_RETRIES;
+
     const shouldRetryInvalidFinalAnswer =
       isInvalidFinalAnswer &&
       cycleState.attempts < MAX_INVALID_TOOL_CALL_RETRIES &&
       !signal?.aborted;
+
+    // Requirements: llm-integration.12.2.4 — non-timeout silent retry limited to 1 attempt
     const shouldRetrySilentFailure =
       !isInvalidFinalAnswer &&
+      !isTimeoutError &&
       cycleState.attempts < 1 &&
       !state.meaningfulChunkSeen &&
       !signal?.aborted;
-    const shouldRetry = shouldRetryInvalidFinalAnswer || shouldRetrySilentFailure;
+
+    const shouldRetry = shouldRetryInvalidFinalAnswer || shouldRetryTimeout || shouldRetrySilentFailure;
+
+    if (shouldRetryTimeout) {
+      cycleState.consecutiveTimeouts += 1;
+    }
 
     if (!shouldRetry) {
       if (isInvalidFinalAnswer) {
