@@ -175,9 +175,9 @@
    - статус активного агента (`in-progress` или любой другой)
    - наличие текста в поле ввода
 
-4.2.1. КОГДА статус активного агента равен `in-progress`, кнопка ДОЛЖНА работать в режиме остановки (`stop generation`) и ДОЛЖНА быть активной независимо от текста в поле ввода
+4.2.1. КОГДА статус активного агента равен `in-progress` И поле ввода пустое (нет видимого текста), кнопка ДОЛЖНА работать в режиме остановки (`stop generation`) и ДОЛЖНА быть активной
 
-4.2.2. КОГДА статус активного агента отличается от `in-progress`, кнопка ДОЛЖНА работать в режиме отправки (`send`) и ДОЛЖНА быть активной только при наличии текста в поле ввода
+4.2.2. КОГДА статус активного агента отличается от `in-progress` ИЛИ поле ввода содержит непустой текст, кнопка ДОЛЖНА работать в режиме отправки (`send`) и ДОЛЖНА быть активной только при наличии текста в поле ввода
 
 4.3. КОГДА пользователь нажимает Enter (без Shift), ТО сообщение ДОЛЖНО отправляться
 
@@ -324,7 +324,7 @@
    - Пробелы в начале и конце текста ДОЛЖНЫ удаляться (trim)
    - Пробелы внутри текста ДОЛЖНЫ сохраняться
 
-4.24. КОГДА статус активного агента равен `in-progress`, кнопка отправки ДОЛЖНА переключаться в режим остановки (`stop`) с иконкой остановки `Square` и текстом доступности `Stop generation`
+4.24. КОГДА статус активного агента равен `in-progress` И поле ввода пустое, кнопка отправки ДОЛЖНА переключаться в режим остановки (`stop`) с иконкой остановки `Square` и текстом доступности `Stop generation`
 
 4.24.1. КОГДА пользователь нажимает кнопку `stop`, текущий активный запрос ДОЛЖЕН быть отменён для текущего агента
 
@@ -332,9 +332,9 @@
 
 4.24.3. ЕСЛИ при попытке остановки запроса возникает ошибка отмены, ТО приложение НЕ ДОЛЖНО показывать toast-уведомление об ошибке
 
-4.24.4. КОГДА статус активного агента отличается от `in-progress`, кнопка ДОЛЖНА отображаться в режиме отправки (`send`)
+4.24.4. КОГДА пользователь нажимает `stop` после начала ответа модели (появился `kind: llm`), исходное `kind: user` сообщение этого turn ДОЛЖНО оставаться видимым в чате
 
-4.24.5. КОГДА пользователь нажимает `stop` после начала ответа модели (появился `kind: llm`), исходное `kind: user` сообщение этого turn ДОЛЖНО оставаться видимым в чате
+4.24.5. КОГДА пользователь отправляет сообщение при статусе агента `in-progress`, текущий активный запрос ДОЛЖЕН быть прерван для текущего агента и ДОЛЖЕН быть запущен новый запрос с введённым текстом. Прерывание ДОЛЖНО оставаться штатным поведением: без `kind:error`, без error toast
 
 #### Функциональные Тесты
 
@@ -342,7 +342,10 @@
 - `tests/functional/agent-messaging.spec.ts` - "should clear input after clicking send button"
 - `tests/functional/agent-messaging.spec.ts` - "should add new line on Shift+Enter"
 - `tests/functional/agent-messaging.spec.ts` - "should enable send button only when input has text"
-- `tests/functional/agent-messaging.spec.ts` - "should keep stop button enabled regardless of input text in in-progress status"
+- `tests/functional/agent-messaging.spec.ts` - "should show stop button for empty input during in-progress"
+- `tests/functional/agent-messaging.spec.ts` - "should show send button when typing during in-progress"
+- `tests/functional/agent-messaging.spec.ts` - "should submit new message during in-progress canceling active request"
+- `tests/functional/agent-messaging.spec.ts` - "should submit new message via Enter key during in-progress"
 - `tests/functional/agent-messaging.spec.ts` - "should display messages in chronological order"
 - `tests/functional/agent-messaging.spec.ts` - "should autoscroll to last message"
 - `tests/functional/auto-expanding-textarea.spec.ts` - "should keep two-line baseline height before overflow threshold"

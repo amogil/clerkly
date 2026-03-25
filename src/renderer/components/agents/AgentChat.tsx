@@ -358,9 +358,11 @@ export function AgentChat({
     return null;
   })();
 
-  // Stop/send mode is driven only by agent status.
-  // Requirements: agents.4.24, agents.4.24.4
+  // Stop/send mode is driven by agent status AND input content.
+  // Requirements: agents.4.2.1, agents.4.2.2, agents.4.24, agents.4.24.5
   const isInProgress = agent.status === 'in-progress';
+  const hasText = Boolean(taskInput.trim());
+  const isStopMode = isInProgress && !hasText;
 
   return (
     // Hidden via CSS — NOT unmounted — absolute+opacity-0 keeps scrollTop intact (agents.13.5, agents.4.14)
@@ -416,12 +418,12 @@ export function AgentChat({
               </span>
             </PromptInputTools>
             <PromptInputSubmit
-              data-testid={isInProgress ? 'prompt-input-stop' : 'prompt-input-send'}
-              disabled={!isInProgress && !taskInput.trim()}
-              onStop={isInProgress ? () => void handleStop() : undefined}
-              status={isInProgress ? 'streaming' : 'ready'}
+              data-testid={isStopMode ? 'prompt-input-stop' : 'prompt-input-send'}
+              disabled={!isStopMode && !hasText}
+              onStop={isStopMode ? () => void handleStop() : undefined}
+              status={isStopMode ? 'streaming' : 'ready'}
             >
-              {isInProgress ? (
+              {isStopMode ? (
                 <Square className="h-4 w-4 fill-current" />
               ) : (
                 <CornerDownLeft className="h-4 w-4" />
