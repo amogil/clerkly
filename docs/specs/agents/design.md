@@ -1976,7 +1976,7 @@ import { Logo } from '../logo';
 | Файл | Покрытие | Примечание |
 |------|----------|------------|
 | `tests/functional/agent-switching.spec.ts` | agents.3 | - |
-| `tests/functional/agent-messaging.spec.ts` | agents.4.2.1, agents.4.2.2, 4.3, 4.4, 4.8, 4.13.1, 4.13.2, 4.13.4, 4.24.6 | - |
+| `tests/functional/agent-messaging.spec.ts` | agents.4.2.1, agents.4.2.2, 4.3, 4.4, 4.8, 4.13.1, 4.13.2, 4.13.4, 4.24, 4.24.6 | - |
 | `tests/functional/agent-scroll-position.spec.ts` | agents.4.14.1-4.14.6, agents.5.9 | - |
 | `tests/functional/startup-loader.spec.ts` | agents.13.2, agents.13.9.1-13.9.4, agents.13.10, agents.13.12, agents.13.16, agents.13.18, agents.4.14.5-4.14.6 (startup settled без визуального рывка, без page-level scrollbar во время loader, стабильная ширина в раннем окне после скрытия loader) | - |
 | `tests/functional/settings-ai-agent.spec.ts` | - | Кросс-фича тест для settings; не используется для покрытия agents.* |

@@ -758,7 +758,7 @@ describe('AgentChat — PromptInput rendered', () => {
   /* Preconditions: agent status is not in-progress
      Action: render AgentChat
      Assertions: send button is rendered, stop button is not rendered
-     Requirements: agents.4.24.4 */
+     Requirements: agents.4.2.2 */
   it('should render send button when agent is not in progress', () => {
     render(<AgentChat {...defaultProps} />);
 
@@ -891,6 +891,28 @@ describe('AgentChat — PromptInput rendered', () => {
     });
 
     expect(mockSendMessage).toHaveBeenCalledWith('new task');
+  });
+
+  /* Preconditions: agent status is in-progress and input has text
+     Action: user presses Enter key
+     Assertions: sendMessage called with text (same as button click, but via Enter path)
+     Requirements: agents.4.3, agents.4.24.6 */
+  it('should call sendMessage when pressing Enter during in-progress', async () => {
+    render(
+      <AgentChat {...defaultProps} agent={{ ...defaultProps.agent, status: 'in-progress' }} />
+    );
+
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('auto-expanding-textarea'), {
+        target: { value: 'enter task' },
+      });
+    });
+
+    await act(async () => {
+      fireEvent.submit(screen.getByTestId('agent-prompt-input'));
+    });
+
+    expect(mockSendMessage).toHaveBeenCalledWith('enter task');
   });
 
   /* Preconditions: agent status is in-progress and input has text

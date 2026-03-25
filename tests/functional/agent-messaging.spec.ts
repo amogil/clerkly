@@ -216,6 +216,52 @@ test.describe('Agent Messaging', () => {
     await expectNoToastError(window);
   });
 
+  /* Preconditions: Last visible message is llm(done=false), so agent is in-progress
+     Action: Type text and press Enter during in-progress
+     Assertions: Message is sent via Enter key, active request is canceled, no error toast
+     Requirements: agents.4.3, agents.4.24.6 */
+  test('should submit new message via Enter key during in-progress', async () => {
+    const firstAgentDataTestId = await window
+      .locator('[data-testid^="agent-icon-"]')
+      .first()
+      .getAttribute('data-testid');
+    const activeAgentId = firstAgentDataTestId?.replace('agent-icon-', '');
+    expect(activeAgentId).toBeTruthy();
+
+    await window.evaluate(async (agentId) => {
+      const api = (window as unknown as { api: any }).api;
+      const result = await api.messages.create(agentId, 'llm', {
+        data: { reasoning: { text: 'streaming...' } },
+      });
+      if (!result?.success) {
+        throw new Error(result?.error || 'Failed to create in-progress llm message');
+      }
+    }, activeAgentId as string);
+
+    const stopButton = window.locator('[data-testid="prompt-input-stop"]');
+    const messageInput = activeChat(window).textarea;
+
+    // Wait for in-progress state
+    await expect(stopButton).toBeVisible({ timeout: 5000 });
+
+    // Type text and press Enter
+    await messageInput.fill('Enter message during in-progress');
+    await messageInput.press('Enter');
+
+    // Input should be cleared
+    await expect(messageInput).toHaveValue('', { timeout: 1000 });
+
+    // User message should appear
+    const userMessages = activeChat(window).userMessages;
+    await expect(userMessages).toHaveCount(1, { timeout: 5000 });
+    await expect(userMessages.first()).toContainText('Enter message during in-progress', {
+      timeout: 5000,
+    });
+
+    // No error toast
+    await expectNoToastError(window);
+  });
+
   /* Preconditions: Agent has stale in-progress UI state (llm done=false) without an active main-process pipeline
      Action: User presses stop button
      Assertions: Existing user/llm messages remain visible; stop acts as no-op

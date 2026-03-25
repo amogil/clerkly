@@ -389,7 +389,7 @@ export class AgentIPCHandlers {
     }
 
     // Keep user message visible on cancel; hide only in-flight llm message when present.
-    // Requirements: llm-integration.8.4, llm-integration.8.6.1, agents.4.24.5
+    // Requirements: llm-integration.8.4, llm-integration.8.6.1, agents.4.24.4
     const lastMessage = this.messageManager.getLastMessage(agentId);
     if (lastMessage && !lastMessage.hidden) {
       if (lastMessage.kind === 'llm' && !lastMessage.done) {
