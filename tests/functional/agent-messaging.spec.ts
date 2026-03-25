@@ -168,7 +168,7 @@ test.describe('Agent Messaging', () => {
   /* Preconditions: Last visible message is llm(done=false), so agent is in-progress
      Action: Type text and submit via send button during in-progress
      Assertions: Message is sent, active request is canceled, no error toast
-     Requirements: agents.4.24.6 */
+     Requirements: agents.4.24.5 */
   test('should submit new message during in-progress canceling active request', async () => {
     const firstAgentDataTestId = await window
       .locator('[data-testid^="agent-icon-"]')
@@ -219,7 +219,7 @@ test.describe('Agent Messaging', () => {
   /* Preconditions: Last visible message is llm(done=false), so agent is in-progress
      Action: Type text and press Enter during in-progress
      Assertions: Message is sent via Enter key, active request is canceled, no error toast
-     Requirements: agents.4.3, agents.4.24.6 */
+     Requirements: agents.4.3, agents.4.24.5 */
   test('should submit new message via Enter key during in-progress', async () => {
     const firstAgentDataTestId = await window
       .locator('[data-testid^="agent-icon-"]')

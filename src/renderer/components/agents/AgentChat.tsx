@@ -359,7 +359,7 @@ export function AgentChat({
   })();
 
   // Stop/send mode is driven by agent status AND input content.
-  // Requirements: agents.4.2.1, agents.4.2.2, agents.4.24, agents.4.24.6
+  // Requirements: agents.4.2.1, agents.4.2.2, agents.4.24, agents.4.24.5
   const isInProgress = agent.status === 'in-progress';
   const hasText = Boolean(taskInput.trim());
   const isStopMode = isInProgress && !hasText;

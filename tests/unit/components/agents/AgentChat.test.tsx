@@ -874,7 +874,7 @@ describe('AgentChat — PromptInput rendered', () => {
   /* Preconditions: agent status is in-progress and input has text
      Action: user submits message
      Assertions: sendMessage called with text (backend handles cancel automatically)
-     Requirements: agents.4.24.6 */
+     Requirements: agents.4.24.5 */
   it('should call sendMessage when submitting text during in-progress', async () => {
     render(
       <AgentChat {...defaultProps} agent={{ ...defaultProps.agent, status: 'in-progress' }} />
@@ -896,7 +896,7 @@ describe('AgentChat — PromptInput rendered', () => {
   /* Preconditions: agent status is in-progress and input has text
      Action: user presses Enter key
      Assertions: sendMessage called with text (same as button click, but via Enter path)
-     Requirements: agents.4.3, agents.4.24.6 */
+     Requirements: agents.4.3, agents.4.24.5 */
   it('should call sendMessage when pressing Enter during in-progress', async () => {
     render(
       <AgentChat {...defaultProps} agent={{ ...defaultProps.agent, status: 'in-progress' }} />
