@@ -1260,8 +1260,9 @@ function ActivityIndicator({ isActive }: { isActive: boolean }) {
 **App-level setup:** renderer root (`App`) содержит единый `TooltipProvider`, потому что `PromptInput` и другие AI Elements используют tooltip primitives на уровне приложения.
 
 **Алгоритм активности action-кнопки (agents.4.2, agents.4.2.1, agents.4.2.2):**
-- Режим `stop` (`agent.status === 'in-progress'`) — кнопка всегда активна, независимо от текста в поле ввода.
-- Режим `send` (любой статус кроме `in-progress`) — кнопка активна только если поле ввода содержит непустой текст.
+- Режим `stop` (`agent.status === 'in-progress'` И `taskInput.trim() === ''`) — кнопка всегда активна.
+- Режим `send` (любой статус кроме `in-progress` ИЛИ `taskInput.trim() !== ''`) — кнопка активна только если поле ввода содержит непустой текст.
+- КОГДА кнопка в режиме `send` при `in-progress`, отправка запускает стандартный submit-path; бэкенд автоматически отменяет активный pipeline перед созданием нового `kind: user` сообщения через `cancelActivePipelineAndNormalizeTail`.
 
 #### Автоскролл к последнему сообщению
 
@@ -1975,7 +1976,7 @@ import { Logo } from '../logo';
 | Файл | Покрытие | Примечание |
 |------|----------|------------|
 | `tests/functional/agent-switching.spec.ts` | agents.3 | - |
-| `tests/functional/agent-messaging.spec.ts` | agents.4.2.1, agents.4.2.2, 4.3, 4.4, 4.8, 4.13.1, 4.13.2, 4.13.4 | - |
+| `tests/functional/agent-messaging.spec.ts` | agents.4.2.1, agents.4.2.2, 4.3, 4.4, 4.8, 4.13.1, 4.13.2, 4.13.4, 4.24.6 | - |
 | `tests/functional/agent-scroll-position.spec.ts` | agents.4.14.1-4.14.6, agents.5.9 | - |
 | `tests/functional/startup-loader.spec.ts` | agents.13.2, agents.13.9.1-13.9.4, agents.13.10, agents.13.12, agents.13.16, agents.13.18, agents.4.14.5-4.14.6 (startup settled без визуального рывка, без page-level scrollbar во время loader, стабильная ширина в раннем окне после скрытия loader) | - |
 | `tests/functional/settings-ai-agent.spec.ts` | - | Кросс-фича тест для settings; не используется для покрытия agents.* |
@@ -2293,7 +2294,7 @@ interface UseAgentChatResult {
 
 5. **`isStreaming`** = `status === 'streaming' || status === 'submitted'` (внутреннее состояние запроса в `useChat`); используется для потока сообщений и reasoning, но НЕ для переключения `send/stop`.
 
-6. **Action-кнопка по статусу и тексту** — кнопка в `AgentChat` переключается в режим `stop`, когда `agent.status === 'in-progress'`; во всех остальных статусах отображается `send`. В режиме `stop` кнопка всегда активна. В режиме `send` кнопка активна только при непустом `taskInput.trim()`. Нажатие `stop` вызывает `cancelCurrentRequest()` и IPC `messages:cancel`.
+6. **Action-кнопка по статусу и тексту** — кнопка в `AgentChat` переключается в режим `stop`, только когда `agent.status === 'in-progress'` И поле ввода пустое (`taskInput.trim() === ''`); при наличии текста в поле ввода кнопка отображает `send` независимо от статуса агента. В режиме `stop` кнопка всегда активна. В режиме `send` кнопка активна только при непустом `taskInput.trim()`. Нажатие `stop` вызывает `cancelCurrentRequest()` и IPC `messages:cancel`. Нажатие `send` при `in-progress` запускает стандартный submit-path; бэкенд автоматически отменяет активный pipeline перед созданием нового `kind: user` сообщения.
 
 6.1. **Поведение отмены после старта ответа** — если `kind: llm` уже начал стримиться, при `stop` скрывается только in-flight `kind: llm`; исходное `kind: user` сообщение этого turn остаётся видимым.
 

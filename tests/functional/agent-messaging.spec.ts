@@ -91,11 +91,11 @@ test.describe('Agent Messaging', () => {
     await expect(userMessages.first()).toContainText(/Click send messag[eEЕе]/, { timeout: 5000 });
   });
 
-  /* Preconditions: Last visible message is llm(done=false), so agent is in-progress and stop mode is visible
-     Action: Change input text between empty and non-empty values
-     Assertions: Stop button remains enabled regardless of input content
-     Requirements: agents.4.2.1 */
-  test('should keep stop button enabled regardless of input text in in-progress status', async () => {
+  /* Preconditions: Last visible message is llm(done=false), so agent is in-progress
+     Action: Keep input empty during in-progress
+     Assertions: Stop button is visible and enabled for empty input
+     Requirements: agents.4.2.1, agents.4.24 */
+  test('should show stop button for empty input during in-progress', async () => {
     const firstAgentDataTestId = await window
       .locator('[data-testid^="agent-icon-"]')
       .first()
@@ -119,11 +119,101 @@ test.describe('Agent Messaging', () => {
     await expect(stopButton).toBeVisible({ timeout: 5000 });
     await expect(stopButton).toBeEnabled();
 
+    // Ensure input is empty — stop button stays
     await messageInput.fill('');
+    await expect(stopButton).toBeVisible();
     await expect(stopButton).toBeEnabled();
+  });
 
+  /* Preconditions: Last visible message is llm(done=false), so agent is in-progress
+     Action: Type text into input during in-progress
+     Assertions: Button switches from stop to send when input has text
+     Requirements: agents.4.2.1, agents.4.2.2, agents.4.24 */
+  test('should show send button when typing during in-progress', async () => {
+    const firstAgentDataTestId = await window
+      .locator('[data-testid^="agent-icon-"]')
+      .first()
+      .getAttribute('data-testid');
+    const activeAgentId = firstAgentDataTestId?.replace('agent-icon-', '');
+    expect(activeAgentId).toBeTruthy();
+
+    await window.evaluate(async (agentId) => {
+      const api = (window as unknown as { api: any }).api;
+      const result = await api.messages.create(agentId, 'llm', {
+        data: { reasoning: { text: 'streaming...' } },
+      });
+      if (!result?.success) {
+        throw new Error(result?.error || 'Failed to create in-progress llm message');
+      }
+    }, activeAgentId as string);
+
+    const stopButton = window.locator('[data-testid="prompt-input-stop"]');
+    const sendButton = window.locator('[data-testid="prompt-input-send"]');
+    const messageInput = activeChat(window).textarea;
+
+    // Initially stop button is visible (empty input)
+    await expect(stopButton).toBeVisible({ timeout: 5000 });
+
+    // Type text — button switches to send
     await messageInput.fill('hello');
+    await expect(sendButton).toBeVisible({ timeout: 2000 });
+    await expect(sendButton).toBeEnabled();
+
+    // Clear text — button switches back to stop
+    await messageInput.fill('');
+    await expect(stopButton).toBeVisible({ timeout: 2000 });
     await expect(stopButton).toBeEnabled();
+  });
+
+  /* Preconditions: Last visible message is llm(done=false), so agent is in-progress
+     Action: Type text and submit via send button during in-progress
+     Assertions: Message is sent, active request is canceled, no error toast
+     Requirements: agents.4.24.6 */
+  test('should submit new message during in-progress canceling active request', async () => {
+    const firstAgentDataTestId = await window
+      .locator('[data-testid^="agent-icon-"]')
+      .first()
+      .getAttribute('data-testid');
+    const activeAgentId = firstAgentDataTestId?.replace('agent-icon-', '');
+    expect(activeAgentId).toBeTruthy();
+
+    await window.evaluate(async (agentId) => {
+      const api = (window as unknown as { api: any }).api;
+      const result = await api.messages.create(agentId, 'llm', {
+        data: { reasoning: { text: 'streaming...' } },
+      });
+      if (!result?.success) {
+        throw new Error(result?.error || 'Failed to create in-progress llm message');
+      }
+    }, activeAgentId as string);
+
+    const stopButton = window.locator('[data-testid="prompt-input-stop"]');
+    const sendButton = window.locator('[data-testid="prompt-input-send"]');
+    const messageInput = activeChat(window).textarea;
+
+    // Wait for in-progress state
+    await expect(stopButton).toBeVisible({ timeout: 5000 });
+
+    // Type text — button switches to send
+    await messageInput.fill('New message during in-progress');
+    await expect(sendButton).toBeVisible({ timeout: 2000 });
+    await expect(sendButton).toBeEnabled();
+
+    // Click send
+    await sendButton.click();
+
+    // Input should be cleared
+    await expect(messageInput).toHaveValue('', { timeout: 1000 });
+
+    // User message should appear
+    const userMessages = activeChat(window).userMessages;
+    await expect(userMessages).toHaveCount(1, { timeout: 5000 });
+    await expect(userMessages.first()).toContainText('New message during in-progress', {
+      timeout: 5000,
+    });
+
+    // No error toast
+    await expectNoToastError(window);
   });
 
   /* Preconditions: Agent has stale in-progress UI state (llm done=false) without an active main-process pipeline

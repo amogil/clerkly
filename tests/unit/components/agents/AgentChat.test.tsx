@@ -758,7 +758,7 @@ describe('AgentChat — PromptInput rendered', () => {
   /* Preconditions: agent status is not in-progress
      Action: render AgentChat
      Assertions: send button is rendered, stop button is not rendered
-     Requirements: agents.4.24.1 */
+     Requirements: agents.4.24.4 */
   it('should render send button when agent is not in progress', () => {
     render(<AgentChat {...defaultProps} />);
 
@@ -766,11 +766,11 @@ describe('AgentChat — PromptInput rendered', () => {
     expect(screen.queryByTestId('prompt-input-stop')).not.toBeInTheDocument();
   });
 
-  /* Preconditions: agent status is in-progress
+  /* Preconditions: agent status is in-progress and input is empty
      Action: render AgentChat
      Assertions: stop button is rendered, send button is not rendered
-     Requirements: agents.4.24.1 */
-  it('should render stop button when agent is in progress', () => {
+     Requirements: agents.4.2.1, agents.4.24 */
+  it('should render stop button when agent is in progress and input is empty', () => {
     mockUseAgentChatState.isStreaming = true;
     render(
       <AgentChat {...defaultProps} agent={{ ...defaultProps.agent, status: 'in-progress' }} />
@@ -780,11 +780,11 @@ describe('AgentChat — PromptInput rendered', () => {
     expect(screen.queryByTestId('prompt-input-send')).not.toBeInTheDocument();
   });
 
-  /* Preconditions: agent status is in-progress but request is not streaming
+  /* Preconditions: agent status is in-progress, input is empty, request is not streaming
      Action: render AgentChat
-     Assertions: stop button is still rendered because mode depends only on agent status
-     Requirements: agents.4.24 */
-  it('should render stop button when agent is in progress even if request is not streaming', () => {
+     Assertions: stop button is still rendered because mode depends on agent status + empty input
+     Requirements: agents.4.2.1, agents.4.24 */
+  it('should render stop button when agent is in progress with empty input even if request is not streaming', () => {
     mockUseAgentChatState.isStreaming = false;
     render(
       <AgentChat {...defaultProps} agent={{ ...defaultProps.agent, status: 'in-progress' }} />
@@ -812,24 +812,103 @@ describe('AgentChat — PromptInput rendered', () => {
     expect(sendButton).toBeEnabled();
   });
 
-  /* Preconditions: agent status is in-progress
+  /* Preconditions: agent status is in-progress and input is empty
      Action: render AgentChat with empty input
-     Assertions: stop button stays enabled regardless of input content
+     Assertions: stop button is enabled
      Requirements: agents.4.2.1 */
-  it('should keep stop button enabled regardless of input text', async () => {
+  it('should keep stop button enabled for empty input during in-progress', () => {
     render(
       <AgentChat {...defaultProps} agent={{ ...defaultProps.agent, status: 'in-progress' }} />
     );
 
-    const stopButton = screen.getByTestId('prompt-input-stop');
-    expect(stopButton).toBeEnabled();
+    expect(screen.getByTestId('prompt-input-stop')).toBeEnabled();
+  });
+
+  /* Preconditions: agent status is in-progress and input is empty
+     Action: user types text into input
+     Assertions: button switches from stop to send
+     Requirements: agents.4.2.1, agents.4.2.2 */
+  it('should switch from stop to send when user types during in-progress', async () => {
+    render(
+      <AgentChat {...defaultProps} agent={{ ...defaultProps.agent, status: 'in-progress' }} />
+    );
+
+    expect(screen.getByTestId('prompt-input-stop')).toBeInTheDocument();
+    expect(screen.queryByTestId('prompt-input-send')).not.toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('auto-expanding-textarea'), {
+        target: { value: 'new message' },
+      });
+    });
+
+    expect(screen.getByTestId('prompt-input-send')).toBeInTheDocument();
+    expect(screen.queryByTestId('prompt-input-stop')).not.toBeInTheDocument();
+  });
+
+  /* Preconditions: agent status is in-progress and input has text
+     Action: user clears input
+     Assertions: button switches from send back to stop
+     Requirements: agents.4.2.1, agents.4.2.2 */
+  it('should switch from send back to stop when user clears input during in-progress', async () => {
+    render(
+      <AgentChat {...defaultProps} agent={{ ...defaultProps.agent, status: 'in-progress' }} />
+    );
+
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('auto-expanding-textarea'), {
+        target: { value: 'text' },
+      });
+    });
+    expect(screen.getByTestId('prompt-input-send')).toBeInTheDocument();
 
     await act(async () => {
       fireEvent.change(screen.getByTestId('auto-expanding-textarea'), {
         target: { value: '' },
       });
     });
-    expect(stopButton).toBeEnabled();
+    expect(screen.getByTestId('prompt-input-stop')).toBeInTheDocument();
+    expect(screen.queryByTestId('prompt-input-send')).not.toBeInTheDocument();
+  });
+
+  /* Preconditions: agent status is in-progress and input has text
+     Action: user submits message
+     Assertions: sendMessage called with text (backend handles cancel automatically)
+     Requirements: agents.4.24.6 */
+  it('should call sendMessage when submitting text during in-progress', async () => {
+    render(
+      <AgentChat {...defaultProps} agent={{ ...defaultProps.agent, status: 'in-progress' }} />
+    );
+
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('auto-expanding-textarea'), {
+        target: { value: 'new task' },
+      });
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('prompt-input-send'));
+    });
+
+    expect(mockSendMessage).toHaveBeenCalledWith('new task');
+  });
+
+  /* Preconditions: agent status is in-progress and input has text
+     Action: render AgentChat
+     Assertions: send button is enabled
+     Requirements: agents.4.2.2 */
+  it('should keep send button enabled for non-empty input during in-progress', async () => {
+    render(
+      <AgentChat {...defaultProps} agent={{ ...defaultProps.agent, status: 'in-progress' }} />
+    );
+
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('auto-expanding-textarea'), {
+        target: { value: 'some text' },
+      });
+    });
+
+    expect(screen.getByTestId('prompt-input-send')).toBeEnabled();
   });
 });
 
