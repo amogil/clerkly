@@ -605,10 +605,13 @@ You are a helpful AI assistant. Always reply in the user's language (detected fr
 // Requirements: llm-integration.3, llm-integration.3.6, llm-integration.3.10
 const TIMEOUT_MS = 120_000; // 2 минуты на каждый запрос к LLM API
 
-// Таймер сбрасывается при каждом onStepFinish (llm-integration.3.6.1):
+// Таймер сбрасывается при каждом onStepFinish и experimental_onStepStart (llm-integration.3.6.1):
 // - setTimeout(120s) при старте chat()
 // - clearTimeout + setTimeout(120s) в onStepFinish callback
-// - Время выполнения инструментов между запросами не учитывается
+// - clearTimeout + setTimeout(120s) в experimental_onStepStart callback
+// - onStepFinish сбрасывает бюджет по завершении model-step
+// - experimental_onStepStart сбрасывает бюджет при начале следующего model request,
+//   чтобы время tool execution между шагами не потребляло timeout budget
 let timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
 try {
@@ -616,6 +619,10 @@ try {
     timeoutMs: TIMEOUT_MS,
     signal,
     onStepFinish: () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    },
+    experimental_onStepStart: () => {
       clearTimeout(timeoutId);
       timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
     },
@@ -913,8 +920,11 @@ User отправляет сообщение
 - `tests/unit/agents/MainPipeline.test.ts` — timeout retry policy: user-aborted signal блокирует retry (early exit и mid-retry abort)
 - `tests/unit/agents/MainPipeline.test.ts` — timeout retry policy: счётчик timeout-повторов сбрасывается между runs (не сквозной)
 - `tests/unit/llm/OpenAIProvider.chat.test.ts` — сброс таймера `CHAT_TIMEOUT_MS` при каждом `onStepFinish`
+- `tests/unit/llm/OpenAIProvider.chat.test.ts` — сброс таймера `CHAT_TIMEOUT_MS` при `experimental_onStepStart` (fresh budget для post-tool continuation)
 - `tests/unit/llm/AnthropicProvider.chat.test.ts` — сброс таймера `CHAT_TIMEOUT_MS` при каждом `onStepFinish`
+- `tests/unit/llm/AnthropicProvider.chat.test.ts` — сброс таймера `CHAT_TIMEOUT_MS` при `experimental_onStepStart` (fresh budget для post-tool continuation)
 - `tests/unit/llm/GoogleProvider.chat.test.ts` — сброс таймера `CHAT_TIMEOUT_MS` при каждом `onStepFinish`
+- `tests/unit/llm/GoogleProvider.chat.test.ts` — сброс таймера `CHAT_TIMEOUT_MS` при `experimental_onStepStart` (fresh budget для post-tool continuation)
 - `tests/unit/renderer/IPCChatTransport.test.ts` — hidden message + error message: error доставляется через idle delay окно до закрытия stream
 - `tests/unit/components/agents/AgentMessage.test.tsx` — renderer defense-in-depth: persisted historical `tool_call` payload с `<!-- clerkly:title-meta: ... -->` не показывает metadata comment в UI
 - `tests/unit/agents/AgentTitleNormalization.test.ts` — нормализация/валидация title (single-line, trim, punctuation, max 200)

@@ -152,6 +152,9 @@ export class GoogleProvider implements ILLMProvider {
           });
         },
         experimental_onStepStart: (event: Record<string, unknown>) => {
+          // Requirements: llm-integration.3.6.1
+          // Reset timeout at step start so tool execution between steps doesn't consume model timeout budget
+          resetTimeout();
           const stepIndex =
             typeof event.stepNumber === 'number'
               ? event.stepNumber
