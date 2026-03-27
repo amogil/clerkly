@@ -2,12 +2,9 @@
 
 ## Обзор
 
-**Issue:** #88
-**Branch:** `fix/88-finalize-unfinished-tool-calls-on-new-message`
+История работ по LLM Integration: timeout management (#84, #89) и finalization stale tool calls (#88).
 
-Финализация всех незавершённых `tool_call` записей при отправке нового пользовательского сообщения.
-
-**Текущий статус:** реализация завершена, ожидание запуска функциональных тестов
+**Текущий статус:** Issue #88 — реализация завершена, ожидание запуска функциональных тестов
 
 ---
 
@@ -16,6 +13,33 @@
 - Не менять поведение retry (timeout retry, silent-failure retry, invalid tool call retry).
 - Не менять семантику существующего `finalizePendingToolCallsForTurn` внутри `MainPipeline` — он продолжает работать для текущего turn.
 - Не запускать полный `npm run test:functional` без подтверждения пользователя.
+
+---
+
+## Issue #84: retry timeout-ошибок модели до 3 раз (completed)
+
+Выделение timeout в отдельную retry-ветку с лимитом 3 consecutive retry (4 попытки суммарно). Счётчик timeout-повторов сбрасывается при успешной попытке.
+
+### Выполнено (Issue #84)
+
+- ✅ Фаза 1: Обновление спецификаций (`requirements.md`, `design.md`).
+- ✅ Фаза 2: Реализация timeout retry в `MainPipeline.ts` (`MAX_TIMEOUT_RETRIES`, `consecutiveTimeouts`, `shouldRetryTimeout`).
+- ✅ Фаза 3: Unit-тесты (6 тестов: exhaust retry, recover, non-timeout unchanged, abort guards, counter reset).
+- ✅ Фаза 4: Валидация (`npm run validate` passed).
+- ✅ Фаза 5: Исправление замечаний code review (PR #85).
+
+---
+
+## Issue #89: post-tool model continuation наследует урезанный timeout budget (completed)
+
+После `tool_result` следующий шаг модели может не получить полный timeout budget (120s). Fix: добавлен `resetTimeout()` в `experimental_onStepStart` во всех 3 провайдерах.
+
+### Выполнено (Issue #89)
+
+- ✅ Фаза 1: Обновление спецификаций (`design.md` — pseudocode и unit test entries).
+- ✅ Фаза 2: Реализация fix — `resetTimeout()` в `experimental_onStepStart` во всех 3 провайдерах.
+- ✅ Фаза 3: Unit-тесты (3 теста: по одному для каждого провайдера).
+- ✅ Фаза 4: Валидация (`npm run validate` passed — TS, ESLint, Prettier, 1983 unit tests).
 
 ---
 
@@ -65,7 +89,7 @@
 
 #### Фаза 3: Unit-тесты
 
-- ✅ **3.1** `tests/unit/agents/MessageManager.test.ts`: 6 тестов для `finalizeStaleToolCalls`
+- ✅ **3.1** `tests/unit/agents/MessageManager.test.ts`: 7 тестов для `finalizeStaleToolCalls`
 - ✅ **3.2** `tests/unit/agents/AgentIPCHandlers.test.ts`: 3 теста для интеграции `finalizeStaleToolCalls`
 
 #### Фаза 4: Валидация
@@ -74,7 +98,14 @@
 - ✅ Все новые и существующие тесты проходят
 - ✅ Обновлена coverage table в `design.md`
 
-#### Фаза 5: Functional tests (ожидает подтверждения пользователя)
+#### Фаза 5: Code review fixes (PR #91)
+
+- ✅ P2: Добавлен `hidden` filter в requirement 8.9
+- ✅ P2: Документированы output contract shapes в design.md
+- ✅ P2: Добавлен тест для malformed JSON payload
+- ✅ P3: Восстановлена история issues #84/#89 в tasks.md
+
+#### Фаза 6: Functional tests (ожидает подтверждения пользователя)
 
 - [ ] Запросить подтверждение пользователя перед `npm run test:functional`
 
@@ -82,5 +113,6 @@
 
 - ✅ Фаза 1: Обновлены `requirements.md` (8.9, 8.10) и `design.md` (поток messages:create, coverage table, unit test descriptions)
 - ✅ Фаза 2: Реализован `MessageManager.finalizeStaleToolCalls()`, вызван в `AgentIPCHandlers.handleMessageCreate()`, рефакторинг MainPipeline отклонён (scope safe)
-- ✅ Фаза 3: Добавлены 9 unit-тестов (6 в MessageManager, 3 в AgentIPCHandlers)
+- ✅ Фаза 3: Добавлены 10 unit-тестов (7 в MessageManager, 3 в AgentIPCHandlers)
 - ✅ Фаза 4: Прогнан `npm run validate` — все проверки пройдены
+- ✅ Фаза 5: Исправлены замечания code review (PR #91)

@@ -750,7 +750,9 @@ catch(error):
    a. Вызвать controller.abort('cancelled_by_user')
    b. Удалить контроллер из Map
 2. Финализировать stale tool calls: `messageManager.finalizeStaleToolCalls(agentId)`
-   (все non-terminal `kind: tool_call` с `done=0` и `hidden=false` переводятся в `cancelled`/`error` с `done=1`)
+   (все non-terminal `kind: tool_call` с `done=0` и `hidden=false` переводятся в `cancelled` с `done=1`:
+   - для `code_exec`: `output = { status: "cancelled", stdout: "", stderr: "", stdout_truncated: false, stderr_truncated: false }`
+   - для прочих: `output = { status: "cancelled", content: "Cancelled by new user message." }`)
 3. Создаёт новый AbortController и сохраняет его в Map
 4. Создаёт `kind: user` сообщение
 5. Запускает `MainPipeline.run(agentId, messageId, abortController.signal)`

@@ -836,5 +836,48 @@ describe('MessageManager', () => {
 
       expect(mockDbManager.messages.update).not.toHaveBeenCalled();
     });
+
+    /* Preconditions: Agent has a stale tool_call with malformed (non-JSON) payloadJson
+       Action: Call finalizeStaleToolCalls(agentId)
+       Assertions: Falls back to generic output shape (non-code_exec branch) and marks done=true
+       Requirements: llm-integration.8.9 */
+    it('should handle malformed payloadJson gracefully using generic output', () => {
+      const malformedTool: Message = {
+        ...mockMessage,
+        id: 30,
+        kind: 'tool_call',
+        done: false,
+        hidden: false,
+        payloadJson: '<<<not valid json>>>',
+      };
+
+      mockDbManager.messages.listByAgent = jest.fn().mockReturnValue([malformedTool]);
+      // After update, DB returns the message with valid (new) payloadJson
+      mockDbManager.messages.getById = jest.fn().mockReturnValue({
+        ...malformedTool,
+        done: true,
+        payloadJson: JSON.stringify({
+          data: {
+            output: { status: 'cancelled', content: 'Cancelled by new user message.' },
+          },
+        }),
+      });
+
+      messageManager.finalizeStaleToolCalls('agent-123');
+
+      expect(mockDbManager.messages.update).toHaveBeenCalledWith(
+        30,
+        'agent-123',
+        expect.any(String),
+        true
+      );
+
+      const payloadJson = (mockDbManager.messages.update as jest.Mock).mock.calls[0][2] as string;
+      const parsed = JSON.parse(payloadJson) as {
+        data: { output: { status: string; content: string } };
+      };
+      expect(parsed.data.output.status).toBe('cancelled');
+      expect(parsed.data.output.content).toBe('Cancelled by new user message.');
+    });
   });
 });
