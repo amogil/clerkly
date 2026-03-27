@@ -78,7 +78,7 @@ export class GoogleProvider implements ILLMProvider {
     const abortFromExternalSignal = () => controller.abort();
     signal?.addEventListener('abort', abortFromExternalSignal);
     // Requirements: llm-integration.3.6, llm-integration.3.6.1
-    // Timer resets on each onStepFinish so tool execution time doesn't count toward model timeout
+    // Timer resets on each onStepFinish and experimental_onStepStart so tool execution time doesn't count toward model timeout
     let timeoutId = setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);
     const resetTimeout = () => {
       clearTimeout(timeoutId);
@@ -152,6 +152,9 @@ export class GoogleProvider implements ILLMProvider {
           });
         },
         experimental_onStepStart: (event: Record<string, unknown>) => {
+          // Requirements: llm-integration.3.6.1
+          // Reset timeout at step start so tool execution between steps doesn't consume model timeout budget
+          resetTimeout();
           const stepIndex =
             typeof event.stepNumber === 'number'
               ? event.stepNumber

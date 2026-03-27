@@ -299,6 +299,57 @@ describe('AnthropicProvider.chat()', () => {
     clearTimeoutSpy.mockRestore();
   });
 
+  /* Preconditions: SDK multi-step tool loop where tool execution happens between onStepFinish and
+       experimental_onStepStart of the next step
+     Action: provider.chat() completes with both onStepFinish and experimental_onStepStart callbacks
+     Assertions: timeout timer is reset at experimental_onStepStart giving post-tool continuation
+       a fresh full timeout budget
+     Requirements: llm-integration.3.6.1 */
+  it('resets timeout timer on experimental_onStepStart so post-tool continuation gets fresh budget', async () => {
+    const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
+    const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
+
+    (aiModule.streamText as unknown as jest.Mock).mockImplementation((options) => {
+      // Step 0: model responds with tool_call
+      options.experimental_onStepStart?.({ stepNumber: 0 });
+      options.onStepFinish?.({
+        stepNumber: 0,
+        finishReason: 'tool-calls',
+        toolCalls: [{ id: 't1' }],
+        toolResults: [{ id: 't1' }],
+        usage: {},
+      });
+      // Tool execution happens here (time passes in real scenario)
+      // Step 1: post-tool continuation — this must reset timeout
+      options.experimental_onStepStart?.({ stepNumber: 1 });
+      options.onStepFinish?.({
+        stepNumber: 1,
+        finishReason: 'stop',
+        toolCalls: [],
+        toolResults: [],
+        usage: {},
+      });
+      return {
+        fullStream: toAsyncIterable([{ type: 'text-delta', text: 'ok' }]),
+        totalUsage: Promise.resolve({}),
+      };
+    });
+
+    await provider.chat(mockMessages, mockOptions, () => {});
+
+    // Initial setTimeout(1) + onStepStart(0)(2) + onStepFinish(0)(3) + onStepStart(1)(4) + onStepFinish(1)(5)
+    // = 5 calls with CHAT_TIMEOUT_MS
+    const timeoutCalls = setTimeoutSpy.mock.calls.filter((call) => call[1] === CHAT_TIMEOUT_MS);
+    expect(timeoutCalls.length).toBeGreaterThanOrEqual(5);
+
+    // clearTimeout called by each resetTimeout (4 resets) + 1 in finally = at least 5
+    const clearCalls = clearTimeoutSpy.mock.calls.length;
+    expect(clearCalls).toBeGreaterThanOrEqual(5);
+
+    setTimeoutSpy.mockRestore();
+    clearTimeoutSpy.mockRestore();
+  });
+
   it('collects per-step diagnostics from SDK onStep callbacks', async () => {
     (aiModule.streamText as unknown as jest.Mock).mockImplementation((options) => {
       options.experimental_onStepStart?.({ stepNumber: 0 });
