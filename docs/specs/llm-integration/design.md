@@ -749,10 +749,12 @@ catch(error):
 1. Если для `agentId` есть активный AbortController:
    a. Вызвать controller.abort('cancelled_by_user')
    b. Удалить контроллер из Map
-2. Создаёт новый AbortController и сохраняет его в Map
-3. Создаёт `kind: user` сообщение
-4. Запускает `MainPipeline.run(agentId, messageId, abortController.signal)`
-5. По завершении `run()` удаляет контроллер из Map
+2. Финализировать stale tool calls: `messageManager.finalizeStaleToolCalls(agentId)`
+   (все non-terminal `kind: tool_call` с `done=0` и `hidden=false` переводятся в `cancelled`/`error` с `done=1`)
+3. Создаёт новый AbortController и сохраняет его в Map
+4. Создаёт `kind: user` сообщение
+5. Запускает `MainPipeline.run(agentId, messageId, abortController.signal)`
+6. По завершении `run()` удаляет контроллер из Map
 ```
 
 `MainPipeline.run()` принимает `AbortSignal` и передаёт его в `provider.chat(...)` (через AI SDK adapter). При отмене:
@@ -772,11 +774,12 @@ catch(error):
 
 ```
 messages:create (kind: user):
-  1. UPDATE messages SET hidden = 1
+  1. Отменить активный pipeline (если есть)
+  2. Финализировать stale tool_call записи (done=0 → cancelled с done=1)
+  3. UPDATE messages SET hidden = 1
      WHERE agent_id = ? AND kind = 'error' AND hidden = 0
-  2. Отменить активный pipeline (если есть)
-  3. Создать kind:user сообщение
-  4. Запустить MainPipeline.run()
+  4. Создать kind:user сообщение
+  5. Запустить MainPipeline.run()
 ```
 
 Клиентский runtime фильтрует сообщения с `hidden: true`.
@@ -900,6 +903,9 @@ User отправляет сообщение
 - `tests/unit/agents/MainPipeline.test.ts` — отклонение ответа модели с `tool_calls.length > 1` (retry/repair без persist `tool_call`)
 - `tests/unit/agents/MainPipeline.test.ts` — 100ms batching streaming updates: промежуточные flush не чаще 1/100ms, force-flush на `tool_call/tool_result/done/error/abort`, без потери accumulated delta
 - `tests/unit/agents/AgentIPCHandlers.test.ts` — запуск pipeline при kind:user
+- `tests/unit/agents/AgentIPCHandlers.test.ts` — вызов `finalizeStaleToolCalls` при `messages:create (kind:user)` перед созданием сообщения и после cancel pipeline
+- `tests/unit/agents/AgentIPCHandlers.test.ts` — отсутствие вызова `finalizeStaleToolCalls` при `messages:create (kind:llm)`
+- `tests/unit/agents/MessageManager.test.ts` — `finalizeStaleToolCalls`: финализация running `code_exec` в `cancelled`, running generic tool call в `cancelled`, пропуск terminal и hidden записей, обработка множественных stale tool calls, no-op при отсутствии stale записей
 - `tests/unit/renderer/IPCChatTransport.test.ts` — обработка delta-stream (`reasoning/text`) и persisted `kind: tool_call` snapshot
 - `tests/unit/renderer/messageOrder.test.ts` — детерминированная сортировка snapshots по `runId/attemptId/sequence` (из колонок `messages`) с fallback на `timestamp,id`
 - `tests/unit/hooks/useAgentChat.test.ts` — применение сортировки при `message.created`/`message.updated` для out-of-order доставки
@@ -1078,6 +1084,8 @@ User отправляет сообщение
 | llm-integration.8.6.1 | ✓ | ✓ |
 | llm-integration.8.7 | ✓ | ✓ |
 | llm-integration.8.8 | ✓ | ✓ |
+| llm-integration.8.9 | ✓ | - |
+| llm-integration.8.10 | ✓ | - |
 | llm-integration.9 | ✓ | ✓ |
 | llm-integration.9.1 | ✓ | ✓ |
 | llm-integration.9.2 | ✓ | ✓ |

@@ -644,4 +644,197 @@ describe('MessageManager', () => {
       expect(parsed.raw).not.toHaveProperty('timestamp');
     });
   });
+
+  describe('finalizeStaleToolCalls', () => {
+    /* Preconditions: Agent has a running code_exec tool_call (done=false, hidden=false)
+       Action: Call finalizeStaleToolCalls(agentId)
+       Assertions: tool_call is updated to cancelled with code_exec-shaped output and done=true
+       Requirements: llm-integration.8.9 */
+    it('should finalize running code_exec tool call to cancelled', () => {
+      const staleCodeExec: Message = {
+        ...mockMessage,
+        id: 10,
+        kind: 'tool_call',
+        done: false,
+        hidden: false,
+        payloadJson: JSON.stringify({
+          data: {
+            callId: 'call-1',
+            toolName: 'code_exec',
+            arguments: { code: 'console.log("hi")' },
+          },
+        }),
+      };
+
+      mockDbManager.messages.listByAgent = jest.fn().mockReturnValue([staleCodeExec]);
+      // Mock getById to return updated message for event emission
+      mockDbManager.messages.getById = jest.fn().mockReturnValue({
+        ...staleCodeExec,
+        done: true,
+      });
+
+      messageManager.finalizeStaleToolCalls('agent-123');
+
+      expect(mockDbManager.messages.update).toHaveBeenCalledWith(
+        10,
+        'agent-123',
+        expect.any(String),
+        true
+      );
+
+      const payloadJson = (mockDbManager.messages.update as jest.Mock).mock.calls[0][2] as string;
+      const parsed = JSON.parse(payloadJson) as {
+        data: {
+          output: {
+            status: string;
+            stdout: string;
+            stderr: string;
+            stdout_truncated: boolean;
+            stderr_truncated: boolean;
+          };
+        };
+      };
+      expect(parsed.data.output.status).toBe('cancelled');
+      expect(parsed.data.output.stdout).toBe('');
+      expect(parsed.data.output.stderr).toBe('');
+      expect(parsed.data.output.stdout_truncated).toBe(false);
+      expect(parsed.data.output.stderr_truncated).toBe(false);
+    });
+
+    /* Preconditions: Agent has a running generic tool_call (done=false, hidden=false)
+       Action: Call finalizeStaleToolCalls(agentId)
+       Assertions: tool_call is updated to cancelled with generic output and done=true
+       Requirements: llm-integration.8.9 */
+    it('should finalize running generic tool call to cancelled', () => {
+      const staleGeneric: Message = {
+        ...mockMessage,
+        id: 11,
+        kind: 'tool_call',
+        done: false,
+        hidden: false,
+        payloadJson: JSON.stringify({
+          data: {
+            callId: 'call-2',
+            toolName: 'search_docs',
+            arguments: { query: 'test' },
+          },
+        }),
+      };
+
+      mockDbManager.messages.listByAgent = jest.fn().mockReturnValue([staleGeneric]);
+      mockDbManager.messages.getById = jest.fn().mockReturnValue({
+        ...staleGeneric,
+        done: true,
+      });
+
+      messageManager.finalizeStaleToolCalls('agent-123');
+
+      const payloadJson = (mockDbManager.messages.update as jest.Mock).mock.calls[0][2] as string;
+      const parsed = JSON.parse(payloadJson) as {
+        data: { output: { status: string; content: string } };
+      };
+      expect(parsed.data.output.status).toBe('cancelled');
+      expect(parsed.data.output.content).toBe('Cancelled by new user message.');
+    });
+
+    /* Preconditions: Agent has only terminal tool_calls (done=true)
+       Action: Call finalizeStaleToolCalls(agentId)
+       Assertions: No updates are performed
+       Requirements: llm-integration.8.10 */
+    it('should not touch already terminal (done=1) tool calls', () => {
+      const terminalTool: Message = {
+        ...mockMessage,
+        id: 12,
+        kind: 'tool_call',
+        done: true,
+        hidden: false,
+        payloadJson: JSON.stringify({
+          data: {
+            toolName: 'code_exec',
+            output: { status: 'success', stdout: 'ok' },
+          },
+        }),
+      };
+
+      mockDbManager.messages.listByAgent = jest.fn().mockReturnValue([terminalTool]);
+
+      messageManager.finalizeStaleToolCalls('agent-123');
+
+      expect(mockDbManager.messages.update).not.toHaveBeenCalled();
+    });
+
+    /* Preconditions: Agent has hidden non-terminal tool_calls
+       Action: Call finalizeStaleToolCalls(agentId)
+       Assertions: Hidden tool_calls are not touched
+       Requirements: llm-integration.8.9 */
+    it('should not touch hidden tool calls', () => {
+      const hiddenTool: Message = {
+        ...mockMessage,
+        id: 13,
+        kind: 'tool_call',
+        done: false,
+        hidden: true,
+        payloadJson: JSON.stringify({
+          data: { toolName: 'code_exec', arguments: { code: 'x' } },
+        }),
+      };
+
+      mockDbManager.messages.listByAgent = jest.fn().mockReturnValue([hiddenTool]);
+
+      messageManager.finalizeStaleToolCalls('agent-123');
+
+      expect(mockDbManager.messages.update).not.toHaveBeenCalled();
+    });
+
+    /* Preconditions: Agent has multiple stale tool_calls
+       Action: Call finalizeStaleToolCalls(agentId)
+       Assertions: All stale tool_calls are finalized in one pass
+       Requirements: llm-integration.8.9 */
+    it('should handle multiple stale tool calls in one pass', () => {
+      const stale1: Message = {
+        ...mockMessage,
+        id: 20,
+        kind: 'tool_call',
+        done: false,
+        hidden: false,
+        payloadJson: JSON.stringify({
+          data: { callId: 'c1', toolName: 'code_exec', arguments: { code: 'a' } },
+        }),
+      };
+      const stale2: Message = {
+        ...mockMessage,
+        id: 21,
+        kind: 'tool_call',
+        done: false,
+        hidden: false,
+        payloadJson: JSON.stringify({
+          data: { callId: 'c2', toolName: 'search_docs', arguments: { query: 'b' } },
+        }),
+      };
+
+      mockDbManager.messages.listByAgent = jest.fn().mockReturnValue([stale1, stale2]);
+      mockDbManager.messages.getById = jest
+        .fn()
+        .mockReturnValueOnce({ ...stale1, done: true })
+        .mockReturnValueOnce({ ...stale2, done: true });
+
+      messageManager.finalizeStaleToolCalls('agent-123');
+
+      expect(mockDbManager.messages.update).toHaveBeenCalledTimes(2);
+    });
+
+    /* Preconditions: Agent has no stale tool_calls
+       Action: Call finalizeStaleToolCalls(agentId)
+       Assertions: No updates are performed
+       Requirements: llm-integration.8.9 */
+    it('should do nothing when no stale tool calls exist', () => {
+      const userMsg: Message = { ...mockMessage, id: 1, kind: 'user', done: true };
+
+      mockDbManager.messages.listByAgent = jest.fn().mockReturnValue([userMsg]);
+
+      messageManager.finalizeStaleToolCalls('agent-123');
+
+      expect(mockDbManager.messages.update).not.toHaveBeenCalled();
+    });
+  });
 });

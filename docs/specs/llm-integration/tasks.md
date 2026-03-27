@@ -2,94 +2,85 @@
 
 ## Обзор
 
-План работ по LLM timeout management (Issue #84: retry policy, Issue #89: step-start reset).
+**Issue:** #88
+**Branch:** `fix/88-finalize-unfinished-tool-calls-on-new-message`
 
-**Текущий статус:** Issue #89 — Фаза 4 завершена, ожидание functional tests
+Финализация всех незавершённых `tool_call` записей при отправке нового пользовательского сообщения.
+
+**Текущий статус:** реализация завершена, ожидание запуска функциональных тестов
 
 ---
 
 ## CRITICAL RULES
 
 - Не менять поведение retry (timeout retry, silent-failure retry, invalid tool call retry).
-- Не менять семантику `onStepFinish` reset — он остаётся как есть.
-- Изменения идентичны во всех трёх провайдерах (OpenAI, Anthropic, Google).
+- Не менять семантику существующего `finalizePendingToolCallsForTurn` внутри `MainPipeline` — он продолжает работать для текущего turn.
 - Не запускать полный `npm run test:functional` без подтверждения пользователя.
 
 ---
 
-## Issue #84: retry timeout-ошибок модели до 3 раз
+## Issue #88: Finalize all unfinished tool calls when user sends a new message
 
-Выделение timeout в отдельную retry-ветку с лимитом 3 consecutive retry (4 попытки суммарно). Счётчик timeout-повторов сбрасывается при успешной попытке.
-
-### Выполнено (Issue #84)
-
-- ✅ Фаза 1: Обновление спецификаций (`requirements.md`, `design.md`).
-- ✅ Фаза 2: Реализация timeout retry в `MainPipeline.ts` (`MAX_TIMEOUT_RETRIES`, `consecutiveTimeouts`, `shouldRetryTimeout`).
-- ✅ Фаза 3: Unit-тесты (6 тестов: exhaust retry, recover, non-timeout unchanged, abort guards, counter reset).
-- ✅ Фаза 4: Валидация (`npm run validate` passed).
-- ✅ Фаза 5: Исправление замечаний code review (PR #85).
-  - [x] P0: Добавить недостающий unit-тест на сброс счётчика timeout-retry между runs.
-  - [x] P0: Исправить ложное отмечание в tasks.md.
-  - [x] P2: Убрать implementation details из `requirements.md` 12.2.3 (имена классов, `consecutive`).
-  - [x] P2: Добавить `logger.warn` при timeout retry в `MainPipeline.ts`.
-  - [x] P2: Обновить "Выполнено" / "В работе" секции tasks.md.
-  - [x] P3: Guard `normalizeLLMError` вызов за `!isInvalidFinalAnswer`.
-  - [x] P3: Переименовать тест "does not retry timeout when signal is already aborted" → "exits early without calling provider when signal is already aborted".
-  - [x] Прогнать `npm run validate`.
-  - [x] Push и ответить на review comments.
-
----
-
-## Issue #89: post-tool model continuation наследует урезанный timeout budget
-
-После `tool_result` следующий шаг модели может не получить полный timeout budget (120s). Таймер сбрасывался только в `onStepFinish`, но между `onStepFinish` и началом следующего model request проходит время на выполнение инструмента.
+При отправке нового `kind:user` сообщения система отменяет активный pipeline (`cancelActivePipelineAndNormalizeTail`), но не финализирует «осиротевшие» persisted `tool_call` записи (`done=0`, `status=running`), у которых уже нет живого runtime-сессии. Такие записи остаются навсегда, портят UX и статус агента.
 
 ### Анализ бага
 
 #### Текущее поведение
 
-Lifecycle Vercel AI SDK multi-step tool-loop:
-1. `experimental_onStepStart(step 0)` — next model request begins
-2. Model streams response with `tool_call`
-3. `onStepFinish(step 0)` — model step completed; **timeout resets here** (fresh 120s)
-4. Tool executes (e.g. `code_exec`, may take 10-30s+)
-5. `experimental_onStepStart(step 1)` — next model request begins; **timeout NOT reset**
-6. Model streams response
-7. `onStepFinish(step 1)` — model step completed
+Поток при `messages:create` (`kind: user`):
+1. `cancelActivePipelineAndNormalizeTail(agentId)` — отменяет `AbortController`, скрывает in-flight `kind:llm` (если есть)
+2. `hideErrorMessages(agentId)` — скрывает видимые `kind:error`
+3. Создаёт `kind:user` сообщение
+4. Запускает новый `MainPipeline.run()`
 
-Между шагами 3 и 5 инструмент выполняется и потребляет бюджет таймаута. К моменту начала следующего model request (шаг 5) от 120s бюджета уже потрачена часть на tool execution.
+**Проблема:** между шагами 1 и 4 нет очистки stale `tool_call` записей.
 
-#### Production data (Issue #89)
+`finalizePendingToolCallsForTurn()` вызывается **только** внутри `MainPipeline.handleRunError()` (при ошибке/отмене **текущего** run) и фильтрует по `replyToMessageId === userMessageId` (текущий turn). Она не видит tool calls от **предыдущих** turns и не вызывается при cancel из `AgentIPCHandlers`.
 
-- User message at `14:47:43.981Z`
-- `tool_call(code_exec)` terminal at `14:48:08.631Z` (tool took ~25s)
-- `kind:error timeout` at `14:49:44.017Z`
-- Delta user→timeout = `120.036s` (full budget from user message)
-- Delta tool_result→timeout = `95.386s` (reduced budget for post-tool step)
+#### Сценарий проблемы
 
-Post-tool model step получил ~95s вместо полных 120s, потому что ~25s ушло на tool execution.
-
-#### Ожидаемое поведение (по спецификации)
-
-Требование `llm-integration.3.6.1`: таймаут применяется к **каждому запросу отдельно**. Время выполнения инструментов между запросами НЕ ДОЛЖНО учитываться в таймауте.
+1. Пользователь отправляет сообщение → pipeline запускает `code_exec` → persisted `tool_call` (`done=0`, `status=running`)
+2. Pipeline падает или сигнал abort «теряет» runtime-контекст (AI SDK bug)
+3. Пользователь отправляет **новое** сообщение
+4. `cancelActivePipelineAndNormalizeTail` отменяет pipeline, но stale `tool_call` остаётся `done=0`
+5. Новый pipeline запускается с «мусором» в истории → UI показывает бесконечный spinner для старого tool call
 
 #### Root cause
 
-`resetTimeout()` вызывается только в `onStepFinish`. Callback `experimental_onStepStart` уже существует во всех провайдерах, но используется только для записи `stepStartedAt` (диагностика latency). Он не сбрасывает таймер.
+`cancelActivePipelineAndNormalizeTail` работает **только** с последним сообщением (`getLastMessage`) и **только** скрывает in-flight `kind:llm`. Она не трогает `kind:tool_call` записи. Persisted reconciliation отсутствует.
 
-#### Fix
+### Plan
 
-Добавить `resetTimeout()` в `experimental_onStepStart` во всех трёх провайдерах. Это гарантирует, что каждый model request получает свежий полный timeout budget с момента фактического начала запроса.
+#### Фаза 1: Обновление спецификаций
 
-### Выполнено (Issue #89)
+- ✅ Добавить требование `llm-integration.8.9` в `requirements.md`
+- ✅ Добавить требование `llm-integration.8.10` в `requirements.md`
+- ✅ Обновить `design.md` — секция «Прерывание запроса при новом сообщении»: добавить шаг persisted reconciliation в поток `messages:create (kind: user)`
 
-- ✅ Фаза 1: Обновление спецификаций (`design.md` — pseudocode и unit test entries).
-- ✅ Фаза 2: Реализация fix — `resetTimeout()` в `experimental_onStepStart` во всех 3 провайдерах.
-- ✅ Фаза 3: Unit-тесты (3 теста: по одному для каждого провайдера).
-- ✅ Фаза 4: Валидация (`npm run validate` passed — TS, ESLint, Prettier, 1983 unit tests).
+#### Фаза 2: Реализация
 
-### Запланировано
+- ✅ **2.1** Создать метод `MessageManager.finalizeStaleToolCalls(agentId: string): void`
+- ✅ **2.2** Вызвать `messageManager.finalizeStaleToolCalls(agentId)` в `AgentIPCHandlers.handleMessageCreate()` между `cancelActivePipelineAndNormalizeTail()` и `hideErrorMessages()`
+- ✅ **2.3** Рефакторинг `MainPipeline.finalizePendingToolCallsForTurn()` оценён и отклонён (scope safe: оба метода оставлены независимыми из-за различий в семантике фильтрации и статусов)
+
+#### Фаза 3: Unit-тесты
+
+- ✅ **3.1** `tests/unit/agents/MessageManager.test.ts`: 6 тестов для `finalizeStaleToolCalls`
+- ✅ **3.2** `tests/unit/agents/AgentIPCHandlers.test.ts`: 3 теста для интеграции `finalizeStaleToolCalls`
+
+#### Фаза 4: Валидация
+
+- ✅ Прогнан `npm run validate` (TypeScript, ESLint, Prettier, unit tests, coverage)
+- ✅ Все новые и существующие тесты проходят
+- ✅ Обновлена coverage table в `design.md`
 
 #### Фаза 5: Functional tests (ожидает подтверждения пользователя)
 
-- [ ] Запросить подтверждение пользователя перед `npm run test:functional`.
+- [ ] Запросить подтверждение пользователя перед `npm run test:functional`
+
+### Выполнено (Issue #88)
+
+- ✅ Фаза 1: Обновлены `requirements.md` (8.9, 8.10) и `design.md` (поток messages:create, coverage table, unit test descriptions)
+- ✅ Фаза 2: Реализован `MessageManager.finalizeStaleToolCalls()`, вызван в `AgentIPCHandlers.handleMessageCreate()`, рефакторинг MainPipeline отклонён (scope safe)
+- ✅ Фаза 3: Добавлены 9 unit-тестов (6 в MessageManager, 3 в AgentIPCHandlers)
+- ✅ Фаза 4: Прогнан `npm run validate` — все проверки пройдены

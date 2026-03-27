@@ -343,4 +343,63 @@ export class MessageManager {
       );
     }
   }
+
+  /**
+   * Finalize all stale (non-terminal) tool_call records for an agent.
+   * Called before creating a new kind:user message to clean up orphaned tool_call
+   * records that were left behind by a cancelled/crashed pipeline.
+   * Requirements: llm-integration.8.9, llm-integration.8.10
+   */
+  finalizeStaleToolCalls(agentId: string): void {
+    const allMessages = this.list(agentId);
+    const staleToolCalls = allMessages.filter(
+      (msg) => msg.kind === 'tool_call' && !msg.done && !msg.hidden
+    );
+
+    for (const message of staleToolCalls) {
+      let payload: Record<string, unknown>;
+      try {
+        payload = JSON.parse(message.payloadJson) as Record<string, unknown>;
+      } catch {
+        payload = {};
+      }
+
+      const data =
+        payload.data && typeof payload.data === 'object' && !Array.isArray(payload.data)
+          ? (payload.data as Record<string, unknown>)
+          : {};
+      const toolName = typeof data.toolName === 'string' ? data.toolName : '';
+
+      if (toolName === 'code_exec') {
+        data.output = {
+          status: 'cancelled',
+          stdout: '',
+          stderr: '',
+          stdout_truncated: false,
+          stderr_truncated: false,
+        };
+      } else {
+        data.output = {
+          status: 'cancelled',
+          content: 'Cancelled by new user message.',
+        };
+      }
+
+      this.update(
+        message.id,
+        agentId,
+        {
+          ...payload,
+          data,
+        },
+        true
+      );
+    }
+
+    if (staleToolCalls.length > 0) {
+      this.logger.info(
+        `Finalized ${staleToolCalls.length} stale tool_call(s) for agent ${agentId}`
+      );
+    }
+  }
 }
