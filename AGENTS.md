@@ -44,7 +44,7 @@ Every task MUST be executed using the following workflow:
 
 ### Step 1: Gather Context
 
-1. Read the plan file for the current task (located in the relevant spec folder as `plan-<N>-<desc>.md`)
+1. Read the plan file for the current task (located in the relevant spec folder as `plan-<NNNN>-<desc>.md`)
 2. Read the specifications referenced in the plan:
    - `requirements.md`
    - `design.md`
@@ -593,7 +593,6 @@ Before disabling a test, you MUST:
 
 Correct approach: provide a short verbal summary at the end (2-3 sentences).
 
-
 ### Environment variables
 
 **FORBIDDEN** to add new `process.env.VARIABLE_NAME` without explicit user agreement.
@@ -636,3 +635,4 @@ Allowed update path:
 | Coverage below requirement | Not enough tests | `npm run test:coverage`, open `coverage/lcov-report/index.html` |
 | `Command timed out after 120000ms` | Functional tests were not run in background mode | Use background execution and monitor process in current environment |
 | Tests were started twice | Previous run status was not checked | Always check current process status before restarting |
+
