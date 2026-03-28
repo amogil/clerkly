@@ -66,6 +66,7 @@ describe('MessageManager', () => {
         update: jest.fn(),
         setDone: jest.fn(),
         updateUsageJson: jest.fn(),
+        listStaleToolCalls: jest.fn().mockReturnValue([]),
       },
       agents: {} as IDatabaseManager['agents'],
       settings: {} as IDatabaseManager['settings'],
@@ -878,6 +879,284 @@ describe('MessageManager', () => {
       };
       expect(parsed.data.output.status).toBe('cancelled');
       expect(parsed.data.output.content).toBe('Cancelled by new user message.');
+    });
+  });
+
+  describe('finalizeAllStaleToolCallsOnStartup', () => {
+    /* Preconditions: DB has a visible stale code_exec tool_call (done=false, hidden=false)
+       Action: Call finalizeAllStaleToolCallsOnStartup()
+       Assertions: tool_call is updated with cancelled code_exec-shaped output and done=true via MessagesRepository.update
+       Requirements: llm-integration.11.6.3 */
+    it('should finalize visible stale code_exec tool_call to cancelled', () => {
+      const staleCodeExec: Message = {
+        ...mockMessage,
+        id: 40,
+        agentId: 'agent-123',
+        kind: 'tool_call',
+        done: false,
+        hidden: false,
+        payloadJson: JSON.stringify({
+          data: {
+            callId: 'call-startup-1',
+            toolName: 'code_exec',
+            arguments: { code: 'console.log("hi")' },
+          },
+        }),
+      };
+
+      (mockDbManager.messages.listStaleToolCalls as jest.Mock).mockReturnValue([staleCodeExec]);
+
+      messageManager.finalizeAllStaleToolCallsOnStartup();
+
+      expect(mockDbManager.messages.update).toHaveBeenCalledWith(
+        40,
+        'agent-123',
+        expect.any(String),
+        true
+      );
+
+      const payloadJson = (mockDbManager.messages.update as jest.Mock).mock.calls[0][2] as string;
+      const parsed = JSON.parse(payloadJson) as {
+        data: {
+          output: {
+            status: string;
+            stdout: string;
+            stderr: string;
+            stdout_truncated: boolean;
+            stderr_truncated: boolean;
+          };
+        };
+      };
+      expect(parsed.data.output.status).toBe('cancelled');
+      expect(parsed.data.output.stdout).toBe('');
+      expect(parsed.data.output.stderr).toBe('');
+    });
+
+    /* Preconditions: DB has a hidden stale code_exec tool_call (done=false, hidden=true)
+       Action: Call finalizeAllStaleToolCallsOnStartup()
+       Assertions: hidden tool_call is also updated (unlike finalizeStaleToolCalls which skips hidden)
+       Requirements: llm-integration.11.6.3 */
+    it('should finalize hidden stale tool_call (includes hidden=true rows)', () => {
+      const hiddenStale: Message = {
+        ...mockMessage,
+        id: 41,
+        agentId: 'agent-123',
+        kind: 'tool_call',
+        done: false,
+        hidden: true,
+        payloadJson: JSON.stringify({
+          data: {
+            callId: 'call-startup-hidden',
+            toolName: 'code_exec',
+            arguments: { code: 'x' },
+          },
+        }),
+      };
+
+      (mockDbManager.messages.listStaleToolCalls as jest.Mock).mockReturnValue([hiddenStale]);
+
+      messageManager.finalizeAllStaleToolCallsOnStartup();
+
+      expect(mockDbManager.messages.update).toHaveBeenCalledWith(
+        41,
+        'agent-123',
+        expect.any(String),
+        true
+      );
+    });
+
+    /* Preconditions: DB has a stale generic tool_call (non-code_exec)
+       Action: Call finalizeAllStaleToolCallsOnStartup()
+       Assertions: tool_call is updated with generic cancelled output shape
+       Requirements: llm-integration.11.6.3 */
+    it('should finalize stale generic tool_call with generic output shape', () => {
+      const staleGeneric: Message = {
+        ...mockMessage,
+        id: 42,
+        agentId: 'agent-123',
+        kind: 'tool_call',
+        done: false,
+        hidden: false,
+        payloadJson: JSON.stringify({
+          data: {
+            callId: 'call-startup-generic',
+            toolName: 'search_docs',
+            arguments: { query: 'test' },
+          },
+        }),
+      };
+
+      (mockDbManager.messages.listStaleToolCalls as jest.Mock).mockReturnValue([staleGeneric]);
+
+      messageManager.finalizeAllStaleToolCallsOnStartup();
+
+      const payloadJson = (mockDbManager.messages.update as jest.Mock).mock.calls[0][2] as string;
+      const parsed = JSON.parse(payloadJson) as {
+        data: { output: { status: string; content: string } };
+      };
+      expect(parsed.data.output.status).toBe('cancelled');
+      expect(parsed.data.output.content).toBe('Cancelled: stale from previous session.');
+    });
+
+    /* Preconditions: DB has no stale tool_calls
+       Action: Call finalizeAllStaleToolCallsOnStartup()
+       Assertions: No updates performed
+       Requirements: llm-integration.11.6.3 */
+    it('should do nothing when no stale tool_calls exist', () => {
+      (mockDbManager.messages.listStaleToolCalls as jest.Mock).mockReturnValue([]);
+
+      messageManager.finalizeAllStaleToolCallsOnStartup();
+
+      expect(mockDbManager.messages.update).not.toHaveBeenCalled();
+    });
+
+    /* Preconditions: DB has multiple stale tool_calls across different agents
+       Action: Call finalizeAllStaleToolCallsOnStartup()
+       Assertions: All stale rows are finalized in one pass
+       Requirements: llm-integration.11.6.3 */
+    it('should handle multiple stale rows across agents in one pass', () => {
+      const stale1: Message = {
+        ...mockMessage,
+        id: 50,
+        agentId: 'agent-A',
+        kind: 'tool_call',
+        done: false,
+        hidden: false,
+        payloadJson: JSON.stringify({
+          data: { callId: 'c1', toolName: 'code_exec', arguments: { code: 'a' } },
+        }),
+      };
+      const stale2: Message = {
+        ...mockMessage,
+        id: 51,
+        agentId: 'agent-B',
+        kind: 'tool_call',
+        done: false,
+        hidden: true,
+        payloadJson: JSON.stringify({
+          data: { callId: 'c2', toolName: 'search_docs', arguments: { query: 'b' } },
+        }),
+      };
+
+      (mockDbManager.messages.listStaleToolCalls as jest.Mock).mockReturnValue([stale1, stale2]);
+
+      messageManager.finalizeAllStaleToolCallsOnStartup();
+
+      expect(mockDbManager.messages.update).toHaveBeenCalledTimes(2);
+      expect(mockDbManager.messages.update).toHaveBeenCalledWith(
+        50,
+        'agent-A',
+        expect.any(String),
+        true
+      );
+      expect(mockDbManager.messages.update).toHaveBeenCalledWith(
+        51,
+        'agent-B',
+        expect.any(String),
+        true
+      );
+    });
+
+    /* Preconditions: Startup reconciliation runs
+       Action: Call finalizeAllStaleToolCallsOnStartup()
+       Assertions: No MessageUpdatedEvent is emitted (renderer not yet available)
+       Requirements: llm-integration.11.6.3 */
+    it('should not emit MessageUpdatedEvent', () => {
+      const stale: Message = {
+        ...mockMessage,
+        id: 60,
+        agentId: 'agent-123',
+        kind: 'tool_call',
+        done: false,
+        hidden: false,
+        payloadJson: JSON.stringify({
+          data: { callId: 'c-no-event', toolName: 'code_exec', arguments: { code: 'x' } },
+        }),
+      };
+
+      (mockDbManager.messages.listStaleToolCalls as jest.Mock).mockReturnValue([stale]);
+
+      messageManager.finalizeAllStaleToolCallsOnStartup();
+
+      expect(mockEventBus.publish).not.toHaveBeenCalled();
+    });
+
+    /* Preconditions: DB has a stale tool_call with malformed payloadJson
+       Action: Call finalizeAllStaleToolCallsOnStartup()
+       Assertions: Falls back to generic output (non-code_exec branch) and marks done=true
+       Requirements: llm-integration.11.6.3 */
+    it('should handle malformed payloadJson gracefully using generic output', () => {
+      const malformed: Message = {
+        ...mockMessage,
+        id: 70,
+        agentId: 'agent-123',
+        kind: 'tool_call',
+        done: false,
+        hidden: false,
+        payloadJson: '<<<not valid json>>>',
+      };
+
+      (mockDbManager.messages.listStaleToolCalls as jest.Mock).mockReturnValue([malformed]);
+
+      messageManager.finalizeAllStaleToolCallsOnStartup();
+
+      expect(mockDbManager.messages.update).toHaveBeenCalledWith(
+        70,
+        'agent-123',
+        expect.any(String),
+        true
+      );
+
+      const payloadJson = (mockDbManager.messages.update as jest.Mock).mock.calls[0][2] as string;
+      const parsed = JSON.parse(payloadJson) as {
+        data: { output: { status: string; content: string } };
+      };
+      expect(parsed.data.output.status).toBe('cancelled');
+      expect(parsed.data.output.content).toBe('Cancelled: stale from previous session.');
+    });
+
+    /* Preconditions: DB only has terminal tool_calls (done=true) — no stale rows
+       Action: Call finalizeAllStaleToolCallsOnStartup()
+       Assertions: listStaleToolCalls returns empty (SQL filters done=false), no updates performed
+       Requirements: llm-integration.11.6.3 */
+    it('should not touch already terminal tool_calls (done=true)', () => {
+      // listStaleToolCalls filters done=false at SQL level, so done=true rows are never returned
+      (mockDbManager.messages.listStaleToolCalls as jest.Mock).mockReturnValue([]);
+
+      messageManager.finalizeAllStaleToolCallsOnStartup();
+
+      expect(mockDbManager.messages.update).not.toHaveBeenCalled();
+    });
+
+    /* Preconditions: Startup reconciliation bypasses MessageManager.update (uses repo directly)
+       Action: Call finalizeAllStaleToolCallsOnStartup()
+       Assertions: Uses MessagesRepository.update directly, not MessageManager.update
+       Requirements: llm-integration.11.6.3 */
+    it('should use MessagesRepository.update directly (bypass MessageManager.update)', () => {
+      const stale: Message = {
+        ...mockMessage,
+        id: 80,
+        agentId: 'agent-123',
+        kind: 'tool_call',
+        done: false,
+        hidden: false,
+        payloadJson: JSON.stringify({
+          data: { callId: 'c-repo', toolName: 'code_exec', arguments: { code: 'x' } },
+        }),
+      };
+
+      (mockDbManager.messages.listStaleToolCalls as jest.Mock).mockReturnValue([stale]);
+
+      // Spy on the update method to verify it's the repo method being called
+      const repoUpdate = mockDbManager.messages.update as jest.Mock;
+      const managerUpdateSpy = jest.spyOn(messageManager, 'update');
+
+      messageManager.finalizeAllStaleToolCallsOnStartup();
+
+      expect(repoUpdate).toHaveBeenCalledTimes(1);
+      expect(managerUpdateSpy).not.toHaveBeenCalled();
+
+      managerUpdateSpy.mockRestore();
     });
   });
 });
