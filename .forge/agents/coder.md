@@ -16,12 +16,7 @@ tools:
 custom_rules: |
   - Follow the plan strictly by phases in the specified order. Do NOT skip phases.
   - After each significant change, run relevant unit tests. If tests fail — fix IMMEDIATELY, do not move forward.
-  - Do NOT disable tests (.skip(), .only(), commenting out) without explicit user permission.
   - Do NOT remove or change behavior defined in requirements without explicit permission.
-  - Do NOT add new process.env variables without permission.
-  - Do NOT edit files in src/renderer/components/ai-elements/** and src/renderer/components/ui/**.
-  - Do NOT create report files (VALIDATION_REPORT.md, SUMMARY.md, etc.) without explicit request.
-  - NEVER rewrite git history (no --force, --amend, rebase).
 reasoning:
   enabled: true
   effort: medium
@@ -107,6 +102,163 @@ Closed comments:
 ```
 
 **PR label flow:** `ready for work` -> `in progress` -> `review`
+
+---
+
+## Command Reference
+
+### Validation
+```bash
+npm run validate          # full validation (TypeScript, ESLint, Prettier, unit tests)
+npm run validate:verbose  # same, with verbose output
+npm run validate:deps     # validate + optional dependency check (npm outdated)
+npm run validate:verbose:deps  # verbose validate + optional dependency check
+```
+
+### Tests
+```bash
+npm test                    # unit tests
+npm run test:unit           # unit tests only
+npm run test:functional     # functional tests (they open windows!)
+npm run test:coverage       # tests with coverage report
+```
+
+### Debugging
+```bash
+npm run test:unit -- path/to/test.ts -t "test name"   # specific test
+npm run test:functional:debug -- test.spec.ts          # functional tests, stop on first failure
+npx playwright show-report                             # functional test HTML report
+```
+
+### Build
+```bash
+npm run rebuild:node      # rebuild native modules for Node.js
+npm run rebuild:electron  # rebuild native modules for Electron
+npm run build             # build the application
+```
+
+---
+
+## Running Tests
+
+### Preparation
+
+Before running tests, you MUST rebuild native modules:
+
+```bash
+npm run rebuild:node
+```
+
+When needed:
+- After switching Node.js version
+- After `npm install`
+- On `ERR_DLOPEN_FAILED` or `MODULE_NOT_FOUND` errors
+- Before first run after cloning repository
+
+`npm test` runs rebuild automatically. For separate test types, do it manually:
+
+```bash
+npm run rebuild:node && npm run test:unit
+```
+
+### Unit Tests
+
+```bash
+# Specific file
+npm run test:unit -- tests/unit/auth/UserProfileManager.test.ts
+
+# Specific test by name
+npm run test:unit -- -t "should validate token expiration"
+
+# Directory
+npm run test:unit -- tests/unit/auth/
+
+# Verbose output
+npm run test:unit -- tests/unit/auth/UserProfileManager.test.ts --verbose
+
+# Stop on first failure
+npm run test:unit -- tests/unit/auth/UserProfileManager.test.ts --bail
+```
+
+**CRITICALLY IMPORTANT**: If tests fail, run ONLY failed tests, not all tests.
+
+### Functional Tests
+
+**IMPORTANT**: They open real Electron windows on screen!
+
+```bash
+npm run test:functional                                          # all tests
+npm run test:functional:verbose                                  # verbose output
+npm run test:functional:debug                                    # stop on first failure
+npm run test:functional:single -- navigation.spec.ts             # specific file
+npm run test:functional:single -- --grep "should show login"     # by test name
+```
+
+Specific functional tests from the plan — run without asking the user.
+Full suite (`npm run test:functional`) — ask the user via `followup` first (they open windows).
+
+### Running functional tests in background
+
+Functional tests are long (~30 minutes). Use background execution via available tools in the current agent environment and follow these rules:
+
+1. Verify `npm run test:functional` is not already running.
+2. Start exactly one instance in background.
+3. Monitor output and status until completion.
+4. Stop the process if needed via available environment mechanisms.
+
+### Run order for "run all tests"
+
+1. `npm run validate` - fast checks (TypeScript, ESLint, Prettier, unit)
+2. `npm run test:functional` - only if step 1 passed
+
+If any step fails, stop and report to user.
+
+### Debugging failed tests
+
+```bash
+# Step 1: run only failed test
+npm run test:unit -- tests/unit/auth/UserProfileManager.test.ts -t "specific test name"
+
+# Step 2: with verbose output
+npm run test:unit -- tests/unit/auth/UserProfileManager.test.ts -t "specific test name" --verbose
+```
+
+### Parallel execution
+
+- Jest already parallelizes tests inside `test:unit`
+- Do NOT run functional tests in parallel with anything
+
+---
+
+## Critical Prohibitions
+
+### Disabling tests
+
+**ABSOLUTE PROHIBITION** - do not use `.skip()`, `.only()`, or comment out tests without explicit user permission.
+
+Before disabling a test, you MUST:
+1. Explain to the user why the test cannot be fixed
+2. Propose alternatives (move to functional tests, simplify, fix code)
+3. Obtain explicit confirmation
+
+### Environment variables
+
+**FORBIDDEN** to add new `process.env.VARIABLE_NAME` without explicit user agreement.
+
+Exceptions: variable already exists in code, user explicitly asked, standard variables (`NODE_ENV`, `PATH`).
+
+### AI Elements and UI vendor components
+
+**ABSOLUTE PROHIBITION** - do not manually edit library-managed components in:
+- `src/renderer/components/ai-elements/**`
+- `src/renderer/components/ui/**`
+
+These files are vendor scope and will be overwritten by library updates.
+
+Allowed update path:
+1. Update components only via the official CLI flow (`npm run ai-elements:update-all`).
+2. Apply product customizations only in app-owned layers outside those directories.
+3. If a change appears to require editing vendor files, stop and request explicit user approval first.
 
 ---
 
