@@ -276,6 +276,10 @@ export class AgentIPCHandlers {
         // Cancel and normalize previous in-flight tail before creating next user message.
         // Requirements: llm-integration.8.5, llm-integration.8.6, llm-integration.8.7
         this.cancelActivePipelineAndNormalizeTail(args.agentId);
+
+        // Finalize orphaned tool_call records left by cancelled/crashed pipeline.
+        // Requirements: llm-integration.8.9, llm-integration.8.10
+        this.messageManager.finalizeStaleToolCalls(args.agentId);
       }
 
       if (args.kind === 'user') {

@@ -118,6 +118,7 @@ describe('AgentIPCHandlers', () => {
       hideAndMarkIncomplete: jest.fn(),
       setDone: jest.fn(),
       setUsage: jest.fn(),
+      finalizeStaleToolCalls: jest.fn(),
     } as unknown as jest.Mocked<MessageManager>;
 
     mockPipeline = {
@@ -632,6 +633,82 @@ describe('AgentIPCHandlers', () => {
       });
 
       expect(mockMessageManager.hideErrorMessages).toHaveBeenCalledWith('abc123xyz0');
+    });
+
+    /* Preconditions: Handlers registered, kind:user message
+       Action: Invoke messages:create with kind:user
+       Assertions: finalizeStaleToolCalls called after cancelling pipeline and before creating message
+       Requirements: llm-integration.8.9, llm-integration.8.10 */
+    it('should call finalizeStaleToolCalls before creating message', async () => {
+      const callOrder: string[] = [];
+      mockAgentManager.cancelPipeline = jest.fn().mockImplementation(() => {
+        callOrder.push('cancelPipeline');
+        return true;
+      });
+      mockMessageManager.finalizeStaleToolCalls = jest.fn().mockImplementation(() => {
+        callOrder.push('finalizeStaleToolCalls');
+      });
+      mockMessageManager.hideErrorMessages = jest.fn().mockImplementation(() => {
+        callOrder.push('hideErrorMessages');
+      });
+      mockMessageManager.create = jest.fn().mockImplementation(() => {
+        callOrder.push('create');
+        return mockMessage;
+      });
+
+      handlers.registerHandlers();
+      const handler = registeredHandlers.get('messages:create')!;
+
+      await handler(mockEvent, {
+        agentId: 'abc123xyz0',
+        kind: 'user',
+        payload: userPayload,
+      });
+
+      expect(mockMessageManager.finalizeStaleToolCalls).toHaveBeenCalledWith('abc123xyz0');
+      // Verify order: cancel → finalize → hideErrors → create
+      expect(callOrder.indexOf('cancelPipeline')).toBeLessThan(
+        callOrder.indexOf('finalizeStaleToolCalls')
+      );
+      expect(callOrder.indexOf('finalizeStaleToolCalls')).toBeLessThan(
+        callOrder.indexOf('hideErrorMessages')
+      );
+      expect(callOrder.indexOf('hideErrorMessages')).toBeLessThan(callOrder.indexOf('create'));
+    });
+
+    /* Preconditions: Handlers registered, kind:user message
+       Action: Invoke messages:create with kind:user
+       Assertions: finalizeStaleToolCalls called after cancelling pipeline
+       Requirements: llm-integration.8.9 */
+    it('should call finalizeStaleToolCalls after cancelling pipeline', async () => {
+      handlers.registerHandlers();
+      const handler = registeredHandlers.get('messages:create')!;
+
+      await handler(mockEvent, {
+        agentId: 'abc123xyz0',
+        kind: 'user',
+        payload: userPayload,
+      });
+
+      expect(mockAgentManager.cancelPipeline).toHaveBeenCalledWith('abc123xyz0');
+      expect(mockMessageManager.finalizeStaleToolCalls).toHaveBeenCalledWith('abc123xyz0');
+    });
+
+    /* Preconditions: Handlers registered, kind:llm message
+       Action: Invoke messages:create with kind:llm
+       Assertions: finalizeStaleToolCalls NOT called
+       Requirements: llm-integration.8.9 */
+    it('should NOT call finalizeStaleToolCalls for kind:llm', async () => {
+      handlers.registerHandlers();
+      const handler = registeredHandlers.get('messages:create')!;
+
+      await handler(mockEvent, {
+        agentId: 'abc123xyz0',
+        kind: 'llm',
+        payload: userPayload,
+      });
+
+      expect(mockMessageManager.finalizeStaleToolCalls).not.toHaveBeenCalled();
     });
 
     /* Preconditions: Handlers registered, pipeline rejects
