@@ -370,7 +370,7 @@
 
 8.8. КОГДА агент архивируется, ТО активный `MainPipeline.run()` для этого агента (если есть) ДОЛЖЕН быть отменён через `AbortController` — без создания новых сообщений
 
-8.9. КОГДА пользователь отправляет новое `kind:user` сообщение, ТО система ДОЛЖНА финализировать все non-terminal, non-hidden `tool_call` записи этого агента (`done=0`, `hidden=false`) в terminal состояние (`cancelled` preferred, `error` fallback) с `done=1` ДО запуска нового pipeline. Hidden tool calls (`hidden=true`) исключаются — они уже обработаны предыдущим cancel/retry.
+8.9. КОГДА пользователь отправляет новое `kind:user` сообщение, ТО система ДОЛЖНА финализировать все non-terminal, non-hidden `tool_call` записи этого агента (`done=0`, `hidden=false`) в terminal состояние `cancelled` с `done=1` ДО запуска нового pipeline. Hidden tool calls (`hidden=true`) исключаются — они уже обработаны предыдущим cancel/retry.
 
 8.10. Финализация stale tool calls НЕ ДОЛЖНА затрагивать уже terminal tool call записи (`done=1`).
 

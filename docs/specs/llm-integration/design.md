@@ -907,7 +907,7 @@ User отправляет сообщение
 - `tests/unit/agents/AgentIPCHandlers.test.ts` — запуск pipeline при kind:user
 - `tests/unit/agents/AgentIPCHandlers.test.ts` — вызов `finalizeStaleToolCalls` при `messages:create (kind:user)` перед созданием сообщения и после cancel pipeline
 - `tests/unit/agents/AgentIPCHandlers.test.ts` — отсутствие вызова `finalizeStaleToolCalls` при `messages:create (kind:llm)`
-- `tests/unit/agents/MessageManager.test.ts` — `finalizeStaleToolCalls`: финализация running `code_exec` в `cancelled`, running generic tool call в `cancelled`, пропуск terminal и hidden записей, обработка множественных stale tool calls, no-op при отсутствии stale записей
+- `tests/unit/agents/MessageManager.test.ts` — `finalizeStaleToolCalls`: финализация running `code_exec` в `cancelled`, running generic tool call в `cancelled`, пропуск terminal и hidden записей, обработка множественных stale tool calls, no-op при отсутствии stale записей, graceful fallback при malformed payloadJson
 - `tests/unit/renderer/IPCChatTransport.test.ts` — обработка delta-stream (`reasoning/text`) и persisted `kind: tool_call` snapshot
 - `tests/unit/renderer/messageOrder.test.ts` — детерминированная сортировка snapshots по `runId/attemptId/sequence` (из колонок `messages`) с fallback на `timestamp,id`
 - `tests/unit/hooks/useAgentChat.test.ts` — применение сортировки при `message.created`/`message.updated` для out-of-order доставки
