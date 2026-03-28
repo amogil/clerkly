@@ -40,7 +40,9 @@ npm run build             # build the application
 
 ## 2. Mandatory Workflow
 
-Every task MUST be executed using the following workflow:
+Every task MUST be executed using the following workflow.
+
+When working through the agent system (solver -> planner -> coder -> reviewer), each agent follows its own workflow defined in `.forge/agents/`. The steps below apply when working directly (without the agent system).
 
 ### Step 1: Gather Context
 
