@@ -4,119 +4,13 @@ This document describes all rules, workflows, and work formats. These rules are 
 
 ---
 
-## 1. Quick Command Reference
+## 1. Workflow
 
-### Validation
-```bash
-npm run validate          # full validation (TypeScript, ESLint, Prettier, unit tests)
-npm run validate:verbose  # same, with verbose output
-npm run validate:deps     # validate + optional dependency check (npm outdated)
-npm run validate:verbose:deps  # verbose validate + optional dependency check
-```
-
-### Tests
-```bash
-npm test                    # unit tests
-npm run test:unit           # unit tests only
-npm run test:functional     # functional tests (they open windows!)
-npm run test:coverage       # tests with coverage report
-```
-
-### Debugging
-```bash
-npm run test:unit -- path/to/test.ts -t "test name"   # specific test
-npm run test:functional:debug -- test.spec.ts          # functional tests, stop on first failure
-npx playwright show-report                             # functional test HTML report
-```
-
-### Build
-```bash
-npm run rebuild:node      # rebuild native modules for Node.js
-npm run rebuild:electron  # rebuild native modules for Electron
-npm run build             # build the application
-```
+Task execution is handled by the agent system: **solver** -> **planner** -> **coder** -> **reviewer**. Each agent follows its own workflow defined in `.forge/agents/`. See `.forge/agents/solver.md` for the full workflow diagram and label transitions.
 
 ---
 
-## 2. Mandatory Workflow
-
-Every task MUST be executed using the following workflow:
-
-### Step 1: Gather Context
-
-1. Get the list of all specifications in `docs/specs/`
-2. Identify the specifications relevant to the task
-3. For each relevant specification, read:
-   - `requirements.md`
-   - `design.md`
-   - `tasks.md` (if the file exists)
-4. Review existing code related to the task
-5. Review existing tests
-
-### Step 2: Create a Plan
-
-Create a plan and **get user approval** before starting implementation.
-
-**Prohibition:** Before a plan is approved, it is FORBIDDEN to make any changes to code, tests, or documentation.
-
-**Readiness checklist for making changes:**
-- Plan approved: yes/no
-
-```
-Action plan:
-1. Modify file X - add function Y
-2. Create test Z to verify function Y
-3. Update tasks.md (if used for this feature)
-4. Run validation
-
-Expected result: [description]
-Risks: [if any]
-```
-
-### Step 3: Execute
-
-- Execute the plan step by step
-- After each significant change, run relevant unit tests according to sections 4 and 5
-- Write code with requirement comments
-- Write tests with the correct structure (see section 6)
-- **Prohibition:** Do not remove or change behavior defined in requirements without user approval
-
-### Step 4: Complete
-
-1. Ensure specs and design are complete, consistent, and non-redundant
-2. Ensure all code changes match the requirements and design
-3. Run `npm run validate`
-4. Ensure all checks pass:
-   - ✅ TypeScript compilation
-   - ✅ ESLint
-   - ✅ Prettier
-   - ✅ Unit tests
-   - ✅ Code coverage
-5. Ask the user: *"Task completed. Run functional tests? (they will open windows on screen)"*
-
-### Step 5: Report
-
-Provide a short summary at the end (without creating separate files):
-
-```
-Task completed.
-
-Implemented:
-- [item 1]
-
-Files changed:
-- [file 1]
-
-Tests added/updated:
-- [test 1]
-
-Remaining work:
-- [item 1] (if any)
-```
-
----
-
-## 3. Working with Specifications
+## 2. Working with Specifications
 
 ### Specification Structure
 
@@ -128,10 +22,7 @@ docs/specs/
   <feature-name>/
     requirements.md   # What needs to be built (requirements)
     design.md         # How it is built (architecture and design)
-    tasks.md          # (optional) Task list with progress
 ```
-
-Additionally, `docs/specs/` root may contain `AGENTS-DESIGN.md` - a shared architecture reference.
 
 ### Before Starting Work on a Feature
 
@@ -141,8 +32,6 @@ You MUST read:
 docs/specs/<feature>/requirements.md
 docs/specs/<feature>/design.md
 ```
-
-If the feature has `tasks.md`, you must also read it.
 
 For test-related work, also read:
 ```
@@ -323,56 +212,6 @@ For example: "Database Schema", "Main Process Architecture", "Renderer Architect
 
 ---
 
-### tasks.md Format
-
-The task file describes **implementation progress** for a feature.
-
-**File structure:**
-
-```markdown
-# Task List: <Feature Name>
-
-## Overview
-
-Short description and overall effort estimate.
-
-**Current status:** Phase N - [name]
-
----
-
-## CRITICAL RULES
-
-[Feature-specific rules that must not be violated]
-
----
-
-## Current State
-
-### Completed
-- ✅ Task 1
-- ✅ Task 2
-
-### In Progress
-- 🔄 Task 3
-
-### Planned
-
-#### Phase N: <Name>
-
-- [ ] Task A
-  - [ ] Subtask A.1
-  - [ ] Subtask A.2
-- [ ] Task B
-```
-
-**Rules for updating tasks.md:**
-- After finishing a task: move it to "Completed" with ✅
-- After starting a task: mark it as 🔄 in "In Progress"
-- Add a short description of what was done (one line)
-- Update "Current status" when a phase is completed
-
----
-
 ### Creating a New Specification
 
 When creating a new feature:
@@ -380,8 +219,7 @@ When creating a new feature:
 1. Create folder `docs/specs/<feature-name>/`
 2. Create `requirements.md` - describe User Stories and acceptance criteria
 3. Create `design.md` - describe architecture and components
-4. Create `tasks.md` if needed - split into phases and tasks
-5. Get user approval before implementation
+4. Get user approval before implementation
 
 **Feature naming:** lowercase letters with hyphens (for example, `token-management-ui`)
 
@@ -393,7 +231,6 @@ When code changes, you MUST update the corresponding specs:
 
 - Behavior changed -> update `requirements.md`
 - Architecture changed -> update `design.md`
-- Task completed -> update `tasks.md` (if used for this feature)
 - Test added -> update coverage table in `design.md`
 
 Specifications MUST be:
@@ -403,9 +240,9 @@ Specifications MUST be:
 
 ---
 
-## 4. Testing Strategy
+## 3. Testing Strategy
 
-This section defines test principles and constraints. Exact commands and run order are described in section 5.
+This section defines test principles and constraints. Exact commands and run order are in the coder agent definition (`.forge/agents/coder.md`).
 
 ### Test Types
 
@@ -455,106 +292,7 @@ Exceptions: database migration files, config files, types without logic.
 
 ---
 
-## 5. Running Tests
-
-This section defines commands, run order, and debugging for tests.
-
-### Preparation
-
-Before running tests, you MUST rebuild native modules:
-
-```bash
-npm run rebuild:node
-```
-
-When needed:
-- After switching Node.js version
-- After `npm install`
-- On `ERR_DLOPEN_FAILED` or `MODULE_NOT_FOUND` errors
-- Before first run after cloning repository
-
-`npm test` runs rebuild automatically. For separate test types, do it manually:
-
-```bash
-npm run rebuild:node && npm run test:unit
-```
-
-### Unit Tests
-
-```bash
-# Specific file
-npm run test:unit -- tests/unit/auth/UserProfileManager.test.ts
-
-# Specific test by name
-npm run test:unit -- -t "should validate token expiration"
-
-# Directory
-npm run test:unit -- tests/unit/auth/
-
-# Verbose output
-npm run test:unit -- tests/unit/auth/UserProfileManager.test.ts --verbose
-
-# Stop on first failure
-npm run test:unit -- tests/unit/auth/UserProfileManager.test.ts --bail
-```
-
-**CRITICALLY IMPORTANT**: If tests fail, run ONLY failed tests, not all tests.
-
-### Functional Tests
-
-**IMPORTANT**: They open real Electron windows on screen!
-
-```bash
-npm run test:functional                                          # all tests
-npm run test:functional:verbose                                  # verbose output
-npm run test:functional:debug                                    # stop on first failure
-npm run test:functional:single -- navigation.spec.ts             # specific file
-npm run test:functional:single -- --grep "should show login"     # by test name
-```
-
-#### When to run functional tests
-
-- "Run all tests" -> ✅ run, after warning about windows
-- "Run functional tests" -> ✅ run, after warning about windows
-- Task completion by agent -> ❌ DO NOT run automatically, ASK user (see Step 4 workflow)
-- Automatic validation -> ❌ DO NOT run
-
-#### Running functional tests in background
-
-Functional tests are long (~30 minutes). Use background execution via available tools in the current agent environment and follow these rules:
-
-1. Verify `npm run test:functional` is not already running.
-2. Start exactly one instance in background.
-3. Monitor output and status until completion.
-4. Stop the process if needed via available environment mechanisms.
-
-### Run order for "run all tests"
-
-1. `npm run validate` - fast checks (TypeScript, ESLint, Prettier, unit)
-2. `npm run test:functional` - only if step 1 passed
-
-If any step fails, stop and report to user.
-
-### Debugging failed tests
-
-#### Unit tests
-
-```bash
-# Step 1: run only failed test
-npm run test:unit -- tests/unit/auth/UserProfileManager.test.ts -t "specific test name"
-
-# Step 2: with verbose output
-npm run test:unit -- tests/unit/auth/UserProfileManager.test.ts -t "specific test name" --verbose
-```
-
-### Parallel execution
-
-- ✅ Jest already parallelizes tests inside `test:unit`
-- ❌ Do NOT run functional tests in parallel with anything
-
----
-
-## 6. Code Writing Rules
+## 4. Code Writing Rules
 
 ### Requirement comments
 
@@ -621,7 +359,7 @@ ErrorHandler automatically filters race condition errors (does not show them to 
 
 ---
 
-## 7. Documentation Rules
+## 5. Documentation Rules
 
 ### Language
 
@@ -629,7 +367,8 @@ ErrorHandler automatically filters race condition errors (does not show them to 
 |------|----------|
 | requirements.md | Russian |
 | design.md | Russian |
-| tasks.md (if used) | Russian |
+| plan-*.md | English |
+| Agent definitions (.forge/agents/) | English |
 | Code comments | English |
 | GitHub (issues, PR descriptions, review comments/replies, commit messages) | English |
 | File and variable names | English |
@@ -657,16 +396,7 @@ ErrorHandler automatically filters race condition errors (does not show them to 
 
 ---
 
-## 8. Critical Prohibitions
-
-### Disabling tests
-
-**ABSOLUTE PROHIBITION** - do not use `.skip()`, `.only()`, or comment out tests without explicit user permission.
-
-Before disabling a test, you MUST:
-1. Explain to the user why the test cannot be fixed
-2. Propose alternatives (move to functional tests, simplify, fix code)
-3. Obtain explicit confirmation
+## 6. Critical Prohibitions
 
 ### Creating reports and summary files
 
@@ -674,29 +404,13 @@ Before disabling a test, you MUST:
 
 Correct approach: provide a short verbal summary at the end (2-3 sentences).
 
+### Git history
 
-### Environment variables
-
-**FORBIDDEN** to add new `process.env.VARIABLE_NAME` without explicit user agreement.
-
-Exceptions: variable already exists in code, user explicitly asked, standard variables (`NODE_ENV`, `PATH`).
-
-### AI Elements and UI vendor components
-
-**ABSOLUTE PROHIBITION** - do not manually edit library-managed components in:
-- `src/renderer/components/ai-elements/**`
-- `src/renderer/components/ui/**`
-
-These files are vendor scope and will be overwritten by library updates.
-
-Allowed update path:
-1. Update components only via the official CLI flow (`npm run ai-elements:update-all`).
-2. Apply product customizations only in app-owned layers outside those directories.
-3. If a change appears to require editing vendor files, stop and request explicit user approval first.
+**NEVER** rewrite git history — no `--force`, `--amend`, `rebase`.
 
 ---
 
-## 9. Priority in Case of Conflicts
+## 7. Priority in Case of Conflicts
 
 1. **Data safety** - do not lose user data
 2. **Explicit user instructions** - if the user explicitly requested, execute
@@ -704,16 +418,4 @@ Allowed update path:
 4. **Efficiency** - do not run all tests when one test is enough
 5. **Code quality** - do not disable tests, fix problems
 
----
 
-## 10. Common Errors and Solutions
-
-| Error | Cause | Solution |
-|--------|---------|---------|
-| `Cannot find module 'better-sqlite3'` | Native module not built | `npm run rebuild:node` |
-| Test fails with timeout | Test is slower than 5000ms | `--testTimeout=10000` |
-| Functional tests do not start | Native modules or build issue | `npm run rebuild:electron && npm run build` |
-| ESLint/Prettier fails | Formatting issue | `npm run lint:fix` or `npm run format` |
-| Coverage below requirement | Not enough tests | `npm run test:coverage`, open `coverage/lcov-report/index.html` |
-| `Command timed out after 120000ms` | Functional tests were not run in background mode | Use background execution and monitor process in current environment |
-| Tests were started twice | Previous run status was not checked | Always check current process status before restarting |
