@@ -101,20 +101,19 @@ Error: GitHub issue number not provided. Please pass the issue number (e.g., "Re
 
 1. Собери все оставленные inline threads
 2. Определи вердикт:
-   - **Ready to merge** — нет P0/P1 замечаний
-   - **Not ready to merge** — есть хотя бы одно P0 или P1 замечание
+   - **Ready to merge** — нет замечаний вообще (ни одного inline thread)
+   - **Not ready to merge** — есть хотя бы одно замечание любого приоритета
 3. Оставь review в PR через `gh api repos/<owner>/<repo>/pulls/<PR>/reviews` с event `COMMENT` и полным отчётом
 4. Установить финальную метку на PR:
-   - **`ready for test`** — ready to merge (нет P0/P1)
-   - **`review`** — not ready to merge (есть P0/P1, требуется доработка кодером)
-   - Убрать остальные метки
+   - **`ready for test`** — ready to merge (нет замечаний). Убрать `review`
+   - **`in progress`** — not ready to merge (есть замечания). Убрать `review`
 5. Вернуть отчёт:
 
 ```
 Результат: ✅ Ready to merge / 🚫 Not ready to merge
 PR: <ссылка на PR>
 HEAD: <commit SHA>
-Метка: ready for test / review
+Метка: ready for test / in progress
 
 Отчёт по пунктам:
 1. requirements.md: ✅ / 🚫 [детали — ссылки на threads] / 🥺 [причина]
@@ -135,7 +134,7 @@ HEAD: <commit SHA>
 16. Производительность: ✅ / 🚫 / 🥺
 17. Undocumented behavior: ✅ / 🚫 / 🥺
 
-Blocking threads (P0/P1):
+Created threads:
 - 🚫 [замечание — ссылка на thread]
 ```
 
@@ -144,4 +143,4 @@ Blocking threads (P0/P1):
 - 🚫 — проблемы есть: список + ссылки на созданные inline threads
 - 🥺 — не применимо (с указанием причины)
 
-**Flow меток PR:** `review` -> `in review` -> `approved` (готов к merge) или `in progress` (требуется доработка)
+**Flow меток PR:** `review` -> `ready for test` (готов) или `in progress` (требуется доработка кодером)
