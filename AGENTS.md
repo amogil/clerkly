@@ -549,6 +549,8 @@ ErrorHandler automatically filters race condition errors (does not show them to 
 |------|----------|
 | requirements.md | Russian |
 | design.md | Russian |
+| plan-*.md | English |
+| Agent definitions (.forge/agents/) | English |
 | Code comments | English |
 | GitHub (issues, PR descriptions, review comments/replies, commit messages) | English |
 | File and variable names | English |
