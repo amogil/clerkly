@@ -271,3 +271,4 @@ Allowed update path:
 | Functional tests do not start | Native modules or build issue | `npm run rebuild:electron && npm run build` |
 | ESLint/Prettier fails | Formatting issue | `npm run lint:fix` or `npm run format` |
 | Coverage below threshold | Not enough tests | `npm run test:coverage`, open `coverage/lcov-report/index.html` |
+
