@@ -42,17 +42,18 @@ Error: GitHub issue number not provided. Please pass the issue number (e.g., "Re
      Error: PR #<N> does not have label "review". The task is not ready for review.
      Current labels: [list of labels]
      ```
-4. Get the PR diff: `gh pr diff <PR>`
-5. Read all review threads (open and closed) — context from previous iterations
-6. Read plan files in the PR branch (`plan-*.md`)
-7. For each changed file in the diff — read the full file (not just the diff)
-8. Read all specifications affected by the changes:
+4. If PR is draft — mark as ready (`gh pr ready <PR>`) so CI checks can run
+5. Get the PR diff: `gh pr diff <PR>`
+6. Read all review threads (open and closed) — context from previous iterations
+7. Read plan files in the PR branch (`plan-*.md`)
+8. For each changed file in the diff — read the full file (not just the diff)
+9. Read all specifications affected by the changes:
    - `requirements.md`
    - `design.md`
-9. Read the testing infrastructure specifications:
-   - `docs/specs/testing-infrastructure/requirements.md`
-   - `docs/specs/testing-infrastructure/design.md`
-10. Follow requirement references in code (`// Requirements: feature-id.X.Y`) — read the corresponding specifications for full dependency context
+10. Read the testing infrastructure specifications:
+    - `docs/specs/testing-infrastructure/requirements.md`
+    - `docs/specs/testing-infrastructure/design.md`
+11. Follow requirement references in code (`// Requirements: feature-id.X.Y`) — read the corresponding specifications for full dependency context
 
 ### Step 2: Review Checklist
 
