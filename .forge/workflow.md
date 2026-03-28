@@ -1,34 +1,41 @@
 # PR Label Workflow
 
 ```
-                                                 Human leaves
-                                                 inline comments
-                                                    +--+
-                                                    |  |
-                                                    v  |
- +-------+    +----------+    +-----------------+    +----------------+
- |  new  |--->| analysis |--->| analysis review |--->| ready for work |
- +-------+    +----------+    +-----------------+    +----------------+
-                Planner          Planner         Human approves
-                                                            |
-                                                            |  Coder starts
-                                                            v
-              +----------------+    +--------+    +-------------+
-              | ready for test |<---| review |<---| in progress |
-              +----------------+    +--------+    +-------------+
-                  Reviewer           Coder              ^
-                  approves           finishes            |
-                                        |               |
-                                        +---------------+
-                                      Reviewer finds issues
+                          Human leaves comments
+                          and re-runs Planner
+                                +--+
+                                |  |
+                                v  |
+ +-------+    +----------+    +-----------------+
+ |  new  |--->| analysis |--->| analysis review |
+ +-------+    +----------+    +-----------------+
+                Planner          Planner    |
+                                            | Human approves plan
+                                            v
+                                     +----------------+
+                                     | ready for work |
+                                     +----------------+
+                                            |
+                                            | Coder (first run)
+                                            v
+                                     +-------------+
+                                     | in progress |
+                                     +-------------+
+                                       ^    |
+                                       |    | Coder finishes
+                                       |    v
+                                       |  +--------+              +----------------+
+                              Reviewer +--| review |------------->| ready for test |
+                           finds issues   +--------+              +----------------+
+                                                  Reviewer approves
 ```
 
 ## Label Transitions
 
 | Agent    | Entry label                       | Working label  | Final label                       |
 |----------|-----------------------------------|----------------|-----------------------------------|
-| Planner  | `new`                             | `analysis`     | `analysis review` or `analysis`   |
-| (Human)  | `analysis review`                 | —              | `ready for work` (approves) or leaves inline comments (planner re-runs) |
+| Planner  | `new` or `analysis review`        | `analysis`     | `analysis review` or `analysis`   |
+| (Human)  | `analysis review`                 | —              | `ready for work` (approves) or re-runs Planner (leaves comments) |
 | Coder    | `ready for work` or `in progress` | `in progress`  | `review`                          |
 | Reviewer | `review`                          | —              | `ready for test` or `in progress` |
 
