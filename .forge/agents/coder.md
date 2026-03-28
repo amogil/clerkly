@@ -42,26 +42,27 @@ Error: GitHub issue number not provided. Please pass the issue number (e.g., "Im
 
 ### Шаг 1: Сбор контекста
 
-1. Получи задачу: `gh issue view <N> --json title,body,labels`
-2. Найди PR по задаче: `gh pr list --state all --search "<N>" --json number,title,state,labels`
+1. Прочитай `AGENTS.md` — обязательный справочник по правилам, командам и workflow
+2. Получи задачу: `gh issue view <N> --json title,body,labels`
+3. Найди PR по задаче: `gh pr list --state all --search "<N>" --json number,title,state,labels`
    - Если PR нет — **ОСТАНОВИ РАБОТУ**: задача не прошла этап планирования
    - Если PR есть, но НЕ имеет метку `ready for work` или `in progress` — **ОСТАНОВИ РАБОТУ** и верни сообщение:
      ```
      Error: PR #<N> does not have label "ready for work" or "in progress". The task is not ready for implementation.
      Current labels: [список меток]
      ```
-3. Прочитай review threads в PR:
+4. Прочитай review threads в PR:
    - Закрытые — уже решённые вопросы, принятые решения
    - Открытые — замечания с ревью, которые нужно учесть при реализации
-4. Найди все файлы планов в ветке PR (файлы `plan-*.md`) и прочитай их
-5. Поставь метку `in progress` на PR (если ещё не стоит), убери `ready for work` если есть
-6. Прочитай спецификации, указанные в планах:
+5. Найди все файлы планов в ветке PR (файлы `plan-*.md`) и прочитай их
+6. Поставь метку `in progress` на PR (если ещё не стоит), убери `ready for work` если есть
+7. Прочитай спецификации, указанные в планах:
    - `requirements.md`
    - `design.md`
-7. Прочитай спецификации тестовой инфраструктуры:
+8. Прочитай спецификации тестовой инфраструктуры:
    - `docs/specs/testing-infrastructure/requirements.md`
    - `docs/specs/testing-infrastructure/design.md`
-8. Изучи существующий код и тесты, указанные в планах
+9. Изучи существующий код и тесты, указанные в планах
 
 ### Шаг 2: Реализация
 
@@ -106,65 +107,6 @@ PR: <ссылка на PR>
 ```
 
 **Flow меток PR:** `ready for work` -> `in progress` -> `review`
-
----
-
-## Справочник команд
-
-### Валидация
-```bash
-npm run validate          # полная валидация (TypeScript, ESLint, Prettier, unit tests)
-npm run validate:verbose  # то же, с подробным выводом
-```
-
-### Тесты
-```bash
-npm test                    # unit tests
-npm run test:unit           # unit tests only
-npm run test:functional     # functional tests (открывают окна!)
-npm run test:coverage       # tests with coverage report
-```
-
-### Запуск конкретных тестов
-```bash
-npm run test:unit -- tests/unit/auth/UserProfileManager.test.ts              # конкретный файл
-npm run test:unit -- -t "should validate token expiration"                    # по имени теста
-npm run test:unit -- tests/unit/auth/                                         # директория
-npm run test:unit -- tests/unit/auth/UserProfileManager.test.ts --verbose    # подробный вывод
-npm run test:unit -- tests/unit/auth/UserProfileManager.test.ts --bail       # стоп на первом падении
-```
-
-**КРИТИЧЕСКИ ВАЖНО**: Если тесты падают — запускай ТОЛЬКО упавшие тесты, не все.
-
-### Отладка упавших тестов
-```bash
-npm run test:unit -- tests/unit/<path>/<file>.test.ts -t "specific test name"
-npm run test:unit -- tests/unit/<path>/<file>.test.ts -t "specific test name" --verbose
-```
-
-### Подготовка (native modules)
-```bash
-npm run rebuild:node      # rebuild для Node.js
-npm run rebuild:electron  # rebuild для Electron
-```
-Когда нужен rebuild:
-- После переключения Node.js версии
-- После `npm install`
-- При ошибках `ERR_DLOPEN_FAILED` или `MODULE_NOT_FOUND`
-
-### Build
-```bash
-npm run build             # build приложения
-```
-
-### Functional tests
-```bash
-npm run test:functional                                          # все тесты
-npm run test:functional:debug                                    # стоп на первом падении
-npm run test:functional:single -- navigation.spec.ts             # конкретный файл
-npm run test:functional:single -- --grep "should show login"     # по имени теста
-```
-**НЕ запускай functional tests автоматически** — только по запросу пользователя (они открывают окна).
 
 ---
 
