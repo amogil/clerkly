@@ -4,98 +4,13 @@ This document describes all rules, workflows, and work formats. These rules are 
 
 ---
 
-## 1. Quick Command Reference
+## 1. Workflow
 
-### Validation
-```bash
-npm run validate          # full validation (TypeScript, ESLint, Prettier, unit tests)
-npm run validate:verbose  # same, with verbose output
-npm run validate:deps     # validate + optional dependency check (npm outdated)
-npm run validate:verbose:deps  # verbose validate + optional dependency check
-```
-
-### Tests
-```bash
-npm test                    # unit tests
-npm run test:unit           # unit tests only
-npm run test:functional     # functional tests (they open windows!)
-npm run test:coverage       # tests with coverage report
-```
-
-### Debugging
-```bash
-npm run test:unit -- path/to/test.ts -t "test name"   # specific test
-npm run test:functional:debug -- test.spec.ts          # functional tests, stop on first failure
-npx playwright show-report                             # functional test HTML report
-```
-
-### Build
-```bash
-npm run rebuild:node      # rebuild native modules for Node.js
-npm run rebuild:electron  # rebuild native modules for Electron
-npm run build             # build the application
-```
+Task execution is handled by the agent system: **solver** -> **planner** -> **coder** -> **reviewer**. Each agent follows its own workflow defined in `.forge/agents/`. See `.forge/agents/solver.md` for the full workflow diagram and label transitions.
 
 ---
 
-## 2. Mandatory Workflow
-
-Every task MUST be executed using the following workflow.
-
-When working through the agent system (solver -> planner -> coder -> reviewer), each agent follows its own workflow defined in `.forge/agents/`. The steps below apply when working directly (without the agent system).
-
-### Step 1: Gather Context
-
-1. Read the plan file for the current task (located in the relevant spec folder as `plan-<NNNN>-<desc>.md`)
-2. Read the specifications referenced in the plan:
-   - `requirements.md`
-   - `design.md`
-3. Review existing code and tests related to the task
-
-### Step 2: Execute the Plan
-
-- Execute the plan step by step
-- After each significant change, run relevant unit tests according to sections 4 and 5
-- Write code with requirement comments
-- Write tests with the correct structure (see section 6)
-- **Prohibition:** Do not remove or change behavior defined in requirements without user approval
-
-### Step 3: Complete
-
-1. Ensure specs and design are complete, consistent, and non-redundant
-2. Ensure all code changes match the requirements and design
-3. Run `npm run validate`
-4. Ensure all checks pass:
-   - ✅ TypeScript compilation
-   - ✅ ESLint
-   - ✅ Prettier
-   - ✅ Unit tests
-   - ✅ Code coverage
-5. Ask the user: *"Task completed. Run functional tests? (they will open windows on screen)"*
-
-### Step 4: Report
-
-Provide a short summary at the end (without creating separate files):
-
-```
-Task completed.
-
-Implemented:
-- [item 1]
-
-Files changed:
-- [file 1]
-
-Tests added/updated:
-- [test 1]
-
-Remaining work:
-- [item 1] (if any)
-```
-
----
-
-## 3. Working with Specifications
+## 2. Working with Specifications
 
 ### Specification Structure
 
@@ -325,9 +240,9 @@ Specifications MUST be:
 
 ---
 
-## 4. Testing Strategy
+## 3. Testing Strategy
 
-This section defines test principles and constraints. Exact commands and run order are described in section 5.
+This section defines test principles and constraints. Exact commands and run order are in the coder agent definition (`.forge/agents/coder.md`).
 
 ### Test Types
 
@@ -377,106 +292,7 @@ Exceptions: database migration files, config files, types without logic.
 
 ---
 
-## 5. Running Tests
-
-This section defines commands, run order, and debugging for tests.
-
-### Preparation
-
-Before running tests, you MUST rebuild native modules:
-
-```bash
-npm run rebuild:node
-```
-
-When needed:
-- After switching Node.js version
-- After `npm install`
-- On `ERR_DLOPEN_FAILED` or `MODULE_NOT_FOUND` errors
-- Before first run after cloning repository
-
-`npm test` runs rebuild automatically. For separate test types, do it manually:
-
-```bash
-npm run rebuild:node && npm run test:unit
-```
-
-### Unit Tests
-
-```bash
-# Specific file
-npm run test:unit -- tests/unit/auth/UserProfileManager.test.ts
-
-# Specific test by name
-npm run test:unit -- -t "should validate token expiration"
-
-# Directory
-npm run test:unit -- tests/unit/auth/
-
-# Verbose output
-npm run test:unit -- tests/unit/auth/UserProfileManager.test.ts --verbose
-
-# Stop on first failure
-npm run test:unit -- tests/unit/auth/UserProfileManager.test.ts --bail
-```
-
-**CRITICALLY IMPORTANT**: If tests fail, run ONLY failed tests, not all tests.
-
-### Functional Tests
-
-**IMPORTANT**: They open real Electron windows on screen!
-
-```bash
-npm run test:functional                                          # all tests
-npm run test:functional:verbose                                  # verbose output
-npm run test:functional:debug                                    # stop on first failure
-npm run test:functional:single -- navigation.spec.ts             # specific file
-npm run test:functional:single -- --grep "should show login"     # by test name
-```
-
-#### When to run functional tests
-
-- "Run all tests" -> ✅ run, after warning about windows
-- "Run functional tests" -> ✅ run, after warning about windows
-- Task completion by agent -> ❌ DO NOT run automatically, ASK user (see Step 3 workflow)
-- Automatic validation -> ❌ DO NOT run
-
-#### Running functional tests in background
-
-Functional tests are long (~30 minutes). Use background execution via available tools in the current agent environment and follow these rules:
-
-1. Verify `npm run test:functional` is not already running.
-2. Start exactly one instance in background.
-3. Monitor output and status until completion.
-4. Stop the process if needed via available environment mechanisms.
-
-### Run order for "run all tests"
-
-1. `npm run validate` - fast checks (TypeScript, ESLint, Prettier, unit)
-2. `npm run test:functional` - only if step 1 passed
-
-If any step fails, stop and report to user.
-
-### Debugging failed tests
-
-#### Unit tests
-
-```bash
-# Step 1: run only failed test
-npm run test:unit -- tests/unit/auth/UserProfileManager.test.ts -t "specific test name"
-
-# Step 2: with verbose output
-npm run test:unit -- tests/unit/auth/UserProfileManager.test.ts -t "specific test name" --verbose
-```
-
-### Parallel execution
-
-- ✅ Jest already parallelizes tests inside `test:unit`
-- ❌ Do NOT run functional tests in parallel with anything
-
----
-
-## 6. Code Writing Rules
+## 4. Code Writing Rules
 
 ### Requirement comments
 
@@ -543,7 +359,7 @@ ErrorHandler automatically filters race condition errors (does not show them to 
 
 ---
 
-## 7. Documentation Rules
+## 5. Documentation Rules
 
 ### Language
 
@@ -580,16 +396,7 @@ ErrorHandler automatically filters race condition errors (does not show them to 
 
 ---
 
-## 8. Critical Prohibitions
-
-### Disabling tests
-
-**ABSOLUTE PROHIBITION** - do not use `.skip()`, `.only()`, or comment out tests without explicit user permission.
-
-Before disabling a test, you MUST:
-1. Explain to the user why the test cannot be fixed
-2. Propose alternatives (move to functional tests, simplify, fix code)
-3. Obtain explicit confirmation
+## 6. Critical Prohibitions
 
 ### Creating reports and summary files
 
@@ -597,28 +404,13 @@ Before disabling a test, you MUST:
 
 Correct approach: provide a short verbal summary at the end (2-3 sentences).
 
-### Environment variables
+### Git history
 
-**FORBIDDEN** to add new `process.env.VARIABLE_NAME` without explicit user agreement.
-
-Exceptions: variable already exists in code, user explicitly asked, standard variables (`NODE_ENV`, `PATH`).
-
-### AI Elements and UI vendor components
-
-**ABSOLUTE PROHIBITION** - do not manually edit library-managed components in:
-- `src/renderer/components/ai-elements/**`
-- `src/renderer/components/ui/**`
-
-These files are vendor scope and will be overwritten by library updates.
-
-Allowed update path:
-1. Update components only via the official CLI flow (`npm run ai-elements:update-all`).
-2. Apply product customizations only in app-owned layers outside those directories.
-3. If a change appears to require editing vendor files, stop and request explicit user approval first.
+**NEVER** rewrite git history — no `--force`, `--amend`, `rebase`.
 
 ---
 
-## 9. Priority in Case of Conflicts
+## 7. Priority in Case of Conflicts
 
 1. **Data safety** - do not lose user data
 2. **Explicit user instructions** - if the user explicitly requested, execute
