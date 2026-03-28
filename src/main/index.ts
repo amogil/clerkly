@@ -311,13 +311,6 @@ app.whenReady().then(async () => {
     await userManager.initialize();
     logger.info('UserManager initialized');
 
-    // Requirements: llm-integration.11.6.3
-    // Finalize stale tool_call records left from previous session (crash/kill).
-    // Must run after userManager.initialize() (userId available) and before renderer creation.
-    if (userManager.getCurrentUserId()) {
-      messageManager.finalizeAllStaleToolCallsOnStartup();
-    }
-
     // Requirements: clerkly.1.2, clerkly.1.3, clerkly.1.4
     // Initialize application
     const initResult = await lifecycleManager.initialize();
