@@ -120,3 +120,4 @@ PR: <ссылка на PR>
 | ESLint/Prettier fails | Форматирование | `npm run lint:fix` или `npm run format` |
 | Coverage ниже порога | Мало тестов | `npm run test:coverage`, открой `coverage/lcov-report/index.html` |
 
+
