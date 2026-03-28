@@ -100,14 +100,18 @@ Check each item and leave inline threads in the PR for every finding.
 ### Step 3: Finalization
 
 1. Collect all inline threads left during review
-2. Determine verdict:
-   - **Ready to merge** — zero findings (no inline threads created at all)
-   - **Not ready to merge** — at least one finding of any priority
-3. Submit review in PR via `gh api repos/<owner>/<repo>/pulls/<PR>/reviews` with event `COMMENT` and the full report
-4. Set the final label on PR:
-   - **`ready for test`** — ready to merge (no findings). Remove `review`
-   - **`in progress`** — not ready to merge (has findings). Remove `review`
-5. Return report:
+2. Check PR CI status (`gh pr checks <PR>`):
+   - All checks passed — continue to step 3
+   - Checks still running — wait and re-check until they complete
+   - Any check failed — this counts as a finding (add to report)
+3. Determine verdict:
+   - **Ready to merge** — zero findings AND all CI checks passed
+   - **Not ready to merge** — at least one finding of any priority OR any CI check failed
+4. Submit review in PR via `gh api repos/<owner>/<repo>/pulls/<PR>/reviews` with event `COMMENT` and the full report
+5. Set the final label on PR:
+   - **`ready for test`** — ready to merge. Remove `review`
+   - **`in progress`** — not ready to merge. Remove `review`
+6. Return report:
 
 ```
 Result: ✅ Ready to merge / 🚫 Not ready to merge
@@ -133,6 +137,7 @@ Review checklist:
 15. Security: ✅ / 🚫 / 🥺
 16. Performance: ✅ / 🚫 / 🥺
 17. Undocumented behavior: ✅ / 🚫 / 🥺
+18. CI checks: ✅ / 🚫 [failed check names]
 
 Created threads:
 - 🚫 [finding — thread link]

@@ -55,8 +55,9 @@ Which task should I work on? Please provide a GitHub issue number (e.g., #89).
                                        |    v
                                        |  +--------+              +----------------+
                               Reviewer +--| review |------------->| ready for test |
-                           finds issues   +--------+              +----------------+
-                                                  Reviewer approves
+                     finds issues or   +--------+              +----------------+
+                       CI checks fail        Reviewer approves
+                                             + CI checks pass
 ```
 
 ## Algorithm
