@@ -622,17 +622,4 @@ Allowed update path:
 4. **Efficiency** - do not run all tests when one test is enough
 5. **Code quality** - do not disable tests, fix problems
 
----
-
-## 10. Common Errors and Solutions
-
-| Error | Cause | Solution |
-|--------|---------|---------|
-| `Cannot find module 'better-sqlite3'` | Native module not built | `npm run rebuild:node` |
-| Test fails with timeout | Test is slower than 5000ms | `--testTimeout=10000` |
-| Functional tests do not start | Native modules or build issue | `npm run rebuild:electron && npm run build` |
-| ESLint/Prettier fails | Formatting issue | `npm run lint:fix` or `npm run format` |
-| Coverage below requirement | Not enough tests | `npm run test:coverage`, open `coverage/lcov-report/index.html` |
-| `Command timed out after 120000ms` | Functional tests were not run in background mode | Use background execution and monitor process in current environment |
-| Tests were started twice | Previous run status was not checked | Always check current process status before restarting |
 
