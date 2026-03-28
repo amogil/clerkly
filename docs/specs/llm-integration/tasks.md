@@ -4,7 +4,7 @@
 
 Persisted `tool_call(code_exec)` записи могут навсегда остаться в `running` (`done=0`), что блокирует чат в статусе `In progress` после рестарта приложения. Две root cause: (1) retry path (`handleAttemptFailure`) скрывает сообщения попытки, но не финализирует running tool calls; (2) нет startup reconciliation для stale `running` tool_call записей.
 
-**Текущий статус:** план составлен, ожидает согласования
+**Текущий статус:** реализация завершена, ожидает прогона functional tests
 
 ---
 
@@ -58,42 +58,42 @@ Persisted `tool_call(code_exec)` записи могут навсегда ост
 
 ### Фаза 1: Обновление спецификаций
 
-- [ ] **1.1** Добавить требование `llm-integration.11.6.2` в `requirements.md`:
+- [x] **1.1** Добавить требование `llm-integration.11.6.2` в `requirements.md`:
   > КОГДА попытка (attempt) завершается retry, ТО все running `tool_call` записи этой попытки ДОЛЖНЫ быть финализированы в terminal состояние (`error`) с `done=1` ДО скрытия сообщений попытки.
-- [ ] **1.2** Добавить требование `llm-integration.11.6.3` в `requirements.md`:
+- [x] **1.2** Добавить требование `llm-integration.11.6.3` в `requirements.md`:
   > КОГДА приложение стартует, ТО система ДОЛЖНА финализировать все persisted `tool_call` записи с `done=0` (включая `hidden=true`) во всех агентах текущего пользователя в terminal состояние `cancelled` с `done=1`.
-- [ ] **1.3** Обновить `design.md`:
+- [x] **1.3** Обновить `design.md`:
   - Секция `handleAttemptFailure`: добавить шаг финализации running tool calls перед `setHidden`
   - Новая секция startup reconciliation: описание метода в `MessageManager` + `MessagesRepository`
   - Обновить coverage table
 
 ### Фаза 2: Реализация — Fix retry path (Gap 1)
 
-- [ ] **2.1** Вынести private метод `finalizeRunningToolCallsForAttempt(state, agentId)` в `MainPipeline`:
+- [x] **2.1** Вынести private метод `finalizeRunningToolCallsForAttempt(state, agentId)` в `MainPipeline`:
   - Итерирует `state.runningToolCalls` (Map с messageId, callId, toolName, args, startedAt)
   - Для каждой записи: читает текущий `payloadJson`, подставляет terminal output, вызывает `this.messageManager.update(messageId, agentId, payload, true)`
   - Формат output: для `code_exec` — `{ status: 'error', stdout: '', stderr: '', stdout_truncated: false, stderr_truncated: false, error: { code: 'internal_error', message: 'Retried due to model error.' } }`; для прочих — `{ status: 'error', content: 'Retried due to model error.' }`
   - После update очищает entry из `state.runningToolCalls`
-- [ ] **2.2** Вызвать `finalizeRunningToolCallsForAttempt` в `handleAttemptFailure()` перед циклом `setHidden` (строка ~1397)
+- [x] **2.2** Вызвать `finalizeRunningToolCallsForAttempt` в `handleAttemptFailure()` перед циклом `setHidden` (строка ~1397)
 
 ### Фаза 3: Реализация — Startup reconciliation (Gap 2)
 
-- [ ] **3.1** Добавить метод `MessagesRepository.listStaleToolCalls(): Message[]`
+- [x] **3.1** Добавить метод `MessagesRepository.listStaleToolCalls(): Message[]`
   - SQL: `SELECT * FROM messages WHERE done=false AND kind='tool_call' AND agentId IN (SELECT agentId FROM agents WHERE userId=<currentUser>)`
   - Возвращает все stale tool_call rows (включая `hidden=true`)
-- [ ] **3.2** Добавить метод `MessageManager.finalizeAllStaleToolCallsOnStartup(): void`
+- [x] **3.2** Добавить метод `MessageManager.finalizeAllStaleToolCallsOnStartup(): void`
   - Вызывает `MessagesRepository.listStaleToolCalls()`
   - Для каждой `kind:tool_call` записи: parse payload, set terminal output по toolName (status: `cancelled`), update `payloadJson` + `done=true` через `MessagesRepository.update()`
   - **Не emit'ить `MessageUpdatedEvent`** — renderer ещё не подключён, читает из БД при загрузке (см. Q2)
   - Logging: `this.logger.info(...)` с количеством обработанных записей
-- [ ] **3.3** Вызвать startup reconciliation в `src/main/index.ts`:
+- [x] **3.3** Вызвать startup reconciliation в `src/main/index.ts`:
   - Место: после `userManager.initialize()` + `lifecycleManager.initialize()`, до `appCoordinator.start()` (строка ~378)
   - Условие: `userManager.getCurrentUserId()` не null
   - Вызов: `messageManager.finalizeAllStaleToolCallsOnStartup()`
 
 ### Фаза 4: Unit-тесты
 
-- [ ] **4.1** `tests/unit/agents/MainPipeline.test.ts`:
+- [x] **4.1** `tests/unit/agents/MainPipeline.test.ts`:
   - Тест: при retry через `InvalidFinalAnswerContractError` (orphaned tool_call) running `tool_call` записи обновляются до `done=true` и `output.status='error'` перед `setHidden`
   - Тест: при retry через timeout running `tool_call` записи финализируются
   - Тест: при retry через silent-failure running `tool_call` записи финализируются
@@ -101,7 +101,7 @@ Persisted `tool_call(code_exec)` записи могут навсегда ост
   - Тест: non-code_exec tool_call получает output с `{ status, content }`
   - Тест: если `state.runningToolCalls` пуст — no-op, без ошибок
 
-- [ ] **4.2** `tests/unit/agents/MessageManager.test.ts`:
+- [x] **4.2** `tests/unit/agents/MessageManager.test.ts`:
   - Тест: `finalizeAllStaleToolCallsOnStartup()` финализирует visible stale `tool_call` (`hidden=false, done=false`) — payload содержит `cancelled` output, `done=true`
   - Тест: `finalizeAllStaleToolCallsOnStartup()` финализирует hidden stale `tool_call` (`hidden=true, done=false`) — payload содержит `cancelled` output, `done=true`
   - Тест: не трогает уже terminal `tool_calls` (`done=true`)
@@ -112,9 +112,9 @@ Persisted `tool_call(code_exec)` записи могут навсегда ост
 
 ### Фаза 5: Валидация
 
-- [ ] Прогнать `npm run validate` (TypeScript, ESLint, Prettier, unit tests, coverage)
-- [ ] Убедиться, что все новые и существующие тесты проходят
-- [ ] Обновить coverage table в `design.md`
+- [x] Прогнать `npm run validate` (TypeScript, ESLint, Prettier, unit tests, coverage)
+- [x] Убедиться, что все новые и существующие тесты проходят
+- [x] Обновить coverage table в `design.md`
 
 ### Фаза 6: Functional tests
 
