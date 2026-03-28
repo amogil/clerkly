@@ -937,7 +937,7 @@ User отправляет сообщение
 - `tests/unit/agents/AgentIPCHandlers.test.ts` — вызов `finalizeStaleToolCalls` при `messages:create (kind:user)` перед созданием сообщения и после cancel pipeline
 - `tests/unit/agents/AgentIPCHandlers.test.ts` — отсутствие вызова `finalizeStaleToolCalls` при `messages:create (kind:llm)`
 - `tests/unit/agents/MessageManager.test.ts` — `finalizeStaleToolCalls`: финализация running `code_exec` в `cancelled`, running generic tool call в `cancelled`, пропуск terminal и hidden записей, обработка множественных stale tool calls, no-op при отсутствии stale записей, graceful fallback при malformed payloadJson
-- `tests/unit/agents/MessageManager.test.ts` — `finalizeAllStaleToolCallsOnStartup`: финализация visible stale tool_call, финализация hidden stale tool_call, пропуск terminal, no-op без stale записей, code_exec cancelled output, non-code_exec cancelled output, не emit'ит MessageUpdatedEvent
+- `tests/unit/agents/MessageManager.test.ts` — `finalizeAllStaleToolCallsOnStartup`: финализация visible stale tool_call, финализация hidden stale tool_call, пропуск terminal (done=true), no-op без stale записей, code_exec cancelled output, non-code_exec cancelled output, не emit'ит MessageUpdatedEvent, malformed payloadJson fallback, bypass MessageManager.update (repo direct)
 - `tests/unit/renderer/IPCChatTransport.test.ts` — обработка delta-stream (`reasoning/text`) и persisted `kind: tool_call` snapshot
 - `tests/unit/renderer/messageOrder.test.ts` — детерминированная сортировка snapshots по `runId/attemptId/sequence` (из колонок `messages`) с fallback на `timestamp,id`
 - `tests/unit/hooks/useAgentChat.test.ts` — применение сортировки при `message.created`/`message.updated` для out-of-order доставки
@@ -951,12 +951,9 @@ User отправляет сообщение
 - `tests/unit/agents/MainPipeline.test.ts` — runtime guard: `<!-- clerkly:title-meta: ... -->` отклоняется в аргументах tool_call до persist (`final_answer`, `code_exec.task_summary`)
 - `tests/unit/agents/MainPipeline.test.ts` — orphaned tool_call (SDK multi-step abort bug): retry при `sawAnyToolCall && !finalLlmMessageId && !finalAnswerCall`, затем `kind:error` после исчерпания retry
 - `tests/unit/agents/MainPipeline.test.ts` — handleRunError resilience: secondary error при создании error message логируется, не теряется
-- `tests/unit/agents/MainPipeline.test.ts` — finalizeRunningToolCallsForAttempt: при retry через InvalidFinalAnswerContractError running tool_call записи финализируются до setHidden
-- `tests/unit/agents/MainPipeline.test.ts` — finalizeRunningToolCallsForAttempt: при retry через timeout running tool_call записи финализируются
-- `tests/unit/agents/MainPipeline.test.ts` — finalizeRunningToolCallsForAttempt: при retry через silent-failure running tool_call записи финализируются
-- `tests/unit/agents/MainPipeline.test.ts` — finalizeRunningToolCallsForAttempt: code_exec получает output с error status и stdout/stderr/error
-- `tests/unit/agents/MainPipeline.test.ts` — finalizeRunningToolCallsForAttempt: non-code_exec получает output с error status и content
-- `tests/unit/agents/MainPipeline.test.ts` — finalizeRunningToolCallsForAttempt: no-op при пустом state.runningToolCalls
+- `tests/unit/agents/MainPipeline.test.ts` — finalizeRunningToolCallsForAttempt: code_exec running tool_call финализируется с error output (stdout/stderr/error) до retry setHidden
+- `tests/unit/agents/MainPipeline.test.ts` — finalizeRunningToolCallsForAttempt: generic (non-code_exec) running tool_call финализируется с generic error output (status/content) до retry
+- `tests/unit/agents/MainPipeline.test.ts` — finalizeRunningToolCallsForAttempt: no-op при пустом state.runningToolCalls (invalid final_answer retry без running tool_calls)
 - `tests/unit/agents/MainPipeline.test.ts` — per-step timeout: создание `kind:error` при internal timeout после multi-step tool execution
 - `tests/unit/agents/MainPipeline.test.ts` — timeout retry policy: исчерпание 3 consecutive retry (4 вызова chat), затем один `kind:error` с `type=timeout`
 - `tests/unit/agents/MainPipeline.test.ts` — timeout retry policy: успешный retry на 2-й попытке (нет `kind:error`)

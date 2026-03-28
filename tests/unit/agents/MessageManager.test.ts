@@ -1115,6 +1115,19 @@ describe('MessageManager', () => {
       expect(parsed.data.output.content).toBe('Cancelled: stale from previous session.');
     });
 
+    /* Preconditions: DB only has terminal tool_calls (done=true) — no stale rows
+       Action: Call finalizeAllStaleToolCallsOnStartup()
+       Assertions: listStaleToolCalls returns empty (SQL filters done=false), no updates performed
+       Requirements: llm-integration.11.6.3 */
+    it('should not touch already terminal tool_calls (done=true)', () => {
+      // listStaleToolCalls filters done=false at SQL level, so done=true rows are never returned
+      (mockDbManager.messages.listStaleToolCalls as jest.Mock).mockReturnValue([]);
+
+      messageManager.finalizeAllStaleToolCallsOnStartup();
+
+      expect(mockDbManager.messages.update).not.toHaveBeenCalled();
+    });
+
     /* Preconditions: Startup reconciliation bypasses MessageManager.update (uses repo directly)
        Action: Call finalizeAllStaleToolCallsOnStartup()
        Assertions: Uses MessagesRepository.update directly, not MessageManager.update
