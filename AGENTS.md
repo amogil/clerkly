@@ -44,36 +44,13 @@ Every task MUST be executed using the following workflow:
 
 ### Step 1: Gather Context
 
-1. Get the list of all specifications in `docs/specs/`
-2. Identify the specifications relevant to the task
-3. For each relevant specification, read:
+1. Read the plan file for the current task (located in the relevant spec folder as `plan-<N>-<desc>.md`)
+2. Read the specifications referenced in the plan:
    - `requirements.md`
    - `design.md`
-   - `tasks.md` (if the file exists)
-4. Review existing code related to the task
-5. Review existing tests
+3. Review existing code and tests related to the task
 
-### Step 2: Create a Plan
-
-Create a plan and **get user approval** before starting implementation.
-
-**Prohibition:** Before a plan is approved, it is FORBIDDEN to make any changes to code, tests, or documentation.
-
-**Readiness checklist for making changes:**
-- Plan approved: yes/no
-
-```
-Action plan:
-1. Modify file X - add function Y
-2. Create test Z to verify function Y
-3. Update tasks.md (if used for this feature)
-4. Run validation
-
-Expected result: [description]
-Risks: [if any]
-```
-
-### Step 3: Execute
+### Step 2: Execute the Plan
 
 - Execute the plan step by step
 - After each significant change, run relevant unit tests according to sections 4 and 5
@@ -81,7 +58,7 @@ Risks: [if any]
 - Write tests with the correct structure (see section 6)
 - **Prohibition:** Do not remove or change behavior defined in requirements without user approval
 
-### Step 4: Complete
+### Step 3: Complete
 
 1. Ensure specs and design are complete, consistent, and non-redundant
 2. Ensure all code changes match the requirements and design
@@ -94,7 +71,7 @@ Risks: [if any]
    - ✅ Code coverage
 5. Ask the user: *"Task completed. Run functional tests? (they will open windows on screen)"*
 
-### Step 5: Report
+### Step 4: Report
 
 Provide a short summary at the end (without creating separate files):
 
@@ -128,10 +105,7 @@ docs/specs/
   <feature-name>/
     requirements.md   # What needs to be built (requirements)
     design.md         # How it is built (architecture and design)
-    tasks.md          # (optional) Task list with progress
 ```
-
-Additionally, `docs/specs/` root may contain `AGENTS-DESIGN.md` - a shared architecture reference.
 
 ### Before Starting Work on a Feature
 
@@ -141,8 +115,6 @@ You MUST read:
 docs/specs/<feature>/requirements.md
 docs/specs/<feature>/design.md
 ```
-
-If the feature has `tasks.md`, you must also read it.
 
 For test-related work, also read:
 ```
@@ -323,56 +295,6 @@ For example: "Database Schema", "Main Process Architecture", "Renderer Architect
 
 ---
 
-### tasks.md Format
-
-The task file describes **implementation progress** for a feature.
-
-**File structure:**
-
-```markdown
-# Task List: <Feature Name>
-
-## Overview
-
-Short description and overall effort estimate.
-
-**Current status:** Phase N - [name]
-
----
-
-## CRITICAL RULES
-
-[Feature-specific rules that must not be violated]
-
----
-
-## Current State
-
-### Completed
-- ✅ Task 1
-- ✅ Task 2
-
-### In Progress
-- 🔄 Task 3
-
-### Planned
-
-#### Phase N: <Name>
-
-- [ ] Task A
-  - [ ] Subtask A.1
-  - [ ] Subtask A.2
-- [ ] Task B
-```
-
-**Rules for updating tasks.md:**
-- After finishing a task: move it to "Completed" with ✅
-- After starting a task: mark it as 🔄 in "In Progress"
-- Add a short description of what was done (one line)
-- Update "Current status" when a phase is completed
-
----
-
 ### Creating a New Specification
 
 When creating a new feature:
@@ -380,8 +302,7 @@ When creating a new feature:
 1. Create folder `docs/specs/<feature-name>/`
 2. Create `requirements.md` - describe User Stories and acceptance criteria
 3. Create `design.md` - describe architecture and components
-4. Create `tasks.md` if needed - split into phases and tasks
-5. Get user approval before implementation
+4. Get user approval before implementation
 
 **Feature naming:** lowercase letters with hyphens (for example, `token-management-ui`)
 
@@ -393,7 +314,6 @@ When code changes, you MUST update the corresponding specs:
 
 - Behavior changed -> update `requirements.md`
 - Architecture changed -> update `design.md`
-- Task completed -> update `tasks.md` (if used for this feature)
 - Test added -> update coverage table in `design.md`
 
 Specifications MUST be:
@@ -516,7 +436,7 @@ npm run test:functional:single -- --grep "should show login"     # by test name
 
 - "Run all tests" -> ✅ run, after warning about windows
 - "Run functional tests" -> ✅ run, after warning about windows
-- Task completion by agent -> ❌ DO NOT run automatically, ASK user (see Step 4 workflow)
+- Task completion by agent -> ❌ DO NOT run automatically, ASK user (see Step 3 workflow)
 - Automatic validation -> ❌ DO NOT run
 
 #### Running functional tests in background
@@ -629,7 +549,6 @@ ErrorHandler automatically filters race condition errors (does not show them to 
 |------|----------|
 | requirements.md | Russian |
 | design.md | Russian |
-| tasks.md (if used) | Russian |
 | Code comments | English |
 | GitHub (issues, PR descriptions, review comments/replies, commit messages) | English |
 | File and variable names | English |
