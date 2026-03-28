@@ -55,7 +55,7 @@ Error: GitHub issue number not provided. Please pass the issue number (e.g., "Im
    - Closed — already resolved questions, accepted decisions
    - Open — review comments to address during implementation
 5. Find all plan files in the PR branch (`plan-*.md`) and read them
-6. Set label `in progress` on PR (if not already set), remove `ready for work` if present
+6. Set label `in progress` on PR, remove `ready for work` if present
 7. Read specifications referenced in the plans:
    - `requirements.md`
    - `design.md`
