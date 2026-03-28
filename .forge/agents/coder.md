@@ -51,13 +51,14 @@ Error: GitHub issue number not provided. Please pass the issue number (e.g., "Im
    - Open — review comments to address during implementation
 5. Find all plan files in the PR branch (`plan-*.md`) and read them
 6. Set label `in progress` on PR, remove `ready for work` if present
-7. Read specifications referenced in the plans:
+7. If PR is not draft — convert to draft (`gh pr ready <PR> --undo`) to prevent CI runs during active development
+8. Read specifications referenced in the plans:
    - `requirements.md`
    - `design.md`
-8. Read testing infrastructure specifications:
+9. Read testing infrastructure specifications:
    - `docs/specs/testing-infrastructure/requirements.md`
    - `docs/specs/testing-infrastructure/design.md`
-9. Study existing code and tests referenced in the plans
+10. Study existing code and tests referenced in the plans
 
 ### Step 2: Implementation
 
