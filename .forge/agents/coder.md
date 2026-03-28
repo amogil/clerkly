@@ -1,7 +1,7 @@
 ---
 id: coder
 title: Разработчик проекта
-description: Реализует план задачи — изменяет спецификации, код и тесты, запускает валидацию и коммитит результат.
+description: Реализует план задачи — выполняет все фазы плана, запускает валидацию и коммитит результат.
 max_walker_depth: 10
 tools:
   - read
@@ -21,6 +21,7 @@ custom_rules: |
   - НЕ добавляй новые process.env переменные без разрешения.
   - НЕ редактируй файлы в src/renderer/components/ai-elements/** и src/renderer/components/ui/**.
   - НЕ создавай файлы отчётов (VALIDATION_REPORT.md, SUMMARY.md и т.п.) без явного запроса.
+  - НИКОГДА не переписывай историю git (no --force, --amend, rebase).
 reasoning:
   enabled: true
   effort: medium
@@ -68,6 +69,8 @@ Error: GitHub issue number not provided. Please pass the issue number (e.g., "Im
 
 Принципы выполнения каждой фазы:
 - Делай ровно то, что указано в фазе — не больше и не меньше
+- Коммить промежуточные результаты после каждой завершённой фазы или значимого блока работы — чтобы иметь возможность откатиться
+- Отмечай в файле плана выполненные пункты (`- [x]`) по мере выполнения и коммить вместе с изменениями
 - По завершении всех фаз — запусти `npm run validate`. Если что-то падает — исправь и запусти заново
 
 ### Шаг 3: Завершение
@@ -79,19 +82,18 @@ Error: GitHub issue number not provided. Please pass the issue number (e.g., "Im
 
 Агент завершает работу:
 
-1. Закоммить изменения в ветку задачи
-2. Запушить
-3. Если PR существует и не draft — перевести в draft (`gh pr ready <PR> --undo`)
-4. Определить финальную метку PR:
+1. Закоммить оставшиеся изменения (если есть) и запушить ветку
+2. Если PR не draft — перевести в draft (`gh pr ready <PR> --undo`)
+3. Определить финальную метку PR:
    - **`review`** — реализация готова, `npm run validate` проходит
    - **`in progress`** — есть нерешённые проблемы
-5. Установить финальную метку на PR, убрав остальные
-6. Вернуть отчёт:
+4. Установить финальную метку на PR, убрав остальные
+5. Вернуть отчёт:
 
 ```
 Результат: реализация готова / есть проблемы
 PR: <ссылка на PR>
-Метка: implementation review / implementation
+Метка: review / in progress
 Что сделано:
 - [файл 1 — что изменено]
 - [файл 2 — что изменено]
@@ -102,7 +104,7 @@ PR: <ссылка на PR>
 - [проблема 1]
 ```
 
-**Flow меток PR:** `ready for work` -> `implementation` -> `implementation review` или остаётся `implementation`
+**Flow меток PR:** `ready for work` -> `in progress` -> `review` или остаётся `in progress`
 
 ---
 
@@ -336,3 +338,4 @@ await expect(messages).toHaveCount(1);
 | Functional tests не запускаются | Native modules или build | `npm run rebuild:electron && npm run build` |
 | ESLint/Prettier fails | Форматирование | `npm run lint:fix` или `npm run format` |
 | Coverage ниже порога | Мало тестов | `npm run test:coverage`, открой `coverage/lcov-report/index.html` |
+
