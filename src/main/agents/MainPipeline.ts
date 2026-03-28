@@ -1394,59 +1394,10 @@ export class MainPipeline {
       throw error;
     }
 
-    // Requirements: llm-integration.11.6.2
-    // Finalize running tool_call records BEFORE hiding attempt messages
-    this.finalizeRunningToolCallsForAttempt(state, agentId);
-
     for (const messageId of state.attemptMessageIds) {
       this.messageManager.setHidden(messageId, agentId);
     }
     return true;
-  }
-
-  /**
-   * Finalize all running tool_call records for the current attempt before retry.
-   * Sets terminal error status and done=true so rows don't remain stale in DB.
-   * Requirements: llm-integration.11.6.2
-   */
-  private finalizeRunningToolCallsForAttempt(state: AttemptRuntimeState, agentId: string): void {
-    if (state.runningToolCalls.size === 0) {
-      return;
-    }
-
-    for (const [callId, running] of state.runningToolCalls) {
-      // Build payload from in-memory running state — more reliable than DB read
-      // because list() may exclude hidden rows or the row may not be flushed yet.
-      const data: Record<string, unknown> = {
-        callId: running.callId,
-        toolName: running.toolName,
-        arguments: running.args,
-      };
-
-      if (running.toolName === 'code_exec') {
-        data.output = {
-          status: 'error',
-          stdout: '',
-          stderr: '',
-          stdout_truncated: false,
-          stderr_truncated: false,
-          error: { code: 'internal_error', message: 'Retried due to model error.' },
-        };
-      } else {
-        data.output = {
-          status: 'error',
-          content: 'Retried due to model error.',
-        };
-      }
-
-      this.messageManager.update(running.messageId, agentId, { data }, true);
-
-      this.logger.info(
-        `Finalized running tool_call ${callId} (message ${running.messageId}) for retry`
-      );
-    }
-
-    state.runningToolCalls.clear();
   }
 
   // Requirements: llm-integration.11.2.3, llm-integration.11.2.3.1, llm-integration.11.2.3.3

@@ -5,7 +5,7 @@
 import { eq, and, asc, desc, lt, or } from 'drizzle-orm';
 import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../schema';
-import { messages, agents, Message } from '../schema';
+import { messages, Message } from '../schema';
 import { AgentsRepository } from './AgentsRepository';
 
 export interface MessageOrderColumns {
@@ -303,37 +303,5 @@ export class MessagesRepository {
       .set({ usageJson })
       .where(and(eq(messages.id, messageId), eq(messages.agentId, agentId)))
       .run();
-  }
-
-  /**
-   * List all stale tool_call messages (done=false) across all agents for the current user.
-   * Includes both hidden and visible rows. Used for startup reconciliation.
-   * Bypasses per-agent checkAccess — filters by userId via agents join instead.
-   * Requirements: llm-integration.11.6.3
-   */
-  listStaleToolCalls(): Message[] {
-    const userId = this.getUserId();
-    return this.db
-      .select({
-        id: messages.id,
-        agentId: messages.agentId,
-        kind: messages.kind,
-        runId: messages.runId,
-        attemptId: messages.attemptId,
-        sequence: messages.sequence,
-        timestamp: messages.timestamp,
-        payloadJson: messages.payloadJson,
-        usageJson: messages.usageJson,
-        replyToMessageId: messages.replyToMessageId,
-        hidden: messages.hidden,
-        done: messages.done,
-      })
-      .from(messages)
-      .innerJoin(agents, eq(messages.agentId, agents.agentId))
-      .where(
-        and(eq(agents.userId, userId), eq(messages.kind, 'tool_call'), eq(messages.done, false))
-      )
-      .orderBy(asc(messages.id))
-      .all();
   }
 }
