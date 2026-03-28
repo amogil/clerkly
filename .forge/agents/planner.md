@@ -38,7 +38,7 @@ Error: GitHub issue number not provided. Please pass the issue number (e.g., "An
 1. Read `AGENTS.md` — mandatory reference for rules, specification formats and workflow
 2. Load issue text via `gh issue view <N>`
 3. Check if a PR exists for this task (`gh pr list --state all --search "<N>" --json number,title,state,labels`). If PR exists:
-   - If PR has label `analysis review` — validate the plan against the readiness checklist (Step 3). If all items are checked — **FINISH**, return PR link. If not all — remove `analysis review`, set `analysis` and continue from the beginning.
+   - If PR has label `analysis review` — validate the plan against the readiness checklist (Step 3). If all items are checked — **FINISH**, return PR link. If not all — set `analysis`, remove `analysis review` and continue work addressing open threads.
    - If other label or no label — set `analysis`, remove `new` if present
    - Read all review threads (open and closed) via `gh api graphql` — they contain context from previous iterations, decisions and unresolved questions
    - Open threads — unresolved issues that the plan MUST address
