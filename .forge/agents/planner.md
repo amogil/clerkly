@@ -134,6 +134,7 @@ After the plan is written, execute Phase 1 yourself:
 - Do NOT touch any files outside `docs/specs/`
 - If Phase 1 has no specification changes (rare) — skip this step
 - If any requirement or design decision is ambiguous or you are unsure about the correct interpretation — use `followup` to ask the user for clarification before making the change. Do NOT guess.
+- After spec changes are finalized, re-read the updated specifications and regenerate the plan file to ensure it is consistent with the final state of requirements and design. The plan must always reflect the actual specs, not the other way around.
 
 ### Step 4: Finish
 
