@@ -203,9 +203,12 @@
   - ошибки stream protocol (`UIMessageStreamError`) → `protocol`
   - ошибки валидации replay prompt (например, `Invalid prompt: ... ModelMessage[] schema`) → `protocol`
 
+3.11. КОГДА исходная ошибка содержит HTTP-статус код, ТО `kind:error` payload ДОЛЖЕН включать его в `data.error.statusCode` как опциональное числовое поле для диагностики. Пользовательское сообщение (`data.error.message`) НЕ ДОЛЖНО изменяться.
+
 #### Функциональные Тесты
 
 - `tests/functional/llm-chat.spec.ts` — "should show rate limit banner with countdown and auto-retry"
+- `tests/functional/llm-chat.spec.ts` — "should show provider error message on 500"
 
 ---
 
