@@ -85,7 +85,7 @@ The fix sets `hidden=true` rather than `done=true` because:
 
 ### Phase 3: Tests
 
-- [ ] Add unit test `tests/unit/db/repositories/MessagesRepository.test.ts`:
+- [x] Add unit test `tests/unit/db/repositories/MessagesRepository.test.ts`:
   - Test `listStaleLlmMessages()` returns `kind:llm` with `done=false, hidden=false`.
   - Test `listStaleLlmMessages()` excludes `kind:llm` with `done=true` (already complete).
   - Test `listStaleLlmMessages()` excludes `kind:llm` with `hidden=true` (already hidden).
@@ -93,7 +93,7 @@ The fix sets `hidden=true` rather than `done=true` because:
   - Test `listStaleLlmMessages()` filters by current user via agents join.
   - Covers requirement ID: `llm-integration.11.6.4`.
 
-- [ ] Add unit test `tests/unit/agents/MessageManager.test.ts`:
+- [x] Add unit test `tests/unit/agents/MessageManager.test.ts`:
   - Test `hideAllStaleLlmOnStartup()` — hides visible stale llm message (`hidden=false, done=false`).
   - Test `hideAllStaleLlmOnStartup()` — no-op when no stale llm messages exist.
   - Test `hideAllStaleLlmOnStartup()` — handles multiple stale rows across agents.

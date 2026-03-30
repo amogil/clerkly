@@ -67,6 +67,10 @@ describe('MessageManager', () => {
         setDone: jest.fn(),
         updateUsageJson: jest.fn(),
         listStaleToolCalls: jest.fn().mockReturnValue([]),
+        listStaleLlmMessages: jest.fn().mockReturnValue([]),
+        setHidden: jest.fn(),
+        hideErrorMessages: jest.fn().mockReturnValue([]),
+        hideAndMarkIncomplete: jest.fn().mockReturnValue(null),
       },
       agents: {} as IDatabaseManager['agents'],
       settings: {} as IDatabaseManager['settings'],
@@ -1157,6 +1161,156 @@ describe('MessageManager', () => {
       expect(managerUpdateSpy).not.toHaveBeenCalled();
 
       managerUpdateSpy.mockRestore();
+    });
+  });
+
+  describe('hideAllStaleLlmOnStartup', () => {
+    /* Preconditions: DB has a visible stale llm message (done=false, hidden=false)
+       Action: Call hideAllStaleLlmOnStartup()
+       Assertions: setHidden called on the stale row
+       Requirements: llm-integration.11.6.4 */
+    it('should hide visible stale llm message (hidden=false, done=false)', () => {
+      const staleLlm: Message = {
+        ...mockMessage,
+        id: 100,
+        agentId: 'agent-123',
+        kind: 'llm',
+        done: false,
+        hidden: false,
+        payloadJson: JSON.stringify({ data: { text: 'partial response' } }),
+      };
+
+      (mockDbManager.messages.listStaleLlmMessages as jest.Mock).mockReturnValue([staleLlm]);
+
+      messageManager.hideAllStaleLlmOnStartup();
+
+      expect(mockDbManager.messages.listStaleLlmMessages).toHaveBeenCalled();
+      expect(mockDbManager.messages.setHidden).toHaveBeenCalledWith(100, 'agent-123');
+    });
+
+    /* Preconditions: DB has no stale llm messages
+       Action: Call hideAllStaleLlmOnStartup()
+       Assertions: No setHidden calls are made
+       Requirements: llm-integration.11.6.4 */
+    it('should be no-op when no stale llm messages exist', () => {
+      (mockDbManager.messages.listStaleLlmMessages as jest.Mock).mockReturnValue([]);
+
+      messageManager.hideAllStaleLlmOnStartup();
+
+      expect(mockDbManager.messages.setHidden).not.toHaveBeenCalled();
+    });
+
+    /* Preconditions: DB has multiple stale llm messages across different agents
+       Action: Call hideAllStaleLlmOnStartup()
+       Assertions: setHidden called for each stale row with correct agentId
+       Requirements: llm-integration.11.6.4 */
+    it('should handle multiple stale rows across agents', () => {
+      const stale1: Message = {
+        ...mockMessage,
+        id: 101,
+        agentId: 'agent-A',
+        kind: 'llm',
+        done: false,
+        hidden: false,
+        payloadJson: JSON.stringify({ data: { text: 'partial 1' } }),
+      };
+      const stale2: Message = {
+        ...mockMessage,
+        id: 102,
+        agentId: 'agent-B',
+        kind: 'llm',
+        done: false,
+        hidden: false,
+        payloadJson: JSON.stringify({ data: { text: 'partial 2' } }),
+      };
+
+      (mockDbManager.messages.listStaleLlmMessages as jest.Mock).mockReturnValue([stale1, stale2]);
+
+      messageManager.hideAllStaleLlmOnStartup();
+
+      expect(mockDbManager.messages.setHidden).toHaveBeenCalledTimes(2);
+      expect(mockDbManager.messages.setHidden).toHaveBeenCalledWith(101, 'agent-A');
+      expect(mockDbManager.messages.setHidden).toHaveBeenCalledWith(102, 'agent-B');
+    });
+
+    /* Preconditions: Startup reconciliation runs
+       Action: Call hideAllStaleLlmOnStartup()
+       Assertions: No MessageUpdatedEvent is emitted (renderer not yet available)
+       Requirements: llm-integration.11.6.4 */
+    it('should not emit MessageUpdatedEvent (renderer not available)', () => {
+      const staleLlm: Message = {
+        ...mockMessage,
+        id: 103,
+        agentId: 'agent-123',
+        kind: 'llm',
+        done: false,
+        hidden: false,
+        payloadJson: JSON.stringify({ data: { text: 'partial' } }),
+      };
+
+      (mockDbManager.messages.listStaleLlmMessages as jest.Mock).mockReturnValue([staleLlm]);
+
+      messageManager.hideAllStaleLlmOnStartup();
+
+      expect(mockEventBus.publish).not.toHaveBeenCalled();
+    });
+
+    /* Preconditions: Startup reconciliation uses MessagesRepository.setHidden directly
+       Action: Call hideAllStaleLlmOnStartup()
+       Assertions: Uses MessagesRepository.setHidden directly, not MessageManager.setHidden
+       Requirements: llm-integration.11.6.4 */
+    it('should use MessagesRepository.setHidden directly (bypass MessageManager.setHidden)', () => {
+      const staleLlm: Message = {
+        ...mockMessage,
+        id: 104,
+        agentId: 'agent-123',
+        kind: 'llm',
+        done: false,
+        hidden: false,
+        payloadJson: JSON.stringify({ data: { text: 'partial' } }),
+      };
+
+      (mockDbManager.messages.listStaleLlmMessages as jest.Mock).mockReturnValue([staleLlm]);
+
+      const repoSetHidden = mockDbManager.messages.setHidden as jest.Mock;
+      const managerSetHiddenSpy = jest.spyOn(messageManager as any, 'setHidden');
+
+      messageManager.hideAllStaleLlmOnStartup();
+
+      expect(repoSetHidden).toHaveBeenCalledTimes(1);
+      expect(managerSetHiddenSpy).not.toHaveBeenCalled();
+
+      managerSetHiddenSpy.mockRestore();
+    });
+
+    /* Preconditions: DB has stale llm messages
+       Action: Call hideAllStaleLlmOnStartup()
+       Assertions: Logger logs count of hidden rows
+       Requirements: llm-integration.11.6.4 */
+    it('should log count of hidden rows', () => {
+      const staleLlm: Message = {
+        ...mockMessage,
+        id: 105,
+        agentId: 'agent-123',
+        kind: 'llm',
+        done: false,
+        hidden: false,
+        payloadJson: JSON.stringify({ data: { text: 'partial' } }),
+      };
+
+      (mockDbManager.messages.listStaleLlmMessages as jest.Mock).mockReturnValue([staleLlm]);
+
+      // Access the mocked logger
+      const { Logger } = jest.requireMock('../../../src/main/Logger') as {
+        Logger: { create: jest.Mock };
+      };
+      const loggerInstance = Logger.create.mock.results[0]?.value as { info: jest.Mock };
+
+      messageManager.hideAllStaleLlmOnStartup();
+
+      expect(loggerInstance.info).toHaveBeenCalledWith(
+        expect.stringContaining('1 stale kind:llm message(s)')
+      );
     });
   });
 });
