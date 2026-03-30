@@ -247,13 +247,17 @@ export class AnthropicProvider implements ILLMProvider {
           continue;
         }
         if (part.type === 'error') {
-          const message =
-            part.error instanceof Error
-              ? part.error.message
-              : typeof part.error === 'string'
-                ? part.error
-                : ERROR_MESSAGES.unknown;
-          onChunk({ type: 'turn_error', errorType: 'provider', message });
+          // Requirements: llm-integration.3.11
+          // Preserve the original error object so that ErrorNormalizer can extract
+          // statusCode, name (AI_RetryError, AI_APICallError), lastError, etc.
+          // from the real AI SDK error chain.
+          // NOTE: We throw the original error BEFORE calling onChunk because
+          // the onChunk callback for 'turn_error' throws a plain Error(message)
+          // which would mask the rich SDK error structure.
+          if (part.error instanceof Error) {
+            throw part.error;
+          }
+          const message = typeof part.error === 'string' ? part.error : ERROR_MESSAGES.unknown;
           throw new Error(message);
         }
       }
