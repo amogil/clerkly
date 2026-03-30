@@ -10,6 +10,7 @@ tools:
   - shell
   - fetch
   - search
+  - followup
 custom_rules: |
   - NEVER modify code, tests, or config files. You MAY only create/edit: the plan file and specification files (`docs/specs/**/requirements.md`, `docs/specs/**/design.md`).
   - Check for conflicts between specifications of different features. If the plan affects multiple features — read ALL their specifications.
@@ -132,6 +133,7 @@ After the plan is written, execute Phase 1 yourself:
 - Follow `AGENTS.md` rules for specification format (EARS for requirements, Russian language, requirement IDs)
 - Do NOT touch any files outside `docs/specs/`
 - If Phase 1 has no specification changes (rare) — skip this step
+- If any requirement or design decision is ambiguous or you are unsure about the correct interpretation — use `followup` to ask the user for clarification before making the change. Do NOT guess.
 
 ### Step 4: Finish
 
