@@ -1200,37 +1200,29 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     expect(text?.toLowerCase()).toMatch(/unavailable|try again/);
 
     // Requirements: llm-integration.3.11 — verify statusCode is persisted in error payload
-    const errorStatusCode = await context.window.evaluate(async () => {
+    const agentIds = await getAgentIdsFromApi(context.window);
+    expect(agentIds.length).toBeGreaterThan(0);
+    const errorStatusCode = await context.window.evaluate(async (agentId) => {
       const api = (
         window as unknown as {
-          electronAPI: {
+          api: {
             messages: {
               list: (agentId: string) => Promise<{
                 success: boolean;
                 data?: Array<{
                   kind: string;
-                  payload: { data?: { error?: { statusCode?: number } } };
+                  payload?: { data?: { error?: { statusCode?: number } } };
                 }>;
               }>;
             };
           };
         }
-      ).electronAPI;
-      const agents = await (
-        window as unknown as {
-          electronAPI: {
-            agents: {
-              list: () => Promise<{ success: boolean; data?: Array<{ agentId: string }> }>;
-            };
-          };
-        }
-      ).electronAPI.agents.list();
-      if (!agents.success || !agents.data?.length) return undefined;
-      const result = await api.messages.list(agents.data[0]!.agentId);
+      ).api;
+      const result = await api.messages.list(agentId);
       if (!result.success || !result.data) return undefined;
       const errorMsg = result.data.find((m) => m.kind === 'error');
       return errorMsg?.payload?.data?.error?.statusCode;
-    });
+    }, agentIds[0]);
     expect(errorStatusCode).toBe(500);
   });
 
