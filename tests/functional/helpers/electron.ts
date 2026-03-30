@@ -133,12 +133,25 @@ export async function launchElectron(
     },
   });
 
-  // Wait for the first window to open
+  // Wait for the first window to open.
+  // If firstWindow() or waitForLoadState() times out (flaky CI), kill the
+  // Electron process so it does not leak and cause worker teardown timeouts.
   // Requirements: testing.3.6 - Real window will be shown
-  const window = await app.firstWindow();
-
-  // Wait for the window to be ready
-  await window.waitForLoadState('domcontentloaded');
+  let window: Page;
+  try {
+    window = await app.firstWindow();
+    await window.waitForLoadState('domcontentloaded');
+  } catch (error) {
+    try {
+      const proc = app.process();
+      if (proc && !proc.killed) {
+        proc.kill('SIGKILL');
+      }
+    } catch {
+      // Ignore kill errors — process may have already exited.
+    }
+    throw error;
+  }
 
   return { app, window, testDataPath };
 }
