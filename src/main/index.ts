@@ -316,6 +316,9 @@ app.whenReady().then(async () => {
     // Must run after userManager.initialize() (userId available) and before renderer creation.
     if (userManager.getCurrentUserId()) {
       messageManager.finalizeAllStaleToolCallsOnStartup();
+      // Requirements: llm-integration.11.6.4
+      // Hide stale kind:llm messages left from previous session (crash/kill).
+      messageManager.hideAllStaleLlmOnStartup();
     }
 
     // Requirements: clerkly.1.2, clerkly.1.3, clerkly.1.4

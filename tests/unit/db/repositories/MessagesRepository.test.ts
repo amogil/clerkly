@@ -510,6 +510,121 @@ describe('MessagesRepository', () => {
     });
   });
 
+  describe('listStaleLlmMessages', () => {
+    /* Preconditions: Agent has kind:llm message with done=false, hidden=false
+       Action: Call listStaleLlmMessages()
+       Assertions: Returns the stale llm message
+       Requirements: llm-integration.11.6.4 */
+    it('should return kind:llm with done=false and hidden=false', () => {
+      const agent = agentsRepo.create('Test');
+      const llmMsg = messagesRepo.create(
+        agent.agentId,
+        'llm',
+        '{"data":{"text":"partial"}}',
+        null,
+        false
+      );
+
+      const stale = messagesRepo.listStaleLlmMessages();
+      expect(stale).toHaveLength(1);
+      expect(stale[0].id).toBe(llmMsg.id);
+      expect(stale[0].kind).toBe('llm');
+      expect(stale[0].done).toBe(false);
+      expect(stale[0].hidden).toBe(false);
+    });
+
+    /* Preconditions: Agent has kind:llm message with done=true
+       Action: Call listStaleLlmMessages()
+       Assertions: Excludes the completed llm message
+       Requirements: llm-integration.11.6.4 */
+    it('should exclude kind:llm with done=true (already complete)', () => {
+      const agent = agentsRepo.create('Test');
+      messagesRepo.create(agent.agentId, 'llm', '{"data":{"text":"complete"}}', null, true);
+
+      const stale = messagesRepo.listStaleLlmMessages();
+      expect(stale).toHaveLength(0);
+    });
+
+    /* Preconditions: Agent has kind:llm message with hidden=true
+       Action: Call listStaleLlmMessages()
+       Assertions: Excludes the hidden llm message
+       Requirements: llm-integration.11.6.4 */
+    it('should exclude kind:llm with hidden=true (already hidden)', () => {
+      const agent = agentsRepo.create('Test');
+      const llmMsg = messagesRepo.create(
+        agent.agentId,
+        'llm',
+        '{"data":{"text":"hidden"}}',
+        null,
+        false
+      );
+      messagesRepo.setHidden(llmMsg.id, agent.agentId);
+
+      const stale = messagesRepo.listStaleLlmMessages();
+      expect(stale).toHaveLength(0);
+    });
+
+    /* Preconditions: Agent has messages of other kinds (user, error, tool_call) with done=false
+       Action: Call listStaleLlmMessages()
+       Assertions: Excludes non-llm kinds
+       Requirements: llm-integration.11.6.4 */
+    it('should exclude other kinds (user, error, tool_call)', () => {
+      const agent = agentsRepo.create('Test');
+      messagesRepo.create(agent.agentId, 'user', '{"data":{"text":"hello"}}', null, false);
+      messagesRepo.create(
+        agent.agentId,
+        'error',
+        '{"data":{"error":{"message":"fail"}}}',
+        null,
+        false
+      );
+      messagesRepo.create(
+        agent.agentId,
+        'tool_call',
+        '{"data":{"toolName":"code_exec"}}',
+        null,
+        false
+      );
+
+      const stale = messagesRepo.listStaleLlmMessages();
+      expect(stale).toHaveLength(0);
+    });
+
+    /* Preconditions: Two users, each with an agent containing a stale llm message
+       Action: Call listStaleLlmMessages() as testUserId
+       Assertions: Only returns stale llm messages for the current user
+       Requirements: llm-integration.11.6.4 */
+    it('should filter by current user via agents join', () => {
+      // Current user's agent and stale llm
+      const agent = agentsRepo.create('My Agent');
+      const llmMsg = messagesRepo.create(
+        agent.agentId,
+        'llm',
+        '{"data":{"text":"mine"}}',
+        null,
+        false
+      );
+
+      // Other user's agent and stale llm (inserted directly)
+      db.insert(agents)
+        .values({
+          agentId: 'other-agent',
+          userId: 'other_user',
+          name: 'Other',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        })
+        .run();
+      sqlite.exec(
+        `INSERT INTO messages (agent_id, kind, timestamp, payload_json, hidden, done) VALUES ('other-agent', 'llm', '${new Date().toISOString()}', '{"data":{"text":"theirs"}}', 0, 0)`
+      );
+
+      const stale = messagesRepo.listStaleLlmMessages();
+      expect(stale).toHaveLength(1);
+      expect(stale[0].id).toBe(llmMsg.id);
+    });
+  });
+
   describe('listByAgentPaginated', () => {
     let agentId: string;
 
