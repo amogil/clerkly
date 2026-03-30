@@ -455,4 +455,25 @@ export class MessageManager {
 
     this.logger.info(`Startup: finalized ${staleRows.length} stale tool_call(s) across all agents`);
   }
+
+  /**
+   * Hide all stale kind:llm messages (done=false, hidden=false) across all agents for the current user.
+   * Sets hidden=true on each row, leaving done=false (consistent with hideAndMarkIncomplete semantics).
+   * Called once at startup before renderer is created.
+   * Uses MessagesRepository directly — no events emitted (renderer not yet available).
+   * Requirements: llm-integration.11.6.4
+   */
+  hideAllStaleLlmOnStartup(): void {
+    const staleRows = this.dbManager.messages.listStaleLlmMessages();
+
+    if (staleRows.length === 0) {
+      return;
+    }
+
+    for (const row of staleRows) {
+      this.dbManager.messages.setHidden(row.id, row.agentId);
+    }
+
+    this.logger.info(`Startup: hidden ${staleRows.length} stale kind:llm message(s) across all agents`);
+  }
 }

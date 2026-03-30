@@ -336,4 +336,41 @@ export class MessagesRepository {
       .orderBy(asc(messages.id))
       .all();
   }
+
+  /**
+   * List all stale kind:llm messages (done=false, hidden=false) across all agents for the current user.
+   * Only targets hidden=false rows because hidden=true llm messages are already in the correct state.
+   * Bypasses per-agent checkAccess — filters by userId via agents join instead.
+   * Requirements: llm-integration.11.6.4
+   */
+  listStaleLlmMessages(): Message[] {
+    const userId = this.getUserId();
+    return this.db
+      .select({
+        id: messages.id,
+        agentId: messages.agentId,
+        kind: messages.kind,
+        runId: messages.runId,
+        attemptId: messages.attemptId,
+        sequence: messages.sequence,
+        timestamp: messages.timestamp,
+        payloadJson: messages.payloadJson,
+        usageJson: messages.usageJson,
+        replyToMessageId: messages.replyToMessageId,
+        hidden: messages.hidden,
+        done: messages.done,
+      })
+      .from(messages)
+      .innerJoin(agents, eq(messages.agentId, agents.agentId))
+      .where(
+        and(
+          eq(agents.userId, userId),
+          eq(messages.kind, 'llm'),
+          eq(messages.done, false),
+          eq(messages.hidden, false)
+        )
+      )
+      .orderBy(asc(messages.id))
+      .all();
+  }
 }

@@ -64,19 +64,19 @@ The fix sets `hidden=true` rather than `done=true` because:
 
 ### Phase 2: Code
 
-- [ ] Add `listStaleLlmMessages()` to `src/main/db/repositories/MessagesRepository.ts`:
+- [x] Add `listStaleLlmMessages()` to `src/main/db/repositories/MessagesRepository.ts`:
   - SQL: `SELECT * FROM messages INNER JOIN agents ON messages.agentId = agents.agentId WHERE agents.userId = ? AND messages.kind = 'llm' AND messages.done = false AND messages.hidden = false ORDER BY messages.id ASC`
   - Pattern: identical to `listStaleToolCalls()` but with `kind='llm'` and `hidden=false` filter.
   - Note: Unlike `listStaleToolCalls()` which includes `hidden=true` rows (because tool calls need terminal state regardless), this method only targets `hidden=false` rows because `hidden=true` llm messages are already in the correct state.
 
-- [ ] Add `hideAllStaleLlmOnStartup()` to `src/main/agents/MessageManager.ts`:
+- [x] Add `hideAllStaleLlmOnStartup()` to `src/main/agents/MessageManager.ts`:
   - Call `this.dbManager.messages.listStaleLlmMessages()`.
   - For each stale row: call `this.dbManager.messages.setHidden(row.id, row.agentId)` to set `hidden=true`.
   - No event emission (renderer not yet connected at startup).
   - Log count of processed rows.
   - Requirements comment: `// Requirements: llm-integration.11.6.4`
 
-- [ ] Add startup call in `src/main/index.ts`:
+- [x] Add startup call in `src/main/index.ts`:
   - After line 318 (`messageManager.finalizeAllStaleToolCallsOnStartup();`), add:
     ```typescript
     messageManager.hideAllStaleLlmOnStartup();
