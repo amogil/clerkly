@@ -145,6 +145,7 @@ CREATE TABLE messages (
     "error": {
       "type": "auth",
       "message": "Invalid API key. Please check your key and try again.",
+      "statusCode": 401,
       "action_link": { "label": "Open Settings", "screen": "settings" }
     }
   }
@@ -152,6 +153,8 @@ CREATE TABLE messages (
 ```
 
 `kind: error` сообщения всегда сохраняются как завершённые (`done: true`).
+
+`statusCode` — опциональное числовое поле, присутствует только когда исходная ошибка содержала HTTP-статус код. Используется для диагностики; пользовательское сообщение (`message`) не зависит от этого поля.
 
 #### Последовательность hidden → error на renderer
 
@@ -164,6 +167,16 @@ CREATE TABLE messages (
 Без idle delay: `IPCChatTransport` закрывал stream при `hidden`, отписывался от событий, и `kind: error` терялся — UI зависал без error bubble.
 
 Для ошибок без action_link (network, provider, timeout):
+
+```json
+{
+  "data": {
+    "error": { "type": "provider", "message": "Provider service unavailable. Please try again later.", "statusCode": 503 }
+  }
+}
+```
+
+Для ошибок без HTTP-статуса (network, timeout) `statusCode` отсутствует:
 
 ```json
 {
@@ -683,16 +696,18 @@ try {
 
 Нормализация выполняется единообразно для всех провайдеров:
 
-| Источник ошибки AI SDK | Доменный тип |
-|---|---|
-| `APICallError` (`401/403`) | `auth` |
-| `APICallError` (`429`) | `rate_limit` |
-| `APICallError` (`5xx`) | `provider` |
-| timeout/abort | `timeout` |
-| transport-level ошибка без `statusCode` | `network` |
-| `NoSuchToolError` / `InvalidToolInputError` / `ToolExecutionError` / `ToolCallRepairError` | `tool` |
-| `UIMessageStreamError` | `protocol` |
-| `Invalid prompt: ... ModelMessage[] schema` | `protocol` |
+| Источник ошибки AI SDK | Доменный тип | statusCode |
+|---|---|---|
+| `APICallError` (`401/403`) | `auth` | 401 / 403 |
+| `APICallError` (`429`) | `rate_limit` | 429 |
+| `APICallError` (`5xx`) | `provider` | 500 / 502 / 503 / ... |
+| timeout/abort | `timeout` | - |
+| transport-level ошибка без `statusCode` | `network` | - |
+| `NoSuchToolError` / `InvalidToolInputError` / `ToolExecutionError` / `ToolCallRepairError` | `tool` | - |
+| `UIMessageStreamError` | `protocol` | - |
+| `Invalid prompt: ... ModelMessage[] schema` | `protocol` | - |
+
+`normalizeLLMError()` ДОЛЖЕН возвращать `statusCode` в `NormalizedLLMError`, если исходная ошибка содержала HTTP-статус код (llm-integration.3.11). Для `RetryError` `statusCode` извлекается из наиболее релевантного элемента cause-chain.
 
 ```typescript
 // Requirements: llm-integration.1
@@ -782,9 +797,11 @@ catch(error):
   if llmMessageId != null:
     обновляет `kind: llm` с `hidden: true, done: false`
     эмитит `message.updated`
-  создаёт `kind: error` (`done: true`, messages.reply_to_message_id = userMessageId, payload.error.message)
+  создаёт `kind: error` (`done: true`, messages.reply_to_message_id = userMessageId, payload.error.{type, message, statusCode?})
   эмитит `message.created`
 ```
+
+`statusCode` включается в payload ошибки только если нормализованная ошибка содержит HTTP-статус код (llm-integration.3.11).
 
 ### Прерывание запроса при новом сообщении
 
@@ -943,7 +960,7 @@ User отправляет сообщение
 - `tests/unit/llm/OpenAIProvider.chat.test.ts` — streaming/tool-loop mapping, ошибки, usage
 - `tests/unit/llm/AnthropicProvider.chat.test.ts` — streaming/tool-loop mapping, ошибки, usage
 - `tests/unit/llm/GoogleProvider.chat.test.ts` — streaming/tool-loop mapping, ошибки, usage
-- `tests/unit/llm/ErrorNormalizer.test.ts` — mapping AI SDK ошибок (`auth/rate_limit/provider/network/timeout/tool/protocol`)
+- `tests/unit/llm/ErrorNormalizer.test.ts` — mapping AI SDK ошибок (`auth/rate_limit/provider/network/timeout/tool/protocol`), сохранение `statusCode` при наличии HTTP-статуса в исходной ошибке
 - `tests/unit/agents/PromptBuilder.test.ts` — формирование массива `messages`, исключения из replay
 - `tests/unit/agents/PromptModelContract.test.ts` — контрактная валидация `ModelMessage[]` (AI SDK schema), terminal-статусы `tool-result`, негативные кейсы `legacy result`, missing pair, mismatched `toolCallId`, malformed/non-terminal `tool_call`
 - `tests/unit/agents/MainPipeline.test.ts` — мок провайдера, полный цикл, ошибки, события
@@ -980,6 +997,7 @@ User отправляет сообщение
 - `tests/unit/agents/MainPipeline.test.ts` — timeout retry policy: non-timeout (network) по-прежнему max 1 retry
 - `tests/unit/agents/MainPipeline.test.ts` — timeout retry policy: user-aborted signal блокирует retry (early exit и mid-retry abort)
 - `tests/unit/agents/MainPipeline.test.ts` — timeout retry policy: счётчик timeout-повторов сбрасывается между runs (не сквозной)
+- `tests/unit/agents/MainPipeline.test.ts` — handleRunError: statusCode из нормализованной ошибки включается в payload `kind:error` при наличии HTTP-статуса
 - `tests/unit/llm/OpenAIProvider.chat.test.ts` — сброс таймера `CHAT_TIMEOUT_MS` при каждом `onStepFinish`
 - `tests/unit/llm/OpenAIProvider.chat.test.ts` — сброс таймера `CHAT_TIMEOUT_MS` при `experimental_onStepStart` (fresh budget для post-tool continuation)
 - `tests/unit/llm/AnthropicProvider.chat.test.ts` — сброс таймера `CHAT_TIMEOUT_MS` при каждом `onStepFinish`
@@ -1090,6 +1108,7 @@ User отправляет сообщение
 | llm-integration.3.8 | - | ✓ |
 | llm-integration.3.9 | ✓ | ✓ |
 | llm-integration.3.10 | ✓ | ✓ |
+| llm-integration.3.11 | ✓ | ✓ |
 | llm-integration.4 | ✓ | - |
 | llm-integration.4.1 | ✓ | - |
 | llm-integration.4.2 | ✓ | - |

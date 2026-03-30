@@ -11,9 +11,11 @@ export type NormalizedLLMErrorType =
   | 'tool'
   | 'protocol';
 
+// Requirements: llm-integration.3.11
 export interface NormalizedLLMError {
   type: NormalizedLLMErrorType;
   message: string;
+  statusCode?: number;
   retryAfterSeconds?: number;
 }
 
@@ -78,22 +80,55 @@ function parseRetryAfterSecondsFromHeaders(
   return Math.ceil(seconds);
 }
 
+// Requirements: llm-integration.3.10, llm-integration.3.11
+// Real Vercel AI SDK error names use AI_ prefix (e.g. AI_APICallError, AI_RetryError)
+function isAPICallError(name: string): boolean {
+  return name === 'APICallError' || name === 'AI_APICallError';
+}
+
+// Requirements: llm-integration.3.10, llm-integration.3.11
+function isRetryError(name: string): boolean {
+  return name === 'RetryError' || name === 'AI_RetryError';
+}
+
+// Requirements: llm-integration.3.10, llm-integration.3.11
+// Traverse the error cause chain including AI SDK RetryError.lastError and RetryError.errors[]
 function unwrapCauseChain(error: unknown, maxDepth = 6): ErrorWithStatusCode[] {
   const chain: ErrorWithStatusCode[] = [];
-  let current: unknown = error;
-  let depth = 0;
+  const visited = new WeakSet<object>();
 
-  while (current && typeof current === 'object' && depth < maxDepth) {
-    const typed = current as ErrorWithStatusCode;
+  const enqueue = (item: unknown): void => {
+    if (!item || typeof item !== 'object' || chain.length >= maxDepth) return;
+    if (visited.has(item as object)) return;
+    visited.add(item as object);
+
+    const typed = item as ErrorWithStatusCode & {
+      lastError?: unknown;
+      errors?: unknown[];
+    };
     chain.push(typed);
-    current = typed.cause;
-    depth += 1;
-  }
 
+    // Standard Error.cause chain
+    if (typed.cause) {
+      enqueue(typed.cause);
+    }
+
+    // AI SDK RetryError stores the wrapped error in lastError and errors[]
+    if (typed.lastError) {
+      enqueue(typed.lastError);
+    }
+    if (Array.isArray(typed.errors)) {
+      for (const nested of typed.errors) {
+        enqueue(nested);
+      }
+    }
+  };
+
+  enqueue(error);
   return chain;
 }
 
-// Requirements: llm-integration.3.10
+// Requirements: llm-integration.3.10, llm-integration.3.11
 export function normalizeLLMError(error: unknown): NormalizedLLMError {
   if (error instanceof LLMRequestAbortedError) {
     return { type: 'timeout', message: STANDARD_MESSAGES.timeout };
@@ -120,12 +155,12 @@ export function normalizeLLMError(error: unknown): NormalizedLLMError {
     return { type: 'protocol', message: STANDARD_MESSAGES.protocol };
   }
 
-  if (name === 'APICallError') {
+  if (isAPICallError(name)) {
     if (statusCode === undefined) {
       return { type: 'network', message: STANDARD_MESSAGES.network };
     }
     if (statusCode === 401 || statusCode === 403) {
-      return { type: 'auth', message: STANDARD_MESSAGES.auth };
+      return { type: 'auth', message: STANDARD_MESSAGES.auth, statusCode };
     }
     if (statusCode === 429) {
       const retryAfterFromHeaders =
@@ -135,16 +170,17 @@ export function normalizeLLMError(error: unknown): NormalizedLLMError {
       return {
         type: 'rate_limit',
         message: STANDARD_MESSAGES.rateLimit,
+        statusCode,
         retryAfterSeconds: retryAfterFromHeaders ?? retryAfterFromMessage,
       };
     }
     if (statusCode >= 500 && statusCode < 600) {
-      return { type: 'provider', message: STANDARD_MESSAGES.provider };
+      return { type: 'provider', message: STANDARD_MESSAGES.provider, statusCode };
     }
   }
 
   if (statusCode === 401 || statusCode === 403) {
-    return { type: 'auth', message: STANDARD_MESSAGES.auth };
+    return { type: 'auth', message: STANDARD_MESSAGES.auth, statusCode };
   }
   if (
     statusCode === 429 ||
@@ -155,11 +191,12 @@ export function normalizeLLMError(error: unknown): NormalizedLLMError {
     return {
       type: 'rate_limit',
       message: STANDARD_MESSAGES.rateLimit,
+      ...(statusCode !== undefined ? { statusCode } : {}),
       retryAfterSeconds: parseRetryAfterSecondsFromText(message),
     };
   }
   if (statusCode !== undefined && statusCode >= 500 && statusCode < 600) {
-    return { type: 'provider', message: STANDARD_MESSAGES.provider };
+    return { type: 'provider', message: STANDARD_MESSAGES.provider, statusCode };
   }
 
   if (
@@ -177,15 +214,23 @@ export function normalizeLLMError(error: unknown): NormalizedLLMError {
     return { type: 'network', message: STANDARD_MESSAGES.network };
   }
 
-  if (name === 'RetryError') {
+  if (isRetryError(name)) {
     const chain = unwrapCauseChain(error);
-    const authCause = chain.find((item) => {
-      const itemStatus =
-        typeof item.statusCode === 'number'
-          ? item.statusCode
-          : typeof item.status === 'number'
-            ? item.status
+
+    // Requirements: llm-integration.3.11
+    // Extract statusCode from the most relevant cause in the chain for RetryError
+    const extractCauseStatusCode = (cause: ErrorWithStatusCode): number | undefined => {
+      const s =
+        typeof cause.statusCode === 'number'
+          ? cause.statusCode
+          : typeof cause.status === 'number'
+            ? cause.status
             : undefined;
+      return s;
+    };
+
+    const authCause = chain.find((item) => {
+      const itemStatus = extractCauseStatusCode(item);
       const itemMessage = (item.message ?? '').toLowerCase();
       return (
         itemStatus === 401 ||
@@ -197,16 +242,16 @@ export function normalizeLLMError(error: unknown): NormalizedLLMError {
       );
     });
     if (authCause) {
-      return { type: 'auth', message: STANDARD_MESSAGES.auth };
+      const causeStatus = extractCauseStatusCode(authCause);
+      return {
+        type: 'auth',
+        message: STANDARD_MESSAGES.auth,
+        ...(causeStatus !== undefined ? { statusCode: causeStatus } : {}),
+      };
     }
 
     const rateLimitCause = chain.find((item) => {
-      const itemStatus =
-        typeof item.statusCode === 'number'
-          ? item.statusCode
-          : typeof item.status === 'number'
-            ? item.status
-            : undefined;
+      const itemStatus = extractCauseStatusCode(item);
       const itemMessage = (item.message ?? '').toLowerCase();
       return (
         itemStatus === 429 ||
@@ -217,6 +262,7 @@ export function normalizeLLMError(error: unknown): NormalizedLLMError {
     });
 
     if (rateLimitCause) {
+      const causeStatus = extractCauseStatusCode(rateLimitCause);
       const retryAfterSeconds =
         parseRetryAfterSecondsFromHeaders(rateLimitCause.responseHeaders) ??
         parseRetryAfterSecondsFromHeaders(rateLimitCause.headers) ??
@@ -226,12 +272,27 @@ export function normalizeLLMError(error: unknown): NormalizedLLMError {
       return {
         type: 'rate_limit',
         message: STANDARD_MESSAGES.rateLimit,
+        ...(causeStatus !== undefined ? { statusCode: causeStatus } : {}),
         retryAfterSeconds,
       };
     }
 
-    return { type: 'provider', message: STANDARD_MESSAGES.provider };
+    // For generic RetryError fallback, find any statusCode in the cause chain
+    const causeWithStatus = chain.find(
+      (item) => extractCauseStatusCode(item) !== undefined && item !== chain[0]
+    );
+    const fallbackStatus = causeWithStatus ? extractCauseStatusCode(causeWithStatus) : statusCode;
+
+    return {
+      type: 'provider',
+      message: STANDARD_MESSAGES.provider,
+      ...(fallbackStatus !== undefined ? { statusCode: fallbackStatus } : {}),
+    };
   }
 
-  return { type: 'provider', message: STANDARD_MESSAGES.provider };
+  return {
+    type: 'provider',
+    message: STANDARD_MESSAGES.provider,
+    ...(statusCode !== undefined ? { statusCode } : {}),
+  };
 }

@@ -201,18 +201,22 @@ describe('AnthropicProvider.chat()', () => {
     expect(aiModule.jsonSchema).not.toHaveBeenCalled();
   });
 
-  it('emits turn_error and throws when SDK stream yields error part', async () => {
-    mockSdkResult([{ type: 'error', error: new Error('anthropic stream failed') }]);
+  /* Preconditions: SDK stream yields an error part with an Error instance
+     Action: chat() processes the error part
+     Assertions: Original Error is thrown directly (preserving AI SDK error chain for ErrorNormalizer);
+       no turn_error chunk is emitted because the error is thrown before onChunk
+     Requirements: llm-integration.3.11 */
+  it('throws original Error when SDK stream yields error part', async () => {
+    const sdkError = new Error('anthropic stream failed');
+    mockSdkResult([{ type: 'error', error: sdkError }]);
 
     const chunks: ChatChunk[] = [];
     await expect(
       provider.chat(mockMessages, mockOptions, (chunk) => chunks.push(chunk))
     ).rejects.toThrow('anthropic stream failed');
-    expect(chunks).toContainEqual({
-      type: 'turn_error',
-      errorType: 'provider',
-      message: 'anthropic stream failed',
-    });
+    // No turn_error chunk emitted — the original error is thrown directly
+    // so that ErrorNormalizer can extract statusCode from the AI SDK error chain
+    expect(chunks).toEqual([]);
   });
 
   it('throws LLMRequestAbortedError when SDK throws abort-like error', async () => {
