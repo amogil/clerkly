@@ -505,5 +505,138 @@ export function registerTestIPCHandlers(
     }
   );
 
+  // Requirements: llm-integration.11.6.3
+  // Inject a stale tool_call message (done=false, status=running) for startup recovery tests.
+  ipcMain.handle(
+    'test:inject-stale-tool-call',
+    async (
+      _event: Electron.IpcMainInvokeEvent,
+      agentId: string,
+      toolName: string = 'code_exec',
+      callId?: string
+    ) => {
+      if (!isTestEnvironment()) {
+        throw new Error('test:inject-stale-tool-call can only be used in test environment');
+      }
+      if (!agentId || typeof agentId !== 'string') {
+        return { success: false, error: 'agentId parameter is required' };
+      }
+      try {
+        const resolvedCallId = callId || `stale-call-${Date.now()}`;
+        const payload = {
+          data: {
+            callId: resolvedCallId,
+            toolName,
+            arguments: toolName === 'code_exec' ? { code: 'console.log("stale")' } : {},
+          },
+        };
+        const lastMessage = messageManager.getLastMessage(agentId);
+        const replyToMessageId = lastMessage?.id ?? null;
+        // Create with done=false to simulate a stale running tool_call
+        const message = messageManager.create(
+          agentId,
+          'tool_call',
+          payload,
+          replyToMessageId,
+          false
+        );
+        logger.info(`Test: Injected stale tool_call for agent ${agentId}, messageId=${message.id}`);
+        return { success: true, messageId: message.id };
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        logger.error(`Test: Failed to inject stale tool_call: ${errorMessage}`);
+        return { success: false, error: errorMessage };
+      }
+    }
+  );
+
+  // Requirements: llm-integration.11.6.4
+  // Inject a stale kind:llm message (done=false, hidden=false) for startup recovery tests.
+  ipcMain.handle(
+    'test:inject-stale-llm',
+    async (
+      _event: Electron.IpcMainInvokeEvent,
+      agentId: string,
+      text?: string,
+      reasoning?: string
+    ) => {
+      if (!isTestEnvironment()) {
+        throw new Error('test:inject-stale-llm can only be used in test environment');
+      }
+      if (!agentId || typeof agentId !== 'string') {
+        return { success: false, error: 'agentId parameter is required' };
+      }
+      try {
+        const payload: Record<string, unknown> = {
+          data: {
+            ...(text ? { text } : {}),
+            ...(reasoning ? { reasoning: { text: reasoning } } : {}),
+          },
+        };
+        const lastMessage = messageManager.getLastMessage(agentId);
+        const replyToMessageId = lastMessage?.id ?? null;
+        // Create with done=false to simulate a stale in-flight llm message
+        const message = messageManager.create(agentId, 'llm', payload, replyToMessageId, false);
+        logger.info(`Test: Injected stale llm for agent ${agentId}, messageId=${message.id}`);
+        return { success: true, messageId: message.id };
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        logger.error(`Test: Failed to inject stale llm: ${errorMessage}`);
+        return { success: false, error: errorMessage };
+      }
+    }
+  );
+
+  // Requirements: llm-integration.11.6.3, llm-integration.11.6.4
+  // Return all messages for a given agent (including hidden) as raw DB rows.
+  // Used to assert DB state after restart without relying on UI rendering.
+  ipcMain.handle(
+    'test:get-messages-raw',
+    async (_event: Electron.IpcMainInvokeEvent, agentId: string) => {
+      if (!isTestEnvironment()) {
+        throw new Error('test:get-messages-raw can only be used in test environment');
+      }
+      if (!agentId || typeof agentId !== 'string') {
+        return { success: false, error: 'agentId parameter is required' };
+      }
+      try {
+        // Use listByAgent with includeHidden=true to get all messages including hidden
+        const db = dbManager.getDatabase();
+        if (!db) {
+          return { success: false, error: 'Database not available' };
+        }
+        const allMessages = db
+          .prepare(
+            'SELECT id, agent_id as agentId, kind, done, hidden, payload_json as payloadJson, timestamp, reply_to_message_id as replyToMessageId FROM messages WHERE agent_id = ? ORDER BY id ASC'
+          )
+          .all(agentId) as Array<{
+          id: number;
+          agentId: string;
+          kind: string;
+          done: number;
+          hidden: number;
+          payloadJson: string;
+          timestamp: string;
+          replyToMessageId: number | null;
+        }>;
+        const rawMessages = allMessages.map((msg) => ({
+          id: msg.id,
+          agentId: msg.agentId,
+          kind: msg.kind,
+          done: !!msg.done,
+          hidden: !!msg.hidden,
+          payloadJson: msg.payloadJson,
+          timestamp: msg.timestamp,
+          replyToMessageId: msg.replyToMessageId,
+        }));
+        return { success: true, messages: rawMessages };
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        logger.error(`Test: Failed to get raw messages: ${errorMessage}`);
+        return { success: false, error: errorMessage };
+      }
+    }
+  );
+
   logger.info('Test IPC handlers registered');
 }

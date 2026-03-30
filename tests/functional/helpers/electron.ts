@@ -635,6 +635,42 @@ export async function expectNoToastError(window: Page): Promise<void> {
 }
 
 /**
+ * Kill Electron application via SIGKILL (simulates hard crash).
+ * Does NOT clean up testDataPath — the DB must be preserved for relaunch.
+ * Returns the testDataPath so it can be reused in a subsequent launchElectron call.
+ *
+ * Requirements: llm-integration.11.6.3, llm-integration.11.6.4
+ */
+export async function killElectron(context: ElectronTestContext): Promise<string> {
+  const proc = context.app.process();
+  const pid = proc.pid;
+
+  if (!pid) {
+    throw new Error('killElectron: Electron process has no PID');
+  }
+
+  // Send SIGKILL to the Electron process
+  process.kill(pid, 'SIGKILL');
+
+  // Wait for the process to exit (poll killed flag)
+  await waitFor(
+    () => {
+      try {
+        // process.kill(pid, 0) throws if PID no longer exists
+        process.kill(pid, 0);
+        return false;
+      } catch {
+        return true;
+      }
+    },
+    10000,
+    100
+  );
+
+  return context.testDataPath;
+}
+
+/**
  * Create and start a MockOAuthServer on a free port chosen by the OS.
  * Pass an explicit port only when you need a fixed address (legacy usage).
  *

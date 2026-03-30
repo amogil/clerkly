@@ -1031,6 +1031,10 @@ User отправляет сообщение
 - `tests/functional/llm-chat.spec.ts` — "should skip rename when rename_need_score is invalid"
 - `tests/functional/llm-chat.spec.ts` — "should apply rename for new intent after 5-turn cooldown"
 - `tests/functional/llm-chat.spec.ts` — "should show error bubble after LLM stream failure (not a silent hang)"
+- `tests/functional/startup-recovery.spec.ts` — "should finalize stale tool_call records after SIGKILL restart"
+- `tests/functional/startup-recovery.spec.ts` — "should hide stale llm messages after SIGKILL restart"
+- `tests/functional/startup-recovery.spec.ts` — "should recover both stale tool_call and stale llm after SIGKILL restart"
+- `tests/functional/startup-recovery.spec.ts` — "should handle SIGKILL restart with no stale messages (no-op)"
 
 ### Покрытие Требований
 
@@ -1196,8 +1200,8 @@ User отправляет сообщение
 | llm-integration.11.6 | ✓ | ✓ |
 | llm-integration.11.6.1 | ✓ | ✓ |
 | llm-integration.11.6.2 | ✓ | - |
-| llm-integration.11.6.3 | ✓ | - |
-| llm-integration.11.6.4 | ✓ | - |
+| llm-integration.11.6.3 | ✓ | ✓ |
+| llm-integration.11.6.4 | ✓ | ✓ |
 | llm-integration.11.7 | ✓ | ✓ |
 | llm-integration.12 | ✓ | ✓ |
 | llm-integration.12.1 | ✓ | ✓ |

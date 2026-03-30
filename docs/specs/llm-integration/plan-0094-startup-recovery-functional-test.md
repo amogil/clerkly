@@ -39,66 +39,73 @@ Relevant code:
 
 ### Phase 1: Specifications
 
-- [ ] Update `docs/specs/llm-integration/requirements.md`:
+- [x] Update `docs/specs/llm-integration/requirements.md`:
   - Add new requirement under section 11 (Tool Calling): a functional test entry for `llm-integration.11.6.3` pointing to `tests/functional/startup-recovery.spec.ts` -- "should finalize stale tool_call records after SIGKILL restart"
   - Add new requirement `llm-integration.17` (or sub-section of existing) for stale `kind:llm` startup reconciliation (from issue #92):
     - `17.1`: WHEN the application starts, system SHALL hide (`hidden=true`) all persisted `kind:llm` messages with `done=false` and `hidden=false` across all agents of the current user
     - `17.2`: Stale `kind:llm` reconciliation SHALL NOT emit realtime events (renderer not yet connected at startup)
   - Add functional test entry for the new requirement pointing to `tests/functional/startup-recovery.spec.ts` -- "should hide stale llm messages after SIGKILL restart"
+  - NOTE: Requirement was implemented as `llm-integration.11.6.4` in a prior PR (#97), not as `llm-integration.17.*`. Functional test entries added to section 11.
 
-- [ ] Update `docs/specs/llm-integration/design.md`:
+- [x] Update `docs/specs/llm-integration/design.md`:
   - Add section "Startup reconciliation for stale `kind:llm`" describing the SQL query and hide logic (analogous to existing `tool_call` reconciliation section)
   - Add functional test entries for `startup-recovery.spec.ts`
   - Update coverage table: mark `llm-integration.11.6.3` with functional test coverage; add rows for `llm-integration.17.*`
+  - NOTE: Design section and coverage table already existed for `11.6.4`; functional test entries and coverage table updated.
 
 ### Phase 2: Code
 
-- [ ] Add helper `killElectron(context)` to `tests/functional/helpers/electron.ts`:
+- [x] Add helper `killElectron(context)` to `tests/functional/helpers/electron.ts`:
   - Retrieves the Electron process PID via `context.app.process()`
   - Sends `SIGKILL` to the process: `process.kill(pid, 'SIGKILL')`
   - Waits for the process to exit (poll `process.killed` or catch the exit event)
   - Does NOT clean up `testDataPath` (DB must be preserved for relaunch)
 
-- [ ] Add test IPC handler `test:inject-stale-tool-call` to `src/main/TestIPCHandlers.ts`:
+- [x] Add test IPC handler `test:inject-stale-tool-call` to `src/main/TestIPCHandlers.ts`:
   - Creates a `kind:tool_call` message with `done=false`, `status=running` for a given agent
   - Accepts `agentId`, `toolName` (default `code_exec`), optional `callId`
   - Uses `messageManager.create()` with `done=false`
 
-- [ ] Add test IPC handler `test:inject-stale-llm` to `src/main/TestIPCHandlers.ts`:
+- [x] Add test IPC handler `test:inject-stale-llm` to `src/main/TestIPCHandlers.ts`:
   - Creates a `kind:llm` message with `done=false`, `hidden=false` for a given agent
   - Accepts `agentId`, optional `text`/`reasoning`
   - Uses `messageManager.create()` with `done=false`
 
-- [ ] Add test IPC handler `test:get-messages-raw` to `src/main/TestIPCHandlers.ts`:
+- [x] Add test IPC handler `test:get-messages-raw` to `src/main/TestIPCHandlers.ts`:
   - Returns all messages for a given agent (including hidden) as raw DB rows
   - Used to assert DB state after restart without relying on UI rendering
 
-- [ ] Implement stale `kind:llm` startup reconciliation in `src/main/agents/MessageManager.ts`:
+- [x] Implement stale `kind:llm` startup reconciliation in `src/main/agents/MessageManager.ts`:
   - Add method `hideAllStaleLlmMessagesOnStartup()`:
     - Queries: `SELECT * FROM messages WHERE done=false AND kind='llm' AND hidden=false AND agentId IN (SELECT agentId FROM agents WHERE userId=?)`
     - For each row: `UPDATE messages SET hidden=1 WHERE id=?`
     - No event emission (renderer not connected)
     - Logging with count of affected rows
+  - NOTE: Already implemented as `hideAllStaleLlmOnStartup()` in prior PR (#97).
 
-- [ ] Add `listStaleLlmMessages()` to `src/main/db/repositories/MessagesRepository.ts`:
+- [x] Add `listStaleLlmMessages()` to `src/main/db/repositories/MessagesRepository.ts`:
   - SQL: select `kind='llm'`, `done=false`, `hidden=false`, joined with agents on userId
   - Returns `Message[]`
+  - NOTE: Already implemented in prior PR (#97).
 
-- [ ] Call `messageManager.hideAllStaleLlmMessagesOnStartup()` in `src/main/index.ts`:
+- [x] Call `messageManager.hideAllStaleLlmMessagesOnStartup()` in `src/main/index.ts`:
   - After existing `finalizeAllStaleToolCallsOnStartup()` call at line 318
   - Same guard: `if (userManager.getCurrentUserId())`
+  - NOTE: Already implemented in prior PR (#97).
 
 ### Phase 3: Tests
 
-- [ ] Add unit test in `tests/unit/agents/MessageManager.test.ts` -- `hideAllStaleLlmMessagesOnStartup`:
+- [x] Add unit test in `tests/unit/agents/MessageManager.test.ts` -- `hideAllStaleLlmMessagesOnStartup`:
   - Covers: stale visible `kind:llm` hidden, already-hidden `kind:llm` untouched, done `kind:llm` untouched, no-op when no stale rows, no event emission
-  - Requirement IDs: `llm-integration.17.1`, `llm-integration.17.2`
+  - Requirement IDs: `llm-integration.11.6.4`
+  - NOTE: Already implemented in prior PR (#97) as `hideAllStaleLlmOnStartup`.
 
-- [ ] Add unit test in `tests/unit/db/repositories/MessagesRepository.test.ts` -- `listStaleLlmMessages`:
+- [x] Add unit test in `tests/unit/db/repositories/MessagesRepository.test.ts` -- `listStaleLlmMessages`:
   - Covers: returns visible stale `llm`, excludes hidden, excludes done, excludes other kinds
-  - Requirement IDs: `llm-integration.17.1`
+  - Requirement IDs: `llm-integration.11.6.4`
+  - NOTE: Already implemented in prior PR (#97).
 
-- [ ] Create functional test `tests/functional/startup-recovery.spec.ts`:
+- [x] Create functional test `tests/functional/startup-recovery.spec.ts`:
   - Test 1: "should finalize stale tool_call records after SIGKILL restart"
     - Launch app, authenticate, get agentId
     - Inject stale `tool_call(code_exec)` via `test:inject-stale-tool-call` with `done=false`, `status=running`
@@ -119,22 +126,22 @@ Relevant code:
     - Re-authenticate
     - Verify via `test:get-messages-raw` that stale `kind:llm` now has `hidden=true`
     - Verify agent is NOT stuck in `IN_PROGRESS`
-    - Requirement IDs: `llm-integration.17.1`, `llm-integration.17.2`
+    - Requirement IDs: `llm-integration.11.6.4`
 
   - Test 3: "should recover both stale tool_call and stale llm after SIGKILL restart"
     - Combined scenario: inject both stale tool_call and stale llm, kill, restart, verify both recovered
-    - Requirement IDs: `llm-integration.11.6.3`, `llm-integration.17.1`
+    - Requirement IDs: `llm-integration.11.6.3`, `llm-integration.11.6.4`
 
   - Test 4: "should handle SIGKILL restart with no stale messages (no-op)"
     - Launch, authenticate, kill, restart -- verify app starts normally, no errors
-    - Requirement IDs: `llm-integration.11.6.3`, `llm-integration.17.1`
+    - Requirement IDs: `llm-integration.11.6.3`, `llm-integration.11.6.4`
 
   - All tests follow testing.11 (no `waitForTimeout` for element waits), testing.12 (toast error check via `closeElectron`), testing.3.13 exception (LLM not used -- tests validate DB-level recovery, not LLM interaction; approved by issue scope)
 
 ### Phase 4: Finalization
 
-- [ ] Update coverage table in `docs/specs/llm-integration/design.md`
-- [ ] Run `npm run validate`
+- [x] Update coverage table in `docs/specs/llm-integration/design.md`
+- [x] Run `npm run validate`
 
 ## Files to change
 
