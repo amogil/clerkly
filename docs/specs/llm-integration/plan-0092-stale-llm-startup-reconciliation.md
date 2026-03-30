@@ -50,11 +50,11 @@ The fix sets `hidden=true` rather than `done=true` because:
 
 ### Phase 1: Specifications
 
-- [ ] Update `docs/specs/llm-integration/requirements.md`:
+- [x] Update `docs/specs/llm-integration/requirements.md`:
   - Add new requirement `llm-integration.11.6.4`:
     > WHEN the application starts, the system SHALL hide all persisted `kind:llm` messages with `done=false` and `hidden=false` across all agents of the current user by setting `hidden=true`. The `done` flag SHALL remain `false` (consistent with `hideAndMarkIncomplete` semantics).
   - Add note that this is analogous to `llm-integration.11.6.3` but for `kind:llm` instead of `kind:tool_call`.
-- [ ] Update `docs/specs/llm-integration/design.md`:
+- [x] Update `docs/specs/llm-integration/design.md`:
   - Add "Startup reconciliation for stale kind:llm" section (next to existing "Startup reconciliation" for tool_call at line 431).
   - Document `MessagesRepository.listStaleLlmMessages()` SQL query.
   - Document `MessageManager.hideAllStaleLlmOnStartup()` method.
