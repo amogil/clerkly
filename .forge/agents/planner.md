@@ -9,7 +9,6 @@ tools:
   - shell
   - fetch
   - search
-  - plan
 custom_rules: |
   - NEVER modify project files. The only exception is creating the plan file.
   - Check for conflicts between specifications of different features. If the plan affects multiple features — read ALL their specifications.
@@ -39,7 +38,7 @@ Error: GitHub issue number not provided. Please pass the issue number (e.g., "An
 2. Load issue text via `gh issue view <N>`
 3. Check if a PR exists for this task (`gh pr list --state all --search "<N>" --json number,title,state,labels`). If PR exists:
    - If PR has label `analysis review` — validate the plan against the readiness checklist (Step 3). If all items are checked — **FINISH**, return PR link. If not all — set `analysis`, remove `analysis review` and continue work addressing open threads.
-   - If other label or no label — set `analysis`, remove `new` if present
+   - If other label or no label — set `analysis`
    - Read all review threads (open and closed) via `gh api graphql` — they contain context from previous iterations, decisions and unresolved questions
    - Open threads — unresolved issues that the plan MUST address
    - Closed threads — already accepted decisions, do NOT revisit
@@ -62,6 +61,7 @@ Error: GitHub issue number not provided. Please pass the issue number (e.g., "An
 1. Save plan in the specification closest in meaning to the task
 2. File name: `plan-<issue-number>-<short-description>.md` (issue number with leading zeros up to 4 digits)
 3. Example: task #89 about timeout after tool execution -> `docs/specs/llm-integration/plan-0089-post-tool-timeout.md`
+4. On re-run (e.g., after PR review comments), update the existing plan file — do NOT create a new one. Find the existing `plan-<issue-number>-*.md` on the branch and modify it in place.
 
 Code NEVER goes before specifications. Every step in the plan MUST be tied to one of the phases in the format below.
 
@@ -158,7 +158,7 @@ Agent finishes:
 5. Determine final PR label by readiness criteria:
    - **`analysis review`** — plan is ready
    - **`analysis`** — there are open questions or unresolved threads
-6. Set final label on PR, removing others (`new`, `analysis`, `analysis review`)
+6. Set final label on PR, removing others (`analysis`, `analysis review`)
 7. Return report:
 
 ```
@@ -173,5 +173,5 @@ Open questions (if any):
 - ❓ [question 1 — link to inline thread]
 ```
 
-**PR label flow:** `new` (before work) -> `analysis` (in progress) -> `analysis review` (plan ready) or stays `analysis` (open questions)
+**PR label flow:** `analysis` (in progress) -> `analysis review` (plan ready) or stays `analysis` (open questions)
 
