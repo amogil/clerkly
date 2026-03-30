@@ -380,7 +380,9 @@ export function registerTestIPCHandlers(
         const payload = {
           data: { text },
         };
-        messageManager.create(agentId, 'llm', payload, null);
+        // Pass done=true so seeded messages represent completed LLM responses
+        // and are not treated as stale in-flight messages by startup reconciliation.
+        messageManager.create(agentId, 'llm', payload, null, true);
         logger.info(`Test: Created agent message for agent ${agentId}`);
         return { success: true };
       } catch (error: unknown) {
