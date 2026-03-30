@@ -101,10 +101,14 @@ Check each item and leave inline threads in the PR for every finding.
 ### Step 3: Finalization
 
 1. Collect all inline threads left during review
-2. Check PR CI status (`gh pr checks <PR>`):
-   - All checks passed — continue to step 3
-   - Checks still running — wait and re-check until they complete
-   - Any check failed — this counts as a finding (add to report)
+2. Wait for PR CI checks to complete:
+   ```
+   gh pr checks <PR> --watch --fail-fast
+   ```
+   - If `--watch` is not supported, poll manually: run `gh pr checks <PR>` every 30 seconds until no checks have status `pending` or `in_progress`
+   - After all checks complete:
+     - All passed — continue to verdict
+     - Any check failed — this counts as a finding (add failed check names to report)
 3. Determine verdict:
    - **Ready to merge** — zero findings AND all CI checks passed
    - **Not ready to merge** — at least one finding of any priority OR any CI check failed
