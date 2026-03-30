@@ -344,4 +344,108 @@ describe('ErrorNormalizer', () => {
     expect(normalized.type).toBe('provider');
     expect(normalized.statusCode).toBe(503);
   });
+
+  /* Preconditions: Real AI SDK APICallError uses name 'AI_APICallError' with statusCode 500
+     Action: normalizeLLMError
+     Assertions: mapped to provider with statusCode: 500
+     Requirements: llm-integration.3.10, llm-integration.3.11 */
+  it('maps AI_APICallError (real AI SDK name) with statusCode 500 to provider', () => {
+    const normalized = normalizeLLMError({
+      name: 'AI_APICallError',
+      statusCode: 500,
+      message: 'Internal Server Error',
+    });
+    expect(normalized.type).toBe('provider');
+    expect(normalized.statusCode).toBe(500);
+    expect(normalized.message).toBe('Provider service unavailable. Please try again later.');
+  });
+
+  /* Preconditions: Real AI SDK APICallError uses name 'AI_APICallError' with statusCode 401
+     Action: normalizeLLMError
+     Assertions: mapped to auth with statusCode: 401
+     Requirements: llm-integration.3.10, llm-integration.3.11 */
+  it('maps AI_APICallError (real AI SDK name) with statusCode 401 to auth', () => {
+    const normalized = normalizeLLMError({
+      name: 'AI_APICallError',
+      statusCode: 401,
+      message: 'Unauthorized',
+    });
+    expect(normalized.type).toBe('auth');
+    expect(normalized.statusCode).toBe(401);
+  });
+
+  /* Preconditions: Real AI SDK RetryError (name: AI_RetryError) wraps AI_APICallError in lastError
+     Action: normalizeLLMError
+     Assertions: statusCode is extracted from lastError (not cause) for provider error
+     Requirements: llm-integration.3.10, llm-integration.3.11 */
+  it('maps AI_RetryError with AI_APICallError in lastError to provider with statusCode', () => {
+    const normalized = normalizeLLMError({
+      name: 'AI_RetryError',
+      message: 'Failed after 3 attempts.',
+      lastError: {
+        name: 'AI_APICallError',
+        statusCode: 500,
+        message: 'Internal Server Error',
+      },
+      errors: [
+        {
+          name: 'AI_APICallError',
+          statusCode: 500,
+          message: 'Internal Server Error',
+        },
+      ],
+    });
+    expect(normalized.type).toBe('provider');
+    expect(normalized.statusCode).toBe(500);
+  });
+
+  /* Preconditions: Real AI SDK RetryError wraps AI_APICallError 401 in lastError (auth scenario)
+     Action: normalizeLLMError
+     Assertions: statusCode is extracted from lastError for auth error
+     Requirements: llm-integration.3.10, llm-integration.3.11 */
+  it('maps AI_RetryError with AI_APICallError 401 in lastError to auth with statusCode', () => {
+    const normalized = normalizeLLMError({
+      name: 'AI_RetryError',
+      message: 'Failed after 3 attempts.',
+      lastError: {
+        name: 'AI_APICallError',
+        statusCode: 401,
+        message: 'Unauthorized',
+      },
+      errors: [
+        {
+          name: 'AI_APICallError',
+          statusCode: 401,
+          message: 'Unauthorized',
+        },
+      ],
+    });
+    expect(normalized.type).toBe('auth');
+    expect(normalized.statusCode).toBe(401);
+  });
+
+  /* Preconditions: Real AI SDK RetryError wraps AI_APICallError 429 in errors[]
+     Action: normalizeLLMError
+     Assertions: statusCode extracted from errors array for rate limit
+     Requirements: llm-integration.3.10, llm-integration.3.11 */
+  it('maps AI_RetryError with AI_APICallError 429 in errors to rate_limit with statusCode', () => {
+    const normalized = normalizeLLMError({
+      name: 'AI_RetryError',
+      message: 'Failed after 3 attempts.',
+      lastError: {
+        name: 'AI_APICallError',
+        statusCode: 429,
+        message: 'Too many requests',
+      },
+      errors: [
+        {
+          name: 'AI_APICallError',
+          statusCode: 429,
+          message: 'Too many requests',
+        },
+      ],
+    });
+    expect(normalized.type).toBe('rate_limit');
+    expect(normalized.statusCode).toBe(429);
+  });
 });

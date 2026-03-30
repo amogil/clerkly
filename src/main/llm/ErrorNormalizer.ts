@@ -80,18 +80,51 @@ function parseRetryAfterSecondsFromHeaders(
   return Math.ceil(seconds);
 }
 
+// Requirements: llm-integration.3.10, llm-integration.3.11
+// Real Vercel AI SDK error names use AI_ prefix (e.g. AI_APICallError, AI_RetryError)
+function isAPICallError(name: string): boolean {
+  return name === 'APICallError' || name === 'AI_APICallError';
+}
+
+// Requirements: llm-integration.3.10, llm-integration.3.11
+function isRetryError(name: string): boolean {
+  return name === 'RetryError' || name === 'AI_RetryError';
+}
+
+// Requirements: llm-integration.3.10, llm-integration.3.11
+// Traverse the error cause chain including AI SDK RetryError.lastError and RetryError.errors[]
 function unwrapCauseChain(error: unknown, maxDepth = 6): ErrorWithStatusCode[] {
   const chain: ErrorWithStatusCode[] = [];
-  let current: unknown = error;
-  let depth = 0;
+  const visited = new WeakSet<object>();
 
-  while (current && typeof current === 'object' && depth < maxDepth) {
-    const typed = current as ErrorWithStatusCode;
+  const enqueue = (item: unknown): void => {
+    if (!item || typeof item !== 'object' || chain.length >= maxDepth) return;
+    if (visited.has(item as object)) return;
+    visited.add(item as object);
+
+    const typed = item as ErrorWithStatusCode & {
+      lastError?: unknown;
+      errors?: unknown[];
+    };
     chain.push(typed);
-    current = typed.cause;
-    depth += 1;
-  }
 
+    // Standard Error.cause chain
+    if (typed.cause) {
+      enqueue(typed.cause);
+    }
+
+    // AI SDK RetryError stores the wrapped error in lastError and errors[]
+    if (typed.lastError) {
+      enqueue(typed.lastError);
+    }
+    if (Array.isArray(typed.errors)) {
+      for (const nested of typed.errors) {
+        enqueue(nested);
+      }
+    }
+  };
+
+  enqueue(error);
   return chain;
 }
 
@@ -122,7 +155,7 @@ export function normalizeLLMError(error: unknown): NormalizedLLMError {
     return { type: 'protocol', message: STANDARD_MESSAGES.protocol };
   }
 
-  if (name === 'APICallError') {
+  if (isAPICallError(name)) {
     if (statusCode === undefined) {
       return { type: 'network', message: STANDARD_MESSAGES.network };
     }
@@ -181,7 +214,7 @@ export function normalizeLLMError(error: unknown): NormalizedLLMError {
     return { type: 'network', message: STANDARD_MESSAGES.network };
   }
 
-  if (name === 'RetryError') {
+  if (isRetryError(name)) {
     const chain = unwrapCauseChain(error);
 
     // Requirements: llm-integration.3.11
