@@ -74,17 +74,17 @@ Determine the current PR label (or absence of PR) and proceed to the correspondi
 | Current state                 | Action                              |
 |-------------------------------|-------------------------------------|
 | PR does not exist             | -> Run **planner** (Step 2)         |
-| PR with label `new`           | -> Run **planner** (Step 2)         |
 | PR with label `analysis`      | -> Run **planner** (Step 2)         |
 | PR with label `analysis review` | -> Human approval (Step 3)       |
 | PR with label `ready for code`  | -> Run **coder** (Step 4)        |
 | PR with label `in progress`     | -> Run **coder** (Step 4)        |
 | PR with label `code review`          | -> Run **reviewer** (Step 5)     |
 | PR with label `ready for test`  | -> Task already complete (Step 6)|
+| PR is MERGED or CLOSED         | -> Stop (Step 7)                   |
 
 ### Step 2: Planning (planner)
 
-**When:** PR does not exist, or label is `new`, or `analysis`.
+**When:** PR does not exist, or label is `analysis`.
 
 1. Run **planner** agent with the issue number
 2. After completion, check the PR label:
@@ -155,3 +155,16 @@ Workflow:
 - ✅ Review: <reviewer iteration count>
 ```
 
+### Step 7: Stop (MERGED or CLOSED)
+
+**When:** PR is already merged or closed.
+
+Stop immediately. Do NOT run any agents. Return:
+```
+Result: ⛔ Stopped
+Issue: #<N>
+PR: <link>
+State: MERGED / CLOSED
+
+PR is already merged or closed. No further action needed.
+```
