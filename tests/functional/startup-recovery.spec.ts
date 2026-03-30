@@ -18,6 +18,7 @@ import {
   launchElectronWithMockOAuth,
   expectAgentsVisible,
   killElectron,
+  closeElectron,
   getAgentIdsFromApi,
   ElectronTestContext,
 } from './helpers/electron';
@@ -160,10 +161,8 @@ test.describe('Startup Recovery after SIGKILL', () => {
       };
       expect(payload.data?.output?.status).toBe('cancelled');
     } finally {
-      await context2.app.close();
-      if (fs.existsSync(testDataPath)) {
-        fs.rmSync(testDataPath, { recursive: true, force: true });
-      }
+      // Requirements: testing.12.1 — closeElectron checks for toast errors automatically
+      await closeElectron(context2);
     }
   });
 
@@ -220,10 +219,8 @@ test.describe('Startup Recovery after SIGKILL', () => {
       // done should remain false (hideAndMarkIncomplete semantics)
       expect(staleAfter!.done).toBe(false);
     } finally {
-      await context2.app.close();
-      if (fs.existsSync(testDataPath)) {
-        fs.rmSync(testDataPath, { recursive: true, force: true });
-      }
+      // Requirements: testing.12.1 — closeElectron checks for toast errors automatically
+      await closeElectron(context2);
     }
   });
 
@@ -297,10 +294,8 @@ test.describe('Startup Recovery after SIGKILL', () => {
       expect(llmAfter!.hidden).toBe(true);
       expect(llmAfter!.done).toBe(false);
     } finally {
-      await context2.app.close();
-      if (fs.existsSync(testDataPath)) {
-        fs.rmSync(testDataPath, { recursive: true, force: true });
-      }
+      // Requirements: testing.12.1 — closeElectron checks for toast errors automatically
+      await closeElectron(context2);
     }
   });
 
@@ -341,10 +336,8 @@ test.describe('Startup Recovery after SIGKILL', () => {
       const errorMessages = messages.filter((m) => m.kind === 'error');
       expect(errorMessages.length).toBe(0);
     } finally {
-      await context2.app.close();
-      if (fs.existsSync(testDataPath)) {
-        fs.rmSync(testDataPath, { recursive: true, force: true });
-      }
+      // Requirements: testing.12.1 — closeElectron checks for toast errors automatically
+      await closeElectron(context2);
     }
   });
 });

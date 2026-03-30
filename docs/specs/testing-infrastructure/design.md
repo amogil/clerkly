@@ -184,6 +184,9 @@ interface TestIPCHandlers {
   'test:get-token-status': () => Promise<TokenStatus>;
   'test:clear-data': () => Promise<void>;
   'test:handle-deep-link': (url: string) => Promise<void>;
+  'test:inject-stale-tool-call': (agentId: string, toolName?: string, callId?: string) => Promise<{ success: boolean; messageId?: number }>;
+  'test:inject-stale-llm': (agentId: string, text?: string, reasoning?: string) => Promise<{ success: boolean; messageId?: number }>;
+  'test:get-messages-raw': (agentId: string) => Promise<{ success: boolean; messages?: RawMessage[] }>;
 }
 ```
 
@@ -246,6 +249,56 @@ test('should refresh expired tokens', async () => {
 if (process.env.NODE_ENV !== 'test') {
   throw new Error('Test IPC handlers can only be used in test environment');
 }
+```
+
+#### Handlers для Startup Recovery тестов
+
+**Requirements**: llm-integration.11.6.3, llm-integration.11.6.4
+
+Три IPC handler-а для поддержки функциональных тестов восстановления после аварийного завершения (`startup-recovery.spec.ts`). Зарегистрированы в `src/main/TestIPCHandlers.ts`.
+
+##### `test:inject-stale-tool-call`
+
+Создает `kind:tool_call` сообщение с `done=false` (имитация незавершенного вызова инструмента).
+
+**Параметры**:
+- `agentId: string` — ID агента (обязательный)
+- `toolName: string` — имя инструмента (по умолчанию `code_exec`)
+- `callId?: string` — ID вызова (по умолчанию генерируется автоматически)
+
+**Возвращает**: `{ success: boolean; messageId?: number }`
+
+```typescript
+const result = await invokeTestIpc(window, 'test:inject-stale-tool-call', agentId, 'code_exec');
+```
+
+##### `test:inject-stale-llm`
+
+Создает `kind:llm` сообщение с `done=false`, `hidden=false` (имитация незавершенного стриминга LLM).
+
+**Параметры**:
+- `agentId: string` — ID агента (обязательный)
+- `text?: string` — текст сообщения
+- `reasoning?: string` — текст рассуждения
+
+**Возвращает**: `{ success: boolean; messageId?: number }`
+
+```typescript
+const result = await invokeTestIpc(window, 'test:inject-stale-llm', agentId, 'Partial text...');
+```
+
+##### `test:get-messages-raw`
+
+Возвращает все сообщения агента (включая скрытые) как сырые строки БД. Используется для проверки состояния БД после рестарта без зависимости от UI.
+
+**Параметры**:
+- `agentId: string` — ID агента (обязательный)
+
+**Возвращает**: `{ success: boolean; messages?: RawMessage[] }` где `RawMessage` содержит поля `id`, `agentId`, `kind`, `done`, `hidden`, `payloadJson`, `timestamp`, `replyToMessageId`.
+
+```typescript
+const result = await invokeTestIpc(window, 'test:get-messages-raw', agentId);
+const messages = result.messages; // includes hidden messages
 ```
 
 ### Mock OAuth Server
@@ -403,6 +456,60 @@ async function completeOAuthFlow(
 ): Promise<void>;
 
 async function clearTestTokens(window: Page): Promise<void>;
+
+async function killElectron(
+  context: ElectronTestContext
+): Promise<string>;
+```
+
+#### killElectron
+
+**Назначение**: Убивает процесс Electron через SIGKILL для симуляции аварийного завершения (hard crash). НЕ удаляет `testDataPath` — база данных сохраняется для повторного запуска.
+
+**Requirements**: llm-integration.11.6.3, llm-integration.11.6.4
+
+**Реализация**:
+```typescript
+// Requirements: llm-integration.11.6.3, llm-integration.11.6.4
+export async function killElectron(context: ElectronTestContext): Promise<string> {
+  const proc = context.app.process();
+  const pid = proc.pid;
+
+  if (!pid) {
+    throw new Error('killElectron: Electron process has no PID');
+  }
+
+  // Send SIGKILL to the Electron process
+  process.kill(pid, 'SIGKILL');
+
+  // Wait for the process to exit (poll until PID no longer exists)
+  await waitFor(
+    () => {
+      try {
+        process.kill(pid, 0);
+        return false;
+      } catch {
+        return true;
+      }
+    },
+    10000,
+    100
+  );
+
+  return context.testDataPath;
+}
+```
+
+**Использование**:
+```typescript
+// Kill the app (SIGKILL), preserving testDataPath for relaunch
+const testDataPath = await killElectron(context);
+
+// Relaunch with the same DB
+const { context: context2 } = await launchElectronWithMockOAuth(mockServer, {}, testDataPath);
+
+// After assertions, close with toast error check
+await closeElectron(context2);
 ```
 
 **Реализация**:
