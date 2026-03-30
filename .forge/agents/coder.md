@@ -62,7 +62,7 @@ Error: GitHub issue number not provided. Please pass the issue number (e.g., "Im
 
 ### Step 2: Implementation
 
-Execute plan phases strictly in the specified order. Do not skip or reorder phases.
+Execute plan phases starting from the first phase with uncompleted items (`- [ ]`). Skip phases where all items are already marked `- [x]` (e.g., Phase 1: Specifications is typically completed by the planner).
 
 Principles for each phase:
 - Do exactly what the phase specifies — no more, no less

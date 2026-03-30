@@ -6,11 +6,12 @@ max_walker_depth: 10
 tools:
   - read
   - write
+  - patch
   - shell
   - fetch
   - search
 custom_rules: |
-  - NEVER modify project files. The only exception is creating the plan file.
+  - NEVER modify code, tests, or config files. You MAY only create/edit: the plan file and specification files (`docs/specs/**/requirements.md`, `docs/specs/**/design.md`).
   - Check for conflicts between specifications of different features. If the plan affects multiple features — read ALL their specifications.
   - Do NOT assume code structure — read actual files before planning.
   - Language: English for plans and all output. Specifications (requirements.md, design.md) are written in Russian.
@@ -118,7 +119,21 @@ What exactly needs to be done and why. Links to specific code lines.
 - [Risk 1 — description and mitigation]
 ```
 
-### Step 3: Finish
+### Step 3: Execute Phase 1 (Specifications)
+
+After the plan is written, execute Phase 1 yourself:
+
+1. Update `requirements.md` — add/modify requirements as described in the plan
+2. Update `design.md` — add/modify architecture sections, coverage tables as described in the plan
+3. Mark completed items in the plan file (`- [x]`)
+4. Commit specification changes together with the plan file
+
+**Rules:**
+- Follow `AGENTS.md` rules for specification format (EARS for requirements, Russian language, requirement IDs)
+- Do NOT touch any files outside `docs/specs/`
+- If Phase 1 has no specification changes (rare) — skip this step
+
+### Step 4: Finish
 
 **Plan readiness checklist.**
 
@@ -139,6 +154,11 @@ Before determining the final label, check ALL items:
 - [ ] Tests planned with covered requirement IDs
 - [ ] Phases in correct order: specifications -> code -> tests -> finalization
 
+**Phase 1 execution:**
+- [ ] Specification changes from Phase 1 applied (requirements.md, design.md)
+- [ ] Phase 1 items marked `- [x]` in plan file
+- [ ] Specification changes committed
+
 **Quality:**
 - [ ] No conflicts with other specifications
 - [ ] Risks identified and described with mitigation
@@ -151,7 +171,7 @@ If branch for the task does not exist yet — create from fresh remote main: `gi
 
 Agent finishes:
 
-1. Commit plan file to branch
+1. Commit plan file and specification changes to branch (if not already committed in Step 3)
 2. Push branch
 3. If PR does not exist — create PR (draft) with label `analysis`, description includes: link to issue, task summary, link to plan file. If PR exists and not draft — convert to draft (`gh pr ready <PR> --undo`).
 4. If there are ambiguities or open questions — leave them as inline threads in PR on specific code/specification lines
@@ -166,6 +186,9 @@ Result: ✅ plan ready / ❓ open questions remain
 PR: <PR link>
 Label: analysis review / analysis
 Plan file: <path to file>
+Spec changes:
+- ✅ [spec file 1 — what changed]
+- ✅ [spec file 2 — what changed]
 Actions:
 - ✅ [action 1]
 - ✅ [action 2]
