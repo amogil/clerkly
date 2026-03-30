@@ -517,7 +517,13 @@ describe('MessagesRepository', () => {
        Requirements: llm-integration.11.6.4 */
     it('should return kind:llm with done=false and hidden=false', () => {
       const agent = agentsRepo.create('Test');
-      const llmMsg = messagesRepo.create(agent.agentId, 'llm', '{"data":{"text":"partial"}}', null, false);
+      const llmMsg = messagesRepo.create(
+        agent.agentId,
+        'llm',
+        '{"data":{"text":"partial"}}',
+        null,
+        false
+      );
 
       const stale = messagesRepo.listStaleLlmMessages();
       expect(stale).toHaveLength(1);
@@ -545,7 +551,13 @@ describe('MessagesRepository', () => {
        Requirements: llm-integration.11.6.4 */
     it('should exclude kind:llm with hidden=true (already hidden)', () => {
       const agent = agentsRepo.create('Test');
-      const llmMsg = messagesRepo.create(agent.agentId, 'llm', '{"data":{"text":"hidden"}}', null, false);
+      const llmMsg = messagesRepo.create(
+        agent.agentId,
+        'llm',
+        '{"data":{"text":"hidden"}}',
+        null,
+        false
+      );
       messagesRepo.setHidden(llmMsg.id, agent.agentId);
 
       const stale = messagesRepo.listStaleLlmMessages();
@@ -559,8 +571,20 @@ describe('MessagesRepository', () => {
     it('should exclude other kinds (user, error, tool_call)', () => {
       const agent = agentsRepo.create('Test');
       messagesRepo.create(agent.agentId, 'user', '{"data":{"text":"hello"}}', null, false);
-      messagesRepo.create(agent.agentId, 'error', '{"data":{"error":{"message":"fail"}}}', null, false);
-      messagesRepo.create(agent.agentId, 'tool_call', '{"data":{"toolName":"code_exec"}}', null, false);
+      messagesRepo.create(
+        agent.agentId,
+        'error',
+        '{"data":{"error":{"message":"fail"}}}',
+        null,
+        false
+      );
+      messagesRepo.create(
+        agent.agentId,
+        'tool_call',
+        '{"data":{"toolName":"code_exec"}}',
+        null,
+        false
+      );
 
       const stale = messagesRepo.listStaleLlmMessages();
       expect(stale).toHaveLength(0);
@@ -573,17 +597,27 @@ describe('MessagesRepository', () => {
     it('should filter by current user via agents join', () => {
       // Current user's agent and stale llm
       const agent = agentsRepo.create('My Agent');
-      const llmMsg = messagesRepo.create(agent.agentId, 'llm', '{"data":{"text":"mine"}}', null, false);
+      const llmMsg = messagesRepo.create(
+        agent.agentId,
+        'llm',
+        '{"data":{"text":"mine"}}',
+        null,
+        false
+      );
 
       // Other user's agent and stale llm (inserted directly)
-      db.insert(agents).values({
-        agentId: 'other-agent',
-        userId: 'other_user',
-        name: 'Other',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }).run();
-      sqlite.exec(`INSERT INTO messages (agent_id, kind, timestamp, payload_json, hidden, done) VALUES ('other-agent', 'llm', '${new Date().toISOString()}', '{"data":{"text":"theirs"}}', 0, 0)`);
+      db.insert(agents)
+        .values({
+          agentId: 'other-agent',
+          userId: 'other_user',
+          name: 'Other',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        })
+        .run();
+      sqlite.exec(
+        `INSERT INTO messages (agent_id, kind, timestamp, payload_json, hidden, done) VALUES ('other-agent', 'llm', '${new Date().toISOString()}', '{"data":{"text":"theirs"}}', 0, 0)`
+      );
 
       const stale = messagesRepo.listStaleLlmMessages();
       expect(stale).toHaveLength(1);

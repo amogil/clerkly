@@ -104,8 +104,8 @@ The fix sets `hidden=true` rather than `done=true` because:
 
 ### Phase 4: Finalization
 
-- [ ] Update coverage table in `docs/specs/llm-integration/design.md` with `llm-integration.11.6.4` row.
-- [ ] Run `npm run validate`.
+- [x] Update coverage table in `docs/specs/llm-integration/design.md` with `llm-integration.11.6.4` row.
+- [x] Run `npm run validate`.
 
 ## Files to change
 

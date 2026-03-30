@@ -474,6 +474,8 @@ export class MessageManager {
       this.dbManager.messages.setHidden(row.id, row.agentId);
     }
 
-    this.logger.info(`Startup: hidden ${staleRows.length} stale kind:llm message(s) across all agents`);
+    this.logger.info(
+      `Startup: hidden ${staleRows.length} stale kind:llm message(s) across all agents`
+    );
   }
 }
