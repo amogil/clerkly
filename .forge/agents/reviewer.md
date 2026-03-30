@@ -37,9 +37,9 @@ Error: GitHub issue number not provided. Please pass the issue number (e.g., "Re
 2. Get the issue: `gh issue view <N> --json title,body,labels`
 3. Find the PR: `gh pr list --state all --search "<N>" --json number,title,state,labels,headRefOid`
    - If no PR exists — **STOP**: nothing to review
-   - If PR exists but does NOT have the `code review` label — **STOP** and return:
+   - If PR exists but does NOT have the `review` label — **STOP** and return:
      ```
-     Error: PR #<N> does not have label "code review". The task is not ready for review.
+     Error: PR #<N> does not have label "review". The task is not ready for review.
      Current labels: [list of labels]
      ```
 4. If PR is draft — mark as ready (`gh pr ready <PR>`) so CI checks can run
@@ -110,8 +110,8 @@ Check each item and leave inline threads in the PR for every finding.
    - **Not ready to merge** — at least one finding of any priority OR any CI check failed
 4. Submit review in PR via `gh api repos/<owner>/<repo>/pulls/<PR>/reviews` with event `COMMENT` and the full report
 5. Set the final label on PR:
-   - **`ready for test`** — ready to merge. Remove `code review`
-   - **`in progress`** — not ready to merge. Remove `code review`
+   - **`ready for test`** — ready to merge. Remove `review`
+   - **`in progress`** — not ready to merge. Remove `review`
 6. Return report:
 
 ```
@@ -149,5 +149,5 @@ Created threads:
 - 🚫 — issues found: list + links to created inline threads
 - 🥺 — not applicable (with reason)
 
-**PR label flow:** `code review` -> `ready for test` (approved) or `in progress` (needs rework by coder)
+**PR label flow:** `review` -> `ready for test` (approved) or `in progress` (needs rework by coder)
 

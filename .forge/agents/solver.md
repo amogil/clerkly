@@ -42,7 +42,7 @@ Which task should I work on? Please provide a GitHub issue number (e.g., #89).
                                             | Human approves plan
                                             v
                                      +----------------+
-                                     | ready for code |
+                                     | ready for work |
                                      +----------------+
                                             |
                                             | Coder (first run)
@@ -77,9 +77,9 @@ Determine the current PR label (or absence of PR) and proceed to the correspondi
 | PR with label `new`           | -> Run **planner** (Step 2)         |
 | PR with label `analysis`      | -> Run **planner** (Step 2)         |
 | PR with label `analysis review` | -> Human approval (Step 3)       |
-| PR with label `ready for code`  | -> Run **coder** (Step 4)        |
+| PR with label `ready for work`  | -> Run **coder** (Step 4)        |
 | PR with label `in progress`     | -> Run **coder** (Step 4)        |
-| PR with label `code review`          | -> Run **reviewer** (Step 5)     |
+| PR with label `review`          | -> Run **reviewer** (Step 5)     |
 | PR with label `ready for test`  | -> Task already complete (Step 6)|
 
 ### Step 2: Planning (planner)
@@ -108,30 +108,30 @@ Determine the current PR label (or absence of PR) and proceed to the correspondi
    Plan file: <path>
 
    Please review the plan and:
-   - If approved — set label `ready for code` on the PR
+   - If approved — set label `ready for work` on the PR
    - If changes needed — leave inline comments on the PR
 
    Reply when ready to proceed.
    ```
 2. **STOP and wait for the user's response**
 3. When the user replies — check the PR label:
-   - `ready for code` — proceed to **Step 4**
+   - `ready for work` — proceed to **Step 4**
    - `analysis review` (label unchanged) — check open inline threads in the PR:
      - If there are open threads — user left comments. Proceed to **Step 2** (re-run planner)
-     - If no open threads — user approved the plan but did not change the label. Remove `analysis review`, set `ready for code`, and proceed to **Step 4**
+     - If no open threads — user approved the plan but did not change the label. Remove `analysis review`, set `ready for work`, and proceed to **Step 4**
 
 ### Step 4: Implementation (coder)
 
-**When:** PR has label `ready for code` or `in progress`.
+**When:** PR has label `ready for work` or `in progress`.
 
 1. Run **coder** agent with the issue number
 2. After completion, check the PR label:
-   - `code review` — implementation complete. Proceed to **Step 5**
+   - `review` — implementation complete. Proceed to **Step 5**
    - Coder returned a question via `followup` — relay the question to the user, wait for the answer, re-run **coder** (repeat Step 4)
 
 ### Step 5: Review (reviewer)
 
-**When:** PR has label `code review`.
+**When:** PR has label `review`.
 
 1. Run **reviewer** agent with the issue number
 2. After completion, check the PR label:

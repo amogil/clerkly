@@ -41,16 +41,16 @@ Error: GitHub issue number not provided. Please pass the issue number (e.g., "Im
 2. Get task: `gh issue view <N> --json title,body,labels`
 3. Find PR for the task: `gh pr list --state all --search "<N>" --json number,title,state,labels`
    - If no PR — **STOP**: task has not passed the planning stage
-   - If PR exists but does NOT have label `ready for code` or `in progress` — **STOP** and return:
+   - If PR exists but does NOT have label `ready for work` or `in progress` — **STOP** and return:
      ```
-     Error: PR #<N> does not have label "ready for code" or "in progress". The task is not ready for implementation.
+     Error: PR #<N> does not have label "ready for work" or "in progress". The task is not ready for implementation.
      Current labels: [label list]
      ```
 4. Read review threads in PR:
    - Closed — already resolved questions, accepted decisions
    - Open — review comments to address during implementation
 5. Find all plan files in the PR branch (`plan-*.md`) and read them
-6. Set label `in progress` on PR, remove `ready for code` if present
+6. Set label `in progress` on PR, remove `ready for work` if present
 7. If PR is not draft — convert to draft (`gh pr ready <PR> --undo`) to prevent CI runs during active development
 8. Read specifications referenced in the plans:
    - `requirements.md`
@@ -84,7 +84,7 @@ If any condition is not met — **do NOT finish**, keep fixing. Use `followup` i
 When all conditions are met:
 
 1. Commit remaining changes (if any) and push branch
-2. Set label `code review` on PR, removing others
+2. Set label `review` on PR, removing others
 3. Close all open review threads that were fixed
 4. Return report:
 
@@ -102,7 +102,7 @@ Closed comments:
 - ✅ [comment — link to thread]
 ```
 
-**PR label flow:** `ready for code` -> `in progress` -> `code review`
+**PR label flow:** `ready for work` -> `in progress` -> `review`
 
 ---
 
