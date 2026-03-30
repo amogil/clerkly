@@ -203,4 +203,249 @@ describe('ErrorNormalizer', () => {
       'Model response timeout. The provider took too long to respond. Please try again later.'
     );
   });
+
+  /* Preconditions: APICallError with statusCode 503
+     Action: normalizeLLMError
+     Assertions: normalized error includes statusCode: 503
+     Requirements: llm-integration.3.11 */
+  it('should include statusCode in normalized error for APICallError 5xx', () => {
+    const normalized = normalizeLLMError({
+      name: 'APICallError',
+      statusCode: 503,
+      message: 'Service unavailable',
+    });
+    expect(normalized.type).toBe('provider');
+    expect(normalized.statusCode).toBe(503);
+    expect(normalized.message).toBe('Provider service unavailable. Please try again later.');
+  });
+
+  /* Preconditions: APICallError with statusCode 500
+     Action: normalizeLLMError
+     Assertions: normalized error includes statusCode: 500
+     Requirements: llm-integration.3.11 */
+  it('should include statusCode 500 in normalized error for APICallError', () => {
+    const normalized = normalizeLLMError({
+      name: 'APICallError',
+      statusCode: 500,
+      message: 'Internal server error',
+    });
+    expect(normalized.type).toBe('provider');
+    expect(normalized.statusCode).toBe(500);
+  });
+
+  /* Preconditions: APICallError with statusCode 502
+     Action: normalizeLLMError
+     Assertions: normalized error includes statusCode: 502
+     Requirements: llm-integration.3.11 */
+  it('should include statusCode 502 in normalized error for APICallError', () => {
+    const normalized = normalizeLLMError({
+      name: 'APICallError',
+      statusCode: 502,
+      message: 'Bad gateway',
+    });
+    expect(normalized.type).toBe('provider');
+    expect(normalized.statusCode).toBe(502);
+  });
+
+  /* Preconditions: APICallError with statusCode 401
+     Action: normalizeLLMError
+     Assertions: normalized error includes statusCode: 401
+     Requirements: llm-integration.3.11 */
+  it('should include statusCode in normalized error for APICallError 401/403', () => {
+    const normalized401 = normalizeLLMError({
+      name: 'APICallError',
+      statusCode: 401,
+      message: 'Unauthorized',
+    });
+    expect(normalized401.type).toBe('auth');
+    expect(normalized401.statusCode).toBe(401);
+
+    const normalized403 = normalizeLLMError({
+      name: 'APICallError',
+      statusCode: 403,
+      message: 'Forbidden',
+    });
+    expect(normalized403.type).toBe('auth');
+    expect(normalized403.statusCode).toBe(403);
+  });
+
+  /* Preconditions: APICallError with statusCode 429
+     Action: normalizeLLMError
+     Assertions: normalized error includes statusCode: 429
+     Requirements: llm-integration.3.11 */
+  it('should include statusCode in normalized error for APICallError 429', () => {
+    const normalized = normalizeLLMError({
+      name: 'APICallError',
+      statusCode: 429,
+      message: 'Too many requests',
+    });
+    expect(normalized.type).toBe('rate_limit');
+    expect(normalized.statusCode).toBe(429);
+  });
+
+  /* Preconditions: Error with no HTTP status code (network error, timeout, tool error)
+     Action: normalizeLLMError
+     Assertions: statusCode is undefined in normalized error
+     Requirements: llm-integration.3.11 */
+  it('should not include statusCode when original error has no HTTP status', () => {
+    const networkError = normalizeLLMError({
+      name: 'APICallError',
+      message: 'fetch failed',
+    });
+    expect(networkError.type).toBe('network');
+    expect(networkError.statusCode).toBeUndefined();
+
+    const timeoutError = normalizeLLMError(
+      new LLMRequestAbortedError('timeout', new Error('aborted'))
+    );
+    expect(timeoutError.type).toBe('timeout');
+    expect(timeoutError.statusCode).toBeUndefined();
+
+    const toolError = normalizeLLMError({
+      name: 'ToolExecutionError',
+      message: 'tool failed',
+    });
+    expect(toolError.type).toBe('tool');
+    expect(toolError.statusCode).toBeUndefined();
+  });
+
+  /* Preconditions: RetryError wrapping APICallError with statusCode 401 in cause chain
+     Action: normalizeLLMError
+     Assertions: statusCode is extracted from cause chain
+     Requirements: llm-integration.3.11 */
+  it('should extract statusCode from RetryError cause chain', () => {
+    const normalized = normalizeLLMError({
+      name: 'RetryError',
+      message: 'Retries exhausted',
+      cause: {
+        name: 'APICallError',
+        statusCode: 401,
+        message: 'Unauthorized',
+      },
+    });
+    expect(normalized.type).toBe('auth');
+    expect(normalized.statusCode).toBe(401);
+  });
+
+  /* Preconditions: RetryError wrapping APICallError with statusCode 503 in cause chain (generic fallback)
+     Action: normalizeLLMError
+     Assertions: statusCode is extracted from cause chain for generic RetryError
+     Requirements: llm-integration.3.11 */
+  it('should extract statusCode from RetryError cause chain for 5xx fallback', () => {
+    const normalized = normalizeLLMError({
+      name: 'RetryError',
+      message: 'Retries exhausted',
+      cause: {
+        name: 'APICallError',
+        statusCode: 503,
+        message: 'Service unavailable',
+      },
+    });
+    expect(normalized.type).toBe('provider');
+    expect(normalized.statusCode).toBe(503);
+  });
+
+  /* Preconditions: Real AI SDK APICallError uses name 'AI_APICallError' with statusCode 500
+     Action: normalizeLLMError
+     Assertions: mapped to provider with statusCode: 500
+     Requirements: llm-integration.3.10, llm-integration.3.11 */
+  it('maps AI_APICallError (real AI SDK name) with statusCode 500 to provider', () => {
+    const normalized = normalizeLLMError({
+      name: 'AI_APICallError',
+      statusCode: 500,
+      message: 'Internal Server Error',
+    });
+    expect(normalized.type).toBe('provider');
+    expect(normalized.statusCode).toBe(500);
+    expect(normalized.message).toBe('Provider service unavailable. Please try again later.');
+  });
+
+  /* Preconditions: Real AI SDK APICallError uses name 'AI_APICallError' with statusCode 401
+     Action: normalizeLLMError
+     Assertions: mapped to auth with statusCode: 401
+     Requirements: llm-integration.3.10, llm-integration.3.11 */
+  it('maps AI_APICallError (real AI SDK name) with statusCode 401 to auth', () => {
+    const normalized = normalizeLLMError({
+      name: 'AI_APICallError',
+      statusCode: 401,
+      message: 'Unauthorized',
+    });
+    expect(normalized.type).toBe('auth');
+    expect(normalized.statusCode).toBe(401);
+  });
+
+  /* Preconditions: Real AI SDK RetryError (name: AI_RetryError) wraps AI_APICallError in lastError
+     Action: normalizeLLMError
+     Assertions: statusCode is extracted from lastError (not cause) for provider error
+     Requirements: llm-integration.3.10, llm-integration.3.11 */
+  it('maps AI_RetryError with AI_APICallError in lastError to provider with statusCode', () => {
+    const normalized = normalizeLLMError({
+      name: 'AI_RetryError',
+      message: 'Failed after 3 attempts.',
+      lastError: {
+        name: 'AI_APICallError',
+        statusCode: 500,
+        message: 'Internal Server Error',
+      },
+      errors: [
+        {
+          name: 'AI_APICallError',
+          statusCode: 500,
+          message: 'Internal Server Error',
+        },
+      ],
+    });
+    expect(normalized.type).toBe('provider');
+    expect(normalized.statusCode).toBe(500);
+  });
+
+  /* Preconditions: Real AI SDK RetryError wraps AI_APICallError 401 in lastError (auth scenario)
+     Action: normalizeLLMError
+     Assertions: statusCode is extracted from lastError for auth error
+     Requirements: llm-integration.3.10, llm-integration.3.11 */
+  it('maps AI_RetryError with AI_APICallError 401 in lastError to auth with statusCode', () => {
+    const normalized = normalizeLLMError({
+      name: 'AI_RetryError',
+      message: 'Failed after 3 attempts.',
+      lastError: {
+        name: 'AI_APICallError',
+        statusCode: 401,
+        message: 'Unauthorized',
+      },
+      errors: [
+        {
+          name: 'AI_APICallError',
+          statusCode: 401,
+          message: 'Unauthorized',
+        },
+      ],
+    });
+    expect(normalized.type).toBe('auth');
+    expect(normalized.statusCode).toBe(401);
+  });
+
+  /* Preconditions: Real AI SDK RetryError wraps AI_APICallError 429 in errors[]
+     Action: normalizeLLMError
+     Assertions: statusCode extracted from errors array for rate limit
+     Requirements: llm-integration.3.10, llm-integration.3.11 */
+  it('maps AI_RetryError with AI_APICallError 429 in errors to rate_limit with statusCode', () => {
+    const normalized = normalizeLLMError({
+      name: 'AI_RetryError',
+      message: 'Failed after 3 attempts.',
+      lastError: {
+        name: 'AI_APICallError',
+        statusCode: 429,
+        message: 'Too many requests',
+      },
+      errors: [
+        {
+          name: 'AI_APICallError',
+          statusCode: 429,
+          message: 'Too many requests',
+        },
+      ],
+    });
+    expect(normalized.type).toBe('rate_limit');
+    expect(normalized.statusCode).toBe(429);
+  });
 });

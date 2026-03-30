@@ -2208,10 +2208,14 @@ export class MainPipeline {
         return;
       }
 
+      // Requirements: llm-integration.3.11
       const errorPayload: Record<string, unknown> = {
         type: errorType,
         message: normalizedError.message,
       };
+      if (normalizedError.statusCode !== undefined) {
+        errorPayload['statusCode'] = normalizedError.statusCode;
+      }
       if (errorType === 'auth') {
         errorPayload['action_link'] = { label: 'Open Settings', screen: 'settings' };
       }

@@ -1180,8 +1180,9 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
   /* Preconditions: MockLLMServer configured to return HTTP 500,
        app authenticated with mock LLM URL
      Action: User sends a message
-     Assertions: message-error bubble appears with provider unavailable text
-     Requirements: llm-integration.3.1, llm-integration.3.5 */
+     Assertions: message-error bubble appears with provider unavailable text;
+       persisted error payload includes statusCode: 500 for diagnostics
+     Requirements: llm-integration.3.1, llm-integration.3.5, llm-integration.3.11 */
   test('should show provider error message on 500', async () => {
     mockLLMServer.setSuccess(false);
     mockLLMServer.setError(500, 'Internal Server Error');
@@ -1197,6 +1198,32 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
 
     const text = await errorBubble.textContent();
     expect(text?.toLowerCase()).toMatch(/unavailable|try again/);
+
+    // Requirements: llm-integration.3.11 — verify statusCode is persisted in error payload
+    const agentIds = await getAgentIdsFromApi(context.window);
+    expect(agentIds.length).toBeGreaterThan(0);
+    const errorStatusCode = await context.window.evaluate(async (agentId) => {
+      const api = (
+        window as unknown as {
+          api: {
+            messages: {
+              list: (agentId: string) => Promise<{
+                success: boolean;
+                data?: Array<{
+                  kind: string;
+                  payload?: { data?: { error?: { statusCode?: number } } };
+                }>;
+              }>;
+            };
+          };
+        }
+      ).api;
+      const result = await api.messages.list(agentId);
+      if (!result.success || !result.data) return undefined;
+      const errorMsg = result.data.find((m) => m.kind === 'error');
+      return errorMsg?.payload?.data?.error?.statusCode;
+    }, agentIds[0]);
+    expect(errorStatusCode).toBe(500);
   });
 
   /* Preconditions: MockLLMServer returns 500 on first request, success on second;

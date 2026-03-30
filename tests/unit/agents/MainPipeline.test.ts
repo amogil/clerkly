@@ -4130,4 +4130,87 @@ describe('MainPipeline.run()', () => {
     );
     expect(toolCallFinalizations).toHaveLength(0);
   });
+
+  /* Preconditions: Provider throws APICallError with statusCode 503 before any chunks
+     Action: pipeline.run() — normalizeLLMError produces { type: 'provider', statusCode: 503 }
+     Assertions: kind:error payload includes statusCode: 503 alongside type and message
+     Requirements: llm-integration.3.11 */
+  it('should persist statusCode in kind:error payload when provider returns 5xx', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(async () => {
+      const err = Object.assign(new Error('Service unavailable'), {
+        name: 'APICallError',
+        statusCode: 503,
+      });
+      throw err;
+    });
+
+    await pipeline.run('agent-1', 1);
+
+    const errorCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'error'
+    );
+    expect(errorCreates).toHaveLength(1);
+    const errorPayload = errorCreates[0]?.[2] as {
+      data: { error: { type: string; message: string; statusCode?: number } };
+    };
+    expect(errorPayload.data.error.type).toBe('provider');
+    expect(errorPayload.data.error.statusCode).toBe(503);
+    expect(errorPayload.data.error.message).toBe(
+      'Provider service unavailable. Please try again later.'
+    );
+  });
+
+  /* Preconditions: Provider throws APICallError with statusCode 401 before any chunks
+     Action: pipeline.run() — normalizeLLMError produces { type: 'auth', statusCode: 401 }
+     Assertions: kind:error payload includes statusCode: 401
+     Requirements: llm-integration.3.11 */
+  it('should persist statusCode in kind:error payload when provider returns 401', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(async () => {
+      const err = Object.assign(new Error('Unauthorized'), {
+        name: 'APICallError',
+        statusCode: 401,
+      });
+      throw err;
+    });
+
+    await pipeline.run('agent-1', 1);
+
+    const errorCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'error'
+    );
+    expect(errorCreates).toHaveLength(1);
+    const errorPayload = errorCreates[0]?.[2] as {
+      data: { error: { type: string; message: string; statusCode?: number } };
+    };
+    expect(errorPayload.data.error.type).toBe('auth');
+    expect(errorPayload.data.error.statusCode).toBe(401);
+  });
+
+  /* Preconditions: Provider throws timeout error (no HTTP status)
+     Action: pipeline.run() — normalizeLLMError produces { type: 'timeout' } without statusCode
+     Assertions: kind:error payload does NOT include statusCode
+     Requirements: llm-integration.3.11 */
+  it('should not persist statusCode in kind:error payload when error has no HTTP status', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    llmProvider.chat.mockImplementation(async () => {
+      throw new LLMRequestAbortedError('timeout', new Error('aborted'));
+    });
+
+    await pipeline.run('agent-1', 1);
+
+    const errorCreates = (messageManager.create as jest.Mock).mock.calls.filter(
+      (call: unknown[]) => call[1] === 'error'
+    );
+    expect(errorCreates).toHaveLength(1);
+    const errorPayload = errorCreates[0]?.[2] as {
+      data: { error: Record<string, unknown> };
+    };
+    expect(errorPayload.data.error['type']).toBe('timeout');
+    expect(errorPayload.data.error['statusCode']).toBeUndefined();
+  });
 });
