@@ -60,22 +60,22 @@ APICallError { statusCode: 503 }
 
 ### Phase 2: Code
 
-- [ ] Modify `src/main/llm/ErrorNormalizer.ts` -- add `statusCode?: number` to `NormalizedLLMError` interface; populate it in `normalizeLLMError()` whenever `statusCode` is available from the error or its cause chain
-- [ ] Modify `src/main/agents/MainPipeline.ts` -- in `handleRunError()`, include `normalizedError.statusCode` in the error payload when it is defined (both in the general error path at line ~2211 and in the `InvalidToolCallRetryExhaustedError` path at line ~2129)
+- [x] Modify `src/main/llm/ErrorNormalizer.ts` -- add `statusCode?: number` to `NormalizedLLMError` interface; populate it in `normalizeLLMError()` whenever `statusCode` is available from the error or its cause chain
+- [x] Modify `src/main/agents/MainPipeline.ts` -- in `handleRunError()`, include `normalizedError.statusCode` in the error payload when it is defined (both in the general error path at line ~2211 and in the `InvalidToolCallRetryExhaustedError` path at line ~2129)
 
 ### Phase 3: Tests
 
-- [ ] Add unit test `tests/unit/llm/ErrorNormalizer.test.ts` -- "should include statusCode in normalized error for APICallError 5xx" (verifies `llm-integration.3.11`)
-- [ ] Add unit test `tests/unit/llm/ErrorNormalizer.test.ts` -- "should include statusCode in normalized error for APICallError 401/403" (verifies `llm-integration.3.11`)
-- [ ] Add unit test `tests/unit/llm/ErrorNormalizer.test.ts` -- "should include statusCode in normalized error for APICallError 429" (verifies `llm-integration.3.11`)
-- [ ] Add unit test `tests/unit/llm/ErrorNormalizer.test.ts` -- "should not include statusCode when original error has no HTTP status" (verifies `llm-integration.3.11`)
-- [ ] Add unit test `tests/unit/agents/MainPipeline.test.ts` -- "should persist statusCode in kind:error payload when provider returns 5xx" (verifies `llm-integration.3.11`)
-- [ ] Add/update functional test `tests/functional/llm-chat.spec.ts` -- "should show provider error message on 500" -- verify `statusCode` is present in persisted error payload (verifies `llm-integration.3.11`)
+- [x] Add unit test `tests/unit/llm/ErrorNormalizer.test.ts` -- "should include statusCode in normalized error for APICallError 5xx" (verifies `llm-integration.3.11`)
+- [x] Add unit test `tests/unit/llm/ErrorNormalizer.test.ts` -- "should include statusCode in normalized error for APICallError 401/403" (verifies `llm-integration.3.11`)
+- [x] Add unit test `tests/unit/llm/ErrorNormalizer.test.ts` -- "should include statusCode in normalized error for APICallError 429" (verifies `llm-integration.3.11`)
+- [x] Add unit test `tests/unit/llm/ErrorNormalizer.test.ts` -- "should not include statusCode when original error has no HTTP status" (verifies `llm-integration.3.11`)
+- [x] Add unit test `tests/unit/agents/MainPipeline.test.ts` -- "should persist statusCode in kind:error payload when provider returns 5xx" (verifies `llm-integration.3.11`)
+- [x] Add/update functional test `tests/functional/llm-chat.spec.ts` -- "should show provider error message on 500" -- verify `statusCode` is present in persisted error payload (verifies `llm-integration.3.11`)
 
 ### Phase 4: Finalization
 
-- [ ] Update coverage table in `design.md` (already done in Phase 1 for the new requirement row)
-- [ ] Run `npm run validate`
+- [x] Update coverage table in `design.md` (already done in Phase 1 for the new requirement row)
+- [x] Run `npm run validate`
 
 ## Files to change
 
