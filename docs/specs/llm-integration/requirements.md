@@ -575,6 +575,10 @@
 - `tests/functional/llm-chat.spec.ts` — "should include final_answer non-duplication rules in system prompt"
 - `tests/functional/llm-chat.spec.ts` — "should not render raw final_answer JSON text when tool_call(final_answer) is present"
 - `tests/functional/llm-chat.spec.ts` — "should not render duplicate markdown summary before final_answer checklist"
+- `tests/functional/startup-recovery.spec.ts` — "should finalize stale tool_call records after SIGKILL restart"
+- `tests/functional/startup-recovery.spec.ts` — "should hide stale llm messages after SIGKILL restart"
+- `tests/functional/startup-recovery.spec.ts` — "should recover both stale tool_call and stale llm after SIGKILL restart"
+- `tests/functional/startup-recovery.spec.ts` — "should handle SIGKILL restart with no stale messages (no-op)"
 
 ### 12. Надёжность chat-flow и обработка некорректных ответов
 
