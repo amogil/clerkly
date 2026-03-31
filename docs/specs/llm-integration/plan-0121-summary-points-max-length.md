@@ -36,19 +36,19 @@ The `code_exec.task_summary` also uses `maxLength: 200` (`src/main/code_exec/con
 - [x] Update `design.md` -- update `PromptBuilder` tool schema snippet to reflect `maxLength: 300`
 
 ### Phase 2: Code
-- [ ] Modify `src/main/agents/PromptBuilder.ts` -- change `maxLength: 200` to `maxLength: 300` at line 466; update prompt text at lines 440 and 460 to say "max 300 characters" and add "Each point must end on a complete word — never cut off mid-word; rephrase if near the limit."
-- [ ] Modify `src/main/agents/MainPipeline.ts` -- change `point.length > 200` to `point.length > 300` and update error message at lines 1870-1873
+- [x] Modify `src/main/agents/PromptBuilder.ts` -- change `maxLength: 200` to `maxLength: 300` at line 466; update prompt text at lines 440 and 460 to say "max 300 characters" and add "Each point must end on a complete word — never cut off mid-word; rephrase if near the limit."
+- [x] Modify `src/main/agents/MainPipeline.ts` -- change `point.length > 200` to `point.length > 300` and update error message at lines 1870-1873
 
 ### Phase 3: Tests
-- [ ] Update unit test `tests/unit/agents/PromptBuilder.test.ts` -- change `maxLength: 200` assertion to `maxLength: 300` (line 200); covers `llm-integration.9.5.3`
-- [ ] Update unit test `tests/unit/agents/MainPipeline.test.ts` -- change `max 200 characters` assertion to `max 300 characters` (line 552); covers `llm-integration.9.5.1.1`
-- [ ] Add unit test in `tests/unit/agents/MainPipeline.test.ts` -- validate runtime rejects items > 300 chars and accepts items <= 300 chars; covers `llm-integration.9.5.3`
-- [ ] Add unit test in `tests/unit/agents/PromptBuilder.test.ts` -- verify prompt text contains "complete word" / "never cut off mid-word" instruction; covers `llm-integration.9.5.3.4`
-- [ ] Update functional test `tests/functional/llm-chat.spec.ts` -- change `max 200 characters` assertion to `max 300 characters` (line 3197); covers `llm-integration.9.5.3`
+- [x] Update unit test `tests/unit/agents/PromptBuilder.test.ts` -- change `maxLength: 200` assertion to `maxLength: 300` (line 200); covers `llm-integration.9.5.3`
+- [x] Update unit test `tests/unit/agents/MainPipeline.test.ts` -- `max 200 characters` assertion at line 552 is for auto-title contract (not summary_points), no change needed
+- [x] Add unit test in `tests/unit/agents/MainPipeline.test.ts` -- validate runtime rejects items > 300 chars and accepts items <= 300 chars; covers `llm-integration.9.5.3`
+- [x] Add unit test in `tests/unit/agents/PromptBuilder.test.ts` -- verify prompt text contains "complete word" / "never cut off mid-word" instruction; covers `llm-integration.9.5.3.4`
+- [x] Update functional test `tests/functional/llm-chat.spec.ts` -- `max 200 characters` assertion at line 3197 is for auto-title contract (not summary_points), no change needed
 
 ### Phase 4: Finalization
 - [x] Update coverage table in `design.md` -- add row for `llm-integration.9.5.3.4`
-- [ ] Run `npm run validate`
+- [x] Run `npm run validate`
 
 ## Files to change
 

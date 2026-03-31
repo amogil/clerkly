@@ -1867,9 +1867,9 @@ export class MainPipeline {
           'final_answer.summary_points items must be non-empty'
         );
       }
-      if (point.length > 200) {
+      if (point.length > 300) {
         throw new InvalidFinalAnswerContractError(
-          'final_answer.summary_points item length must be <= 200'
+          'final_answer.summary_points item length must be <= 300'
         );
       }
     }

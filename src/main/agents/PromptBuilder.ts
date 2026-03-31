@@ -437,7 +437,7 @@ export class FinalAnswerFeature implements AgentFeature {
       '- Call `final_answer` alone: do not combine it with any other tool call in the same turn.',
       '- Do not duplicate tool payload as plain assistant text: never output raw JSON that mirrors `final_answer` arguments/output.',
       '- If you are about to call `final_answer`, do not emit assistant summary/bullet/checklist content that duplicates solved tasks from `final_answer.summary_points` (including paraphrased duplicates); keep solved-task completion points only in `final_answer.summary_points`.',
-      '- Use `final_answer.summary_points` to list solved tasks (required: 1 to 10 non-empty points, each max 200 characters).',
+      '- Use `final_answer.summary_points` to list solved tasks (required: 1 to 10 non-empty points, each max 300 characters). Each point must end on a complete word — never cut off mid-word; rephrase if near the limit.',
       '- You MAY use Markdown (GFM) inside `final_answer.summary_points` when it improves clarity.',
       '- In `final_answer.summary_points`, mathematical expressions are optional; if used, format them with Markdown math delimiters: inline `$...$`, block `$$...$$`.',
     ].join('\n');
@@ -457,13 +457,13 @@ export class FinalAnswerFeature implements AgentFeature {
             summary_points: {
               type: 'array',
               description:
-                'Required concise list of solved tasks (1-10 points, max 200 chars each).',
+                'Required concise list of solved tasks (1-10 points, max 300 chars each). Each point must end on a complete word — never cut off mid-word; rephrase if near the limit.',
               minItems: 1,
               maxItems: 10,
               items: {
                 type: 'string',
                 minLength: 1,
-                maxLength: 200,
+                maxLength: 300,
                 pattern: '.*\\S.*',
               },
             },
