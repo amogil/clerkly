@@ -677,6 +677,8 @@
 15.2. В текущем scope список `toolName` ДОЛЖЕН состоять ровно из:
   - `final_answer`
   - `code_exec`
+  - `request_scope`
+  - `dummy_tool`
 
 15.3. Другие спецификации (`agents`, `code_exec`, `realtime-events`) SHALL ссылаться на канонический список из `llm-integration` и SHALL NOT переопределять его независимо.
 
