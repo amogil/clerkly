@@ -30,15 +30,15 @@ The current code complies with the existing requirement `agents.7.4.6.5.4` which
 
 ### Phase 2: Code
 
-- [ ] Modify `src/renderer/components/agents/AgentMessage.tsx:502` -- change `buildCodeFence(stripAutoTitleMetadataComments(stderr), 'Output')` to `buildCodeFence(stripAutoTitleMetadataComments(stderr), 'Error')`
+- [x] Modify `src/renderer/components/agents/AgentMessage.tsx:502` -- change `buildCodeFence(stripAutoTitleMetadataComments(stderr), 'Output')` to `buildCodeFence(stripAutoTitleMetadataComments(stderr), 'Error')`
 
 ### Phase 3: Tests
 
-- [ ] Update unit test `tests/unit/components/agents/AgentMessage.test.tsx:188` -- change assertion from `toHaveTextContent('```Output')` to `toHaveTextContent('```Error')` for the `message-code-exec-stderr` testid. Covers requirement `agents.7.4.6.5.4`.
+- [x] Update unit test `tests/unit/components/agents/AgentMessage.test.tsx:188` -- change assertion from `toHaveTextContent('```Output')` to `toHaveTextContent('```Error')` for the `message-code-exec-stderr` testid. Covers requirement `agents.7.4.6.5.4`.
 
 ### Phase 4: Finalization
 
-- [ ] Run `npm run validate`
+- [x] Run `npm run validate`
 
 ## Files to change
 
