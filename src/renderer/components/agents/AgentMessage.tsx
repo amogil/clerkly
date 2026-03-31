@@ -35,6 +35,7 @@ interface AgentMessageProps {
   message: MessageSnapshot;
   isReasoningStreaming?: boolean;
   onNavigate?: (screen: string) => void;
+  onToggleScrollLock?: (originalOnOpenChange?: (open: boolean) => void) => (open: boolean) => void;
 }
 
 const streamdownPlugins = {
@@ -228,6 +229,7 @@ function AgentMessageComponent({
   message,
   isReasoningStreaming = false,
   onNavigate,
+  onToggleScrollLock,
 }: AgentMessageProps) {
   const [isDismissed, setIsDismissed] = React.useState(false);
 
@@ -322,8 +324,11 @@ function AgentMessageComponent({
       <Message from="assistant" className="w-full max-w-full">
         <div data-testid="message-llm" className="space-y-2 message-llm message-llm-response">
           {(llmReasoning?.text || isReasoningStreaming) && (
-            // Requirements: llm-integration.2, llm-integration.7.2 — collapsible reasoning block with streaming state
-            <Reasoning isStreaming={isReasoningStreaming}>
+            // Requirements: llm-integration.2, llm-integration.7.2, agents.4.13.7 — collapsible reasoning block with streaming state and scroll lock
+            <Reasoning
+              isStreaming={isReasoningStreaming}
+              onOpenChange={onToggleScrollLock ? onToggleScrollLock() : undefined}
+            >
               <AgentReasoningTrigger />
               <AgentReasoningContent data-testid="message-llm-reasoning">
                 {llmReasoningText ?? ''}
@@ -444,6 +449,7 @@ function AgentMessageComponent({
           <Tool
             data-testid="message-code-exec-block"
             className="bg-transparent min-w-0 max-w-full overflow-hidden"
+            onOpenChange={onToggleScrollLock ? onToggleScrollLock() : undefined}
           >
             <CollapsibleTrigger
               data-testid="message-code-exec-toggle"
@@ -549,7 +555,8 @@ function areAgentMessagePropsEqual(prev: AgentMessageProps, next: AgentMessagePr
   return (
     prev.message === next.message &&
     prev.isReasoningStreaming === next.isReasoningStreaming &&
-    prev.onNavigate === next.onNavigate
+    prev.onNavigate === next.onNavigate &&
+    prev.onToggleScrollLock === next.onToggleScrollLock
   );
 }
 

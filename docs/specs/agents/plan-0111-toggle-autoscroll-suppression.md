@@ -65,10 +65,10 @@ The implementation will:
 - [x] Update `design.md` — Add "Scroll Suppression During Collapsible Toggle" section describing the mechanism, update coverage table
 
 ### Phase 2: Code
-- [ ] Add `useToggleScrollLock` hook in `src/renderer/hooks/useToggleScrollLock.ts` — captures `scrollTop` before toggle, restores it via `requestAnimationFrame` after reflow, temporarily suppresses `isAtBottom` on `StickToBottomState`
-- [ ] Modify `src/renderer/components/agents/AgentChat.tsx` — pass scroll lock callback via context or prop to `AgentMessage`
-- [ ] Modify `src/renderer/components/agents/AgentMessage.tsx` — wrap `onOpenChange` of `Reasoning` and `Tool` (code_exec) collapsibles with the scroll lock callback
-- [ ] Alternatively, create a wrapper component `ScrollLockedCollapsible` that intercepts `onOpenChange` and applies scroll position preservation
+- [x] Add `useToggleScrollLock` hook in `src/renderer/hooks/useToggleScrollLock.ts` — captures `scrollTop` before toggle, restores it via `requestAnimationFrame` after reflow, temporarily suppresses `isAtBottom` on `StickToBottomState`
+- [x] Modify `src/renderer/components/agents/AgentChat.tsx` — pass scroll lock callback via context or prop to `AgentMessage`
+- [x] Modify `src/renderer/components/agents/AgentMessage.tsx` — wrap `onOpenChange` of `Reasoning` and `Tool` (code_exec) collapsibles with the scroll lock callback
+- [x] Alternatively, create a wrapper component `ScrollLockedCollapsible` that intercepts `onOpenChange` and applies scroll position preservation
 
 ### Phase 3: Tests
 - [ ] Add unit test `tests/unit/hooks/useToggleScrollLock.test.ts` — verifies scroll position is preserved during open/close toggle, covers `agents.4.13.7`

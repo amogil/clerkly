@@ -24,6 +24,7 @@ import {
   PromptInputTools,
 } from '../ai-elements/prompt-input';
 import { type StickToBottomContext } from 'use-stick-to-bottom';
+import { useToggleScrollLock } from '../../hooks/useToggleScrollLock';
 import type { AgentSnapshot } from '../../types/agent';
 
 interface RateLimitState {
@@ -50,6 +51,7 @@ interface AgentChatInnerProps {
   streamingReasoningMessageId: number | null;
   onPromptClick: (prompt: string) => Promise<void>;
   onNavigate?: (screen: string) => void;
+  onToggleScrollLock: (originalOnOpenChange?: (open: boolean) => void) => (open: boolean) => void;
 }
 
 // Requirements: llm-integration.14.5, realtime-events.6.2
@@ -64,7 +66,8 @@ function areAgentChatInnerPropsEqual(
     prev.rawMessages === next.rawMessages &&
     prev.streamingReasoningMessageId === next.streamingReasoningMessageId &&
     prev.onPromptClick === next.onPromptClick &&
-    prev.onNavigate === next.onNavigate
+    prev.onNavigate === next.onNavigate &&
+    prev.onToggleScrollLock === next.onToggleScrollLock
   );
 }
 
@@ -80,6 +83,7 @@ const AgentChatInner = React.memo(function AgentChatInner({
   streamingReasoningMessageId,
   onPromptClick,
   onNavigate,
+  onToggleScrollLock,
 }: AgentChatInnerProps) {
   return (
     <>
@@ -103,6 +107,7 @@ const AgentChatInner = React.memo(function AgentChatInner({
                 message={message}
                 isReasoningStreaming={message.id === streamingReasoningMessageId}
                 onNavigate={onNavigate}
+                onToggleScrollLock={onToggleScrollLock}
               />
             </motion.div>
           ))
@@ -141,6 +146,8 @@ export function AgentChat({
   );
   const [taskInput, setTaskInput] = useState('');
   const stickContextRef = useRef<StickToBottomContext | null>(null);
+  // Requirements: agents.4.13.7 — suppress auto-scroll when toggling collapsible blocks
+  const onToggleScrollLock = useToggleScrollLock(stickContextRef);
   const hasReachedStartupSettledRef = useRef(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const promptHeightRafRef = useRef<number | null>(null);
@@ -381,6 +388,7 @@ export function AgentChat({
           streamingReasoningMessageId={streamingReasoningMessageId}
           onPromptClick={handlePromptClick}
           onNavigate={handleNavigate}
+          onToggleScrollLock={onToggleScrollLock}
         />
         <ConversationScrollButton data-testid="scroll-to-bottom" />
       </Conversation>
