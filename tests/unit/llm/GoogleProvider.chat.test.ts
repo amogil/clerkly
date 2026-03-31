@@ -383,4 +383,112 @@ describe('GoogleProvider.chat()', () => {
       })
     );
   });
+
+  /* Preconditions: Tool with execute function is provided; tool execution takes time
+     Action: provider.chat() invokes tool execute via buildToolSet wrapper
+     Assertions: clearTimeout is called before tool execution (pause) and setTimeout is called
+       after tool execution completes (resume), so tool time does not consume CHAT_TIMEOUT_MS budget
+     Requirements: llm-integration.3.6.1 */
+  it('pauses timeout during tool execution and resumes after', async () => {
+    const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
+    const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
+
+    const toolExecute = jest.fn().mockResolvedValue({ result: 'ok' });
+
+    (aiModule.streamText as unknown as jest.Mock).mockImplementation(() => {
+      return {
+        fullStream: toAsyncIterable([{ type: 'text-delta', text: 'ok' }]),
+        totalUsage: Promise.resolve({}),
+      };
+    });
+
+    (aiModule.tool as unknown as jest.Mock).mockImplementation((definition) => {
+      if (definition.execute) {
+        definition.execute({ code: 'test' });
+      }
+      return { ...definition };
+    });
+
+    await provider.chat(
+      mockMessages,
+      {
+        model: 'gemini-2.5-pro',
+        tools: [
+          {
+            name: 'code_exec',
+            description: 'Execute code',
+            parameters: { type: 'object', properties: { code: { type: 'string' } } },
+            execute: toolExecute,
+          },
+        ],
+      },
+      () => {}
+    );
+
+    expect(toolExecute).toHaveBeenCalledWith({ code: 'test' }, undefined);
+    expect(clearTimeoutSpy).toHaveBeenCalled();
+
+    const timeoutCalls = setTimeoutSpy.mock.calls.filter((call) => call[1] === CHAT_TIMEOUT_MS);
+    expect(timeoutCalls.length).toBeGreaterThanOrEqual(2);
+
+    setTimeoutSpy.mockRestore();
+    clearTimeoutSpy.mockRestore();
+  });
+
+  /* Preconditions: Tool with execute function that throws an error is provided
+     Action: provider.chat() invokes tool execute via buildToolSet wrapper, tool throws
+     Assertions: resumeTimeout is still called after tool execution failure (via finally block),
+       so the timeout is correctly resumed even when tool throws
+     Requirements: llm-integration.3.6.1 */
+  it('resumes timeout after tool execution failure', async () => {
+    const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
+    const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
+
+    const toolError = new Error('tool crashed');
+    const toolExecute = jest.fn().mockRejectedValue(toolError);
+
+    (aiModule.streamText as unknown as jest.Mock).mockImplementation(() => {
+      return {
+        fullStream: toAsyncIterable([{ type: 'text-delta', text: 'ok' }]),
+        totalUsage: Promise.resolve({}),
+      };
+    });
+
+    let wrappedExecuteError: Error | null = null;
+
+    (aiModule.tool as unknown as jest.Mock).mockImplementation((definition) => {
+      if (definition.execute) {
+        definition.execute({ code: 'test' }).catch((err: Error) => {
+          wrappedExecuteError = err;
+        });
+      }
+      return { ...definition };
+    });
+
+    await provider.chat(
+      mockMessages,
+      {
+        model: 'gemini-2.5-pro',
+        tools: [
+          {
+            name: 'code_exec',
+            description: 'Execute code',
+            parameters: { type: 'object', properties: { code: { type: 'string' } } },
+            execute: toolExecute,
+          },
+        ],
+      },
+      () => {}
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(wrappedExecuteError).toBe(toolError);
+
+    const timeoutCalls = setTimeoutSpy.mock.calls.filter((call) => call[1] === CHAT_TIMEOUT_MS);
+    expect(timeoutCalls.length).toBeGreaterThanOrEqual(2);
+
+    setTimeoutSpy.mockRestore();
+    clearTimeoutSpy.mockRestore();
+  });
 });

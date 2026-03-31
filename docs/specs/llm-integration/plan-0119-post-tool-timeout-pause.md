@@ -65,23 +65,23 @@ This approach:
 
 ### Phase 2: Code
 
-- [ ] Modify `src/main/llm/OpenAIProvider.ts` -- In `chat()`: refactor `resetTimeout` into `pauseTimeout()` and `resumeTimeout()` functions. In `buildToolSet()`: wrap `execute` to call `pauseTimeout` before and `resumeTimeout` after tool execution. `onStepFinish`/`experimental_onStepStart` continue to call `resetTimeout` (which is effectively `resumeTimeout`).
-- [ ] Modify `src/main/llm/AnthropicProvider.ts` -- Same changes as OpenAIProvider
-- [ ] Modify `src/main/llm/GoogleProvider.ts` -- Same changes as OpenAIProvider
+- [x] Modify `src/main/llm/OpenAIProvider.ts` -- In `chat()`: refactor `resetTimeout` into `pauseTimeout()` and `resumeTimeout()` functions. In `buildToolSet()`: wrap `execute` to call `pauseTimeout` before and `resumeTimeout` after tool execution. `onStepFinish`/`experimental_onStepStart` continue to call `resetTimeout` (which is effectively `resumeTimeout`).
+- [x] Modify `src/main/llm/AnthropicProvider.ts` -- Same changes as OpenAIProvider
+- [x] Modify `src/main/llm/GoogleProvider.ts` -- Same changes as OpenAIProvider
 
 ### Phase 3: Tests
 
-- [ ] Update unit test `tests/unit/llm/OpenAIProvider.chat.test.ts` -- Add test: "pauses timeout during tool execution and resumes after" (simulates tool execution that would exceed CHAT_TIMEOUT_MS, verifies timer cleared before execute and restarted after). Covers `llm-integration.3.6.1`
-- [ ] Update unit test `tests/unit/llm/AnthropicProvider.chat.test.ts` -- Same test as OpenAI. Covers `llm-integration.3.6.1`
-- [ ] Update unit test `tests/unit/llm/GoogleProvider.chat.test.ts` -- Same test as OpenAI. Covers `llm-integration.3.6.1`
-- [ ] Update unit test `tests/unit/llm/OpenAIProvider.chat.test.ts` -- Add test: "resumes timeout after tool execution failure" (tool throws, timeout still resumes). Covers `llm-integration.3.6.1`
-- [ ] Update unit test `tests/unit/llm/AnthropicProvider.chat.test.ts` -- Same error-case test. Covers `llm-integration.3.6.1`
-- [ ] Update unit test `tests/unit/llm/GoogleProvider.chat.test.ts` -- Same error-case test. Covers `llm-integration.3.6.1`
+- [x] Update unit test `tests/unit/llm/OpenAIProvider.chat.test.ts` -- Add test: "pauses timeout during tool execution and resumes after" (simulates tool execution that would exceed CHAT_TIMEOUT_MS, verifies timer cleared before execute and restarted after). Covers `llm-integration.3.6.1`
+- [x] Update unit test `tests/unit/llm/AnthropicProvider.chat.test.ts` -- Same test as OpenAI. Covers `llm-integration.3.6.1`
+- [x] Update unit test `tests/unit/llm/GoogleProvider.chat.test.ts` -- Same test as OpenAI. Covers `llm-integration.3.6.1`
+- [x] Update unit test `tests/unit/llm/OpenAIProvider.chat.test.ts` -- Add test: "resumes timeout after tool execution failure" (tool throws, timeout still resumes). Covers `llm-integration.3.6.1`
+- [x] Update unit test `tests/unit/llm/AnthropicProvider.chat.test.ts` -- Same error-case test. Covers `llm-integration.3.6.1`
+- [x] Update unit test `tests/unit/llm/GoogleProvider.chat.test.ts` -- Same error-case test. Covers `llm-integration.3.6.1`
 
 ### Phase 4: Finalization
 
-- [ ] Update coverage table in `design.md`
-- [ ] Run `npm run validate`
+- [x] Update coverage table in `design.md`
+- [x] Run `npm run validate`
 
 ## Files to change
 

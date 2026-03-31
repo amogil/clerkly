@@ -400,4 +400,124 @@ describe('OpenAIProvider.chat()', () => {
       })
     );
   });
+
+  /* Preconditions: Tool with execute function is provided; tool execution takes time
+     Action: provider.chat() invokes tool execute via buildToolSet wrapper
+     Assertions: clearTimeout is called before tool execution (pause) and setTimeout is called
+       after tool execution completes (resume), so tool time does not consume CHAT_TIMEOUT_MS budget
+     Requirements: llm-integration.3.6.1 */
+  it('pauses timeout during tool execution and resumes after', async () => {
+    const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
+    const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
+
+    const toolExecute = jest.fn().mockResolvedValue({ result: 'ok' });
+
+    (aiModule.streamText as unknown as jest.Mock).mockImplementation((_options) => {
+      return {
+        fullStream: toAsyncIterable([{ type: 'text-delta', text: 'ok' }]),
+        totalUsage: Promise.resolve({}),
+      };
+    });
+
+    // The tool mock captures the execute wrapper from buildToolSet
+    (aiModule.tool as unknown as jest.Mock).mockImplementation((definition) => {
+      // Execute the wrapped function to trigger pause/resume
+      if (definition.execute) {
+        definition.execute({ code: 'test' });
+      }
+      return { ...definition };
+    });
+
+    await provider.chat(
+      mockMessages,
+      {
+        model: 'gpt-5-nano',
+        tools: [
+          {
+            name: 'code_exec',
+            description: 'Execute code',
+            parameters: { type: 'object', properties: { code: { type: 'string' } } },
+            execute: toolExecute,
+          },
+        ],
+      },
+      () => {}
+    );
+
+    // Verify tool executor was called
+    expect(toolExecute).toHaveBeenCalledWith({ code: 'test' }, undefined);
+
+    // clearTimeout is called for pauseTimeout (before tool exec) among other calls
+    expect(clearTimeoutSpy).toHaveBeenCalled();
+
+    // setTimeout with CHAT_TIMEOUT_MS is called for resumeTimeout (after tool exec)
+    // Initial + resume after tool = at least 2 calls
+    const timeoutCalls = setTimeoutSpy.mock.calls.filter((call) => call[1] === CHAT_TIMEOUT_MS);
+    expect(timeoutCalls.length).toBeGreaterThanOrEqual(2);
+
+    setTimeoutSpy.mockRestore();
+    clearTimeoutSpy.mockRestore();
+  });
+
+  /* Preconditions: Tool with execute function that throws an error is provided
+     Action: provider.chat() invokes tool execute via buildToolSet wrapper, tool throws
+     Assertions: resumeTimeout is still called after tool execution failure (via finally block),
+       so the timeout is correctly resumed even when tool throws
+     Requirements: llm-integration.3.6.1 */
+  it('resumes timeout after tool execution failure', async () => {
+    const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
+    const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
+
+    const toolError = new Error('tool crashed');
+    const toolExecute = jest.fn().mockRejectedValue(toolError);
+
+    (aiModule.streamText as unknown as jest.Mock).mockImplementation(() => {
+      return {
+        fullStream: toAsyncIterable([{ type: 'text-delta', text: 'ok' }]),
+        totalUsage: Promise.resolve({}),
+      };
+    });
+
+    let wrappedExecuteError: Error | null = null;
+
+    (aiModule.tool as unknown as jest.Mock).mockImplementation((definition) => {
+      // Execute the wrapped function to trigger pause/resume
+      if (definition.execute) {
+        definition.execute({ code: 'test' }).catch((err: Error) => {
+          wrappedExecuteError = err;
+        });
+      }
+      return { ...definition };
+    });
+
+    await provider.chat(
+      mockMessages,
+      {
+        model: 'gpt-5-nano',
+        tools: [
+          {
+            name: 'code_exec',
+            description: 'Execute code',
+            parameters: { type: 'object', properties: { code: { type: 'string' } } },
+            execute: toolExecute,
+          },
+        ],
+      },
+      () => {}
+    );
+
+    // Wait for the async error to propagate
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    // Verify the tool error propagated
+    expect(wrappedExecuteError).toBe(toolError);
+
+    // resumeTimeout should still have been called (setTimeout with CHAT_TIMEOUT_MS)
+    // Initial + resume after tool error = at least 2 calls
+    const timeoutCalls = setTimeoutSpy.mock.calls.filter((call) => call[1] === CHAT_TIMEOUT_MS);
+    expect(timeoutCalls.length).toBeGreaterThanOrEqual(2);
+
+    setTimeoutSpy.mockRestore();
+    clearTimeoutSpy.mockRestore();
+  });
 });
