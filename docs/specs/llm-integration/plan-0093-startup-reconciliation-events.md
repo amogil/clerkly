@@ -2,7 +2,7 @@
 
 ## Context
 
-Issue: https://github.com/amogil/clerkly4/issues/93
+Issue: https://github.com/amogil/clerkly/issues/93
 
 Startup reconciliation (introduced in #87, extended in #92/#97) finalizes stale `tool_call` records and hides stale `kind:llm` messages directly via `MessagesRepository` without emitting `MessageUpdatedEvent`. This was a deliberate decision because at startup:
 
