@@ -30,7 +30,7 @@
 
 1.1.2. Prompt/tool-инструкция для модели ДОЛЖНА содержать правило обработки ресурсных ограничений:
   - при `error.code = "limit_exceeded"` модель ДОЛЖНА уменьшать объём/сложность кода или разбивать задачу на несколько вызовов;
-  - при наличии предупреждения о throttling в `stderr` модель ДОЛЖНА учитывать, что выполнение шло в деградированном режиме.
+  - при наличии предупреждения о throttling в `stdout` модель ДОЛЖНА учитывать, что выполнение шло в деградированном режиме.
 
 1.1.3. Prompt/tool-инструкция для модели ДОЛЖНА явно позиционировать `code_exec` как основной рабочий инструмент для вычислений, извлечения данных, преобразований, анализа, проверки и другой программной обработки в рамках turn.
 
@@ -116,7 +116,7 @@
 
 2.11.3. ЕСЛИ ограничение ресурсов не позволяет удержать выполнение в пределах лимитов, вызов ДОЛЖЕН завершаться с `status = "error"` и `error.code = "limit_exceeded"`.
 
-2.11.4. КОГДА применяется best-effort ограничение ресурсов без остановки выполнения, система ДОЛЖНА вернуть модели явный диагностический сигнал в `stderr` о том, что выполнение прошло в режиме ограничений (throttled/degraded mode).
+2.11.4. КОГДА применяется best-effort ограничение ресурсов без остановки выполнения, система ДОЛЖНА вернуть модели явный диагностический сигнал в `stdout` о том, что выполнение прошло в режиме ограничений (throttled/degraded mode).
 
 #### Функциональные Тесты
 
@@ -135,7 +135,7 @@
 #### Модульные Тесты
 
 - `tests/unit/code_exec/SandboxBridge.test.ts` — "should enforce allowlist and return policy_denied for forbidden APIs"
-- `tests/unit/code_exec/SandboxSessionManager.test.ts` — "should deny multithreading APIs and capture stdout/stderr output channels"
+- `tests/unit/code_exec/SandboxSessionManager.test.ts` — "should deny multithreading APIs and capture stdout output"
 - `tests/unit/code_exec/SandboxSessionManager.test.ts` — "returns policy_denied for Node.js globals access in sandbox runtime"
 - `tests/unit/code_exec/SandboxSessionManager.test.ts` — "should enforce timeout/cancel/cleanup and shutdown forced-kill fallback"
 
@@ -151,9 +151,8 @@
   - обязательное поле `task_summary` (непустая краткая строка с описанием сути работы, выполняемой данным кодом);
   - обязательное поле `code` (JavaScript строка);
   - опциональное поле `timeout_ms`;
-  - ожидаемый результат: `status`, `stdout`, `stderr`, `stdout_truncated`, `stderr_truncated`, `error`.
-  - `stdout` ДОЛЖЕН содержать консольный вывод sandbox-кода.
-  - `stderr` ДОЛЖЕН содержать диагностический/error вывод sandbox-кода.
+  - ожидаемый результат: `status`, `stdout`, `stdout_truncated`, `error`.
+  - `stdout` ДОЛЖЕН содержать весь консольный вывод sandbox-кода (включая `console.log`, `console.info`, `console.warn`, `console.error`).
 
 3.1.1. Формальный входной контракт `code_exec` ДОЛЖЕН быть задокументирован как JSON schema:
   - `type: object`
@@ -174,9 +173,7 @@
 3.1.2. Формальный выходной контракт `code_exec` ДОЛЖЕН быть задокументирован как структура:
   - `status: "running" | "success" | "error" | "timeout" | "cancelled"`
   - `stdout: string`
-  - `stderr: string`
   - `stdout_truncated: boolean`
-  - `stderr_truncated: boolean`
   - `error?: { code: string; message: string }`
 
 3.1.2.1. Формальный выходной контракт `code_exec` ДОЛЖЕН быть JSON-объектом (`type: object`).
@@ -229,11 +226,9 @@
 
 3.5. КОГДА модель обращается к запрещённому API, ТО система ДОЛЖНА возвращать контролируемую ошибку с `status = "error"` и `error.code = "policy_denied"` без раскрытия чувствительных деталей среды.
 
-3.6. Система ДОЛЖНА явно указывать модели, что в `code_exec` она МОЖЕТ писать диагностические сообщения через `console.*`.
+3.6. Система ДОЛЖНА явно указывать модели, что в `code_exec` она МОЖЕТ писать диагностические сообщения через `console.*`, и весь вывод будет доступен в `stdout`.
 
-3.7. КОГДА sandbox-код пишет сообщения в `console.*`, ТО после завершения `code_exec` система ДОЛЖНА возвращать модели содержимое консольного вывода в `stdout` и/или `stderr`.
-
-3.7.1. Потоки `stdout` и `stderr` ДОЛЖНЫ возвращаться раздельно и SHALL NOT объединяться в одно поле.
+3.7. КОГДА sandbox-код пишет сообщения в `console.*` (`console.log`, `console.info`, `console.warn`, `console.error`), ТО после завершения `code_exec` система ДОЛЖНА возвращать модели содержимое консольного вывода в `stdout`.
 
 #### Примеры API для модели
 
@@ -259,7 +254,7 @@ return await window.api.saveData('x', 'y');
 
 - `tests/functional/code_exec.spec.ts` — "should support multiple code_exec calls in one turn with callId correlation"
 - `tests/functional/code_exec.spec.ts` — "should deny main-pipeline-only and non-allowlisted sandbox tools"
-- `tests/functional/code_exec.spec.ts` — "should apply stdout/stderr truncation limits and flags"
+- `tests/functional/code_exec.spec.ts` — "should apply stdout truncation limits and flags"
 
 #### Модульные Тесты
 
@@ -342,15 +337,13 @@ return await window.api.saveData('x', 'y');
 
 5.1.5. ЕСЛИ после исчерпания retry/repair аргументы остаются невалидными, turn ДОЛЖЕН завершаться обычной ошибкой модели (`kind: error` в чате), а НЕ terminal-ошибкой `tool_call`.
 
-5.2. Система ДОЛЖНА ограничивать максимальный объём `stdout` и `stderr`, возвращаемых модели.
+5.2. Система ДОЛЖНА ограничивать максимальный объём `stdout`, возвращаемого модели.
 
-5.2.1. КОГДА `stdout` или `stderr` превышают лимит, ТО система ДОЛЖНА усекать соответствующий поток, выставлять флаг `stdout_truncated=true` и/или `stderr_truncated=true`, и сохранять оставшийся поток без изменений.
+5.2.1. КОГДА `stdout` превышает лимит, ТО система ДОЛЖНА усекать поток, выставлять флаг `stdout_truncated=true`.
 
-5.2.2. В целевой конфигурации лимит `stdout` ДОЛЖЕН составлять `10240` байт (`10 KiB`) на один вызов `code_exec`.
+5.2.2. В целевой конфигурации лимит `stdout` ДОЛЖЕН составлять `20480` байт (`20 KiB`) на один вызов `code_exec`.
 
-5.2.3. В целевой конфигурации лимит `stderr` ДОЛЖЕН составлять `10240` байт (`10 KiB`) на один вызов `code_exec`.
-
-5.2.4. Лимиты `stdout`/`stderr` ДОЛЖНЫ быть явно сообщены модели в prompt/tool-инструкции.
+5.2.3. Лимит `stdout` ДОЛЖЕН быть явно сообщён модели в prompt/tool-инструкции.
 
 5.3. КОГДА модель инициирует параллельные `code_exec` tool calls в одном turn, ТО система ДОЛЖНА поддерживать параллельный запуск отдельных sandbox-инстанций (one-call-one-sandbox) с корректной корреляцией по `callId`.
 
@@ -368,17 +361,17 @@ return await window.api.saveData('x', 'y');
 
 5.6. При срабатывании любого операционного лимита система ДОЛЖНА завершать вызов с `status = "error"` и `error.code = "limit_exceeded"` либо `status = "timeout"` без падения процесса.
 
-5.7. `stdout`/`stderr` (включая усечённые значения и флаги `stdout_truncated`/`stderr_truncated`) ДОЛЖНЫ сохраняться в persisted `tool_call` и ДОЛЖНЫ храниться без автоматической очистки/архивации в рамках данной фичи.
+5.7. `stdout` (включая усечённое значение и флаг `stdout_truncated`) ДОЛЖЕН сохраняться в persisted `tool_call` и ДОЛЖЕН храниться без автоматической очистки/архивации в рамках данной фичи.
 
 #### Функциональные Тесты
 
 - `tests/functional/code_exec.spec.ts` — "should enforce code size limit for code_exec arguments"
-- `tests/functional/code_exec.spec.ts` — "should apply stdout/stderr truncation limits and flags"
+- `tests/functional/code_exec.spec.ts` — "should apply stdout truncation limits and flags"
 - `tests/functional/code_exec.spec.ts` — "should support multiple code_exec calls in one turn with callId correlation"
 
 #### Модульные Тесты
 
-- `tests/unit/code_exec/OutputLimiter.test.ts` — "should truncate stdout/stderr and set truncated flags correctly"
+- `tests/unit/code_exec/OutputLimiter.test.ts` — "should truncate stdout and set truncated flag correctly"
 - `tests/unit/code_exec/SandboxSessionManager.test.ts` — "should apply CPU/RAM limit policy and produce limit_exceeded when containment fails"
 
 ### 6. Тестируемость и покрытие

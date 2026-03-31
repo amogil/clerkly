@@ -31,7 +31,7 @@ UI-визуализация исполнения описывается в `docs
 - **"SandboxRuntime" (Sandbox Renderer)**
   - исполняет JavaScript-код;
   - получает preload bridge `codeExecSandbox.js`, который публикует allowlisted bridge API в `globalThis.__sandboxBridge`;
-  - применяет runtime hardening поверх preload bridge и собирает `stdout/stderr/error`;
+  - применяет runtime hardening поверх preload bridge и собирает `stdout/error`;
   - возвращает результат в main.
 
 ## Контракт данных
@@ -55,9 +55,7 @@ UI-визуализация исполнения описывается в `docs
     "output": {
       "status": "running | success | error | timeout | cancelled",
       "stdout": "hello\n",
-      "stderr": "",
       "stdout_truncated": false,
-      "stderr_truncated": false,
       "started_at": "2026-03-10T10:00:00+01:00",
       "finished_at": "2026-03-10T10:00:01+01:00",
       "duration_ms": 1000
@@ -189,18 +187,16 @@ Lifecycle:
 - `code_exec_timeout_ms_min`: 10000 ms
 - `code_exec_timeout_ms_default`: 60000 ms
 - `code_exec_max_code_bytes`: 30720 bytes
-- `code_exec_max_stdout_bytes`: 10240 bytes
-- `code_exec_max_stderr_bytes`: 10240 bytes
+- `code_exec_max_stdout_bytes`: 20480 bytes
 - `code_exec_sandbox_cpu_limit`: 1 vCPU
 - `code_exec_sandbox_memory_limit_bytes`: 2147483648 bytes (2 GiB)
 
 Правило truncation output:
-- При превышении лимита `stdout` и/или `stderr` соответствующий поток усекается до лимита.
-- Для усечённого потока выставляется флаг `stdout_truncated` и/или `stderr_truncated`.
-- Потоки `stdout` и `stderr` всегда сохраняются и возвращаются раздельно.
+- При превышении лимита `stdout` поток усекается до лимита.
+- Для усечённого потока выставляется флаг `stdout_truncated`.
 
 Информирование модели о лимитах:
-- prompt/tool-инструкция явно сообщает модели лимиты `timeout_ms`, `code` size, `stdout/stderr`, а также ограничения CPU/памяти sandbox.
+- prompt/tool-инструкция явно сообщает модели лимиты `timeout_ms`, `code` size, `stdout`, а также ограничения CPU/памяти sandbox.
 - prompt/tool-инструкция явно сообщает, что `code_exec` является основным рабочим инструментом turn для программной обработки, а не вспомогательной опцией “на случай необходимости”.
 - prompt/tool-инструкция явно требует оценивать достаточность уже полученных tool results перед новым exploratory вызовом.
 - prompt/tool-инструкция явно сообщает, что несколько allowlisted helper-вызовов внутри одного `code_exec` допустимы и что независимые helper-вызовы могут выполняться конкурентно через обычные async-механизмы JavaScript.
@@ -215,7 +211,7 @@ Lifecycle:
 Политика превышения CPU/памяти в текущей реализации:
 - лимиты CPU/RAM фиксируются как контрактные значения и сообщаются модели через prompt/tool-инструкции;
 - при приближении к лимитам включается best-effort containment без немедленной остановки выполнения;
-- при успешном завершении в режиме containment в `stderr` добавляется диагностическое предупреждение о degraded-mode;
+- при успешном завершении в режиме containment в `stdout` добавляется диагностическое предупреждение о degraded-mode;
 - при превышении лимитов, которое не удаётся удержать, результат нормализуется в terminal `status=error` с `error.code='limit_exceeded'`.
 
 ### Best-effort monitor loop (Electron sandbox)
@@ -228,7 +224,7 @@ Lifecycle:
    - hard-limit: CPU `> 120%` от `1 vCPU` (sampling tolerance), RAM `> 2 GiB`.
 3. При near-limit применяет best-effort containment:
    - включает `webContents.setBackgroundThrottling(true)`;
-   - помечает вызов как degraded для последующей диагностической записи в `stderr`.
+   - помечает вызов как degraded для последующей диагностической записи в `stdout`.
 4. При hard-limit принудительно завершает sandbox-выполнение и возвращает terminal результат:
    - `status = error`
    - `error.code = limit_exceeded`
@@ -243,7 +239,7 @@ Lifecycle:
 - `error.message` с конкретикой (`CPU 1 vCPU` / `RAM 2 GiB` / `code size 30 KiB`).
 
 Канал 2 (нефатальный):
-- если execution удержан в пределах лимитов за счёт containment, в `stderr` добавляется предупреждение degraded-mode (throttling diagnostic).
+- если execution удержан в пределах лимитов за счёт containment, в `stdout` добавляется предупреждение degraded-mode (throttling diagnostic).
 - результат остается terminal по доменному исходу выполнения (`success` или `error` пользовательского кода), без подмены в `limit_exceeded`.
 
 ## Стратегия тестирования
@@ -251,29 +247,29 @@ Lifecycle:
 ### Модульные Тесты
 
 - `tests/unit/agents/MainPipeline.test.ts` — lifecycle `running -> terminal`, mapping `error.code`, cancel/timeout, дедупликация по `callId`, terminal-immutability.
-- `tests/unit/agents/PromptBuilder.test.ts` — наличие `code_exec` tool schema, обязательного `task_summary` (1..200 символов) и правил для модели (`timeout`, `code size`, `stdout/stderr`, CPU/RAM).
+- `tests/unit/agents/PromptBuilder.test.ts` — наличие `code_exec` tool schema, обязательного `task_summary` (1..200 символов) и правил для модели (`timeout`, `code size`, `stdout`, CPU/RAM).
 - `tests/unit/code_exec/SandboxSessionManager.test.ts` — one-call-one-sandbox, timeout, cancel, cleanup, shutdown timeout `15000`.
 - `tests/unit/code_exec/SandboxSessionManager.test.ts` — preload bridge bootstrap через `app.getAppPath()` и доступность `window.tools.http_request(...)` внутри sandbox runtime.
 - `tests/unit/code_exec/SandboxBridge.test.ts` — allowlist enforcement, запрет main-pipeline-only tools, `policy_denied`.
 - `tests/unit/code_exec/SandboxPolicy.test.ts` — browser/session policy hardening (`webRequest`, permissions, navigation, CSP/network deny).
-- `tests/unit/code_exec/SandboxSessionManager.test.ts` — capture `console.*`, раздельные `stdout/stderr`, запрет multithreading API.
+- `tests/unit/code_exec/SandboxSessionManager.test.ts` — capture `console.*`, единый `stdout`, запрет multithreading API.
 - `tests/unit/code_exec/SandboxSessionManager.test.ts` — policy mapping для Node.js globals (`process`, `require`, `module`, `Buffer`, `__dirname`, `__filename`) в `policy_denied`.
-- `tests/unit/code_exec/OutputLimiter.test.ts` — лимиты `stdout/stderr`, truncation, флаги `stdout_truncated`/`stderr_truncated`.
+- `tests/unit/code_exec/OutputLimiter.test.ts` — лимит `stdout`, truncation, флаг `stdout_truncated`.
 - `tests/unit/code_exec/CodeExecToolSchema.test.ts` — валидация `task_summary` (1..200 символов), `code`, `timeout_ms` диапазона и `additionalProperties=false`.
 - `tests/unit/code_exec/CodeExecPersistenceMapper.test.ts` — запись `started_at`, `finished_at`, `duration_ms`, переход `done=false/true`.
 
 ### Функциональные Тесты
 
-- `tests/functional/code_exec.spec.ts` — end-to-end запуск `code_exec` + возврат `stdout/stderr`.
+- `tests/functional/code_exec.spec.ts` — end-to-end запуск `code_exec` + возврат `stdout`.
 - `tests/functional/code_exec.spec.ts` — невалидные аргументы `code_exec` с bounded retry/repair и финальным `kind:error`.
 - `tests/functional/code_exec.spec.ts` — несколько вызовов в одном turn (включая параллельные) и корреляция по `callId`.
 - `tests/functional/code_exec.spec.ts` — persisted lifecycle/audit поля (`started_at`, `finished_at`, `duration_ms`) для terminal `code_exec`.
 - `tests/functional/code_exec.spec.ts` — browser-level безопасность (`policy_denied` для `window.open`, `location.assign`, `location.replace`).
 - `tests/functional/code_exec.spec.ts` — sandbox Node.js globals safety (`policy_denied` для `process`/`require`/`module`/`Buffer`/`__dirname`/`__filename`).
 - `tests/functional/code_exec.spec.ts` — browser-level network egress enforcement (`fetch`, `XMLHttpRequest`, `WebSocket`, `navigator.sendBeacon`, `window.open`, `location.assign`, `location.replace` блокируются с `policy_denied`, без исходящих запросов).
-- `tests/functional/code_exec.spec.ts` — лимиты `code`/`stdout`/`stderr` и truncated-флаги.
+- `tests/functional/code_exec.spec.ts` — лимиты `code`/`stdout` и truncated-флаг.
 - `tests/functional/code_exec.spec.ts` — timeout/cancel/shutdown lifecycle и `limit_exceeded` сигналы по ресурсоёмким сценариям.
-- `tests/functional/code_exec.spec.ts` — resource-monitor diagnostics under CPU pressure (degraded stderr path либо terminal `limit_exceeded` containment-fail path).
+- `tests/functional/code_exec.spec.ts` — resource-monitor diagnostics under CPU pressure (degraded stdout path либо terminal `limit_exceeded` containment-fail path).
 - `tests/functional/code_exec.spec.ts` — integration в общий `kind:tool_call` pipeline и продолжение цикла `model -> tools -> model`.
 - `tests/functional/llm-chat.spec.ts` — terminal `tool_call` включаются в model history, non-terminal не включаются, pipeline продолжает следующий шаг `model`.
 
@@ -291,19 +287,19 @@ Lifecycle:
 | code_exec.2.7-2.8.2 | `tests/unit/code_exec/SandboxBridge.test.ts` | - |
 | code_exec.2.9-2.9.1 | `tests/unit/code_exec/SandboxSessionManager.test.ts` | - |
 | code_exec.2.10-2.10.1 | `tests/unit/code_exec/SandboxSessionManager.test.ts` | - |
-| code_exec.2.11-2.11.4 | `tests/unit/code_exec/SandboxSessionManager.test.ts` | `tests/functional/code_exec.spec.ts` покрывает both degraded stderr path and `limit_exceeded` terminal-path |
+| code_exec.2.11-2.11.4 | `tests/unit/code_exec/SandboxSessionManager.test.ts` | `tests/functional/code_exec.spec.ts` покрывает both degraded stdout path and `limit_exceeded` terminal-path |
 | code_exec.3.1-3.1.1 | `tests/unit/code_exec/CodeExecToolSchema.test.ts` | `tests/functional/code_exec.spec.ts` |
 | code_exec.3.1.2-3.1.2.7 | `tests/unit/code_exec/CodeExecToolSchema.test.ts` | `tests/functional/code_exec.spec.ts` |
 | code_exec.3.1.3-3.1.5 | `tests/unit/code_exec/CodeExecToolSchema.test.ts` | `tests/functional/code_exec.spec.ts` |
 | code_exec.3.2-3.3 | `tests/unit/agents/PromptBuilder.test.ts` | `tests/functional/code_exec.spec.ts` |
 | code_exec.3.4-3.5 | `tests/unit/code_exec/SandboxBridge.test.ts` | `tests/functional/code_exec.spec.ts` |
-| code_exec.3.6-3.7.1 | `tests/unit/code_exec/SandboxSessionManager.test.ts` | `tests/functional/code_exec.spec.ts` |
+| code_exec.3.6-3.7 | `tests/unit/code_exec/SandboxSessionManager.test.ts` | `tests/functional/code_exec.spec.ts` |
 | code_exec.4.1-4.1.2 | `tests/unit/code_exec/CodeExecPersistenceMapper.test.ts` | `tests/functional/code_exec.spec.ts` |
 | code_exec.4.2-4.4 | `tests/unit/agents/MainPipeline.test.ts` | - |
 | code_exec.4.5-4.6 | `tests/unit/agents/MainPipeline.test.ts`, `tests/unit/code_exec/CodeExecPersistenceMapper.test.ts` | `tests/functional/code_exec.spec.ts` |
 | code_exec.4.7-4.9 | `tests/unit/code_exec/CodeExecPersistenceMapper.test.ts` | `tests/functional/code_exec.spec.ts` |
 | code_exec.5.1-5.1.5 | `tests/unit/code_exec/CodeExecToolSchema.test.ts`, `tests/unit/agents/MainPipeline.test.ts` | `tests/functional/code_exec.spec.ts` |
-| code_exec.5.2-5.2.4 | `tests/unit/code_exec/OutputLimiter.test.ts` | `tests/functional/code_exec.spec.ts` |
+| code_exec.5.2-5.2.3 | `tests/unit/code_exec/OutputLimiter.test.ts` | `tests/functional/code_exec.spec.ts` |
 | code_exec.5.3 | `tests/unit/agents/MainPipeline.test.ts` | `tests/functional/code_exec.spec.ts` |
 | code_exec.5.4-5.6 | `tests/unit/code_exec/SandboxSessionManager.test.ts` | - |
 | code_exec.5.7 | `tests/unit/code_exec/CodeExecPersistenceMapper.test.ts` | `tests/functional/code_exec.spec.ts` |
