@@ -71,22 +71,22 @@ For `hideAllStaleLlmOnStartup()`: replace `this.dbManager.messages.setHidden(...
 
 ### Phase 2: Code
 
-- [ ] Modify `src/main/agents/MessageManager.ts` -- `finalizeAllStaleToolCallsOnStartup()`: replace `this.dbManager.messages.update(row.id, row.agentId, JSON.stringify({...}), true)` with `this.update(row.id, row.agentId, {...}, true)` which uses `MessageManager.update()` and emits `MessageUpdatedEvent`
-- [ ] Modify `src/main/agents/MessageManager.ts` -- `hideAllStaleLlmOnStartup()`: replace `this.dbManager.messages.setHidden(row.id, row.agentId)` with `this.setHidden(row.id, row.agentId)` which uses `MessageManager.setHidden()` and emits `MessageUpdatedEvent`
-- [ ] Remove method-level comments "Uses MessagesRepository directly -- no events emitted" from both methods
+- [x] Modify `src/main/agents/MessageManager.ts` -- `finalizeAllStaleToolCallsOnStartup()`: replace `this.dbManager.messages.update(row.id, row.agentId, JSON.stringify({...}), true)` with `this.update(row.id, row.agentId, {...}, true)` which uses `MessageManager.update()` and emits `MessageUpdatedEvent`
+- [x] Modify `src/main/agents/MessageManager.ts` -- `hideAllStaleLlmOnStartup()`: replace `this.dbManager.messages.setHidden(row.id, row.agentId)` with `this.setHidden(row.id, row.agentId)` which uses `MessageManager.setHidden()` and emits `MessageUpdatedEvent`
+- [x] Remove method-level comments "Uses MessagesRepository directly -- no events emitted" from both methods
 
 ### Phase 3: Tests
 
-- [ ] Update unit test `tests/unit/agents/MessageManager.test.ts` -- `finalizeAllStaleToolCallsOnStartup` > "should not emit MessageUpdatedEvent": reverse the assertion to verify that `MessageUpdatedEvent` IS emitted for each finalized row. Rename test to "should emit MessageUpdatedEvent for each finalized row". Requirement IDs: `llm-integration.11.6.3`, `llm-integration.2.3`
-- [ ] Update unit test `tests/unit/agents/MessageManager.test.ts` -- `finalizeAllStaleToolCallsOnStartup` > "should use MessagesRepository.update directly (bypass MessageManager.update)": reverse to verify `MessageManager.update` IS called (not repo directly). Rename test to "should use MessageManager.update (emits events)". Requirement IDs: `llm-integration.11.6.3`
-- [ ] Update unit test `tests/unit/agents/MessageManager.test.ts` -- `hideAllStaleLlmOnStartup` > "should not emit MessageUpdatedEvent (renderer not available)": reverse to verify that `MessageUpdatedEvent` IS emitted. Rename to "should emit MessageUpdatedEvent for each hidden row". Requirement IDs: `llm-integration.11.6.4`, `llm-integration.2.3`
-- [ ] Update unit test `tests/unit/agents/MessageManager.test.ts` -- `hideAllStaleLlmOnStartup` > "should use MessagesRepository.setHidden directly (bypass MessageManager.setHidden)": reverse to verify `MessageManager.setHidden` IS called. Rename to "should use MessageManager.setHidden (emits events)". Requirement IDs: `llm-integration.11.6.4`
-- [ ] Existing functional tests in `tests/functional/startup-recovery.spec.ts` do not need changes -- they verify DB state after restart, not event emission. Events are a no-op at startup since no renderer/subscribers exist.
+- [x] Update unit test `tests/unit/agents/MessageManager.test.ts` -- `finalizeAllStaleToolCallsOnStartup` > "should not emit MessageUpdatedEvent": reverse the assertion to verify that `MessageUpdatedEvent` IS emitted for each finalized row. Rename test to "should emit MessageUpdatedEvent for each finalized row". Requirement IDs: `llm-integration.11.6.3`, `llm-integration.2.3`
+- [x] Update unit test `tests/unit/agents/MessageManager.test.ts` -- `finalizeAllStaleToolCallsOnStartup` > "should use MessagesRepository.update directly (bypass MessageManager.update)": reverse to verify `MessageManager.update` IS called (not repo directly). Rename test to "should use MessageManager.update (emits events)". Requirement IDs: `llm-integration.11.6.3`
+- [x] Update unit test `tests/unit/agents/MessageManager.test.ts` -- `hideAllStaleLlmOnStartup` > "should not emit MessageUpdatedEvent (renderer not available)": reverse to verify that `MessageUpdatedEvent` IS emitted. Rename to "should emit MessageUpdatedEvent for each hidden row". Requirement IDs: `llm-integration.11.6.4`, `llm-integration.2.3`
+- [x] Update unit test `tests/unit/agents/MessageManager.test.ts` -- `hideAllStaleLlmOnStartup` > "should use MessagesRepository.setHidden directly (bypass MessageManager.setHidden)": reverse to verify `MessageManager.setHidden` IS called. Rename to "should use MessageManager.setHidden (emits events)". Requirement IDs: `llm-integration.11.6.4`
+- [x] Existing functional tests in `tests/functional/startup-recovery.spec.ts` do not need changes -- they verify DB state after restart, not event emission. Events are a no-op at startup since no renderer/subscribers exist.
 
 ### Phase 4: Finalization
 
-- [ ] Update coverage table in `design.md` -- no new requirement IDs added, existing coverage unchanged
-- [ ] Run `npm run validate`
+- [x] Update coverage table in `design.md` -- no new requirement IDs added, existing coverage unchanged
+- [x] Run `npm run validate`
 
 ## Files to change
 
