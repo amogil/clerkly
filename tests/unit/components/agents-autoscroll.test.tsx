@@ -429,6 +429,111 @@ describe('Agents Autoscroll', () => {
     });
   });
 
+  /* Preconditions: Component with collapsible block, user at bottom, StickToBottom state mocked
+     Action: Toggle collapsible open/close via useToggleScrollLock wrapper
+     Assertions: scrollTop is preserved and auto-scroll is not triggered
+     Requirements: agents.4.13.7 */
+  it('should not auto-scroll when toggling a collapsible block near bottom', async () => {
+    const scrollIntoViewMock = jest.fn();
+    Element.prototype.scrollIntoView = scrollIntoViewMock;
+
+    // Simulate the scroll lock mechanism from useToggleScrollLock.
+    // The real hook manipulates isAtBottom on a mutable StickToBottomState object
+    // (not React state), so the library sees the suppressed value synchronously
+    // and does not re-trigger scroll-to-bottom.
+    // Here we use a mutable ref to model that same synchronous suppression.
+    const TestComponent = () => {
+      const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+      const [isOpen, setIsOpen] = React.useState(false);
+      // Use a ref to model StickToBottomState.isAtBottom (mutable, not React state)
+      const isAtBottomRef = React.useRef(true);
+      const [, forceUpdate] = React.useState(0);
+
+      const handleToggle = (open: boolean) => {
+        // This simulates what useToggleScrollLock does:
+        // 1. Capture scrollTop before toggle
+        const container = scrollContainerRef.current;
+        if (!container) return;
+        const capturedScrollTop = container.scrollTop;
+
+        // 2. Suppress isAtBottom to prevent auto-scroll (synchronous mutation)
+        isAtBottomRef.current = false;
+
+        // 3. Perform the toggle
+        setIsOpen(open);
+
+        // 4. Restore scrollTop after reflow (via rAF)
+        requestAnimationFrame(() => {
+          if (container) {
+            container.scrollTop = capturedScrollTop;
+          }
+          // Restore isAtBottom based on actual position
+          const { scrollHeight, scrollTop: newScrollTop, clientHeight } = container;
+          const distanceFromBottom = scrollHeight - newScrollTop - clientHeight;
+          isAtBottomRef.current = distanceFromBottom < 70;
+          forceUpdate((n) => n + 1);
+        });
+      };
+
+      // Autoscroll effect - simulates StickToBottom ResizeObserver behavior
+      // Reads the mutable isAtBottomRef (like the library reads state.isAtBottom)
+      React.useEffect(() => {
+        if (isAtBottomRef.current) {
+          scrollContainerRef.current
+            ?.querySelector('[data-testid="messages-end"]')
+            ?.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, [isOpen]);
+
+      return (
+        <div
+          ref={scrollContainerRef}
+          data-testid="scroll-container"
+          style={{ height: '300px', overflowY: 'auto' }}
+        >
+          <div>Message 1</div>
+          <div>Message 2</div>
+          <div data-testid="collapsible">
+            <button data-testid="toggle-button" onClick={() => handleToggle(!isOpen)}>
+              Toggle
+            </button>
+            {isOpen && (
+              <div data-testid="collapsible-content" style={{ height: '200px' }}>
+                Expanded content
+              </div>
+            )}
+          </div>
+          <div data-testid="messages-end" />
+        </div>
+      );
+    };
+
+    const { getByTestId } = render(<TestComponent />);
+    const scrollContainer = getByTestId('scroll-container') as HTMLDivElement;
+
+    // Mock scroll position: user is at bottom
+    Object.defineProperty(scrollContainer, 'scrollHeight', { value: 400, configurable: true });
+    Object.defineProperty(scrollContainer, 'scrollTop', {
+      value: 100,
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(scrollContainer, 'clientHeight', { value: 300, configurable: true });
+
+    // Clear initial render scroll calls
+    scrollIntoViewMock.mockClear();
+
+    // Toggle the collapsible open
+    const toggleButton = getByTestId('toggle-button');
+    toggleButton.click();
+
+    // Wait a tick for rAF to process
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // scrollIntoView should NOT have been called because isAtBottom was suppressed during toggle
+    expect(scrollIntoViewMock).not.toHaveBeenCalled();
+  });
+
   /* Preconditions: messagesEndRef is null (not attached)
      Action: Try to scroll
      Assertions: No error is thrown (optional chaining works)

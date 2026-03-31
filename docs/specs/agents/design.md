@@ -1358,6 +1358,57 @@ function ActivityIndicator({ isActive }: { isActive: boolean }) {
    - Агент отвечает → автоскролл НЕ срабатывает (пользователь не внизу)
    - Переключается на другого агента и возвращается → позиция восстановлена
 
+**Подавление автоскролла при toggle сворачиваемых блоков** (agents.4.13.7):
+
+**Проблема:**
+`use-stick-to-bottom` использует `ResizeObserver` на content-элементе. Раскрытие/сворачивание `Collapsible`-блоков (`tool_call(code_exec)`, reasoning) изменяет высоту контента, что `ResizeObserver` интерпретирует как рост/уменьшение — и если пользователь находится «внизу», вызывает `scrollToBottom`, смещая viewport.
+
+**Решение — хук `useToggleScrollLock`:**
+
+`AgentChat` создаёт callback `onToggleScrollLock`, доступный через prop `AgentMessage`. Callback оборачивает каждый `onOpenChange` collapsible-блоков:
+
+1. **До toggle:** callback захватывает текущий `scrollTop` из scroll-контейнера (`stickContextRef.current.scrollRef.current`) и временно устанавливает `state.isAtBottom = false` на `StickToBottomState`, чтобы подавить реакцию `scrollToBottom` на resize.
+2. **После reflow:** через `requestAnimationFrame` восстанавливает `scrollTop` и, если scroll position по-прежнему «внизу» (в пределах порога), восстанавливает `state.isAtBottom`.
+3. Callback не изменяет persisted данные и не влияет на нормальное поведение автоскролла при появлении новых сообщений.
+
+**Файл:** `src/renderer/hooks/useToggleScrollLock.ts`
+
+```typescript
+// Requirements: agents.4.13.7
+function useToggleScrollLock(stickContextRef: React.RefObject<StickToBottomContext | null>) {
+  return useCallback((originalOnOpenChange?: (open: boolean) => void) => {
+    return (open: boolean) => {
+      const ctx = stickContextRef.current;
+      const scrollEl = ctx?.scrollRef?.current;
+      if (scrollEl && ctx) {
+        const savedScrollTop = scrollEl.scrollTop;
+        const wasAtBottom = ctx.state.isAtBottom;
+        // Suppress auto-scroll during resize
+        ctx.state.isAtBottom = false;
+        requestAnimationFrame(() => {
+          scrollEl.scrollTop = savedScrollTop;
+          // Restore isAtBottom after reflow
+          requestAnimationFrame(() => {
+            if (wasAtBottom) {
+              const diff = scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight;
+              ctx.state.isAtBottom = diff <= 70;
+            }
+          });
+        });
+      }
+      originalOnOpenChange?.(open);
+    };
+  }, [stickContextRef]);
+}
+```
+
+**Передача в `AgentMessage`:**
+`AgentChatInner` получает `onToggleScrollLock` как prop и передаёт в `AgentMessage`. `AgentMessage` оборачивает `onOpenChange` блоков `Reasoning` и `Tool` (code_exec) в этот callback.
+
+**Scope подавления:**
+- Подавляется только при пользовательском клике на trigger (toggle). Для `Reasoning` используется `onClickCapture` на обёрточном `<div>`, чтобы перехватить только пользовательские клики; для `Tool` (code_exec) используется `onOpenChange`, поскольку единственный источник изменения состояния — клик пользователя.
+- Авто-сворачивание reasoning после окончания стриминга (reasoning.tsx, auto-close delay 1s) и авто-раскрытие при начале стриминга не подавляются, так как это не пользовательские toggle.
+
 ### AgentWelcome
 
 Компонент пустого стейта для нового агента без сообщений.
@@ -1968,6 +2019,7 @@ import { Logo } from '../logo';
 | `tests/unit/hooks/useAppCoordinatorState.test.ts` | agents.13.9.2, agents.13.9.3, agents.13.12, agents.13.16, agents.13.18 |
 | `tests/unit/components/agents.test.tsx` | agents.4.22 |
 | `tests/unit/components/agents-autoscroll.test.tsx` | agents.4.13 |
+| `tests/unit/hooks/useToggleScrollLock.test.ts` | agents.4.13.7 |
 | `tests/unit/components/agents-scroll-position.test.tsx` | agents.4.14 |
 | `tests/unit/app/AppCoordinator.test.ts` | agents.13.11-13.15, agents.13.17, navigation.1.1, navigation.1.3 |
 
@@ -1985,7 +2037,7 @@ import { Logo } from '../logo';
 | `tests/functional/agent-status-all-places.spec.ts` | agents.6.1-6.5 | Проверка консистентного отображения каждого статуса (`new`, `in-progress`, `awaiting-response`, `error`, `completed`) в Header, Agent List tooltip и All Agents |
 | `tests/functional/message-format.spec.ts` | agents.7 | - |
 | `tests/functional/code_exec.spec.ts` | agents.7.4.5-7.4.9, agents.4.23 | Отдельные сценарии для `tool_call(code_exec)`: стандартный `ToolHeader` toggle, секция `JavaScript` с подсветкой, отдельная `error` section из `output.error`, reopen cycle, width/overflow |
-| `tests/functional/llm-chat.spec.ts` | agents.4.11, agents.4.11.2, agents.7.7, agents.4.24, agents.14.1-14.6, llm-integration.2, llm-integration.7.2, llm-integration.8.7, llm-integration.16 | Включает сценарий deferred rename после non-meaningful triggering turn при наличии meaningful user-message в истории |
+| `tests/functional/llm-chat.spec.ts` | agents.4.11, agents.4.11.2, agents.4.13.7, agents.7.7, agents.4.24, agents.14.1-14.6, llm-integration.2, llm-integration.7.2, llm-integration.8.7, llm-integration.16 | Включает сценарий deferred rename после non-meaningful triggering turn при наличии meaningful user-message в истории |
 | `tests/functional/agent-status-calculation.spec.ts` | agents.9 | - |
 | `tests/functional/agent-data-isolation.spec.ts` | agents.10 | - |
 | `tests/functional/agent-activity-indicator.spec.ts` | agents.11 | - |
@@ -2086,6 +2138,7 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 | agents.4.11.2 | ✓ | ✓ |
 | agents.4.13.1-4.13.6 (autoscroll) | ✓ | ✓ |
 | agents.4.13.4-4.13.6 (scrollbar) | - | Manual |
+| agents.4.13.7 (toggle scroll suppression) | ✓ | ✓ |
 | agents.4.14.1, agents.4.14.2, agents.4.14.3, agents.4.14.4, agents.4.14.5, agents.4.14.6 (scroll position) | ✓ | ✓ |
 | agents.4.16, agents.4.17, agents.4.18, agents.4.19, agents.4.20, agents.4.21 (empty state content/animations) | ✓ | ✓ |
 | agents.4.24.1, agents.4.24.2, agents.4.24.3, agents.4.24.4, agents.4.24.5 (stop/cancel flow, cancel+send) | ✓ | ✓ |
