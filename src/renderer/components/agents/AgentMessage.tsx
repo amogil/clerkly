@@ -325,15 +325,18 @@ function AgentMessageComponent({
         <div data-testid="message-llm" className="space-y-2 message-llm message-llm-response">
           {(llmReasoning?.text || isReasoningStreaming) && (
             // Requirements: llm-integration.2, llm-integration.7.2, agents.4.13.7 — collapsible reasoning block with streaming state and scroll lock
-            <Reasoning
-              isStreaming={isReasoningStreaming}
-              onOpenChange={onToggleScrollLock ? onToggleScrollLock() : undefined}
-            >
-              <AgentReasoningTrigger />
-              <AgentReasoningContent data-testid="message-llm-reasoning">
-                {llmReasoningText ?? ''}
-              </AgentReasoningContent>
-            </Reasoning>
+            // Scroll lock is applied via onClickCapture on a wrapper div to limit suppression
+            // to user-initiated toggles only. Reasoning's onOpenChange fires for programmatic
+            // state changes too (auto-open during streaming, auto-close after streaming),
+            // which should NOT trigger scroll lock.
+            <div onClickCapture={() => onToggleScrollLock?.()(true)}>
+              <Reasoning isStreaming={isReasoningStreaming}>
+                <AgentReasoningTrigger />
+                <AgentReasoningContent data-testid="message-llm-reasoning">
+                  {llmReasoningText ?? ''}
+                </AgentReasoningContent>
+              </Reasoning>
+            </div>
           )}
           {llmText ? (
             <MessageContent

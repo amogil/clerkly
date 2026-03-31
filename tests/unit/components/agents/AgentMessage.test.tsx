@@ -870,11 +870,12 @@ describe('AgentMessage — llm', () => {
 
 describe('AgentMessage — scroll lock wrappers', () => {
   /* Preconditions: kind:llm with reasoning, onToggleScrollLock provided
-     Action: render AgentMessage with onToggleScrollLock
-     Assertions: Reasoning block is rendered with onOpenChange wrapper from onToggleScrollLock
+     Action: render AgentMessage with onToggleScrollLock, click reasoning trigger
+     Assertions: Scroll lock is activated via onClickCapture on wrapper div (user-initiated only)
      Requirements: agents.4.13.7 */
-  it('should apply scroll lock wrapper to reasoning block onOpenChange', () => {
-    const mockScrollLock = jest.fn().mockReturnValue(jest.fn());
+  it('should apply scroll lock via click capture on reasoning block wrapper', () => {
+    const mockInnerFn = jest.fn();
+    const mockScrollLock = jest.fn().mockReturnValue(mockInnerFn);
 
     render(
       <AgentMessage
@@ -891,8 +892,16 @@ describe('AgentMessage — scroll lock wrappers', () => {
       />
     );
 
-    // The factory should have been called once (for the Reasoning block)
+    // The factory should NOT have been called during render (no longer passed as onOpenChange)
+    expect(mockScrollLock).not.toHaveBeenCalled();
+
+    // Click the reasoning trigger to simulate user-initiated toggle
+    const trigger = screen.getByTestId('message-llm-reasoning-trigger');
+    fireEvent.click(trigger);
+
+    // The scroll lock factory should have been called via onClickCapture
     expect(mockScrollLock).toHaveBeenCalled();
+    expect(mockInnerFn).toHaveBeenCalledWith(true);
     expect(screen.getByTestId('reasoning-root')).toBeInTheDocument();
   });
 

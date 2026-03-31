@@ -1406,8 +1406,8 @@ function useToggleScrollLock(stickContextRef: React.RefObject<StickToBottomConte
 `AgentChatInner` получает `onToggleScrollLock` как prop и передаёт в `AgentMessage`. `AgentMessage` оборачивает `onOpenChange` блоков `Reasoning` и `Tool` (code_exec) в этот callback.
 
 **Scope подавления:**
-- Подавляется только при пользовательском клике на trigger (toggle).
-- Авто-сворачивание reasoning после окончания стриминга (reasoning.tsx, auto-close delay 1s) не подавляется, так как это не пользовательский toggle.
+- Подавляется только при пользовательском клике на trigger (toggle). Для `Reasoning` используется `onClickCapture` на обёрточном `<div>`, чтобы перехватить только пользовательские клики; для `Tool` (code_exec) используется `onOpenChange`, поскольку единственный источник изменения состояния — клик пользователя.
+- Авто-сворачивание reasoning после окончания стриминга (reasoning.tsx, auto-close delay 1s) и авто-раскрытие при начале стриминга не подавляются, так как это не пользовательские toggle.
 
 ### AgentWelcome
 
@@ -2037,7 +2037,7 @@ import { Logo } from '../logo';
 | `tests/functional/agent-status-all-places.spec.ts` | agents.6.1-6.5 | Проверка консистентного отображения каждого статуса (`new`, `in-progress`, `awaiting-response`, `error`, `completed`) в Header, Agent List tooltip и All Agents |
 | `tests/functional/message-format.spec.ts` | agents.7 | - |
 | `tests/functional/code_exec.spec.ts` | agents.7.4.5-7.4.9, agents.4.23 | Отдельные сценарии для `tool_call(code_exec)`: стандартный `ToolHeader` toggle, секция `JavaScript` с подсветкой, отдельная `error` section из `output.error`, reopen cycle, width/overflow |
-| `tests/functional/llm-chat.spec.ts` | agents.4.11, agents.4.11.2, agents.7.7, agents.4.24, agents.14.1-14.6, llm-integration.2, llm-integration.7.2, llm-integration.8.7, llm-integration.16 | Включает сценарий deferred rename после non-meaningful triggering turn при наличии meaningful user-message в истории |
+| `tests/functional/llm-chat.spec.ts` | agents.4.11, agents.4.11.2, agents.4.13.7, agents.7.7, agents.4.24, agents.14.1-14.6, llm-integration.2, llm-integration.7.2, llm-integration.8.7, llm-integration.16 | Включает сценарий deferred rename после non-meaningful triggering turn при наличии meaningful user-message в истории |
 | `tests/functional/agent-status-calculation.spec.ts` | agents.9 | - |
 | `tests/functional/agent-data-isolation.spec.ts` | agents.10 | - |
 | `tests/functional/agent-activity-indicator.spec.ts` | agents.11 | - |
@@ -2138,7 +2138,7 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 | agents.4.11.2 | ✓ | ✓ |
 | agents.4.13.1-4.13.6 (autoscroll) | ✓ | ✓ |
 | agents.4.13.4-4.13.6 (scrollbar) | - | Manual |
-| agents.4.13.7 (toggle scroll suppression) | ✓ | - |
+| agents.4.13.7 (toggle scroll suppression) | ✓ | ✓ |
 | agents.4.14.1, agents.4.14.2, agents.4.14.3, agents.4.14.4, agents.4.14.5, agents.4.14.6 (scroll position) | ✓ | ✓ |
 | agents.4.16, agents.4.17, agents.4.18, agents.4.19, agents.4.20, agents.4.21 (empty state content/animations) | ✓ | ✓ |
 | agents.4.24.1, agents.4.24.2, agents.4.24.3, agents.4.24.4, agents.4.24.5 (stop/cancel flow, cancel+send) | ✓ | ✓ |
