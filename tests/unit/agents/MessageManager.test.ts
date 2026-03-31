@@ -1061,11 +1061,11 @@ describe('MessageManager', () => {
       );
     });
 
-    /* Preconditions: Startup reconciliation runs
+    /* Preconditions: Startup reconciliation runs with stale tool_call
        Action: Call finalizeAllStaleToolCallsOnStartup()
-       Assertions: No MessageUpdatedEvent is emitted (renderer not yet available)
-       Requirements: llm-integration.11.6.3 */
-    it('should not emit MessageUpdatedEvent', () => {
+       Assertions: MessageUpdatedEvent is emitted for each finalized row
+       Requirements: llm-integration.11.6.3, llm-integration.2.3 */
+    it('should emit MessageUpdatedEvent for each finalized row', () => {
       const stale: Message = {
         ...mockMessage,
         id: 60,
@@ -1082,7 +1082,7 @@ describe('MessageManager', () => {
 
       messageManager.finalizeAllStaleToolCallsOnStartup();
 
-      expect(mockEventBus.publish).not.toHaveBeenCalled();
+      expect(mockEventBus.publish).toHaveBeenCalledWith(expect.any(MessageUpdatedEvent));
     });
 
     /* Preconditions: DB has a stale tool_call with malformed payloadJson
@@ -1132,11 +1132,11 @@ describe('MessageManager', () => {
       expect(mockDbManager.messages.update).not.toHaveBeenCalled();
     });
 
-    /* Preconditions: Startup reconciliation bypasses MessageManager.update (uses repo directly)
+    /* Preconditions: Startup reconciliation uses MessageManager.update (emits events)
        Action: Call finalizeAllStaleToolCallsOnStartup()
-       Assertions: Uses MessagesRepository.update directly, not MessageManager.update
+       Assertions: Uses MessageManager.update, not MessagesRepository.update directly
        Requirements: llm-integration.11.6.3 */
-    it('should use MessagesRepository.update directly (bypass MessageManager.update)', () => {
+    it('should use MessageManager.update (emits events)', () => {
       const stale: Message = {
         ...mockMessage,
         id: 80,
@@ -1151,14 +1151,13 @@ describe('MessageManager', () => {
 
       (mockDbManager.messages.listStaleToolCalls as jest.Mock).mockReturnValue([stale]);
 
-      // Spy on the update method to verify it's the repo method being called
-      const repoUpdate = mockDbManager.messages.update as jest.Mock;
+      // Spy on the update method to verify MessageManager.update is called
       const managerUpdateSpy = jest.spyOn(messageManager, 'update');
 
       messageManager.finalizeAllStaleToolCallsOnStartup();
 
-      expect(repoUpdate).toHaveBeenCalledTimes(1);
-      expect(managerUpdateSpy).not.toHaveBeenCalled();
+      expect(managerUpdateSpy).toHaveBeenCalledTimes(1);
+      expect(managerUpdateSpy).toHaveBeenCalledWith(80, 'agent-123', expect.any(Object), true);
 
       managerUpdateSpy.mockRestore();
     });
@@ -1233,11 +1232,11 @@ describe('MessageManager', () => {
       expect(mockDbManager.messages.setHidden).toHaveBeenCalledWith(102, 'agent-B');
     });
 
-    /* Preconditions: Startup reconciliation runs
+    /* Preconditions: Startup reconciliation runs with stale llm message
        Action: Call hideAllStaleLlmOnStartup()
-       Assertions: No MessageUpdatedEvent is emitted (renderer not yet available)
-       Requirements: llm-integration.11.6.4 */
-    it('should not emit MessageUpdatedEvent (renderer not available)', () => {
+       Assertions: MessageUpdatedEvent is emitted for each hidden row
+       Requirements: llm-integration.11.6.4, llm-integration.2.3 */
+    it('should emit MessageUpdatedEvent for each hidden row', () => {
       const staleLlm: Message = {
         ...mockMessage,
         id: 103,
@@ -1252,14 +1251,14 @@ describe('MessageManager', () => {
 
       messageManager.hideAllStaleLlmOnStartup();
 
-      expect(mockEventBus.publish).not.toHaveBeenCalled();
+      expect(mockEventBus.publish).toHaveBeenCalledWith(expect.any(MessageUpdatedEvent));
     });
 
-    /* Preconditions: Startup reconciliation uses MessagesRepository.setHidden directly
+    /* Preconditions: Startup reconciliation uses MessageManager.setHidden (emits events)
        Action: Call hideAllStaleLlmOnStartup()
-       Assertions: Uses MessagesRepository.setHidden directly, not MessageManager.setHidden
+       Assertions: Uses MessageManager.setHidden, not MessagesRepository.setHidden directly
        Requirements: llm-integration.11.6.4 */
-    it('should use MessagesRepository.setHidden directly (bypass MessageManager.setHidden)', () => {
+    it('should use MessageManager.setHidden (emits events)', () => {
       const staleLlm: Message = {
         ...mockMessage,
         id: 104,
@@ -1272,13 +1271,13 @@ describe('MessageManager', () => {
 
       (mockDbManager.messages.listStaleLlmMessages as jest.Mock).mockReturnValue([staleLlm]);
 
-      const repoSetHidden = mockDbManager.messages.setHidden as jest.Mock;
+      // Spy on MessageManager.setHidden to verify it is called
       const managerSetHiddenSpy = jest.spyOn(messageManager as any, 'setHidden');
 
       messageManager.hideAllStaleLlmOnStartup();
 
-      expect(repoSetHidden).toHaveBeenCalledTimes(1);
-      expect(managerSetHiddenSpy).not.toHaveBeenCalled();
+      expect(managerSetHiddenSpy).toHaveBeenCalledTimes(1);
+      expect(managerSetHiddenSpy).toHaveBeenCalledWith(104, 'agent-123');
 
       managerSetHiddenSpy.mockRestore();
     });

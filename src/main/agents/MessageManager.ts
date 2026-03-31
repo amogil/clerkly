@@ -406,8 +406,8 @@ export class MessageManager {
   /**
    * Finalize all stale tool_call records (done=false) across all agents for the current user.
    * Includes both hidden and visible rows. Called once at startup before renderer is created.
-   * Uses MessagesRepository directly — no events emitted (renderer not yet available).
-   * Requirements: llm-integration.11.6.3
+   * Emits MessageUpdatedEvent for each finalized row via standard MessageManager.update().
+   * Requirements: llm-integration.11.6.3, llm-integration.2.3
    */
   finalizeAllStaleToolCallsOnStartup(): void {
     const staleRows = this.dbManager.messages.listStaleToolCalls();
@@ -445,12 +445,7 @@ export class MessageManager {
         };
       }
 
-      this.dbManager.messages.update(
-        row.id,
-        row.agentId,
-        JSON.stringify({ ...payload, data }),
-        true
-      );
+      this.update(row.id, row.agentId, { ...payload, data }, true);
     }
 
     this.logger.info(`Startup: finalized ${staleRows.length} stale tool_call(s) across all agents`);
@@ -460,8 +455,8 @@ export class MessageManager {
    * Hide all stale kind:llm messages (done=false, hidden=false) across all agents for the current user.
    * Sets hidden=true on each row, leaving done=false (consistent with hideAndMarkIncomplete semantics).
    * Called once at startup before renderer is created.
-   * Uses MessagesRepository directly — no events emitted (renderer not yet available).
-   * Requirements: llm-integration.11.6.4
+   * Emits MessageUpdatedEvent for each hidden row via standard MessageManager.setHidden().
+   * Requirements: llm-integration.11.6.4, llm-integration.2.3
    */
   hideAllStaleLlmOnStartup(): void {
     const staleRows = this.dbManager.messages.listStaleLlmMessages();
@@ -471,7 +466,7 @@ export class MessageManager {
     }
 
     for (const row of staleRows) {
-      this.dbManager.messages.setHidden(row.id, row.agentId);
+      this.setHidden(row.id, row.agentId);
     }
 
     this.logger.info(
