@@ -157,7 +157,7 @@ export function parseAgentTitleMetadataPayload(payload: string | null): AgentTit
 
 /**
  * Normalize user-visible agent title candidate and validate limits.
- * Requirements: llm-integration.16.8, llm-integration.16.8.2, llm-integration.16.9
+ * Requirements: llm-integration.16.8, llm-integration.16.8.2, llm-integration.16.8.3, llm-integration.16.9
  */
 export function normalizeAgentTitleCandidate(title: string): string | null {
   const collapsed = title
@@ -168,10 +168,70 @@ export function normalizeAgentTitleCandidate(title: string): string | null {
   if (!withoutEdgePunctuation) {
     return null;
   }
-  if (codePointLength(withoutEdgePunctuation) > AGENT_TITLE_MAX_LENGTH) {
+  const withoutUnpairedPunctuation = stripUnpairedPairedPunctuation(withoutEdgePunctuation).trim();
+  if (!withoutUnpairedPunctuation) {
     return null;
   }
-  return withoutEdgePunctuation;
+  if (codePointLength(withoutUnpairedPunctuation) > AGENT_TITLE_MAX_LENGTH) {
+    return null;
+  }
+  return withoutUnpairedPunctuation;
+}
+
+/**
+ * Strip unpaired paired punctuation from a title string.
+ * For symmetric types (ASCII `"`, backtick): if count is odd, remove all.
+ * For asymmetric pairs: if open count != close count, remove all of that type.
+ * ASCII apostrophe (U+0027) is NOT touched.
+ * Requirements: llm-integration.16.8.3
+ */
+function stripUnpairedPairedPunctuation(value: string): string {
+  // Symmetric pairs: odd count means unpaired
+  const symmetricChars = ['"', '`'];
+  // Asymmetric pairs: [open, close]
+  const asymmetricPairs: [string, string][] = [
+    ['\u201C', '\u201D'], // typographic double quotes
+    ['\u2018', '\u2019'], // typographic single quotes
+    ['(', ')'],
+    ['[', ']'],
+    ['{', '}'],
+    ['<', '>'],
+  ];
+
+  let result = value;
+
+  for (const ch of symmetricChars) {
+    const count = countChar(result, ch);
+    if (count % 2 !== 0) {
+      result = removeChar(result, ch);
+    }
+  }
+
+  for (const [open, close] of asymmetricPairs) {
+    const openCount = countChar(result, open);
+    const closeCount = countChar(result, close);
+    if (openCount !== closeCount) {
+      result = removeChar(removeChar(result, open), close);
+    }
+  }
+
+  return result;
+}
+
+// Requirements: llm-integration.16.8.3
+function countChar(value: string, ch: string): number {
+  let count = 0;
+  for (let i = 0; i < value.length; i++) {
+    if (value[i] === ch) {
+      count++;
+    }
+  }
+  return count;
+}
+
+// Requirements: llm-integration.16.8.3
+function removeChar(value: string, ch: string): string {
+  return value.split(ch).join('');
 }
 
 export type AgentTitleGuardDecisionReason =

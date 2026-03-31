@@ -1,4 +1,4 @@
-// Requirements: llm-integration.16.8, llm-integration.16.9
+// Requirements: llm-integration.16.8, llm-integration.16.8.3, llm-integration.16.9
 
 import {
   AGENT_TITLE_MAX_LENGTH,
@@ -71,6 +71,196 @@ describe('normalizeAgentTitleCandidate', () => {
 
     expect(normalizeAgentTitleCandidate(allowed)).toBe(allowed);
     expect(normalizeAgentTitleCandidate(overflow)).toBeNull();
+  });
+
+  /* Preconditions: Title contains a single unpaired ASCII double quote in the middle
+     Action: Normalize candidate title
+     Assertions: The unpaired quote is stripped
+     Requirements: llm-integration.16.8.3 */
+  it('strips unpaired ASCII double quote in the middle', () => {
+    const result = normalizeAgentTitleCandidate('Some "title');
+
+    expect(result).toBe('Some title');
+  });
+
+  /* Preconditions: Title contains paired ASCII double quotes around a word
+     Action: Normalize candidate title
+     Assertions: The paired quotes are preserved
+     Requirements: llm-integration.16.8.3 */
+  it('preserves paired ASCII double quotes', () => {
+    const result = normalizeAgentTitleCandidate('The "Plan" overview');
+
+    expect(result).toBe('The "Plan" overview');
+  });
+
+  /* Preconditions: Title contains an unpaired typographic left double quote
+     Action: Normalize candidate title
+     Assertions: The unpaired typographic quote is stripped
+     Requirements: llm-integration.16.8.3 */
+  it('strips unpaired typographic double quote', () => {
+    const result = normalizeAgentTitleCandidate('Some \u201Ctitle');
+
+    expect(result).toBe('Some title');
+  });
+
+  /* Preconditions: Title contains paired typographic double quotes
+     Action: Normalize candidate title
+     Assertions: The paired typographic quotes are preserved
+     Requirements: llm-integration.16.8.3 */
+  it('preserves paired typographic double quotes', () => {
+    const result = normalizeAgentTitleCandidate('The \u201CPlan\u201D overview');
+
+    expect(result).toBe('The \u201CPlan\u201D overview');
+  });
+
+  /* Preconditions: Title contains an unpaired typographic left single quote
+     Action: Normalize candidate title
+     Assertions: The unpaired typographic single quote is stripped
+     Requirements: llm-integration.16.8.3 */
+  it('strips unpaired typographic single quote', () => {
+    const result = normalizeAgentTitleCandidate('Some \u2018title');
+
+    expect(result).toBe('Some title');
+  });
+
+  /* Preconditions: Title contains paired typographic single quotes
+     Action: Normalize candidate title
+     Assertions: The paired typographic single quotes are preserved
+     Requirements: llm-integration.16.8.3 */
+  it('preserves paired typographic single quotes', () => {
+    const result = normalizeAgentTitleCandidate('The \u2018Plan\u2019 overview');
+
+    expect(result).toBe('The \u2018Plan\u2019 overview');
+  });
+
+  /* Preconditions: Title contains an unpaired opening parenthesis
+     Action: Normalize candidate title
+     Assertions: The unpaired parenthesis is stripped
+     Requirements: llm-integration.16.8.3 */
+  it('strips unpaired parenthesis', () => {
+    const result = normalizeAgentTitleCandidate('Plan for (Q3');
+
+    expect(result).toBe('Plan for Q3');
+  });
+
+  /* Preconditions: Title contains paired parentheses
+     Action: Normalize candidate title
+     Assertions: The paired parentheses are preserved
+     Requirements: llm-integration.16.8.3 */
+  it('preserves paired parentheses', () => {
+    const result = normalizeAgentTitleCandidate('Project (Alpha) review');
+
+    expect(result).toBe('Project (Alpha) review');
+  });
+
+  /* Preconditions: Title contains an unpaired opening square bracket
+     Action: Normalize candidate title
+     Assertions: The unpaired bracket is stripped
+     Requirements: llm-integration.16.8.3 */
+  it('strips unpaired square bracket', () => {
+    const result = normalizeAgentTitleCandidate('Code [review');
+
+    expect(result).toBe('Code review');
+  });
+
+  /* Preconditions: Title contains paired square brackets
+     Action: Normalize candidate title
+     Assertions: The paired square brackets are preserved
+     Requirements: llm-integration.16.8.3 */
+  it('preserves paired square brackets', () => {
+    const result = normalizeAgentTitleCandidate('Task [WIP] update');
+
+    expect(result).toBe('Task [WIP] update');
+  });
+
+  /* Preconditions: Title contains an unpaired opening curly brace
+     Action: Normalize candidate title
+     Assertions: The unpaired brace is stripped
+     Requirements: llm-integration.16.8.3 */
+  it('strips unpaired curly brace', () => {
+    const result = normalizeAgentTitleCandidate('Data {model');
+
+    expect(result).toBe('Data model');
+  });
+
+  /* Preconditions: Title contains paired curly braces
+     Action: Normalize candidate title
+     Assertions: The paired curly braces are preserved
+     Requirements: llm-integration.16.8.3 */
+  it('preserves paired curly braces', () => {
+    const result = normalizeAgentTitleCandidate('Config {json} format');
+
+    expect(result).toBe('Config {json} format');
+  });
+
+  /* Preconditions: Title contains an unpaired backtick
+     Action: Normalize candidate title
+     Assertions: The unpaired backtick is stripped
+     Requirements: llm-integration.16.8.3 */
+  it('strips unpaired backtick', () => {
+    const result = normalizeAgentTitleCandidate('Deploy `fix');
+
+    expect(result).toBe('Deploy fix');
+  });
+
+  /* Preconditions: Title contains paired backticks
+     Action: Normalize candidate title
+     Assertions: The paired backticks are preserved
+     Requirements: llm-integration.16.8.3 */
+  it('preserves paired backticks', () => {
+    const result = normalizeAgentTitleCandidate('Run `test` suite');
+
+    expect(result).toBe('Run `test` suite');
+  });
+
+  /* Preconditions: Title contains an unpaired opening angle bracket
+     Action: Normalize candidate title
+     Assertions: The unpaired angle bracket is stripped
+     Requirements: llm-integration.16.8.3 */
+  it('strips unpaired angle bracket', () => {
+    const result = normalizeAgentTitleCandidate('Compare <values');
+
+    expect(result).toBe('Compare values');
+  });
+
+  /* Preconditions: Title contains paired angle brackets
+     Action: Normalize candidate title
+     Assertions: The paired angle brackets are preserved
+     Requirements: llm-integration.16.8.3 */
+  it('preserves paired angle brackets', () => {
+    const result = normalizeAgentTitleCandidate('Type <string> check');
+
+    expect(result).toBe('Type <string> check');
+  });
+
+  /* Preconditions: Title contains an ASCII apostrophe (contraction)
+     Action: Normalize candidate title
+     Assertions: The apostrophe is NOT modified
+     Requirements: llm-integration.16.8.3 */
+  it('does not modify ASCII apostrophes', () => {
+    const result = normalizeAgentTitleCandidate("it's a plan");
+
+    expect(result).toBe("it's a plan");
+  });
+
+  /* Preconditions: Title contains mixed unpaired punctuation from different types
+     Action: Normalize candidate title
+     Assertions: All unpaired punctuation types are stripped independently
+     Requirements: llm-integration.16.8.3 */
+  it('strips mixed unpaired punctuation from different types', () => {
+    const result = normalizeAgentTitleCandidate('"word(test');
+
+    expect(result).toBe('wordtest');
+  });
+
+  /* Preconditions: Title has edge-only quotes that are handled by edge stripping
+     Action: Normalize candidate title
+     Assertions: Edge stripping handles them, unpaired logic does not interfere
+     Requirements: llm-integration.16.8, llm-integration.16.8.3 */
+  it('handles edge-only quotes without interference from unpaired logic', () => {
+    const result = normalizeAgentTitleCandidate('"Roadmap update"');
+
+    expect(result).toBe('Roadmap update');
   });
 });
 

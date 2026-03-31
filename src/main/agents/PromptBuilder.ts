@@ -46,6 +46,7 @@ export function buildAutoTitleMetadataContractPrompt(currentTitle: string): stri
     '- Keep <short title> concise plain text: target 3-12 words, max 200 characters.',
     '- NN must be an integer 0..100; higher means stronger need to rename current title.',
     '- Emit the comment only inside normal assistant markdown/text for this turn, not inside tool arguments or tool outputs.',
+    '- Do not use quotes, parentheses, brackets, braces, backticks, or angle brackets in <short title>; use plain text only.',
     '- The comment must not alter the user-facing answer semantics.',
   ].join('\n');
 }
