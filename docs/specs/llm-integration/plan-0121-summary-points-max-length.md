@@ -60,7 +60,7 @@ The `code_exec.task_summary` also uses `maxLength: 200` (`src/main/code_exec/con
 | `src/main/agents/MainPipeline.ts` | `point.length > 200` -> `> 300`; update error message |
 | `tests/unit/agents/PromptBuilder.test.ts` | Update `maxLength` assertion; add complete-word prompt assertion |
 | `tests/unit/agents/MainPipeline.test.ts` | Update prompt assertion; add 300-char boundary test |
-| `tests/functional/llm-chat.spec.ts` | Update `max 200 characters` assertion |
+| `tests/functional/llm-chat.spec.ts` | No change needed (`max 200 characters` assertion is for auto-title, not summary_points) |
 
 ## Expected result
 After implementation:

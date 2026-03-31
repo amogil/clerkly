@@ -426,6 +426,7 @@ export class PromptBuilder {
 export class FinalAnswerFeature implements AgentFeature {
   name = 'final_answer';
 
+  // Requirements: llm-integration.9.5.3, llm-integration.9.5.3.4
   getSystemPromptSection(): string {
     return [
       'Final Answer tool usage:',
@@ -443,6 +444,7 @@ export class FinalAnswerFeature implements AgentFeature {
     ].join('\n');
   }
 
+  // Requirements: llm-integration.9.5.3, llm-integration.9.5.3.4
   getTools(): LLMTool[] {
     return [
       {
