@@ -14,12 +14,14 @@ import { useToggleScrollLock } from '../../../src/renderer/hooks/useToggleScroll
 import type { StickToBottomContext } from 'use-stick-to-bottom';
 
 // Helper to create a mock StickToBottomContext
-function createMockContext(overrides?: Partial<{
-  scrollTop: number;
-  scrollHeight: number;
-  clientHeight: number;
-  isAtBottom: boolean;
-}>): { ref: React.RefObject<StickToBottomContext | null>; scrollEl: HTMLElement } {
+function createMockContext(
+  overrides?: Partial<{
+    scrollTop: number;
+    scrollHeight: number;
+    clientHeight: number;
+    isAtBottom: boolean;
+  }>
+): { ref: React.RefObject<StickToBottomContext | null>; scrollEl: HTMLElement } {
   const scrollEl = document.createElement('div');
   Object.defineProperty(scrollEl, 'scrollTop', {
     get: () => overrides?.scrollTop ?? 500,
@@ -55,7 +57,9 @@ function createMockContext(overrides?: Partial<{
     stopScroll: jest.fn(),
     isAtBottom: state.isAtBottom,
     escapedFromLock: false,
-    get targetScrollTop() { return null; },
+    get targetScrollTop() {
+      return null;
+    },
     set targetScrollTop(_v: unknown) {},
     state,
   } as unknown as StickToBottomContext;

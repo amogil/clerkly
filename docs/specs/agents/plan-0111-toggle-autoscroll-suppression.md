@@ -78,7 +78,7 @@ The implementation will:
 
 ### Phase 4: Finalization
 - [x] Update coverage table in `design.md`
-- [ ] Run `npm run validate`
+- [x] Run `npm run validate`
 
 ## Files to change
 

@@ -494,10 +494,7 @@ describe('Agents Autoscroll', () => {
           <div>Message 1</div>
           <div>Message 2</div>
           <div data-testid="collapsible">
-            <button
-              data-testid="toggle-button"
-              onClick={() => handleToggle(!isOpen)}
-            >
+            <button data-testid="toggle-button" onClick={() => handleToggle(!isOpen)}>
               Toggle
             </button>
             {isOpen && (
@@ -516,7 +513,11 @@ describe('Agents Autoscroll', () => {
 
     // Mock scroll position: user is at bottom
     Object.defineProperty(scrollContainer, 'scrollHeight', { value: 400, configurable: true });
-    Object.defineProperty(scrollContainer, 'scrollTop', { value: 100, writable: true, configurable: true });
+    Object.defineProperty(scrollContainer, 'scrollTop', {
+      value: 100,
+      writable: true,
+      configurable: true,
+    });
     Object.defineProperty(scrollContainer, 'clientHeight', { value: 300, configurable: true });
 
     // Clear initial render scroll calls

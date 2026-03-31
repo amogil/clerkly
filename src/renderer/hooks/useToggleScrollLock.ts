@@ -37,8 +37,7 @@ export function useToggleScrollLock(
             // Restore isAtBottom after paint — check if still near bottom
             requestAnimationFrame(() => {
               if (wasAtBottom) {
-                const diff =
-                  scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight;
+                const diff = scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight;
                 // 70px is the threshold used by use-stick-to-bottom for isNearBottom
                 ctx.state.isAtBottom = diff <= 70;
               }

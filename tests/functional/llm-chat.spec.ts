@@ -3651,7 +3651,9 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     const scrollTopBefore = await messagesArea.evaluate((el) => el.scrollTop);
 
     // Find the code_exec toggle trigger and click to collapse
-    const codeExecToggle = context.window.locator('[data-testid="message-code-exec-toggle"]').last();
+    const codeExecToggle = context.window
+      .locator('[data-testid="message-code-exec-toggle"]')
+      .last();
     await expect(codeExecToggle).toBeVisible();
     await codeExecToggle.click();
 
