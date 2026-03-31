@@ -403,14 +403,33 @@ describe('OpenAIProvider.chat()', () => {
 
   /* Preconditions: Tool with execute function is provided; tool execution takes time
      Action: provider.chat() invokes tool execute via buildToolSet wrapper
-     Assertions: clearTimeout is called before tool execution (pause) and setTimeout is called
-       after tool execution completes (resume), so tool time does not consume CHAT_TIMEOUT_MS budget
+     Assertions: Ordered events verify pause is called before tool execute and resume is called
+       after, so tool time does not consume CHAT_TIMEOUT_MS budget
      Requirements: llm-integration.3.6.1 */
   it('pauses timeout during tool execution and resumes after', async () => {
-    const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
-    const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
+    const events: string[] = [];
+    const originalSetTimeout = global.setTimeout;
+    const originalClearTimeout = global.clearTimeout;
 
-    const toolExecute = jest.fn().mockResolvedValue({ result: 'ok' });
+    const setTimeoutSpy = jest
+      .spyOn(global, 'setTimeout')
+      .mockImplementation((...args: Parameters<typeof setTimeout>) => {
+        if (args[1] === CHAT_TIMEOUT_MS) {
+          events.push('setTimeout:CHAT_TIMEOUT_MS');
+        }
+        return originalSetTimeout(...args);
+      });
+    const clearTimeoutSpy = jest
+      .spyOn(global, 'clearTimeout')
+      .mockImplementation((...args: Parameters<typeof clearTimeout>) => {
+        events.push('clearTimeout');
+        return originalClearTimeout(...args);
+      });
+
+    const toolExecute = jest.fn().mockImplementation(async () => {
+      events.push('toolExecute');
+      return { result: 'ok' };
+    });
 
     (aiModule.streamText as unknown as jest.Mock).mockImplementation((_options) => {
       return {
@@ -419,9 +438,9 @@ describe('OpenAIProvider.chat()', () => {
       };
     });
 
-    // The tool mock captures the execute wrapper from buildToolSet
+    // The tool mock captures the execute wrapper from buildToolSet and awaits it
+    // to ensure the full pause->execute->resume sequence completes
     (aiModule.tool as unknown as jest.Mock).mockImplementation((definition) => {
-      // Execute the wrapped function to trigger pause/resume
       if (definition.execute) {
         definition.execute({ code: 'test' });
       }
@@ -444,16 +463,28 @@ describe('OpenAIProvider.chat()', () => {
       () => {}
     );
 
+    // Wait for the async execute wrapper (pause->execute->resume) to complete
+    await new Promise((resolve) => originalSetTimeout(resolve, 20));
+
     // Verify tool executor was called
     expect(toolExecute).toHaveBeenCalledWith({ code: 'test' }, undefined);
 
-    // clearTimeout is called for pauseTimeout (before tool exec) among other calls
-    expect(clearTimeoutSpy).toHaveBeenCalled();
+    // Verify ordering: pause (clearTimeout without follow-up setTimeout) must come before
+    // toolExecute, and resume (setTimeout:CHAT_TIMEOUT_MS) must come after toolExecute
+    const pauseIndex = events.indexOf('clearTimeout');
+    const executeIndex = events.indexOf('toolExecute');
+    const resumeAfterExecuteEvents = events.slice(executeIndex + 1);
+    const resumeIndex = events.indexOf('setTimeout:CHAT_TIMEOUT_MS', executeIndex + 1);
 
-    // setTimeout with CHAT_TIMEOUT_MS is called for resumeTimeout (after tool exec)
-    // Initial + resume after tool = at least 2 calls
-    const timeoutCalls = setTimeoutSpy.mock.calls.filter((call) => call[1] === CHAT_TIMEOUT_MS);
-    expect(timeoutCalls.length).toBeGreaterThanOrEqual(2);
+    expect(pauseIndex).toBeGreaterThanOrEqual(0);
+    expect(executeIndex).toBeGreaterThan(pauseIndex);
+    expect(resumeIndex).toBeGreaterThan(executeIndex);
+    // Between pause (clearTimeout) and execute, there must NOT be a setTimeout:CHAT_TIMEOUT_MS
+    // (that would mean timeout was resumed before execute, defeating the pause purpose)
+    const eventsBetweenPauseAndExecute = events.slice(pauseIndex + 1, executeIndex);
+    expect(eventsBetweenPauseAndExecute).not.toContain('setTimeout:CHAT_TIMEOUT_MS');
+    // After execute, resume must fire setTimeout:CHAT_TIMEOUT_MS
+    expect(resumeAfterExecuteEvents).toContain('setTimeout:CHAT_TIMEOUT_MS');
 
     setTimeoutSpy.mockRestore();
     clearTimeoutSpy.mockRestore();
@@ -461,15 +492,34 @@ describe('OpenAIProvider.chat()', () => {
 
   /* Preconditions: Tool with execute function that throws an error is provided
      Action: provider.chat() invokes tool execute via buildToolSet wrapper, tool throws
-     Assertions: resumeTimeout is still called after tool execution failure (via finally block),
-       so the timeout is correctly resumed even when tool throws
+     Assertions: Ordered events verify resume (setTimeout:CHAT_TIMEOUT_MS) is called after tool
+       execution failure via finally block, preserving pause->execute->resume ordering
      Requirements: llm-integration.3.6.1 */
   it('resumes timeout after tool execution failure', async () => {
-    const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
-    const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
+    const events: string[] = [];
+    const originalSetTimeout = global.setTimeout;
+    const originalClearTimeout = global.clearTimeout;
+
+    const setTimeoutSpy = jest
+      .spyOn(global, 'setTimeout')
+      .mockImplementation((...args: Parameters<typeof setTimeout>) => {
+        if (args[1] === CHAT_TIMEOUT_MS) {
+          events.push('setTimeout:CHAT_TIMEOUT_MS');
+        }
+        return originalSetTimeout(...args);
+      });
+    const clearTimeoutSpy = jest
+      .spyOn(global, 'clearTimeout')
+      .mockImplementation((...args: Parameters<typeof clearTimeout>) => {
+        events.push('clearTimeout');
+        return originalClearTimeout(...args);
+      });
 
     const toolError = new Error('tool crashed');
-    const toolExecute = jest.fn().mockRejectedValue(toolError);
+    const toolExecute = jest.fn().mockImplementation(async () => {
+      events.push('toolExecute');
+      throw toolError;
+    });
 
     (aiModule.streamText as unknown as jest.Mock).mockImplementation(() => {
       return {
@@ -481,7 +531,6 @@ describe('OpenAIProvider.chat()', () => {
     let wrappedExecuteError: Error | null = null;
 
     (aiModule.tool as unknown as jest.Mock).mockImplementation((definition) => {
-      // Execute the wrapped function to trigger pause/resume
       if (definition.execute) {
         definition.execute({ code: 'test' }).catch((err: Error) => {
           wrappedExecuteError = err;
@@ -506,16 +555,24 @@ describe('OpenAIProvider.chat()', () => {
       () => {}
     );
 
-    // Wait for the async error to propagate
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    // Wait for the async error to propagate and finally block to complete
+    await new Promise((resolve) => originalSetTimeout(resolve, 20));
 
     // Verify the tool error propagated
     expect(wrappedExecuteError).toBe(toolError);
 
-    // resumeTimeout should still have been called (setTimeout with CHAT_TIMEOUT_MS)
-    // Initial + resume after tool error = at least 2 calls
-    const timeoutCalls = setTimeoutSpy.mock.calls.filter((call) => call[1] === CHAT_TIMEOUT_MS);
-    expect(timeoutCalls.length).toBeGreaterThanOrEqual(2);
+    // Verify ordering: pause->execute->resume even when tool throws
+    const pauseIndex = events.indexOf('clearTimeout');
+    const executeIndex = events.indexOf('toolExecute');
+    const resumeIndex = events.indexOf('setTimeout:CHAT_TIMEOUT_MS', executeIndex + 1);
+
+    expect(pauseIndex).toBeGreaterThanOrEqual(0);
+    expect(executeIndex).toBeGreaterThan(pauseIndex);
+    // resume must still fire after execute (via finally block) even though tool threw
+    expect(resumeIndex).toBeGreaterThan(executeIndex);
+    // Between pause and execute, no setTimeout:CHAT_TIMEOUT_MS should occur
+    const eventsBetweenPauseAndExecute = events.slice(pauseIndex + 1, executeIndex);
+    expect(eventsBetweenPauseAndExecute).not.toContain('setTimeout:CHAT_TIMEOUT_MS');
 
     setTimeoutSpy.mockRestore();
     clearTimeoutSpy.mockRestore();
