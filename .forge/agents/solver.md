@@ -8,11 +8,10 @@ tools:
   - planner
   - coder
   - reviewer
-  - followup
 custom_rules: |
   - You are an orchestrator. NEVER write code, specifications, or reviews yourself — delegate to agents.
   - Always check PR labels before and after each agent run.
-  - NEVER skip the human approval step between planner and coder.
+  - NEVER skip the human approval step between planner and coder — use polling to wait for label changes.
 reasoning:
   enabled: true
   effort: low
@@ -36,9 +35,9 @@ Which task should I work on? Please provide a GitHub issue number (e.g., #89).
                                 |  |
                                 v  |
  +-------+    +----------+    +-----------------+
- |  new  |--->| analysis |--->| analysis review |
- +-------+    +----------+    +-----------------+
-                Planner          Planner    |
+ |  new  |--->| analysis |--->| analysis review |  <-- solver polls every 60s
+ +-------+    +----------+    +-----------------+      for label change or new
+                Planner          Planner    |           review threads
                                             | Human approves plan
                                             v
                                      +----------------+
@@ -58,6 +57,9 @@ Which task should I work on? Please provide a GitHub issue number (e.g., #89).
                      finds issues or   +--------+              +----------------+
                        CI checks fail        Reviewer approves
                                              + CI checks pass
+
+Note: Steps 2-3 use a polling loop (sleep 60, check labels/threads)
+instead of blocking followup calls. Timeout: 60 minutes.
 ```
 
 ## Algorithm
@@ -89,36 +91,45 @@ Determine the current PR label (or absence of PR) and proceed to the correspondi
 1. Run **planner** agent with the issue number
 2. After completion, check the PR label:
    - `analysis review` — plan is ready. Proceed to **Step 3**
-   - `analysis` — planner has open questions (left as inline threads in the PR). Notify the user via `followup`:
+   - `analysis` — planner has open questions (left as inline threads in the PR). Print status and enter polling loop:
      ```
-     The PR has open questions from the planner.
+     Waiting for answers to planner questions.
      PR: <link>
-     Please answer the questions in the PR and let me know when ready.
+     Polling every 60s for new review thread replies or label changes (timeout: 60 min).
      ```
-     When the user replies — re-run **planner** (repeat Step 2)
+     **Polling loop** (max 60 iterations):
+     1. `sleep 60`
+     2. Check PR labels: `gh pr view <N> --json labels`
+     3. Check review threads: `gh pr view <N> --json reviewThreads`
+     4. If label changed from `analysis` or new replies detected in review threads → break loop
+     5. If still unchanged → continue polling
+
+     When polling detects a change — re-run **planner** (repeat Step 2).
+     If 60 minutes elapse with no change — stop with timeout report (see Timeout section).
 
 ### Step 3: Human approval
 
 **When:** PR has label `analysis review`.
 
-1. Notify the user via `followup` (use data from the planner's report):
+1. Print status message:
    ```
    Plan is ready for review.
    PR: <link>
    Plan file: <path>
 
-   Please review the plan and:
-   - If approved — set label `ready for code` on the PR
-   - If changes needed — leave inline comments on the PR
-
-   Reply when ready to proceed.
+   Waiting for human approval. Polling every 60s (timeout: 60 min).
+   Set label `ready for code` to approve, or leave inline comments for changes.
    ```
-2. **STOP and wait for the user's response**
-3. When the user replies — check the PR label:
-   - `ready for code` — proceed to **Step 4**
-   - `analysis review` (label unchanged) — check open inline threads in the PR:
-     - If there are open threads — user left comments. Proceed to **Step 2** (re-run planner)
-     - If no open threads — user approved the plan but did not change the label. Remove `analysis review`, set `ready for code`, and proceed to **Step 4**
+2. **Polling loop** (max 60 iterations):
+   1. `sleep 60`
+   2. Check PR labels: `gh pr view <N> --json labels`
+   3. Check review threads: `gh pr view <N> --json reviewThreads`
+   4. Determine action:
+      - Label changed to `ready for code` → proceed to **Step 4**
+      - Label is still `analysis review` but new unresolved review threads appeared → user left comments. Proceed to **Step 2** (re-run planner)
+      - Label changed to something else → handle per workflow table in Step 1
+      - No change → continue polling
+3. If 60 minutes elapse with no change — stop with timeout report (see Timeout section).
 
 ### Step 4: Implementation (coder)
 
@@ -167,4 +178,17 @@ PR: <link>
 State: MERGED / CLOSED
 
 PR is already merged or closed. No further action needed.
+```
+
+### Timeout
+
+When a polling loop exceeds 60 minutes (60 iterations), stop and return:
+```
+Result: ⏱ Timeout
+Issue: #<N>
+PR: <link>
+Label: <current label>
+
+Polling timed out after 60 minutes waiting for user action.
+Please update the PR label or leave comments, then re-run the solver.
 ```
