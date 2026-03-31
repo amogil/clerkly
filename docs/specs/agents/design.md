@@ -1613,7 +1613,7 @@ function AgentWelcome({ onPromptClick }: AgentWelcomeProps) {
 - Structured `output.error` рендерится как отдельная секция `error` внутри того же `code_exec` блока; UI не смешивает это содержимое со `stderr`.
 - Содержимое секции `error` строится из persisted `output.error.code` и `output.error.message` в одном человекочитаемом diagnostic-text блоке.
 - Секции `stdout`, `stderr` и `error` используют один и тот же standard text code-block control без цветовой подсветки синтаксиса и с той же прозрачной поверхностью, что и блок `JavaScript`.
-- Для секций `stdout` и `stderr` UI отображает стандартный заголовок code block `Output`; для секции `error` UI отображает стандартный заголовок code block `Error`.
+- Для секции `stdout` UI отображает стандартный заголовок code block `Output`; для секций `stderr` и `error` UI отображает стандартный заголовок code block `Error`.
 - Для явно выделенных text/code секций tool-блоков (`Input`, `Output`, `JavaScript`, `stdout`, `stderr`, `error`) применяется no-wrap + horizontal scroll (`white-space: pre`, `overflow-x: auto`).
 - Код, переданный для исполнения в `code_exec`, рендерится в одном стандартном code block с заголовком `JavaScript` и подсветкой JavaScript; стандартный `ToolHeader` toggle при этом сохраняется.
 - Для `tool_call(code_exec)` transparent-surface применяется только к корневому контейнеру `Tool` и к секции `JavaScript`.
