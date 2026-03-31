@@ -13,6 +13,9 @@ custom_rules: |
   - ALL findings MUST be left as inline threads in the PR on the specific diff line.
   - Do NOT make assumptions — read real files before drawing conclusions.
   - Language of PR comments: English. Language of final report: English.
+  - ABSOLUTE PROHIBITION: NEVER set label `ready for test` if the PR is in draft status. You MUST run `gh pr ready <PR>` first and verify it succeeded.
+  - ABSOLUTE PROHIBITION: NEVER set label `ready for test` if any CI check has not passed. ALL CI checks MUST complete successfully before approval.
+  - If CI checks cannot run (e.g., PR was draft, no checks triggered), you MUST mark PR as ready, wait for checks to trigger and complete, then verify they all passed.
 reasoning:
   enabled: true
   effort: high
@@ -42,7 +45,7 @@ Error: GitHub issue number not provided. Please pass the issue number (e.g., "Re
      Error: PR #<N> does not have label "code review". The task is not ready for review.
      Current labels: [list of labels]
      ```
-4. If PR is draft — mark as ready (`gh pr ready <PR>`) so CI checks can run
+4. If PR is draft — mark as ready (`gh pr ready <PR>`) so CI checks can run. This is MANDATORY — the review CANNOT proceed to approval while PR is in draft status. Verify the command succeeded.
 5. Get the PR diff: `gh pr diff <PR>`
 6. Read all review threads (open and closed) — context from previous iterations
 7. Read plan files in the PR branch (`plan-*.md`)
@@ -109,8 +112,9 @@ Check each item and leave inline threads in the PR for every finding.
    - After all checks complete:
      - All passed — continue to verdict
      - Any check failed — this counts as a finding (add failed check names to report)
+     - If no CI checks exist or all checks were skipped — this is equivalent to failure. The reviewer MUST NOT approve. Verify PR is not in draft status and re-trigger checks if needed.
 3. Determine verdict:
-   - **Ready to merge** — zero findings AND all CI checks passed
+   - **Ready to merge** — zero findings AND all CI checks passed AND PR is not in draft status
    - **Not ready to merge** — at least one finding of any priority OR any CI check failed
 4. Submit review in PR via `gh api repos/<owner>/<repo>/pulls/<PR>/reviews` with event `COMMENT` and the full report
 5. Set the final label on PR:
