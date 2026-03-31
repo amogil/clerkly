@@ -261,6 +261,8 @@
 
 4.13.6. Скроллбар ДОЛЖЕН автоматически скрываться после окончания скролла
 
+4.13.7. КОГДА пользователь раскрывает или сворачивает сворачиваемый блок (блок `tool_call(code_exec)` или reasoning-блок), ТО автоскролл НЕ ДОЛЖЕН срабатывать и viewport ДОЛЖЕН оставаться на текущей позиции скролла пользователя
+
 4.14. Позиция скролла ДОЛЖНА сохраняться для каждого агента независимо
 
 4.14.1. КОГДА пользователь переключается на другого агента, ТО чат предыдущего агента ДОЛЖЕН скрываться через CSS (`absolute inset-0 opacity-0 pointer-events-none`), но НЕ размонтироваться — это сохраняет `scrollTop` в DOM
@@ -370,6 +372,7 @@
 - `tests/functional/message-text-wrapping.spec.ts` - "should handle emoji and Unicode characters correctly"
 - `tests/functional/llm-chat.spec.ts` - "should cancel active request via stop button without creating error message"
 - `tests/functional/llm-chat.spec.ts` - "should keep reasoning trigger logo static after finish and auto-collapse"
+- `tests/functional/llm-chat.spec.ts` - "should not auto-scroll when toggling code_exec block near bottom of chat"
 
 ### 5. Просмотр всех агентов
 
