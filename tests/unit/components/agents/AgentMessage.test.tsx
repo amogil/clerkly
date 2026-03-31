@@ -868,6 +868,97 @@ describe('AgentMessage — llm', () => {
   });
 });
 
+describe('AgentMessage — scroll lock wrappers', () => {
+  /* Preconditions: kind:llm with reasoning, onToggleScrollLock provided
+     Action: render AgentMessage with onToggleScrollLock
+     Assertions: Reasoning block is rendered with onOpenChange wrapper from onToggleScrollLock
+     Requirements: agents.4.13.7 */
+  it('should apply scroll lock wrapper to reasoning block onOpenChange', () => {
+    const mockScrollLock = jest.fn().mockReturnValue(jest.fn());
+
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'llm',
+          payload: {
+            data: {
+              reasoning: { text: 'Thinking...' },
+              text: 'Answer',
+            },
+          },
+        })}
+        onToggleScrollLock={mockScrollLock}
+      />
+    );
+
+    // The factory should have been called once (for the Reasoning block)
+    expect(mockScrollLock).toHaveBeenCalled();
+    expect(screen.getByTestId('reasoning-root')).toBeInTheDocument();
+  });
+
+  /* Preconditions: kind:tool_call code_exec, onToggleScrollLock provided
+     Action: render AgentMessage with onToggleScrollLock
+     Assertions: Tool block is rendered and scroll lock factory is invoked
+     Requirements: agents.4.13.7 */
+  it('should apply scroll lock wrapper to code_exec tool block onOpenChange', () => {
+    const mockScrollLock = jest.fn().mockReturnValue(jest.fn());
+
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'tool_call',
+          done: true,
+          payload: {
+            data: {
+              callId: 'call-code-scroll',
+              toolName: 'code_exec',
+              arguments: {
+                task_summary: 'Scroll test',
+                code: "console.log('scroll')",
+              },
+              output: {
+                status: 'success',
+                stdout: '',
+                stderr: '',
+                stdout_truncated: false,
+                stderr_truncated: false,
+              },
+            },
+          },
+        })}
+        onToggleScrollLock={mockScrollLock}
+      />
+    );
+
+    // The factory should have been called once (for the Tool block)
+    expect(mockScrollLock).toHaveBeenCalled();
+    expect(screen.getByTestId('message-code-exec-block')).toBeInTheDocument();
+  });
+
+  /* Preconditions: kind:llm with reasoning, no onToggleScrollLock provided
+     Action: render AgentMessage without onToggleScrollLock
+     Assertions: Reasoning block renders normally without error
+     Requirements: agents.4.13.7 */
+  it('should render reasoning block without error when no scroll lock provided', () => {
+    render(
+      <AgentMessage
+        message={baseMessage({
+          kind: 'llm',
+          payload: {
+            data: {
+              reasoning: { text: 'Thinking...' },
+              text: 'Answer',
+            },
+          },
+        })}
+      />
+    );
+
+    expect(screen.getByTestId('reasoning-root')).toBeInTheDocument();
+    expect(screen.getByTestId('message-llm-action')).toBeInTheDocument();
+  });
+});
+
 describe('AgentMessage — error', () => {
   beforeEach(() => {
     jest.clearAllMocks();

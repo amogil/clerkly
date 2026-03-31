@@ -71,10 +71,10 @@ The implementation will:
 - [x] Alternatively, create a wrapper component `ScrollLockedCollapsible` that intercepts `onOpenChange` and applies scroll position preservation
 
 ### Phase 3: Tests
-- [ ] Add unit test `tests/unit/hooks/useToggleScrollLock.test.ts` — verifies scroll position is preserved during open/close toggle, covers `agents.4.13.7`
-- [ ] Add unit test case in `tests/unit/components/agents/AgentMessage.test.tsx` — verifies `onOpenChange` wrappers are applied to Reasoning and Tool blocks, covers `agents.4.13.7`
-- [ ] Add unit test case in `tests/unit/components/agents-autoscroll.test.tsx` — verifies toggling a collapsible near bottom does not trigger auto-scroll, covers `agents.4.13.7`
-- [ ] Add functional test `tests/functional/llm-chat.spec.ts` — "should not auto-scroll when toggling code_exec block near bottom of chat", covers `agents.4.13.7`
+- [x] Add unit test `tests/unit/hooks/useToggleScrollLock.test.ts` — verifies scroll position is preserved during open/close toggle, covers `agents.4.13.7`
+- [x] Add unit test case in `tests/unit/components/agents/AgentMessage.test.tsx` — verifies `onOpenChange` wrappers are applied to Reasoning and Tool blocks, covers `agents.4.13.7`
+- [x] Add unit test case in `tests/unit/components/agents-autoscroll.test.tsx` — verifies toggling a collapsible near bottom does not trigger auto-scroll, covers `agents.4.13.7`
+- [x] Add functional test `tests/functional/llm-chat.spec.ts` — "should not auto-scroll when toggling code_exec block near bottom of chat", covers `agents.4.13.7`
 
 ### Phase 4: Finalization
 - [x] Update coverage table in `design.md`

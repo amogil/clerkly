@@ -3581,4 +3581,97 @@ test.describe('LLM Chat (controlled mock transport exceptions)', () => {
     const errorText = await errorBubble.textContent();
     expect(errorText?.trim().length).toBeGreaterThan(0);
   });
+
+  /* Preconditions: Chat pre-filled with messages to make it scrollable, user is at bottom,
+       mock LLM returns code_exec tool_call
+     Action: User sends message, code_exec block appears, user toggles it
+     Assertions: Scroll position is preserved after toggle (no auto-scroll jump)
+     Requirements: agents.4.13.7 */
+  test('should not auto-scroll when toggling code_exec block near bottom of chat', async () => {
+    mockLLMServer.setStreamingMode(true, { chunkDelayMs: 30 });
+    mockLLMServer.setOpenAIStreamScripts([
+      {
+        toolCalls: [
+          {
+            callId: 'scroll-toggle-1',
+            toolName: 'code_exec',
+            arguments: {
+              task_summary: 'Scroll toggle test',
+              code: "console.log('scroll toggle');",
+              timeout_ms: 10000,
+            },
+          },
+        ],
+      },
+      {
+        content: '{"action":{"type":"text","content":"After toggle test"}}',
+      },
+    ]);
+
+    context = await launchWithMockLLM();
+
+    // Pre-fill chat with messages to make it scrollable
+    const agentIds = await getAgentIdsFromApi(context.window);
+    const activeAgentId = agentIds[0];
+    expect(activeAgentId).toBeTruthy();
+    for (let i = 1; i <= 15; i++) {
+      await context.window.evaluate(
+        async ({ agentId, text }) => {
+          // @ts-expect-error - window.api is exposed via contextBridge
+          return await window.api.test.createAgentMessage(agentId, text);
+        },
+        { agentId: activeAgentId as string, text: `Pre-fill message ${i} for scroll test` }
+      );
+    }
+    await expect(context.window.locator('[data-testid="message"]')).toHaveCount(15, {
+      timeout: 5000,
+    });
+
+    const messageInput = context.window.locator('textarea[placeholder*="Ask"]');
+    await messageInput.fill('Use code_exec for scroll toggle test');
+    await messageInput.press('Enter');
+
+    // Wait for code_exec block to appear with terminal output
+    const codeExecBlock = context.window.locator('[data-testid="message-code-exec-block"]').last();
+    await expect(codeExecBlock).toBeVisible({ timeout: 15000 });
+
+    // Wait for the action response to finish
+    const actionContent = context.window.locator('.message-llm-action-response').last();
+    await expect(actionContent).toContainText('After toggle test', { timeout: 15000 });
+
+    // Scroll to bottom and wait for it to settle
+    const messagesArea = context.window.locator('[data-testid="messages-area"]');
+    await messagesArea.evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
+    });
+    // Animation settle delay — required for StickToBottom to update isAtBottom
+    await context.window.waitForTimeout(500);
+
+    // Capture scrollTop before toggle
+    const scrollTopBefore = await messagesArea.evaluate((el) => el.scrollTop);
+
+    // Find the code_exec toggle trigger and click to collapse
+    const codeExecToggle = context.window.locator('[data-testid="message-code-exec-toggle"]').last();
+    await expect(codeExecToggle).toBeVisible();
+    await codeExecToggle.click();
+
+    // Wait for animation to settle
+    await context.window.waitForTimeout(500);
+
+    // Capture scrollTop after toggle
+    const scrollTopAfterCollapse = await messagesArea.evaluate((el) => el.scrollTop);
+
+    // Scroll should be preserved (within small tolerance for rounding)
+    expect(Math.abs(scrollTopAfterCollapse - scrollTopBefore)).toBeLessThan(5);
+
+    // Now expand again
+    await codeExecToggle.click();
+    await context.window.waitForTimeout(500);
+
+    const scrollTopAfterExpand = await messagesArea.evaluate((el) => el.scrollTop);
+    // Scroll should remain preserved after expand too
+    expect(Math.abs(scrollTopAfterExpand - scrollTopAfterCollapse)).toBeLessThan(5);
+
+    await expectNoToastError(context.window);
+  });
 });
