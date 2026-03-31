@@ -67,16 +67,16 @@ The relevant paired punctuation characters to handle:
 
 ### Phase 2: Code
 
-- [ ] Modify `src/main/agents/AgentTitleRuntime.ts` - In `normalizeAgentTitleCandidate`, after edge punctuation removal, add a step that:
+- [x] Modify `src/main/agents/AgentTitleRuntime.ts` - In `normalizeAgentTitleCandidate`, after edge punctuation removal, add a step that:
   1. For each symmetric type (ASCII `"`, backtick `` ` ``): count occurrences; if odd, remove all.
   2. For each asymmetric pair (typographic `""`/`''`, parentheses, brackets, braces, angle brackets): count open and close separately; if counts differ, remove all of that type.
   3. After removal, re-trim to handle any resulting edge whitespace.
 
-- [ ] Modify `src/main/agents/PromptBuilder.ts` - In `buildAutoTitleMetadataContractPrompt`, add a prompt line instructing the model: `- Do not use quotes, parentheses, brackets, braces, backticks, or angle brackets in <short title>; use plain text only.`
+- [x] Modify `src/main/agents/PromptBuilder.ts` - In `buildAutoTitleMetadataContractPrompt`, add a prompt line instructing the model: `- Do not use quotes, parentheses, brackets, braces, backticks, or angle brackets in <short title>; use plain text only.`
 
 ### Phase 3: Tests
 
-- [ ] Update unit tests in `tests/unit/agents/AgentTitleNormalization.test.ts`:
+- [x] Update unit tests in `tests/unit/agents/AgentTitleNormalization.test.ts`:
   - Test: title with single unpaired ASCII `"` in the middle is stripped -> covers `llm-integration.16.8.3`
   - Test: title with paired ASCII `"` around a word preserves them -> covers `llm-integration.16.8.3`
   - Test: title with unpaired typographic `"` is stripped -> covers `llm-integration.16.8.3`
@@ -97,13 +97,13 @@ The relevant paired punctuation characters to handle:
   - Test: title with mixed unpaired punctuation from different types -> covers `llm-integration.16.8.3`
   - Test: edge-only quotes are already handled by edge stripping and unpaired logic does not interfere -> covers `llm-integration.16.8, llm-integration.16.8.3`
 
-- [ ] Add unit test in `tests/unit/agents/AgentTitlePromptContract.test.ts`:
+- [x] Add unit test in `tests/unit/agents/AgentTitlePromptContract.test.ts`:
   - Test: `buildAutoTitleMetadataContractPrompt` output contains instruction prohibiting paired punctuation in titles -> covers `llm-integration.16.8.4`
 
 ### Phase 4: Finalization
 
-- [ ] Update coverage table in `design.md` (already done in Phase 1)
-- [ ] Run `npm run validate`
+- [x] Update coverage table in `design.md` (already done in Phase 1)
+- [x] Run `npm run validate`
 
 ## Files to change
 
