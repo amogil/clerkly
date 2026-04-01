@@ -499,7 +499,7 @@ function AgentMessageComponent({
                 <div className="min-w-0 max-w-full overflow-hidden">
                   <div data-testid="message-code-exec-stderr">
                     <AgentMarkdownResponse className="message-response-transparent-code-blocks text-sm leading-relaxed break-words">
-                      {buildCodeFence(stripAutoTitleMetadataComments(stderr), 'Output')}
+                      {buildCodeFence(stripAutoTitleMetadataComments(stderr), 'Error')}
                     </AgentMarkdownResponse>
                   </div>
                 </div>

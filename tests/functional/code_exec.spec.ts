@@ -285,7 +285,7 @@ test.describe('code_exec tool_call rendering', () => {
     await expect(stdoutSection).toContainText('ok');
     const stderrSection = window.locator('[data-testid="message-code-exec-stderr"]').last();
     await expect(stderrSection.locator('[data-streamdown="code-block-header"]')).toContainText(
-      'Output'
+      'Error'
     );
     await expect(stderrSection).toContainText('warn');
     await expect(
@@ -483,7 +483,7 @@ test.describe('code_exec tool_call rendering', () => {
     ).toBeVisible();
     const stderrSection = window.locator('[data-testid="message-code-exec-stderr"]').last();
     await expect(stderrSection.locator('[data-streamdown="code-block-header"]')).toContainText(
-      'Output'
+      'Error'
     );
     await expect(stderrSection).toContainText('console.error fallback');
     const errorSection = window.locator('[data-testid="message-code-exec-error"]').last();
