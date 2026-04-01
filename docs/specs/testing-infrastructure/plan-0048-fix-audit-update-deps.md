@@ -128,12 +128,12 @@ No specification changes required. The existing `testing.4.6` and `testing.4.7` 
 
 #### Step 2.3: Upgrade `electron-builder` 24.13.3 -> 26.8.1
 
-- [ ] Update `package.json`: `"electron-builder": "^26.8.1"`
-- [ ] Run `npm install`
-- [ ] Verify `electron-builder.json` config is compatible with v26
-- [ ] Verify `npm run package:mac` works (or at least `electron-builder --help`)
-- [ ] This resolves `@tootallnate/once` and `tar` vulnerabilities (5 vulns)
-- [ ] Commit: `fix: upgrade electron-builder to v26 to resolve tar/once vulnerabilities`
+- [x] Update `package.json`: `"electron-builder": "^26.8.1"`
+- [x] Run `npm install`
+- [x] Verify `electron-builder.json` config is compatible with v26
+- [x] Verify `npm run package:mac` works (or at least `electron-builder --help`)
+- [x] This resolves `@tootallnate/once` and `tar` vulnerabilities (5 vulns)
+- [x] Commit: `fix: upgrade electron-builder to v26 to resolve tar/once vulnerabilities`
 
 #### Step 2.4: Upgrade `drizzle-kit` 0.30.6 -> 0.31.10
 
