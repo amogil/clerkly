@@ -263,6 +263,8 @@
 
 4.13.7. КОГДА пользователь раскрывает или сворачивает сворачиваемый блок (блок `tool_call(code_exec)` или reasoning-блок), ТО автоскролл НЕ ДОЛЖЕН срабатывать и viewport ДОЛЖЕН оставаться на текущей позиции скролла пользователя
 
+4.13.8. КОГДА размер окна приложения изменяется, ТО позиция скролла чата ДОЛЖНА оставаться стабильной без видимого повторного скроллирования или рывков анимации; ЕСЛИ пользователь находился внизу чата, ТО скролл ДОЛЖЕН мгновенно (без анимации) перемещаться на новую нижнюю позицию; ЕСЛИ пользователь прокрутил вверх, ТО позиция скролла НЕ ДОЛЖНА принудительно сбрасываться вниз
+
 4.14. Позиция скролла ДОЛЖНА сохраняться для каждого агента независимо
 
 4.14.1. КОГДА пользователь переключается на другого агента, ТО чат предыдущего агента ДОЛЖЕН скрываться через CSS (`absolute inset-0 opacity-0 pointer-events-none`), но НЕ размонтироваться — это сохраняет `scrollTop` в DOM
@@ -373,6 +375,7 @@
 - `tests/functional/llm-chat.spec.ts` - "should cancel active request via stop button without creating error message"
 - `tests/functional/llm-chat.spec.ts` - "should keep reasoning trigger logo static after finish and auto-collapse"
 - `tests/functional/llm-chat.spec.ts` - "should not auto-scroll when toggling code_exec block near bottom of chat"
+- `tests/functional/agent-messaging.spec.ts` - "should maintain stable scroll position during window resize"
 
 ### 5. Просмотр всех агентов
 

@@ -1275,7 +1275,7 @@ function ActivityIndicator({ isActive }: { isActive: boolean }) {
 `Conversation` (`src/renderer/components/ai-elements/conversation.tsx`) — тонкая обёртка над `StickToBottom` из `use-stick-to-bottom`. Автоматически прокручивает вниз при появлении новых сообщений, если пользователь не прокрутил вверх.
 
 ```tsx
-// Requirements: agents.4.13
+// Requirements: agents.4.13, agents.4.13.8
 <Conversation className="flex-1 min-h-0">
   <ConversationContent data-testid="messages-area" className="flex flex-col gap-4 p-6 justify-end min-h-full">
     {/* сообщения */}
@@ -1289,6 +1289,16 @@ function ActivityIndicator({ isActive }: { isActive: boolean }) {
 - Пользователь прокрутил вверх → новое сообщение → автоскролл НЕ срабатывает (agents.4.13.2)
 - `ConversationScrollButton` показывается когда пользователь не внизу — клик возвращает вниз
 - Скроллбар управляется нативно браузером через `overflow-y: auto` на контейнере `StickToBottom`
+
+**Стабильность скролла при изменении размера окна (agents.4.13.8):**
+
+Библиотека `use-stick-to-bottom` использует внутренний `ResizeObserver` на content-элементе. При изменении размера окна текст перекомпоновывается (reflow), что изменяет высоту контента и вызывает callback `ResizeObserver`. Если пользователь находится «внизу» (`state.isAtBottom === true`), библиотека вызывает `scrollToBottom()` с анимацией, заданной в prop `resize`.
+
+Prop `resize="instant"` обеспечивает мгновенное (без spring-анимации) перемещение к нижней позиции при resize. Это устраняет проблему накопления конкурирующих smooth-анимаций, которые возникают при непрерывном resize окна и вызывают визуальные рывки/лаги.
+
+Prop `initial="smooth"` сохраняется для плавного первого скролла при загрузке.
+
+**Примечание:** файл `conversation.tsx` находится в vendor-директории AI Elements. При обновлении через `npm run ai-elements:update-all` необходимо проверить, что prop `resize="instant"` сохранён.
 
 **Скролл при чтении истории:**
 - Скролл работает нативно через `Conversation`
@@ -2018,7 +2028,7 @@ import { Logo } from '../logo';
 | `tests/unit/hooks/useAgentChat.test.ts` | agents.4.24, llm-integration.8.7 |
 | `tests/unit/hooks/useAppCoordinatorState.test.ts` | agents.13.9.2, agents.13.9.3, agents.13.12, agents.13.16, agents.13.18 |
 | `tests/unit/components/agents.test.tsx` | agents.4.22 |
-| `tests/unit/components/agents-autoscroll.test.tsx` | agents.4.13 |
+| `tests/unit/components/agents-autoscroll.test.tsx` | agents.4.13, agents.4.13.8 |
 | `tests/unit/hooks/useToggleScrollLock.test.ts` | agents.4.13.7 |
 | `tests/unit/components/agents-scroll-position.test.tsx` | agents.4.14 |
 | `tests/unit/app/AppCoordinator.test.ts` | agents.13.11-13.15, agents.13.17, navigation.1.1, navigation.1.3 |
@@ -2139,6 +2149,7 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 | agents.4.13.1-4.13.6 (autoscroll) | ✓ | ✓ |
 | agents.4.13.4-4.13.6 (scrollbar) | - | Manual |
 | agents.4.13.7 (toggle scroll suppression) | ✓ | ✓ |
+| agents.4.13.8 (resize scroll stability) | ✓ | - |
 | agents.4.14.1, agents.4.14.2, agents.4.14.3, agents.4.14.4, agents.4.14.5, agents.4.14.6 (scroll position) | ✓ | ✓ |
 | agents.4.16, agents.4.17, agents.4.18, agents.4.19, agents.4.20, agents.4.21 (empty state content/animations) | ✓ | ✓ |
 | agents.4.24.1, agents.4.24.2, agents.4.24.3, agents.4.24.4, agents.4.24.5 (stop/cancel flow, cancel+send) | ✓ | ✓ |
