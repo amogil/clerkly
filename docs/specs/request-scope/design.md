@@ -2,9 +2,9 @@
 
 ## Обзор
 
-Функция `request_scope` реализует runtime-механизм запроса дополнительных Google OAuth scopes и app-level capabilities агентом. Архитектура следует существующим паттернам приложения: `AgentFeature` для регистрации инструментов, `UserSettingsManager` для персистентного хранения, event bus для коммуникации между процессами, IPC для renderer-main взаимодействия.
+Функция `request_scope` реализует runtime-механизм запроса app-level capabilities агентом. Архитектура следует существующим паттернам приложения: `AgentFeature` для регистрации инструментов, `UserSettingsManager` для персистентного хранения, IPC для renderer-main взаимодействия.
 
-Ключевой принцип: вся чувствительная логика (токены, scopes, авторизация) выполняется исключительно в main process. Renderer получает только минимальный набор данных для отображения consent dialog.
+Ключевой принцип: `request_scope` работает только с app-level capabilities (consent dialog). Google OAuth incremental re-authorization вынесена в отдельную задачу и не является частью этого дизайна.
 
 ## Архитектура
 
@@ -19,7 +19,6 @@ LLM Agent Runtime
     │
     ├── RequestScopeHandler (main process orchestrator)
     │       ├── ScopeManager (persistence)
-    │       ├── OAuthClientManager (re-auth)
     │       └── IPC → ScopeConsentDialog (renderer)
     │
     └── ScopeManager (key-value store via UserSettingsManager)
@@ -33,11 +32,9 @@ LLM Agent Runtime
 3. NOT granted → return { code: 'missing_scope', scopes: ['dummy_tool'] }
 4. Agent reads error, calls request_scope({ service: 'dummy', scopes: ['dummy_tool'], reason: '...' })
 5. RequestScopeHandler:
-   a. ScopeManager.getGrantedGoogleScopes() → check if Google scopes sufficient
-   b. If not → OAuthClientManager.startReAuthFlow(additionalScopes)
-      → User completes Google consent in browser
-      → Deep link callback → tokens updated, scopes persisted
-   c. IPC 'scope:request-consent' → ScopeConsentDialog in renderer
+   a. ScopeManager.hasCapability('dummy_tool') → check if already granted
+   b. If already granted → return { status: 'approved', scopes: ['dummy_tool'] }
+   c. If not → IPC 'scope:request-consent' → ScopeConsentDialog in renderer
       → User clicks Allow/Deny
    d. If approved → ScopeManager.grantCapability('dummy_tool')
       → return { status: 'approved', scopes: ['dummy_tool'] }
@@ -53,39 +50,31 @@ LLM Agent Runtime
 
 **Зависимости:** `UserSettingsManager`
 
-**Хранение:** Использует существующий key-value store с ключами:
-- `scope_granted_google_scopes` — JSON-массив granted Google scopes
+**Хранение:** Использует существующий key-value store с ключом:
 - `scope_granted_capabilities` — JSON-массив granted app-level capabilities
 
 ```typescript
 // Requirements: request-scope.1
 export class ScopeManager {
   private readonly KEYS = {
-    GOOGLE_SCOPES: 'scope_granted_google_scopes',
     CAPABILITIES: 'scope_granted_capabilities',
   } as const;
 
   constructor(private readonly settingsManager: IUserSettingsManager) {}
 
-  // Requirements: request-scope.1.5
-  getGrantedGoogleScopes(): string[] { ... }
-
-  // Requirements: request-scope.1.1
-  persistGrantedGoogleScopes(scopes: string[]): void { ... }
-
-  // Requirements: request-scope.1.6
+  // Requirements: request-scope.1.4
   getGrantedCapabilities(): string[] { ... }
 
-  // Requirements: request-scope.1.3
+  // Requirements: request-scope.1.2
   hasCapability(capability: string): boolean { ... }
 
-  // Requirements: request-scope.1.2
+  // Requirements: request-scope.1.1
   grantCapability(capability: string): void { ... }
 
-  // Requirements: request-scope.6.4
+  // Requirements: request-scope.5.2
   revokeCapability(capability: string): void { ... }
 
-  // Requirements: request-scope.1.4
+  // Requirements: request-scope.1.3
   clearAll(): void { ... }
 }
 ```
@@ -94,9 +83,9 @@ export class ScopeManager {
 
 **Расположение:** `src/main/tools/RequestScopeHandler.ts`
 
-**Зависимости:** `ScopeManager`, `OAuthClientManager`, IPC (для consent dialog)
+**Зависимости:** `ScopeManager`, IPC (для consent dialog)
 
-Оркестрирует полный flow запроса разрешений. Сериализует concurrent requests — если request_scope уже выполняется, второй вызов ждёт завершения первого.
+Оркестрирует flow запроса разрешений. Сериализует concurrent requests — если request_scope уже выполняется, второй вызов ждёт завершения первого.
 
 ```typescript
 // Requirements: request-scope.2
@@ -107,23 +96,43 @@ export interface RequestScopeInput {
 }
 
 export interface RequestScopeResult {
-  status: 'approved' | 'denied' | 'cancelled' | 'error';
+  status: 'approved' | 'denied' | 'error';
   scopes: string[];
 }
 
 export class RequestScopeHandler {
   constructor(
     private scopeManager: ScopeManager,
-    private oauthClient: OAuthClientManager,
     private consentRequester: (input: ConsentRequest) => Promise<ConsentResponse>
   ) {}
 
-  // Requirements: request-scope.2.1, request-scope.2.2, request-scope.2.3
+  // Requirements: request-scope.2.1, request-scope.2.2, request-scope.2.3, request-scope.2.4, request-scope.2.5
   async execute(input: RequestScopeInput, signal?: AbortSignal): Promise<RequestScopeResult> {
-    // 1. Check if Google scopes are sufficient
-    // 2. If not, trigger incremental re-auth
-    // 3. Show consent dialog
-    // 4. Return result
+    // 1. Check if all requested capabilities are already granted
+    const allGranted = input.scopes.every(s => this.scopeManager.hasCapability(s));
+    if (allGranted) {
+      return { status: 'approved', scopes: input.scopes };
+    }
+
+    // 2. Show consent dialog
+    try {
+      const response = await this.consentRequester({
+        service: input.service,
+        scopes: input.scopes,
+        reason: input.reason,
+      });
+
+      if (response.approved) {
+        for (const scope of input.scopes) {
+          this.scopeManager.grantCapability(scope);
+        }
+        return { status: 'approved', scopes: input.scopes };
+      }
+
+      return { status: 'denied', scopes: [] };
+    } catch (error) {
+      return { status: 'error', scopes: [] };
+    }
   }
 }
 ```
@@ -161,45 +170,6 @@ export function executeDummyTool(
 }
 ```
 
-### Инкрементальная Re-Авторизация
-
-**Расположение:** Расширение `src/main/auth/OAuthClientManager.ts`
-
-```typescript
-// Requirements: request-scope.4.1
-// Новый метод в OAuthClientManager
-async startReAuthFlow(additionalScopes: string[]): Promise<AuthStatus> {
-  // Merge existing scopes with additional
-  const allScopes = [...new Set([...this.config.scopes, ...additionalScopes])];
-
-  // Build auth URL with include_granted_scopes=true
-  const authUrl = new URL(this.config.authorizationEndpoint);
-  authUrl.searchParams.set('scope', allScopes.join(' '));
-  authUrl.searchParams.set('include_granted_scopes', 'true');
-  // ... standard PKCE params ...
-
-  // Open browser, wait for deep link callback
-  // Requirements: request-scope.4.2 — persist scope from TokenResponse
-  // Requirements: request-scope.4.3 — on error, don't lose existing tokens
-}
-```
-
-**Отличия от startAuthFlow:**
-- Не использует `prompt=consent` (может использовать `prompt=consent` или default)
-- Добавляет `include_granted_scopes=true`
-- Объединяет scopes вместо замены
-- При ошибке НЕ очищает существующие токены (в отличие от начальной авторизации)
-
-### Различие startAuthFlow и startReAuthFlow
-
-| Аспект | startAuthFlow | startReAuthFlow |
-|--------|---------------|-----------------|
-| Когда | Первая авторизация | Запрос дополнительных scopes |
-| Scopes | Фиксированные из config | Текущие + дополнительные |
-| include_granted_scopes | Нет | Да |
-| При ошибке | Очищает всё | Сохраняет существующие токены |
-| После успеха | Создаёт сессию | Обновляет токены, сохраняет scopes |
-
 ## Компоненты Renderer
 
 ### ScopeConsentDialog
@@ -210,7 +180,7 @@ async startReAuthFlow(additionalScopes: string[]): Promise<AuthStatus> {
 
 **Props (через IPC):**
 ```typescript
-// Requirements: request-scope.5.1, request-scope.6.2
+// Requirements: request-scope.4.1, request-scope.5.1
 interface ConsentRequest {
   service: string;    // Название сервиса
   scopes: string[];   // Запрашиваемые разрешения
@@ -220,7 +190,7 @@ interface ConsentRequest {
 
 **Возврат (через IPC):**
 ```typescript
-// Requirements: request-scope.5.2, request-scope.5.3
+// Requirements: request-scope.4.2, request-scope.4.3
 interface ConsentResponse {
   approved: boolean;
 }
@@ -262,12 +232,9 @@ ipcMain.handle('scope:request-consent', async (event, request: ConsentRequest) =
 **Расположение:** `src/shared/events/constants.ts`, `src/shared/events/types.ts`
 
 ```typescript
-// Requirements: request-scope.2, request-scope.4, request-scope.5
+// Requirements: request-scope.2, request-scope.4
 export const EVENT_TYPES = {
   // ... existing ...
-  SCOPE_REAUTH_STARTED: 'scope.reauth.started',
-  SCOPE_REAUTH_COMPLETED: 'scope.reauth.completed',
-  SCOPE_REAUTH_FAILED: 'scope.reauth.failed',
   SCOPE_CONSENT_REQUESTED: 'scope.consent.requested',
   SCOPE_CONSENT_APPROVED: 'scope.consent.approved',
   SCOPE_CONSENT_DENIED: 'scope.consent.denied',
@@ -283,7 +250,7 @@ export const EVENT_TYPES = {
 Реализует `AgentFeature` интерфейс. Предоставляет system prompt секцию и tool definitions для `request_scope` и `dummy_tool`.
 
 ```typescript
-// Requirements: request-scope.7
+// Requirements: request-scope.6
 export class RequestScopeFeature implements AgentFeature {
   name = 'request_scope';
 
@@ -292,14 +259,14 @@ export class RequestScopeFeature implements AgentFeature {
     private requestScopeHandler: RequestScopeHandler
   ) {}
 
-  // Requirements: request-scope.7.2, request-scope.7.3, request-scope.7.4
+  // Requirements: request-scope.6.2, request-scope.6.3, request-scope.6.4
   getSystemPromptSection(): string {
     return [
       'Permission request workflow:',
       '- Some tools require capabilities/permissions that must be explicitly granted by the user.',
       '- If a tool returns an error with code "missing_scope", use `request_scope` to request the required capability.',
       '- `request_scope` input: { service: string, scopes: string[], reason: string }',
-      '- `request_scope` result: { status: "approved"|"denied"|"cancelled"|"error", scopes: string[] }',
+      '- `request_scope` result: { status: "approved"|"denied"|"error", scopes: string[] }',
       '- If approved, retry the original tool call.',
       '- If denied or error, inform the user and continue without the requested capability.',
       '',
@@ -311,7 +278,7 @@ export class RequestScopeFeature implements AgentFeature {
     ].join('\n');
   }
 
-  // Requirements: request-scope.7.1
+  // Requirements: request-scope.6.1
   getTools(): LLMTool[] {
     return [
       {
@@ -353,9 +320,9 @@ export class RequestScopeFeature implements AgentFeature {
 
 ```typescript
 // src/main/index.ts
-// Requirements: request-scope.7.1
+// Requirements: request-scope.6.1
 const scopeManager = new ScopeManager(dataManager);
-const requestScopeHandler = new RequestScopeHandler(scopeManager, oauthClient, consentRequester);
+const requestScopeHandler = new RequestScopeHandler(scopeManager, consentRequester);
 const requestScopeFeature = new RequestScopeFeature(scopeManager, requestScopeHandler);
 
 const promptBuilder = new PromptBuilder(
@@ -367,9 +334,9 @@ const promptBuilder = new PromptBuilder(
 
 ## Tool Timeout Consideration
 
-`request_scope` — инструмент, который может выполняться минуты (пользователь проходит Google re-auth + принимает решение в consent dialog). Текущий `ToolRunnerPolicy.timeoutMs` по умолчанию 30 секунд.
+`request_scope` — инструмент, который может выполняться десятки секунд (пользователь принимает решение в consent dialog). Текущий `ToolRunnerPolicy.timeoutMs` по умолчанию 30 секунд.
 
-Решение: инструменты `request_scope` и `dummy_tool` имеют свои `execute` функции, которые вызываются напрямую через `bindToolExecutors` в `MainPipeline` (не через `ToolRunner.executeBatch`). Timeout контролируется через AbortSignal от AI SDK, а не через ToolRunner policy.
+Решение: инструменты `request_scope` и `dummy_tool` имеют свои `execute` функции, которые вызываются напрямую через `bindToolExecutors` в `MainPipeline` (не через `ToolRunner.executeBatch`). Timeout контролируется через AbortSignal от AI SDK, а не через ToolRunner policy. Таймаут модели приостанавливается на время выполнения tool executor (по паттерну `pauseTimeout`/`resumeTimeout` из `llm-integration.3.6.1`).
 
 ## Стратегия Тестирования
 
@@ -378,47 +345,40 @@ const promptBuilder = new PromptBuilder(
 - `tests/unit/auth/ScopeManager.test.ts` — persistence logic, grant/revoke, clearAll, edge cases
 - `tests/unit/tools/RequestScopeHandler.test.ts` — orchestration, all status branches, abort handling
 - `tests/unit/tools/DummyTool.test.ts` — capability check, missing_scope error, success path
-- `tests/unit/auth/OAuthClientManager.reauth.test.ts` — incremental re-auth, scope merging, error preservation
 
 ### Функциональные Тесты
 
-- `tests/functional/request-scope-flow.spec.ts` — full E2E workflow with real Electron, mock OAuth, consent dialog interaction
+- `tests/functional/request-scope-flow.spec.ts` — full E2E workflow with real Electron, consent dialog interaction
 
 ### Покрытие Требований
 
 | Требование | Модульные Тесты | Функциональные Тесты |
 |------------|-----------------|---------------------|
 | request-scope.1.1 | `ScopeManager.test.ts` | `request-scope-flow.spec.ts` |
-| request-scope.1.2 | `ScopeManager.test.ts` | `request-scope-flow.spec.ts` |
+| request-scope.1.2 | `ScopeManager.test.ts` | - |
 | request-scope.1.3 | `ScopeManager.test.ts` | - |
 | request-scope.1.4 | `ScopeManager.test.ts` | - |
 | request-scope.1.5 | `ScopeManager.test.ts` | - |
-| request-scope.1.6 | `ScopeManager.test.ts` | - |
-| request-scope.1.7 | `ScopeManager.test.ts` | - |
 | request-scope.2.1 | `RequestScopeHandler.test.ts` | `request-scope-flow.spec.ts` |
-| request-scope.2.2 | `RequestScopeHandler.test.ts` | `request-scope-flow.spec.ts` |
+| request-scope.2.2 | `RequestScopeHandler.test.ts` | - |
 | request-scope.2.3 | `RequestScopeHandler.test.ts` | `request-scope-flow.spec.ts` |
 | request-scope.2.4 | `RequestScopeHandler.test.ts` | `request-scope-flow.spec.ts` |
 | request-scope.2.5 | `RequestScopeHandler.test.ts` | `request-scope-flow.spec.ts` |
 | request-scope.2.6 | `RequestScopeHandler.test.ts` | - |
+| request-scope.2.7 | `RequestScopeHandler.test.ts` | - |
 | request-scope.3.1 | `DummyTool.test.ts` | `request-scope-flow.spec.ts` |
 | request-scope.3.2 | `DummyTool.test.ts` | `request-scope-flow.spec.ts` |
 | request-scope.3.3 | `DummyTool.test.ts` | `request-scope-flow.spec.ts` |
 | request-scope.3.4 | `DummyTool.test.ts` | - |
-| request-scope.4.1 | `OAuthClientManager.reauth.test.ts` | `request-scope-flow.spec.ts` |
-| request-scope.4.2 | `OAuthClientManager.reauth.test.ts` | `request-scope-flow.spec.ts` |
-| request-scope.4.3 | `OAuthClientManager.reauth.test.ts` | - |
-| request-scope.5.1 | - | `request-scope-flow.spec.ts` |
-| request-scope.5.2 | - | `request-scope-flow.spec.ts` |
-| request-scope.5.3 | - | `request-scope-flow.spec.ts` |
-| request-scope.5.4 | Security review | - |
-| request-scope.5.5 | `RequestScopeHandler.test.ts` | `request-scope-flow.spec.ts` |
-| request-scope.6.1 | Architecture review | - |
-| request-scope.6.2 | IPC contract test | - |
-| request-scope.6.3 | Architecture review | - |
-| request-scope.6.4 | `ScopeManager.test.ts` | - |
-| request-scope.6.5 | `ScopeManager.test.ts` | - |
-| request-scope.7.1 | `PromptBuilder` integration | `request-scope-flow.spec.ts` |
-| request-scope.7.2 | Prompt snapshot test | - |
-| request-scope.7.3 | Prompt snapshot test | - |
-| request-scope.7.4 | Prompt snapshot test | - |
+| request-scope.4.1 | - | `request-scope-flow.spec.ts` |
+| request-scope.4.2 | - | `request-scope-flow.spec.ts` |
+| request-scope.4.3 | - | `request-scope-flow.spec.ts` |
+| request-scope.4.4 | Security review | - |
+| request-scope.4.5 | `RequestScopeHandler.test.ts` | `request-scope-flow.spec.ts` |
+| request-scope.5.1 | IPC contract test | - |
+| request-scope.5.2 | `ScopeManager.test.ts` | - |
+| request-scope.5.3 | `ScopeManager.test.ts` | - |
+| request-scope.6.1 | `PromptBuilder` integration | `request-scope-flow.spec.ts` |
+| request-scope.6.2 | Prompt snapshot test | - |
+| request-scope.6.3 | Prompt snapshot test | - |
+| request-scope.6.4 | Prompt snapshot test | - |

@@ -506,41 +506,6 @@ class OAuthClientManager {
 ```
 
 
-### 1b. Инкрементальная Re-Авторизация (OAuthClientManager)
-
-Расширение `OAuthClientManager` для поддержки запроса дополнительных Google scopes без потери текущей сессии.
-
-**Новый метод:**
-
-```typescript
-// Requirements: google-oauth-auth.17
-async startReAuthFlow(additionalScopes: string[]): Promise<AuthStatus> {
-  // 1. Merge existing scopes with additional
-  const allScopes = [...new Set([...this.config.scopes, ...additionalScopes])];
-
-  // 2. Build auth URL with include_granted_scopes=true
-  // (reuses PKCE generation from startAuthFlow)
-  // 3. Open browser, wait for deep link callback
-  // 4. On success: update tokens, persist granted scopes
-  // 5. On error: preserve existing tokens (unlike initial auth)
-}
-```
-
-**Отличия от `startAuthFlow()`:**
-
-| Аспект | `startAuthFlow()` | `startReAuthFlow()` |
-|--------|-------------------|---------------------|
-| Когда | Первая авторизация | Запрос дополнительных scopes |
-| Scopes | Фиксированные из config | Текущие + дополнительные |
-| `include_granted_scopes` | Нет | Да |
-| При ошибке | Может очистить сессию | Сохраняет существующие токены |
-| После успеха | Создаёт новую сессию | Обновляет токены, персистит scopes |
-
-**Re-auth vs initial auth в deep link handler:**
-- `OAuthClientManager` хранит флаг `isReAuth: boolean` в состоянии PKCE flow.
-- КОГДА `isReAuth === true` и deep link возвращает ошибку, ТО `handleDeepLink` не очищает существующие токены.
-- КОГДА `isReAuth === true` и deep link успешен, ТО `handleDeepLink` обновляет токены и персистит scope из `TokenResponse.scope`.
-
 ### 2. Token Storage Manager
 
 Управляет безопасным хранением токенов в SQLite.
@@ -1564,11 +1529,6 @@ logger.error(`${operation} failed: ${error.message}`, {
 | google-oauth-auth.15.7 | ✓ | ✓ |
 | google-oauth-auth.15.8 | ✓ | ✓ |
 | google-oauth-auth.15.9 | - | ✓ |
-| google-oauth-auth.17.1 | ✓ | ✓ |
-| google-oauth-auth.17.2 | ✓ | ✓ |
-| google-oauth-auth.17.3 | ✓ | - |
-| google-oauth-auth.17.4 | ✓ | - |
-| google-oauth-auth.17.5 | ✓ | - |
 
 ### Критерии Успеха
 
