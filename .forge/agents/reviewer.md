@@ -15,6 +15,7 @@ custom_rules: |
   - Language of PR comments: English. Language of final report: English.
   - ABSOLUTE PROHIBITION: NEVER set label `ready for test` if the PR is in draft status. You MUST run `gh pr ready <PR>` first and verify it succeeded.
   - ABSOLUTE PROHIBITION: NEVER set label `ready for test` if any CI check has not passed. ALL CI checks MUST complete successfully before approval.
+  - ABSOLUTE PROHIBITION: NEVER set label `ready for test` if there are ANY unresolved review threads in the PR. ALL review threads — including threads created by the reviewer itself in the current round — MUST be resolved before approval. Use the GraphQL API to verify: `gh api graphql` to query `reviewThreads` and check that every thread has `isResolved: true`.
   - If CI checks cannot run (e.g., PR was draft, no checks triggered), you MUST mark PR as ready, wait for checks to trigger and complete, then verify they all passed.
 reasoning:
   enabled: true
@@ -104,7 +105,15 @@ Check each item and leave inline threads in the PR for every finding.
 ### Step 3: Finalization
 
 1. Collect all inline threads left during review
-2. Wait for PR CI checks to complete:
+2. Verify ALL review threads are resolved:
+   - Query all review threads via GraphQL:
+     ```
+     gh api graphql -f query='{ repository(owner: "<owner>", name: "<repo>") { pullRequest(number: <PR>) { reviewThreads(first: 100) { nodes { isResolved comments(first: 1) { nodes { body } } } } } } }'
+     ```
+   - If ANY thread has `isResolved: false` — this is a blocking condition. The reviewer MUST NOT approve.
+   - This includes threads created by the reviewer itself in the current review round — they must be explicitly resolved.
+   - If there are unresolved threads from previous rounds that have been addressed in code, resolve them via GraphQL before proceeding.
+3. Wait for PR CI checks to complete:
    ```
    gh pr checks <PR> --watch --fail-fast
    ```
@@ -113,14 +122,14 @@ Check each item and leave inline threads in the PR for every finding.
      - All passed — continue to verdict
      - Any check failed — this counts as a finding (add failed check names to report)
      - If no CI checks exist or all checks were skipped — this is equivalent to failure. The reviewer MUST NOT approve. Verify PR is not in draft status and re-trigger checks if needed.
-3. Determine verdict:
-   - **Ready to merge** — zero findings AND all CI checks passed AND PR is not in draft status
-   - **Not ready to merge** — at least one finding of any priority OR any CI check failed
-4. Submit review in PR via `gh api repos/<owner>/<repo>/pulls/<PR>/reviews` with event `COMMENT` and the full report
-5. Set the final label on PR:
-   - **`ready for test`** — ready to merge. Remove `code review`
+4. Determine verdict:
+   - **Ready to merge** — zero findings AND all CI checks passed AND all review threads resolved AND PR is not in draft status
+   - **Not ready to merge** — at least one finding of any priority OR any CI check failed OR any unresolved review thread exists
+5. Submit review in PR via `gh api repos/<owner>/<repo>/pulls/<PR>/reviews` with event `COMMENT` and the full report
+6. Set the final label on PR:
+   - **`ready for test`** — ready to merge. Remove `code review`. Before setting this label, perform a final verification that zero unresolved review threads exist by re-running the GraphQL query from step 2. If any unresolved threads are found, set `in progress` instead.
    - **`in progress`** — not ready to merge. Remove `code review`
-6. Return report:
+7. Return report:
 
 ```
 Result: ✅ Ready to merge / 🚫 Not ready to merge
@@ -147,6 +156,7 @@ Review checklist:
 16. Performance: ✅ / 🚫 / 🥺
 17. Undocumented behavior: ✅ / 🚫 / 🥺
 18. CI checks: ✅ / 🚫 [failed check names]
+19. Review threads resolved: ✅ / 🚫 [count of unresolved threads]
 
 Created threads:
 - 🚫 [finding — thread link]
