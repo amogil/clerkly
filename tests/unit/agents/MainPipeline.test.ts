@@ -1313,6 +1313,97 @@ describe('MainPipeline.run()', () => {
     );
   });
 
+  /* Preconditions: provider returns final_answer with summary_points item exceeding 300 chars
+     Action: run pipeline once
+     Assertions: invalid tool arguments are surfaced as provider error and final_answer is not persisted
+     Requirements: llm-integration.9.5.3, llm-integration.9.5.4, llm-integration.12.3 */
+  it('creates kind:error when final_answer summary point exceeds 300 characters', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    const longPoint = 'x'.repeat(301);
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-long',
+          toolName: 'final_answer',
+          arguments: { summary_points: [longPoint] },
+        });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'error',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          error: expect.objectContaining({
+            type: 'provider',
+            message: expect.stringContaining('invalid tool call arguments'),
+          }),
+        }),
+      }),
+      1,
+      true
+    );
+    expect(messageManager.create).not.toHaveBeenCalledWith(
+      'agent-1',
+      'tool_call',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          toolName: 'final_answer',
+        }),
+      }),
+      1,
+      expect.anything()
+    );
+  });
+
+  /* Preconditions: provider returns final_answer with summary_points item exactly 300 chars
+     Action: run pipeline once
+     Assertions: final_answer is accepted and persisted as tool_call (no error)
+     Requirements: llm-integration.9.5.3 */
+  it('accepts final_answer summary point at exactly 300 characters', async () => {
+    const { pipeline, llmProvider, messageManager } = makeMocks();
+
+    const exactPoint = 'x'.repeat(300);
+    llmProvider.chat.mockImplementation(
+      async (_msgs: ChatMessage[], _opts: ChatOptions, onChunk: (c: ChatChunk) => void) => {
+        onChunk({
+          type: 'tool_call',
+          callId: 'call-final-exact',
+          toolName: 'final_answer',
+          arguments: { summary_points: [exactPoint] },
+        });
+        return { text: '' };
+      }
+    );
+
+    await pipeline.run('agent-1', 1);
+
+    expect(messageManager.create).not.toHaveBeenCalledWith(
+      'agent-1',
+      'error',
+      expect.anything(),
+      expect.anything(),
+      expect.anything()
+    );
+    expect(messageManager.create).toHaveBeenCalledWith(
+      'agent-1',
+      'tool_call',
+      expect.objectContaining({
+        data: expect.objectContaining({
+          toolName: 'final_answer',
+        }),
+      }),
+      1,
+      expect.anything()
+    );
+  });
+
   /* Preconditions: first attempt returns invalid final_answer, second attempt returns valid final_answer
      Action: run pipeline with retry/repair
      Assertions: persisted final_answer is created once with attemptId=2 in order metadata

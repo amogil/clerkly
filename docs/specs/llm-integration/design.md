@@ -217,7 +217,7 @@ CREATE TABLE messages (
 
 Контракт `final_answer` валидируется через strict-schema инструмента в `Vercel AI SDK`:
 - `summary_points`: обязательный массив длиной `1..10`;
-- каждый пункт `summary_points`: непустая строка (после `trim`) длиной `<= 200`.
+- каждый пункт `summary_points`: непустая строка (после `trim`) длиной `<= 300`.
 - служебные metadata comments `<!-- clerkly:title-meta: ... -->` относятся только к обычному `kind: llm` markdown/text ответу и не являются допустимым содержимым других payload-контрактов turn.
 Невалидный `final_answer` не фиксируется как завершённый: retry/repair выполняется на стороне AI SDK; при исчерпании лимита создаётся `kind:error`.
 `reply_to_message_id` хранится в колонке `messages.reply_to_message_id` и передаётся в `MessageSnapshot` отдельным полем, не внутри payload.
@@ -650,6 +650,7 @@ class PromptBuilder {
 - при завершении через `final_answer` модель не публикует перед вызовом инструмента отдельный обычный markdown/text summary, буллеты или checklist с теми же solved-task пунктами, включая их перефразированные варианты;
 - математические выражения в `final_answer.summary_points` оформляются только через KaTeX-совместимые markdown-делимитеры `$...$`/`$$...$$`;
 - `final_answer.summary_points` перечисляет решённые задачи.
+- каждый пункт `final_answer.summary_points` должен заканчиваться полным словом или предложением; обрыв на середине слова запрещён; при приближении к лимиту длины — перефразировать.
 
 `messages` содержит:
 - один элемент `role: system` с системной инструкцией;
@@ -1002,6 +1003,7 @@ User отправляет сообщение
 - `tests/unit/llm/GoogleProvider.chat.test.ts` — streaming/tool-loop mapping, ошибки, usage
 - `tests/unit/llm/ErrorNormalizer.test.ts` — mapping AI SDK ошибок (`auth/rate_limit/provider/network/timeout/tool/protocol`), сохранение `statusCode` при наличии HTTP-статуса в исходной ошибке
 - `tests/unit/agents/PromptBuilder.test.ts` — формирование массива `messages`, исключения из replay
+- `tests/unit/agents/PromptBuilder.test.ts` — `final_answer` schema `maxLength: 300`, complete-word prompt instruction
 - `tests/unit/agents/PromptModelContract.test.ts` — контрактная валидация `ModelMessage[]` (AI SDK schema), terminal-статусы `tool-result`, негативные кейсы `legacy result`, missing pair, mismatched `toolCallId`, malformed/non-terminal `tool_call`
 - `tests/unit/agents/MainPipeline.test.ts` — мок провайдера, полный цикл, ошибки, события
 - `tests/unit/agents/MainPipeline.test.ts` — integration guard: в `provider.chat` передаются schema-valid `ModelMessage[]` и связанная replay-пара `assistant(tool-call)` + `tool(tool-result)`
@@ -1022,6 +1024,7 @@ User отправляет сообщение
 - `tests/unit/events/MainEventBus.test.ts` и `tests/unit/events/RendererEventBus.test.ts` — порядок/доставка streaming событий без потери чанков
 - `tests/unit/db/repositories/MessagesRepository.test.ts` — kind как параметр
 - `tests/unit/db/repositories/MessagesRepository.test.ts` — семантика `done` для `kind:llm` и `kind:error`
+- `tests/unit/agents/MainPipeline.test.ts` — отклонение `final_answer` с `summary_points` элементом >300 символов (`kind:error`), принятие элемента ровно 300 символов (валидный `tool_call`)
 - `tests/unit/agents/MainPipeline.test.ts` — parser комментария `<!-- clerkly:title-meta: ... -->` (search/capture, split chunks, незакрытый comment, лимит 260)
 - `tests/unit/agents/MainPipeline.test.ts` — integration rename-flow: первое валидное вхождение, отсутствие модификации output-stream, fallback при invalid comment
 - `tests/unit/agents/MainPipeline.test.ts` — per-turn prompt injection: контракт auto-title добавляется только на eligible turn (cooldown/meaningful guards)
@@ -1227,6 +1230,7 @@ User отправляет сообщение
 | llm-integration.9.5.2 | ✓ | ✓ |
 | llm-integration.9.5.3 | ✓ | ✓ |
 | llm-integration.9.5.3.1 | ✓ | ✓ |
+| llm-integration.9.5.3.4 | ✓ | - |
 | llm-integration.9.5.4 | ✓ | ✓ |
 | llm-integration.9.5.5 | ✓ | ✓ |
 | llm-integration.9.5.6 | ✓ | ✓ |

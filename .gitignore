@@ -13,3 +13,6 @@ playwright-report/
 .env
 
 .vscode/
+
+# Auto-generated drizzle-kit metadata (project uses custom MigrationRunner)
+migrations/meta/
