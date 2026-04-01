@@ -996,6 +996,7 @@ User отправляет сообщение
 - `tests/unit/events/MainEventBus.test.ts` и `tests/unit/events/RendererEventBus.test.ts` — порядок/доставка streaming событий без потери чанков
 - `tests/unit/db/repositories/MessagesRepository.test.ts` — kind как параметр
 - `tests/unit/db/repositories/MessagesRepository.test.ts` — семантика `done` для `kind:llm` и `kind:error`
+- `tests/unit/agents/MainPipeline.test.ts` — отклонение `final_answer` с `summary_points` элементом >300 символов (`kind:error`), принятие элемента ровно 300 символов (валидный `tool_call`)
 - `tests/unit/agents/MainPipeline.test.ts` — parser комментария `<!-- clerkly:title-meta: ... -->` (search/capture, split chunks, незакрытый comment, лимит 260)
 - `tests/unit/agents/MainPipeline.test.ts` — integration rename-flow: первое валидное вхождение, отсутствие модификации output-stream, fallback при invalid comment
 - `tests/unit/agents/MainPipeline.test.ts` — per-turn prompt injection: контракт auto-title добавляется только на eligible turn (cooldown/meaningful guards)

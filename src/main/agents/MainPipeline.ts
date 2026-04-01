@@ -1825,6 +1825,7 @@ export class MainPipeline {
     });
   }
 
+  // Requirements: llm-integration.9.5.2, llm-integration.9.5.3, llm-integration.9.5.3.1, llm-integration.9.5.4
   private validateToolCallArguments(toolName: string, args: Record<string, unknown>): void {
     if (toolName === 'code_exec') {
       const validated = validateCodeExecInput(args);
