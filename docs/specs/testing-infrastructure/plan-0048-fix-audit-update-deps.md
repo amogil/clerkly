@@ -116,15 +116,15 @@ No specification changes required. The existing `testing.4.6` and `testing.4.7` 
 
 #### Step 2.1: Run `npm audit fix` (non-breaking fixes)
 
-- [ ] Run `npm audit fix` to resolve 15 vulnerabilities automatically
-- [ ] Verify `npm audit` output shows reduced vulnerability count
-- [ ] Commit: `fix: resolve npm audit vulnerabilities via npm audit fix`
+- [x] Run `npm audit fix` to resolve 15 vulnerabilities automatically
+- [x] Verify `npm audit` output shows reduced vulnerability count
+- [x] Commit: `fix: resolve npm audit vulnerabilities via npm audit fix`
 
 #### Step 2.2: Update safe dependencies (patch/minor within semver range)
 
-- [ ] Run `npm update` to update all packages to their `Wanted` versions
-- [ ] This covers all 27 packages listed in the "Safe updates" table above
-- [ ] Commit: `chore: update dependencies to latest compatible versions`
+- [x] Run `npm update` to update all packages to their `Wanted` versions
+- [x] This covers all 27 packages listed in the "Safe updates" table above
+- [x] Commit: `chore: update dependencies to latest compatible versions`
 
 #### Step 2.3: Upgrade `electron-builder` 24.13.3 -> 26.8.1
 
