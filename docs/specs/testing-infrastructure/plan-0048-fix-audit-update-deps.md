@@ -153,22 +153,22 @@ No specification changes required. The existing `testing.4.6` and `testing.4.7` 
 
 #### Step 2.6: Evaluate `electron` upgrade
 
-- [ ] Electron 28 -> 35+ is a major undertaking (7 major versions)
-- [ ] The vulnerability (ASAR Integrity Bypass, moderate) is dev-only and does not affect production runtime security since the app is not distributed via adversarial channels yet
-- [ ] **Recommendation: Defer to a separate dedicated issue.** Document justification in PR description.
-- [ ] If deferred, the `electron` vulnerability (1 moderate) remains as accepted risk
+- [x] Electron 28 -> 35+ is a major undertaking (7 major versions)
+- [x] The vulnerability (ASAR Integrity Bypass, moderate) is dev-only and does not affect production runtime security since the app is not distributed via adversarial channels yet
+- [x] **Recommendation: Defer to a separate dedicated issue.** Document justification in PR description.
+- [x] If deferred, the `electron` vulnerability (1 moderate) remains as accepted risk
 
 #### Step 2.7: Evaluate remaining major updates
 
-- [ ] `vite` 6 -> 8, `@vitejs/plugin-react` 4 -> 6: Defer -- major bundler changes, separate issue
-- [ ] `eslint` 8 -> 10: Defer -- requires flat config migration, separate issue
-- [ ] `jest` 29 -> 30: Defer -- already have `jest-environment-jsdom@30` working, but core `jest` upgrade needs careful testing. Note: `@types/jest` should stay at 29 until `jest` is upgraded to 30.
-- [ ] `typescript` 5 -> 6: Defer -- language-level change, separate issue
-- [ ] `zod` 3 -> 4: Defer -- major rewrite, used throughout codebase, separate issue
-- [ ] `date-fns` 3 -> 4, `lucide-react` 0.x -> 1.x, `react-resizable-panels` 2 -> 4, `recharts` 2 -> 3: Defer -- UI libs, test in isolation
-- [ ] `better-sqlite3` 11 -> 12: Defer -- native module, needs rebuild testing
-- [ ] `eslint-config-prettier` 9 -> 10, `eslint-plugin-react-hooks` 5 -> 7: Defer -- tied to eslint upgrade
-- [ ] Document all deferred items in PR description with justification
+- [x] `vite` 6 -> 8, `@vitejs/plugin-react` 4 -> 6: Defer -- major bundler changes, separate issue
+- [x] `eslint` 8 -> 10: Defer -- requires flat config migration, separate issue
+- [x] `jest` 29 -> 30: Defer -- already have `jest-environment-jsdom@30` working, but core `jest` upgrade needs careful testing. Note: `@types/jest` should stay at 29 until `jest` is upgraded to 30.
+- [x] `typescript` 5 -> 6: Defer -- language-level change, separate issue
+- [x] `zod` 3 -> 4: Defer -- major rewrite, used throughout codebase, separate issue
+- [x] `date-fns` 3 -> 4, `lucide-react` 0.x -> 1.x, `react-resizable-panels` 2 -> 4, `recharts` 2 -> 3: Defer -- UI libs, test in isolation
+- [x] `better-sqlite3` 11 -> 12: Defer -- native module, needs rebuild testing
+- [x] `eslint-config-prettier` 9 -> 10, `eslint-plugin-react-hooks` 5 -> 7: Defer -- tied to eslint upgrade
+- [x] Document all deferred items in PR description with justification
 
 ### Phase 3: Tests
 
