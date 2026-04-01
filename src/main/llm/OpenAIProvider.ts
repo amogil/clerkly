@@ -91,10 +91,22 @@ export class OpenAIProvider implements ILLMProvider {
     const abortFromExternalSignal = () => controller.abort();
     signal?.addEventListener('abort', abortFromExternalSignal);
     // Requirements: llm-integration.3.6, llm-integration.3.6.1
-    // Timer resets on each onStepFinish and experimental_onStepStart so tool execution time doesn't count toward model timeout
-    let timeoutId = setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);
-    const resetTimeout = () => {
-      clearTimeout(timeoutId);
+    // Timer resets on each onStepFinish and experimental_onStepStart so tool execution time doesn't count toward model timeout.
+    // pauseTimeout/resumeTimeout ensure intra-step tool execution does not consume the timeout budget.
+    let timeoutId: ReturnType<typeof setTimeout> | null = setTimeout(
+      () => controller.abort(),
+      CHAT_TIMEOUT_MS
+    );
+    const pauseTimeout = () => {
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+    };
+    const resumeTimeout = () => {
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+      }
       timeoutId = setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);
     };
     const stepDiagnostics: Array<{
@@ -123,7 +135,9 @@ export class OpenAIProvider implements ILLMProvider {
       const tools = this.buildToolSet(
         options,
         tool as unknown as (definition: { description: string; inputSchema: unknown }) => unknown,
-        jsonSchema as unknown as (schema: Record<string, unknown>) => unknown
+        jsonSchema as unknown as (schema: Record<string, unknown>) => unknown,
+        pauseTimeout,
+        resumeTimeout
       );
       const result = streamText({
         model: openai.responses(options.model) as unknown as Parameters<
@@ -138,7 +152,7 @@ export class OpenAIProvider implements ILLMProvider {
         onStepFinish: (event: Record<string, unknown>) => {
           // Requirements: llm-integration.3.6.1
           // Reset per-step timeout so tool execution time doesn't eat into model response time
-          resetTimeout();
+          resumeTimeout();
           const stepIndex =
             typeof event.stepNumber === 'number'
               ? event.stepNumber
@@ -167,7 +181,7 @@ export class OpenAIProvider implements ILLMProvider {
         experimental_onStepStart: (event: Record<string, unknown>) => {
           // Requirements: llm-integration.3.6.1
           // Reset timeout at step start so tool execution between steps doesn't consume model timeout budget
-          resetTimeout();
+          resumeTimeout();
           const stepIndex =
             typeof event.stepNumber === 'number'
               ? event.stepNumber
@@ -286,11 +300,14 @@ export class OpenAIProvider implements ILLMProvider {
       }
       throw error;
     } finally {
-      clearTimeout(timeoutId);
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+      }
       signal?.removeEventListener('abort', abortFromExternalSignal);
     }
   }
 
+  // Requirements: llm-integration.3.6.1
   private buildToolSet(
     options: ChatOptions,
     toolFactory: (definition: {
@@ -298,20 +315,41 @@ export class OpenAIProvider implements ILLMProvider {
       inputSchema: unknown;
       execute?: (args: Record<string, unknown>, signal?: AbortSignal) => Promise<unknown> | unknown;
     }) => unknown,
-    jsonSchemaFactory: (schema: Record<string, unknown>) => unknown
+    jsonSchemaFactory: (schema: Record<string, unknown>) => unknown,
+    pauseTimeout: () => void,
+    resumeTimeout: () => void
   ): Record<string, unknown> | undefined {
     if (!options.tools || options.tools.length === 0) {
       return undefined;
     }
 
-    const entries = options.tools.map((toolDef) => [
-      toolDef.name,
-      toolFactory({
-        description: toolDef.description,
-        inputSchema: jsonSchemaFactory(toolDef.parameters),
-        execute: toolDef.execute,
-      }),
-    ]);
+    const entries = options.tools.map((toolDef) => {
+      // Wrap execute to pause/resume timeout so tool execution time
+      // does not count toward the CHAT_TIMEOUT_MS budget
+      const wrappedExecute = toolDef.execute
+        ? async (args: Record<string, unknown>, signal?: AbortSignal): Promise<unknown> => {
+            pauseTimeout();
+            try {
+              return await (
+                toolDef.execute as (
+                  args: Record<string, unknown>,
+                  signal?: AbortSignal
+                ) => Promise<unknown> | unknown
+              )(args, signal);
+            } finally {
+              resumeTimeout();
+            }
+          }
+        : undefined;
+      return [
+        toolDef.name,
+        toolFactory({
+          description: toolDef.description,
+          inputSchema: jsonSchemaFactory(toolDef.parameters),
+          execute: wrappedExecute,
+        }),
+      ];
+    });
     return Object.fromEntries(entries);
   }
 
