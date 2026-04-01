@@ -185,7 +185,7 @@ describe('AgentMessage — tool_call', () => {
     expect(screen.getByTestId('message-code-exec-stdout')).toHaveTextContent('ok');
     expect(screen.getByTestId('message-code-exec-stdout')).toHaveTextContent('```Output');
     expect(screen.getByTestId('message-code-exec-stderr')).toHaveTextContent('warn');
-    expect(screen.getByTestId('message-code-exec-stderr')).toHaveTextContent('```Output');
+    expect(screen.getByTestId('message-code-exec-stderr')).toHaveTextContent('```Error');
 
     fireEvent.click(screen.getByTestId('message-code-exec-toggle'));
 
