@@ -145,11 +145,11 @@ No specification changes required. The existing `testing.4.6` and `testing.4.7` 
 
 #### Step 2.5: Evaluate `drizzle-orm` upgrade 0.38.4 -> 0.45.2
 
-- [ ] Check drizzle-orm changelog for breaking changes between 0.38 and 0.45
-- [ ] If safe, update `package.json`: `"drizzle-orm": "^0.45.2"`
-- [ ] If breaking, document justification for deferral and add `overrides` if needed
-- [ ] Run `npm install` and verify DB operations work
-- [ ] Commit: `chore: upgrade drizzle-orm to v0.45` (if proceeding)
+- [x] Check drizzle-orm changelog for breaking changes between 0.38 and 0.45
+- [x] If safe, update `package.json`: `"drizzle-orm": "^0.45.2"`
+- [x] If breaking, document justification for deferral and add `overrides` if needed
+- [x] Run `npm install` and verify DB operations work
+- [x] Commit: `chore: upgrade drizzle-orm to v0.45` (if proceeding)
 
 #### Step 2.6: Evaluate `electron` upgrade
 
