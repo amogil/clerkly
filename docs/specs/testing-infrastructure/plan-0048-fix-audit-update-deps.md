@@ -172,15 +172,15 @@ No specification changes required. The existing `testing.4.6` and `testing.4.7` 
 
 ### Phase 3: Tests
 
-- [ ] Run `npm run validate` -- must pass fully (testing.4.1)
-- [ ] Run `npm run test:functional` -- verify no regressions in Electron-based tests
-- [ ] No new test files needed -- this is a dependency update, not a behavior change
+- [x] Run `npm run validate` -- must pass fully (testing.4.1)
+- [x] Run `npm run test:functional` -- verify no regressions in Electron-based tests
+- [x] No new test files needed -- this is a dependency update, not a behavior change
 
 ### Phase 4: Finalization
 
-- [ ] No coverage table changes needed (no new requirements)
-- [ ] Run `npm run validate` one final time
-- [ ] Document in PR description:
+- [x] No coverage table changes needed (no new requirements)
+- [x] Run `npm run validate` one final time
+- [x] Document in PR description:
   - Full list of vulnerabilities fixed
   - Full list of packages updated
   - Remaining vulnerabilities with justification
