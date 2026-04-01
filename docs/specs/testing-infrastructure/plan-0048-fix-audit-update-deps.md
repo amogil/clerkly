@@ -140,7 +140,7 @@ No specification changes required. The existing `testing.4.6` and `testing.4.7` 
 - [x] Update `package.json`: `"drizzle-kit": "^0.31.10"`
 - [x] Run `npm install`
 - [x] Verify `drizzle-kit` CLI still works: `npx drizzle-kit generate --help`
-- [x] This resolves `esbuild` vulnerability (2 vulns)
+- [x] This resolves 1 of 2 `esbuild` vulnerability instances (the direct `drizzle-kit` -> `esbuild` path); 2 moderate vulnerabilities remain via `@esbuild-kit/core-utils` -> `esbuild` transitive chain inside `drizzle-kit`, which cannot be resolved without a breaking downgrade
 - [x] Commit: `fix: upgrade drizzle-kit to v0.31 to resolve esbuild vulnerability`
 
 #### Step 2.5: Evaluate `drizzle-orm` upgrade 0.38.4 -> 0.45.2
@@ -199,10 +199,11 @@ After plan execution:
 - Critical and high vulnerabilities are resolved (handlebars, tar, minimatch, picomatch, rollup, xmldom, flatted)
 - Moderate vulnerabilities from `npm audit fix` are resolved (ajv, brace-expansion, dompurify, yaml)
 - `electron-builder` upgraded to v26, resolving `@tootallnate/once` and `tar` chain
-- `drizzle-kit` upgraded to v0.31, resolving `esbuild` chain
+- `drizzle-kit` upgraded to v0.31, partially resolving `esbuild` chain (1 of 2 instances; 2 moderate vulns remain via `@esbuild-kit/core-utils` transitive dependency)
 - All safe patch/minor dependencies updated to latest compatible versions
 - `npm run validate` passes fully
 - Remaining accepted risks:
+  - `esbuild` moderate vulnerabilities (2 instances via `@esbuild-kit/core-utils` in `drizzle-kit`) -- cannot be resolved without breaking downgrade of `drizzle-kit`
   - `electron` ASAR integrity bypass (moderate, dev-only) -- deferred to separate issue
   - Major version upgrades for `vite`, `eslint`, `jest`, `typescript`, `zod` -- deferred to separate issues
 
