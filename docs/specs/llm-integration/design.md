@@ -685,20 +685,33 @@ const TIMEOUT_MS = 120_000; // 2 минуты на каждый запрос к 
 // - onStepFinish сбрасывает бюджет по завершении model-step
 // - experimental_onStepStart сбрасывает бюджет при начале следующего model request,
 //   чтобы время tool execution между шагами не потребляло timeout budget
+//
+// Таймер приостанавливается (pauseTimeout) перед началом выполнения tool executor
+// и возобновляется (resumeTimeout) после завершения (success или error).
+// Это гарантирует, что время выполнения инструмента внутри одного step
+// не потребляет timeout budget модели (llm-integration.3.6.1).
 let timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+const pauseTimeout = () => {
+  clearTimeout(timeoutId);
+  timeoutId = null;
+};
+
+const resumeTimeout = () => {
+  clearTimeout(timeoutId);
+  timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+};
 
 try {
   await runProviderStreamWithTimeout({
     timeoutMs: TIMEOUT_MS,
     signal,
-    onStepFinish: () => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
-    },
-    experimental_onStepStart: () => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
-    },
+    onStepFinish: () => resumeTimeout(),
+    experimental_onStepStart: () => resumeTimeout(),
+    // buildToolSet wraps each tool.execute:
+    //   pauseTimeout();
+    //   try { return await originalExecute(args); }
+    //   finally { resumeTimeout(); }
   });
 } catch (error) {
   throw normalizeLLMError(error); // APICallError/RetryError/UIMessageStreamError/Tool*Error -> domain code
@@ -706,6 +719,19 @@ try {
   clearTimeout(timeoutId);
 }
 ```
+
+**Пауза таймаута при выполнении инструментов (llm-integration.3.6.1):**
+
+Внутри одного AI SDK step, при вызове tool executor, AI SDK выполняет `tool.execute(...)` синхронно относительно step. Если tool execution (например, `code_exec` с `timeout_ms: 360000`) длится дольше `CHAT_TIMEOUT_MS`, таймер модели сработает и прервёт весь stream.
+
+Решение: `buildToolSet` в каждом провайдере оборачивает `execute` каждого инструмента:
+1. `pauseTimeout()` — очищает текущий таймер без запуска нового
+2. Выполнение `originalExecute(args, ...)`
+3. `resumeTimeout()` в `finally` — запускает свежий `CHAT_TIMEOUT_MS` таймер
+
+`pauseTimeout` и `resumeTimeout` определяются как замыкания в `chat()` и передаются в `buildToolSet`.
+
+Это безопасно, т.к. контракт `llm-integration.11` гарантирует `max 1 tool_call` на ответ модели — параллельные tool executions в одном step невозможны.
 
 Нормализация выполняется единообразно для всех провайдеров:
 
@@ -1015,10 +1041,16 @@ User отправляет сообщение
 - `tests/unit/agents/MainPipeline.test.ts` — handleRunError: statusCode из нормализованной ошибки включается в payload `kind:error` при наличии HTTP-статуса
 - `tests/unit/llm/OpenAIProvider.chat.test.ts` — сброс таймера `CHAT_TIMEOUT_MS` при каждом `onStepFinish`
 - `tests/unit/llm/OpenAIProvider.chat.test.ts` — сброс таймера `CHAT_TIMEOUT_MS` при `experimental_onStepStart` (fresh budget для post-tool continuation)
+- `tests/unit/llm/OpenAIProvider.chat.test.ts` — пауза таймера при выполнении tool executor и возобновление после завершения (success)
+- `tests/unit/llm/OpenAIProvider.chat.test.ts` — возобновление таймера после ошибки tool executor (error в finally)
 - `tests/unit/llm/AnthropicProvider.chat.test.ts` — сброс таймера `CHAT_TIMEOUT_MS` при каждом `onStepFinish`
 - `tests/unit/llm/AnthropicProvider.chat.test.ts` — сброс таймера `CHAT_TIMEOUT_MS` при `experimental_onStepStart` (fresh budget для post-tool continuation)
+- `tests/unit/llm/AnthropicProvider.chat.test.ts` — пауза таймера при выполнении tool executor и возобновление после завершения (success)
+- `tests/unit/llm/AnthropicProvider.chat.test.ts` — возобновление таймера после ошибки tool executor (error в finally)
 - `tests/unit/llm/GoogleProvider.chat.test.ts` — сброс таймера `CHAT_TIMEOUT_MS` при каждом `onStepFinish`
 - `tests/unit/llm/GoogleProvider.chat.test.ts` — сброс таймера `CHAT_TIMEOUT_MS` при `experimental_onStepStart` (fresh budget для post-tool continuation)
+- `tests/unit/llm/GoogleProvider.chat.test.ts` — пауза таймера при выполнении tool executor и возобновление после завершения (success)
+- `tests/unit/llm/GoogleProvider.chat.test.ts` — возобновление таймера после ошибки tool executor (error в finally)
 - `tests/unit/renderer/IPCChatTransport.test.ts` — hidden message + error message: error доставляется через idle delay окно до закрытия stream
 - `tests/unit/components/agents/AgentMessage.test.tsx` — renderer defense-in-depth: persisted historical `tool_call` payload с `<!-- clerkly:title-meta: ... -->` не показывает metadata comment в UI
 - `tests/unit/agents/AgentTitleNormalization.test.ts` — нормализация/валидация title (single-line, trim, punctuation, max 200, удаление непарных парных знаков препинания: кавычки, скобки, backticks, угловые скобки)
