@@ -197,13 +197,25 @@ describe('PromptBuilder.build()', () => {
             minItems: 1,
             maxItems: 10,
             description: expect.stringContaining('Required concise list of solved tasks'),
-            items: expect.objectContaining({ minLength: 1, maxLength: 200, pattern: '.*\\S.*' }),
+            items: expect.objectContaining({ minLength: 1, maxLength: 300, pattern: '.*\\S.*' }),
           }),
         },
       });
       expect(
         (finalAnswerTool?.parameters as Record<string, unknown>).properties
       ).not.toHaveProperty('text');
+    });
+
+    /* Preconditions: FinalAnswerFeature enabled
+       Action: build() is called
+       Assertions: system prompt contains instruction requiring complete words in summary_points (no mid-word cutoffs)
+       Requirements: llm-integration.9.5.3.4 */
+    it('should include complete-word instruction for summary_points in prompt', () => {
+      const feature = new FinalAnswerFeature();
+      const promptSection = feature.getSystemPromptSection();
+
+      expect(promptSection).toContain('complete word');
+      expect(promptSection).toContain('never cut off mid-word');
     });
 
     /* Preconditions: CodeExecFeature enabled
