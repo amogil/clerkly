@@ -137,11 +137,11 @@ No specification changes required. The existing `testing.4.6` and `testing.4.7` 
 
 #### Step 2.4: Upgrade `drizzle-kit` 0.30.6 -> 0.31.10
 
-- [ ] Update `package.json`: `"drizzle-kit": "^0.31.10"`
-- [ ] Run `npm install`
-- [ ] Verify `drizzle-kit` CLI still works: `npx drizzle-kit generate --help`
-- [ ] This resolves `esbuild` vulnerability (2 vulns)
-- [ ] Commit: `fix: upgrade drizzle-kit to v0.31 to resolve esbuild vulnerability`
+- [x] Update `package.json`: `"drizzle-kit": "^0.31.10"`
+- [x] Run `npm install`
+- [x] Verify `drizzle-kit` CLI still works: `npx drizzle-kit generate --help`
+- [x] This resolves `esbuild` vulnerability (2 vulns)
+- [x] Commit: `fix: upgrade drizzle-kit to v0.31 to resolve esbuild vulnerability`
 
 #### Step 2.5: Evaluate `drizzle-orm` upgrade 0.38.4 -> 0.45.2
 
