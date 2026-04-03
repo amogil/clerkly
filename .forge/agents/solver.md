@@ -173,8 +173,34 @@ Determine the current PR label (or absence of PR) and proceed to the correspondi
 
 **When:** PR has label `ready for test` or `testing`.
 
-1. Run **tester** agent with the issue number
-2. After completion, check the PR label:
+The tester agent requires computer use (screenshots, mouse, keyboard) to manually test the application. It MUST be launched as a separate Claude Code process with `--computer-use` flag.
+
+1. Prepare the test prompt with full context:
+   - Issue number, PR number, branch name
+   - Summary of what was changed and what to test (from issue body and PR description)
+   - Path to the tester agent definition: `.forge/agents/tester.md`
+
+2. Launch tester via Claude Code CLI:
+   ```
+   claude --computer-use --agent .forge/agents/tester.md -p "<prompt>"
+   ```
+   Where `<prompt>` includes:
+   ```
+   Test task #<N>.
+   PR: #<PR_NUMBER> (branch: <branch_name>)
+   
+   Issue: <issue title>
+   <issue body summary>
+   
+   Key changes:
+   <brief summary of what was modified>
+   
+   Test focus:
+   <what specifically to verify — derived from issue acceptance criteria>
+   ```
+
+3. Wait for the Claude Code process to complete
+4. After completion, check the PR label:
    - `done` — tester approved. Proceed to **Step 7**
    - `in progress` — tester found issues. Proceed to **Step 4** (re-run coder)
 

@@ -54,9 +54,11 @@ Error: GitHub issue number not provided. Please pass the issue number (e.g., "Te
 
 1. Ensure the PR branch is checked out: `git checkout <branch>`
 2. Install dependencies if needed: `npm install`
-3. Start the application: `npm start`
-4. Wait for the application window to appear
-5. Use `computer_use` to take a screenshot and confirm the app is running
+3. Start the application in background: `npm start &`
+4. Wait 10 seconds for the app to compile and launch: `sleep 10`
+5. Take a screenshot to confirm the app window is visible and ready
+6. If the app is not visible — wait more and retry (up to 30 seconds total)
+7. If the app fails to start — leave a P0 finding and skip to Step 5
 
 ### Step 3: Manual Testing
 
@@ -86,8 +88,10 @@ For each scenario in the test plan:
 
 ### Step 4: Stop Application
 
-1. Close the application (Cmd+Q or kill the process)
-2. Verify the process is stopped: `pkill -f electron || true`
+1. Kill all Electron processes: `pkill -f electron || true`
+2. Wait briefly: `sleep 2`
+3. Verify no Electron processes remain: `pgrep -f electron || echo "All stopped"`
+4. If processes remain — force kill: `pkill -9 -f electron || true`
 
 ### Step 5: Finalization
 
