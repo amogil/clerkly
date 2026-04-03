@@ -37,9 +37,9 @@ Error: GitHub issue number not provided. Please pass the issue number (e.g., "Te
 2. Get the issue: `gh issue view <N> --json title,body,labels`
 3. Find the PR: `gh pr list --state all --search "<N>" --json number,title,state,labels,headRefOid`
    - If no PR exists — **STOP**: nothing to test
-   - If PR exists but does NOT have the `ready for test` label — **STOP** and return:
+   - If PR exists but does NOT have `ready for test` or `testing` label — **STOP** and return:
      ```
-     Error: PR #<N> does not have label "ready for test". The task is not ready for testing.
+     Error: PR #<N> does not have label "ready for test" or "testing". The task is not ready for testing.
      Current labels: [list of labels]
      ```
 4. Set label to `testing` (remove `ready for test`, add `testing`)
@@ -89,11 +89,10 @@ Validate each item and leave inline threads in the PR for every finding.
      ```
      gh api graphql -f query='{ repository(owner: "<owner>", name: "<repo>") { pullRequest(number: <PR>) { reviewThreads(first: 100) { nodes { isResolved comments(first: 1) { nodes { body } } } } } } }'
      ```
-   - If ANY thread has `isResolved: false` — this is a blocking condition. The tester MUST NOT approve.
+   - If ANY thread has `isResolved: false` — set label `in progress` and return report. The coder will investigate.
    - If there are unresolved threads from previous rounds that have been addressed in code, resolve them via GraphQL before proceeding.
-3. Verify CI checks:
-   - All CI checks must have passed
-   - PR must not be in draft status
+3. Verify CI checks and draft status:
+   - If PR is in draft or any CI check has not passed — set label `in progress` and return report. The coder will investigate.
 4. Determine verdict:
    - **Approved** — zero findings AND all CI checks passed AND all review threads resolved AND PR is not draft
    - **Not approved** — at least one finding of any priority OR any CI check failed OR any unresolved review thread

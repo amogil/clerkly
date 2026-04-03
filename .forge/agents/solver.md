@@ -1,7 +1,7 @@
 ---
 id: solver
 title: Task Solver
-description: Orchestrates the full task workflow — runs planner, coder, and reviewer agents to deliver a ready PR from a GitHub issue number.
+description: Orchestrates the full task workflow — runs planner, coder, reviewer, and tester agents to deliver a complete PR from a GitHub issue number.
 max_walker_depth: 1
 tools:
   - shell
