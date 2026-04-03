@@ -1276,7 +1276,7 @@ function ActivityIndicator({ isActive }: { isActive: boolean }) {
 
 ```tsx
 // Requirements: agents.4.13, agents.4.13.8
-<Conversation className="flex-1 min-h-0">
+<Conversation className="flex-1 min-h-0" resize="instant">
   <ConversationContent data-testid="messages-area" className="flex flex-col gap-4 p-6 justify-end min-h-full">
     {/* сообщения */}
   </ConversationContent>
@@ -1294,11 +1294,11 @@ function ActivityIndicator({ isActive }: { isActive: boolean }) {
 
 Библиотека `use-stick-to-bottom` использует внутренний `ResizeObserver` на content-элементе. При изменении размера окна текст перекомпоновывается (reflow), что изменяет высоту контента и вызывает callback `ResizeObserver`. Если пользователь находится «внизу» (`state.isAtBottom === true`), библиотека вызывает `scrollToBottom()` с анимацией, заданной в prop `resize`.
 
-Prop `resize="instant"` обеспечивает мгновенное (без spring-анимации) перемещение к нижней позиции при resize. Это устраняет проблему накопления конкурирующих smooth-анимаций, которые возникают при непрерывном resize окна и вызывают визуальные рывки/лаги.
+Prop `resize="instant"` передаётся на уровне вызова `<Conversation>` в компоненте `AgentChat` (`src/renderer/components/agents/AgentChat.tsx`). Компонент `Conversation` (vendor-файл `src/renderer/components/ai-elements/conversation.tsx`) по умолчанию использует `resize="smooth"`, но благодаря spread-оператору `{...props}` в JSX, переданный на месте вызова prop `resize="instant"` переопределяет значение по умолчанию. Это обеспечивает мгновенное (без spring-анимации) перемещение к нижней позиции при resize, устраняя проблему накопления конкурирующих smooth-анимаций.
 
 Prop `initial="smooth"` сохраняется для плавного первого скролла при загрузке.
 
-**Примечание:** файл `conversation.tsx` находится в vendor-директории AI Elements. При обновлении через `npm run ai-elements:update-all` необходимо проверить, что prop `resize="instant"` сохранён.
+**Примечание:** файл `conversation.tsx` является vendor-компонентом AI Elements и НЕ модифицируется. Переопределение prop `resize` выполняется исключительно на уровне вызова в `AgentChat.tsx`, что безопасно при обновлениях через `npm run ai-elements:update-all`.
 
 **Скролл при чтении истории:**
 - Скролл работает нативно через `Conversation`

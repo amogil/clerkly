@@ -557,26 +557,135 @@ describe('Agents Autoscroll', () => {
     expect(() => render(<TestComponent />)).not.toThrow();
   });
 
-  /* Preconditions: Conversation component rendered with StickToBottom mock
-     Action: Render the Conversation component from its real source
-     Assertions: StickToBottom receives resize="instant" prop for stable scroll during window resize
+  /* Preconditions: AgentChat renders Conversation with resize="instant" prop
+     Action: Render AgentChat with mocked dependencies and check conversation element
+     Assertions: The mock Conversation receives resize="instant" via props spread
      Requirements: agents.4.13.8 */
   it('should pass resize="instant" to StickToBottom for stable scroll during window resize', () => {
-    // The Conversation component is remapped by moduleNameMapper, so we cannot
-    // render the real component in this test environment. Instead, verify the
-    // source file contains the correct resize="instant" prop value.
-    const fs = require('fs');
-    const path = require('path');
-    const conversationSource = fs.readFileSync(
-      path.join(process.cwd(), 'src/renderer/components/ai-elements/conversation.tsx'),
-      'utf-8'
-    );
+    // Isolate module registry so that jest.doMock calls only affect this test
+    jest.isolateModules(() => {
+      const ReactLocal = require('react') as typeof React;
+      const ReactDOMClient = require('react-dom/client') as typeof import('react-dom/client');
 
-    // Verify the StickToBottom component receives resize="instant"
-    expect(conversationSource).toContain('resize="instant"');
-    // Verify initial="smooth" is still present (not accidentally changed)
-    expect(conversationSource).toContain('initial="smooth"');
-    // Verify resize="smooth" is NOT present (the old value was removed)
-    expect(conversationSource).not.toContain('resize="smooth"');
+      // Track props passed to Conversation
+      let capturedResizeProp: string | undefined;
+
+      jest.doMock('../../../src/renderer/hooks/useAgentChat', () => ({
+        useAgentChat: () => ({
+          rawMessages: [],
+          isLoading: false,
+          isStreaming: false,
+          sendMessage: jest.fn(),
+          cancelCurrentRequest: jest.fn(),
+          messages: [],
+        }),
+      }));
+
+      jest.doMock('framer-motion', () => ({
+        motion: {
+          div: ({ children, ...props }: { children?: React.ReactNode; [k: string]: unknown }) =>
+            ReactLocal.createElement('div', props, children),
+        },
+      }));
+
+      jest.doMock('../../../src/renderer/components/ai-elements/conversation', () => ({
+        Conversation: ({
+          children,
+          className,
+          resize,
+          ..._rest
+        }: {
+          children?: React.ReactNode;
+          className?: string;
+          resize?: string;
+          [k: string]: unknown;
+        }) => {
+          capturedResizeProp = resize;
+          return ReactLocal.createElement(
+            'div',
+            { 'data-testid': 'conversation-mock', 'data-resize': resize, className },
+            children
+          );
+        },
+        ConversationContent: ({
+          children,
+          ...props
+        }: React.HTMLAttributes<HTMLDivElement> & { children?: React.ReactNode }) =>
+          ReactLocal.createElement('div', props, children),
+        ConversationScrollButton: () => null,
+      }));
+
+      jest.doMock('../../../src/renderer/components/agents/AgentMessage', () => ({
+        AgentMessage: () => null,
+      }));
+
+      jest.doMock('../../../src/renderer/components/agents/AgentWelcome', () => ({
+        AgentWelcome: () =>
+          ReactLocal.createElement('div', { 'data-testid': 'agent-welcome' }, 'Welcome'),
+      }));
+
+      jest.doMock('../../../src/renderer/components/agents/RateLimitBanner', () => ({
+        RateLimitBanner: () => null,
+      }));
+
+      jest.doMock('../../../src/renderer/hooks/useToggleScrollLock', () => ({
+        useToggleScrollLock: () => () => () => {},
+      }));
+
+      jest.doMock('../../../src/renderer/components/ai-elements/prompt-input', () => ({
+        PromptInput: ({ children }: { children?: React.ReactNode }) =>
+          ReactLocal.createElement('div', { 'data-testid': 'prompt-input-mock' }, children),
+        PromptInputBody: ({ children }: { children?: React.ReactNode }) =>
+          ReactLocal.createElement('div', null, children),
+        PromptInputFooter: ({ children }: { children?: React.ReactNode }) =>
+          ReactLocal.createElement('div', null, children),
+        PromptInputTextarea: () => ReactLocal.createElement('textarea'),
+        PromptInputTools: ({ children }: { children?: React.ReactNode }) =>
+          ReactLocal.createElement('div', null, children),
+        PromptInputSubmit: () => ReactLocal.createElement('button', null, 'Submit'),
+      }));
+
+      const { AgentChat } = require('../../../src/renderer/components/agents/AgentChat');
+
+      const agent = {
+        id: 'test-agent',
+        name: 'Test',
+        status: 'idle',
+        archived: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      const container = document.createElement('div');
+      document.body.appendChild(container);
+      const root = ReactDOMClient.createRoot(container);
+
+      // Use React 18 act from react-dom/test-utils
+      const { act: reactAct } = require('react') as { act: (fn: () => void) => void };
+
+      reactAct(() => {
+        root.render(
+          ReactLocal.createElement(AgentChat, {
+            agent,
+            isActive: true,
+            rateLimitBanner: null,
+            onRateLimitDismiss: () => {},
+            onLoadingChange: () => {},
+            onStartupSettledChange: () => {},
+          })
+        );
+      });
+
+      const conversationEl = container.querySelector('[data-testid="conversation-mock"]');
+      expect(conversationEl).toBeTruthy();
+      expect(conversationEl!.getAttribute('data-resize')).toBe('instant');
+      expect(capturedResizeProp).toBe('instant');
+
+      // Cleanup
+      reactAct(() => {
+        root.unmount();
+      });
+      container.remove();
+    });
   });
 });

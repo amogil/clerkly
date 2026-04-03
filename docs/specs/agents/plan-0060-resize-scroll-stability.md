@@ -27,13 +27,13 @@ The current `resize="smooth"` setting is appropriate for content growth (new mes
 
 ### Solution approach
 
-Change the `resize` prop on `StickToBottom` from `"smooth"` to `"instant"`. This ensures that when content height changes due to window resize (while user is at bottom), the scroll position jumps instantly to the new bottom position without animation. This eliminates the compounding smooth-scroll animations that cause stutter.
+Override the `resize` prop on `<Conversation>` at the call site in `AgentChat.tsx` by passing `resize="instant"`. The vendor `Conversation` component (`src/renderer/components/ai-elements/conversation.tsx`) defaults to `resize="smooth"`, but its JSX uses `{...props}` spread after the inline defaults, so passing `resize="instant"` from the call site overrides the default. This ensures that when content height changes due to window resize (while user is at bottom), the scroll position jumps instantly to the new bottom position without animation.
 
-The `initial="smooth"` prop remains unchanged, so the first scroll-to-bottom on load still animates smoothly. New messages still trigger smooth autoscroll through the default behavior of `scrollToBottom()` (which uses the base spring animation, not the `resize` animation).
+**IMPORTANT:** `conversation.tsx` is a vendor/external component in `src/renderer/components/ai-elements/` and MUST NOT be modified directly, as changes will be lost on updates via `npm run ai-elements:update-all`.
 
-From the library source (`useStickToBottom.js:323-324`), the `resize` animation is used specifically in the `ResizeObserver` callback, while user-initiated `scrollToBottom()` calls and initial scroll use their own animation settings. So changing `resize` to `"instant"` only affects the response to content height changes (reflow during window resize, collapsible toggle, etc.), not the smooth autoscroll on new messages.
+The `initial="smooth"` prop remains unchanged, so the first scroll-to-bottom on load still animates smoothly. New messages still trigger smooth autoscroll through the default behavior of `scrollToBottom()`.
 
-Additionally, the `useToggleScrollLock` hook (`src/renderer/hooks/useToggleScrollLock.ts`) already handles scroll suppression for collapsible block toggles by temporarily setting `state.isAtBottom = false`, so the `resize="instant"` change is complementary and does not conflict with that mechanism.
+Additionally, the `useToggleScrollLock` hook already handles scroll suppression for collapsible block toggles, so the `resize="instant"` override is complementary and does not conflict.
 
 ### Affected requirements
 
@@ -61,11 +61,14 @@ A new requirement is needed to specify resize behavior explicitly:
 
 ### Phase 2: Code
 
-- [x] Modify `src/renderer/components/ai-elements/conversation.tsx` - Change `resize="smooth"` to `resize="instant"` on line 17 in the `Conversation` component
+- [x] Revert `src/renderer/components/ai-elements/conversation.tsx` to original `resize="smooth"` (vendor file MUST NOT be modified)
+- [x] Pass `resize="instant"` at the call site in `src/renderer/components/agents/AgentChat.tsx` on the `<Conversation>` element, which overrides the vendor default via props spread
 
 ### Phase 3: Tests
 
-- [x] Add unit test in `tests/unit/components/agents-autoscroll.test.tsx` - Add a test case "should pass resize='instant' to StickToBottom for stable scroll during window resize" that renders the `Conversation` component and verifies it passes `resize="instant"` prop to the underlying `StickToBottom`; covers requirement `agents.4.13.8`. The mock at `tests/__mocks__/use-stick-to-bottom.tsx` already provides a mock `StickToBottom` that can be inspected for props.
+- [x] Rewrite unit test in `tests/unit/components/agents-autoscroll.test.tsx` to render `AgentChat` with mocked dependencies and verify `resize="instant"` prop arrives at the `Conversation` mock at runtime (not fs.readFileSync string check); covers `agents.4.13.8`
+- [x] Remove dead `getLastStickToBottomProps()` export from `tests/__mocks__/use-stick-to-bottom.tsx`
+- [x] Update `StickToBottom` mock to expose `data-resize` attribute for prop inspection
 
 ### Phase 4: Finalization
 
@@ -77,9 +80,11 @@ A new requirement is needed to specify resize behavior explicitly:
 | File | Change |
 |------|--------|
 | `docs/specs/agents/requirements.md` | Add requirement `agents.4.13.8` for resize scroll stability |
-| `docs/specs/agents/design.md` | Document `resize="instant"` in autoscroll section; update coverage table |
-| `src/renderer/components/ai-elements/conversation.tsx` | Change `resize="smooth"` to `resize="instant"` (line 17) |
-| `tests/unit/components/agents-autoscroll.test.tsx` | Add unit test verifying `Conversation` passes `resize="instant"` prop to `StickToBottom`; covers `agents.4.13.8` |
+| `docs/specs/agents/design.md` | Document `resize="instant"` override at call site; update coverage table |
+| `src/renderer/components/ai-elements/conversation.tsx` | Reverted to original `resize="smooth"` (vendor file, not modified) |
+| `src/renderer/components/agents/AgentChat.tsx` | Pass `resize="instant"` on `<Conversation>` call site to override vendor default |
+| `tests/unit/components/agents-autoscroll.test.tsx` | Rewrite test to render AgentChat and verify `resize="instant"` prop at runtime |
+| `tests/__mocks__/use-stick-to-bottom.tsx` | Remove dead `getLastStickToBottomProps()`; expose `data-resize` attribute |
 
 ## Expected result
 
@@ -92,6 +97,6 @@ After implementation:
 
 ## Risks
 
-- **Risk: AI Elements update overwriting the change.** The `conversation.tsx` file is in the AI Elements vendor directory and may be overwritten by `npm run ai-elements:update-all`. Mitigation: The `resize` prop is app-level configuration on the `<StickToBottom>` wrapper, so any re-sync would need to be checked for this prop. Document this in the design spec.
+- **Risk: AI Elements update overwriting the change.** Mitigated: The `conversation.tsx` vendor file is NOT modified. The `resize="instant"` override is applied at the call site in `AgentChat.tsx`, which is app-owned code. Updates via `npm run ai-elements:update-all` will not affect this override as long as `Conversation` continues to use `{...props}` spread.
 - **Risk: `resize="instant"` might cause visual jump on collapsible toggle.** When a collapsible block (code_exec, reasoning) is toggled, the content height changes and the instant resize would jump scroll. Mitigation: The `useToggleScrollLock` hook already sets `state.isAtBottom = false` before the toggle, so the library's resize handler sees `isAtBottom === false` and does not trigger `scrollToBottom`. This is validated by existing tests.
 - **Risk: `resize="instant"` might affect the visual quality of scroll when new streaming content grows the container.** Mitigation: From the library source, the `resize` animation is used in the `ResizeObserver` path with `preserveScrollPosition: true` and `wait: true`. The normal `scrollToBottom()` calls from user actions use the base spring animation. However, during streaming, content growth triggers the `ResizeObserver` which would use `resize="instant"`. This actually improves the streaming experience by eliminating the spring-bounce effect during rapid content growth. The scroll stays locked to bottom without animated lag.
