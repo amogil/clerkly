@@ -12,6 +12,8 @@
 import React from 'react';
 import { render, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
+import { Conversation } from '@/components/ai-elements/conversation';
+import { getLastStickToBottomProps } from '../../__mocks__/use-stick-to-bottom';
 
 describe('Agents Autoscroll', () => {
   let scrollIntoViewMock: jest.Mock;
@@ -555,5 +557,22 @@ describe('Agents Autoscroll', () => {
 
     // Should not throw error
     expect(() => render(<TestComponent />)).not.toThrow();
+  });
+
+  /* Preconditions: Conversation component rendered
+     Action: Render Conversation component
+     Assertions: StickToBottom receives resize="instant" prop for stable scroll during window resize
+     Requirements: agents.4.13.8 */
+  it('should pass resize="instant" to StickToBottom for stable scroll during window resize', () => {
+    render(
+      <div data-testid="conversation-container">
+        <Conversation>
+          <div>Test message</div>
+        </Conversation>
+      </div>
+    );
+
+    const props = getLastStickToBottomProps();
+    expect(props.resize).toBe('instant');
   });
 });
