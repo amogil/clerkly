@@ -1,7 +1,7 @@
 ---
 id: solver
 title: Task Solver
-description: Orchestrates the full task workflow — runs planner, coder, and reviewer agents to deliver a ready PR from a GitHub issue number.
+description: Orchestrates the full task workflow — runs planner, coder, reviewer, and tester agents to deliver a complete PR from a GitHub issue number.
 max_walker_depth: 1
 tools:
   - shell
@@ -12,7 +12,7 @@ custom_rules: |
   - You are an orchestrator. NEVER write code, specifications, or reviews yourself — delegate to agents.
   - Always check PR labels before and after each agent run.
   - NEVER skip the human approval step between planner and coder — use polling to wait for label changes.
-  - GATE LABELS — `analysis review` and `ready for test` require EXPLICIT human action (label change) to advance. When the current PR label is a gate label, you MUST NOT proceed to the next stage under any circumstances. The ONLY valid actions are: (1) answer review comments, (2) re-run planner if new review threads appear, (3) poll and wait. Advancing past a gate label without the human changing it is FORBIDDEN — even if all review comments are answered, even if the plan looks complete, even if there are no open threads.
+  - GATE LABELS — `analysis review` requires EXPLICIT human action (label change) to advance. When the current PR label is a gate label, you MUST NOT proceed to the next stage under any circumstances. The ONLY valid actions are: (1) answer review comments, (2) re-run planner if new review threads appear, (3) poll and wait. Advancing past a gate label without the human changing it is FORBIDDEN — even if all review comments are answered, even if the plan looks complete, even if there are no open threads.
 reasoning:
   enabled: true
   effort: low
@@ -50,14 +50,25 @@ Which task should I work on? Please provide a GitHub issue number (e.g., #89).
                                      +-------------+
                                      | in progress |
                                      +-------------+
-                                       ^    |
-                                       |    | Coder finishes
-                                       |    v
-                                       |  +--------+              +----------------+
-                              Reviewer +--| review |------------->| ready for test |
-                     finds issues or   +--------+              +----------------+
-                       CI checks fail        Reviewer approves
-                                             + CI checks pass
+                                       ^    ^    |
+                                       |    |    | Coder finishes
+                                       |    |    v
+                                       |    |  +--------+              +----------------+
+                              Reviewer |    +--| review |------------->| ready for test |
+                     finds issues or   |       +--------+              +----------------+
+                       CI checks fail  |         Reviewer approves           |
+                                       |         + CI checks pass            | Tester
+                                       |                                     v
+                                       |                              +-----------+
+                                       |                              |  testing  |
+                                       |                              +-----------+
+                                       |  Tester finds issues              |
+                                       +-----------------------------------+
+                                                                           | Tester approves
+                                                                           v
+                                                                      +--------+
+                                                                      |  done  |
+                                                                      +--------+
 
 Note: Steps 2-3 use a polling loop (sleep 60, check labels/threads)
 instead of blocking followup calls. Timeout: 60 minutes.
@@ -82,8 +93,10 @@ Determine the current PR label (or absence of PR) and proceed to the correspondi
 | PR with label `ready for code`  | -> Run **coder** (Step 4)        |
 | PR with label `in progress`     | -> Run **coder** (Step 4)        |
 | PR with label `code review`          | -> Run **reviewer** (Step 5)     |
-| PR with label `ready for test`  | -> Task already complete (Step 6) **GATE** |
-| PR is MERGED or CLOSED         | -> Stop (Step 7)                   |
+| PR with label `ready for test`  | -> Run **tester** (Step 6)        |
+| PR with label `testing`           | -> Run **tester** (Step 6)        |
+| PR with label `done`              | -> Task complete (Step 7)          |
+| PR is MERGED or CLOSED         | -> Stop (Step 8)                   |
 
 **Gate labels** (`analysis review`, `ready for test`) require explicit human label change to advance. Never infer or assume approval — only the label matters.
 
@@ -154,24 +167,69 @@ Determine the current PR label (or absence of PR) and proceed to the correspondi
    - `ready for test` — reviewer approved. Proceed to **Step 6**
    - `in progress` — reviewer found issues. Proceed to **Step 4** (re-run coder)
 
-### Step 6: Finish
 
-**When:** PR has label `ready for test`.
+### Step 6: Testing (tester)
+
+**When:** PR has label `ready for test` or `testing`.
+
+The tester agent requires computer use (screenshots, mouse, keyboard) to manually test the application. Computer use only works in **interactive mode** — it cannot be launched with `-p` flag.
+
+1. Prepare the test prompt with full context:
+   - Issue number, PR number, branch name
+   - Summary of what was changed and what to test (from issue body and PR description)
+   - Path to the tester agent definition: `.forge/agents/tester.md`
+
+2. Print the launch command for the user:
+   ```
+   Ready for manual testing. Please run the tester in a separate terminal:
+
+   claude --agent .forge/agents/tester.md
+
+   Then paste this prompt:
+
+   Test task #<N>.
+   PR: #<PR_NUMBER> (branch: <branch_name>)
+   
+   Issue: <issue title>
+   <issue body summary>
+   
+   Key changes:
+   <brief summary of what was modified>
+   
+   Test focus:
+   <what specifically to verify — derived from issue acceptance criteria>
+   ```
+
+3. Enter polling loop — wait for the tester to finish (max 60 iterations):
+   1. `sleep 60`
+   2. Check PR labels: `gh pr view <N> --json labels`
+   3. If label changed from `ready for test`/`testing` → break loop
+   4. If still unchanged → continue polling
+
+4. After polling detects a label change:
+   - `done` — tester approved. Proceed to **Step 7**
+   - `in progress` — tester found issues. Proceed to **Step 4** (re-run coder)
+   - Other label → handle per workflow table in Step 1
+
+### Step 7: Finish
+
+**When:** PR has label `done`.
 
 Return final report:
 ```
 Result: ✅ Task complete
 Issue: #<N>
 PR: <link>
-Label: ready for test
+Label: done
 
 Workflow:
 - ✅ Planning: <planner iteration count>
 - ✅ Implementation: <coder iteration count>
 - ✅ Review: <reviewer iteration count>
+- ✅ Testing: <tester iteration count>
 ```
 
-### Step 7: Stop (MERGED or CLOSED)
+### Step 8: Stop (MERGED or CLOSED)
 
 **When:** PR is already merged or closed.
 
