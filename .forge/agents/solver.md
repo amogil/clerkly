@@ -51,24 +51,25 @@ Which task should I work on? Please provide a GitHub issue number (e.g., #89).
                                      +-------------+
                                      | in progress |
                                      +-------------+
-                                       ^    |
-                                       |    | Coder finishes
-                                       |    v
-                                       |  +--------+              +----------------+
-                              Reviewer +--| review |------------->| ready for test |
-                     finds issues or      +--------+              +----------------+
-                       CI checks fail        Reviewer approves           |
-                                             + CI checks pass            | Tester
-                                                                         v
-                                                                  +-----------+
-                                                                  |  testing  |
-                                                                  +-----------+
-                                                                    ^    |
-                                                                    |    | Tester finishes
-                                                                    |    v
-                                                               Coder +--+--------+
-                                                          fixes issues  |  done  |
-                                                                        +--------+
+                                       ^    ^    |
+                                       |    |    | Coder finishes
+                                       |    |    v
+                                       |    |  +--------+              +----------------+
+                              Reviewer |    +--| review |------------->| ready for test |
+                     finds issues or   |       +--------+              +----------------+
+                       CI checks fail  |         Reviewer approves           |
+                                       |         + CI checks pass            | Tester
+                                       |                                     v
+                                       |                              +-----------+
+                                       |                              |  testing  |
+                                       |                              +-----------+
+                                       |  Tester finds issues              |
+                                       +-----------------------------------+
+                                                                           | Tester approves
+                                                                           v
+                                                                      +--------+
+                                                                      |  done  |
+                                                                      +--------+
 
 Note: Steps 2-3 use a polling loop (sleep 60, check labels/threads)
 instead of blocking followup calls. Timeout: 60 minutes.
