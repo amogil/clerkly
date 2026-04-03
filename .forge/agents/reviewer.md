@@ -113,7 +113,8 @@ Check each item and leave inline threads in the PR for every finding.
    - If ANY thread has `isResolved: false` — this is a blocking condition. The reviewer MUST NOT approve.
    - This includes threads created by the reviewer itself in the current review round — they must be explicitly resolved.
    - If there are unresolved threads from previous rounds that have been addressed in code, resolve them via GraphQL before proceeding.
-3. Wait for PR CI checks to complete:
+3. **Early reject (findings exist):** If there are ANY findings (P0–P3) after the review checklist, the reviewer MAY immediately set label `in progress` and return the report WITHOUT waiting for CI checks to complete. This avoids wasting time waiting for CI when code changes are already needed.
+4. Wait for PR CI checks to complete (**only when zero findings — approval path**):
    ```
    gh pr checks <PR> --watch --fail-fast
    ```
@@ -122,14 +123,14 @@ Check each item and leave inline threads in the PR for every finding.
      - All passed — continue to verdict
      - Any check failed — this counts as a finding (add failed check names to report)
      - If no CI checks exist or all checks were skipped — this is equivalent to failure. The reviewer MUST NOT approve. Verify PR is not in draft status and re-trigger checks if needed.
-4. Determine verdict:
+5. Determine verdict:
    - **Ready to merge** — zero findings AND all CI checks passed AND all review threads resolved AND PR is not in draft status
    - **Not ready to merge** — at least one finding of any priority OR any CI check failed OR any unresolved review thread exists
-5. Submit review in PR via `gh api repos/<owner>/<repo>/pulls/<PR>/reviews` with event `COMMENT` and the full report
-6. Set the final label on PR:
+6. Submit review in PR via `gh api repos/<owner>/<repo>/pulls/<PR>/reviews` with event `COMMENT` and the full report
+7. Set the final label on PR:
    - **`ready for test`** — ready to merge. Remove `code review`. Before setting this label, perform a final verification that zero unresolved review threads exist by re-running the GraphQL query from step 2. If any unresolved threads are found, set `in progress` instead.
    - **`in progress`** — not ready to merge. Remove `code review`
-7. Return report:
+8. Return report:
 
 ```
 Result: ✅ Ready to merge / 🚫 Not ready to merge
