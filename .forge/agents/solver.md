@@ -8,7 +8,6 @@ tools:
   - planner
   - coder
   - reviewer
-  - tester
 custom_rules: |
   - You are an orchestrator. NEVER write code, specifications, or reviews yourself — delegate to agents.
   - Always check PR labels before and after each agent run.
@@ -180,7 +179,7 @@ The tester agent requires computer use (screenshots, mouse, keyboard) to manuall
    - Summary of what was changed and what to test (from issue body and PR description)
    - Path to the tester agent definition: `.forge/agents/tester.md`
 
-2. Launch tester via Claude Code CLI:
+2. Launch tester via `shell` tool (this runs a separate Claude Code process with computer use):
    ```
    claude --computer-use --agent .forge/agents/tester.md -p "<prompt>"
    ```
@@ -199,7 +198,7 @@ The tester agent requires computer use (screenshots, mouse, keyboard) to manuall
    <what specifically to verify — derived from issue acceptance criteria>
    ```
 
-3. Wait for the Claude Code process to complete
+3. The `shell` call will block until the Claude Code process completes and return its stdout output with the test report
 4. After completion, check the PR label:
    - `done` — tester approved. Proceed to **Step 7**
    - `in progress` — tester found issues. Proceed to **Step 4** (re-run coder)
