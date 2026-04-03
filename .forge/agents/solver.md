@@ -172,19 +172,21 @@ Determine the current PR label (or absence of PR) and proceed to the correspondi
 
 **When:** PR has label `ready for test` or `testing`.
 
-The tester agent requires computer use (screenshots, mouse, keyboard) to manually test the application. It MUST be launched as a separate Claude Code process with `--computer-use` flag.
+The tester agent requires computer use (screenshots, mouse, keyboard) to manually test the application. Computer use only works in **interactive mode** — it cannot be launched with `-p` flag.
 
 1. Prepare the test prompt with full context:
    - Issue number, PR number, branch name
    - Summary of what was changed and what to test (from issue body and PR description)
    - Path to the tester agent definition: `.forge/agents/tester.md`
 
-2. Launch tester via `shell` tool (this runs a separate Claude Code process with computer use):
+2. Print the launch command for the user:
    ```
-   claude --computer-use --agent .forge/agents/tester.md -p "<prompt>"
-   ```
-   Where `<prompt>` includes:
-   ```
+   Ready for manual testing. Please run the tester in a separate terminal:
+
+   claude --agent .forge/agents/tester.md
+
+   Then paste this prompt:
+
    Test task #<N>.
    PR: #<PR_NUMBER> (branch: <branch_name>)
    
@@ -198,10 +200,16 @@ The tester agent requires computer use (screenshots, mouse, keyboard) to manuall
    <what specifically to verify — derived from issue acceptance criteria>
    ```
 
-3. The `shell` call will block until the Claude Code process completes and return its stdout output with the test report
-4. After completion, check the PR label:
+3. Enter polling loop — wait for the tester to finish (max 60 iterations):
+   1. `sleep 60`
+   2. Check PR labels: `gh pr view <N> --json labels`
+   3. If label changed from `ready for test`/`testing` → break loop
+   4. If still unchanged → continue polling
+
+4. After polling detects a label change:
    - `done` — tester approved. Proceed to **Step 7**
    - `in progress` — tester found issues. Proceed to **Step 4** (re-run coder)
+   - Other label → handle per workflow table in Step 1
 
 ### Step 7: Finish
 
