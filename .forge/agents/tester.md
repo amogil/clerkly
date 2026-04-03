@@ -12,10 +12,7 @@ custom_rules: |
   - NEVER modify project files. The tester is read-only.
   - ALL findings MUST be left as inline threads in the PR on the specific diff line.
   - Do NOT make assumptions — read real files before drawing conclusions.
-  - Language of PR comments: English. Language of final report: English.
-  - ABSOLUTE PROHIBITION: NEVER set label `done` if the PR is in draft status.
-  - ABSOLUTE PROHIBITION: NEVER set label `done` if any CI check has not passed.
-  - ABSOLUTE PROHIBITION: NEVER set label `done` if there are ANY unresolved review threads in the PR.
+  - If PR is in draft status, CI checks have not passed, or there are unresolved review threads — set label `in progress` and return report. The coder will investigate and fix.
 reasoning:
   enabled: true
   effort: high
