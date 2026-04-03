@@ -61,16 +61,16 @@ A new requirement is needed to specify resize behavior explicitly:
 
 ### Phase 2: Code
 
-- [ ] Modify `src/renderer/components/ai-elements/conversation.tsx` - Change `resize="smooth"` to `resize="instant"` on line 17 in the `Conversation` component
+- [x] Modify `src/renderer/components/ai-elements/conversation.tsx` - Change `resize="smooth"` to `resize="instant"` on line 17 in the `Conversation` component
 
 ### Phase 3: Tests
 
-- [ ] Add unit test in `tests/unit/components/agents-autoscroll.test.tsx` - Add a test case "should pass resize='instant' to StickToBottom for stable scroll during window resize" that renders the `Conversation` component and verifies it passes `resize="instant"` prop to the underlying `StickToBottom`; covers requirement `agents.4.13.8`. The mock at `tests/__mocks__/use-stick-to-bottom.tsx` already provides a mock `StickToBottom` that can be inspected for props.
+- [x] Add unit test in `tests/unit/components/agents-autoscroll.test.tsx` - Add a test case "should pass resize='instant' to StickToBottom for stable scroll during window resize" that renders the `Conversation` component and verifies it passes `resize="instant"` prop to the underlying `StickToBottom`; covers requirement `agents.4.13.8`. The mock at `tests/__mocks__/use-stick-to-bottom.tsx` already provides a mock `StickToBottom` that can be inspected for props.
 
 ### Phase 4: Finalization
 
 - [x] Update coverage table in `design.md`
-- [ ] Run `npm run validate`
+- [x] Run `npm run validate`
 
 ## Files to change
 

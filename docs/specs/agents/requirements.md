@@ -375,7 +375,6 @@
 - `tests/functional/llm-chat.spec.ts` - "should cancel active request via stop button without creating error message"
 - `tests/functional/llm-chat.spec.ts` - "should keep reasoning trigger logo static after finish and auto-collapse"
 - `tests/functional/llm-chat.spec.ts` - "should not auto-scroll when toggling code_exec block near bottom of chat"
-- `tests/functional/agent-messaging.spec.ts` - "should maintain stable scroll position during window resize"
 
 ### 5. Просмотр всех агентов
 

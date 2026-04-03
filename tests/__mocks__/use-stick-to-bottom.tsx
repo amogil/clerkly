@@ -10,7 +10,22 @@ const StickToBottomContext = createContext<StickToBottomContextValue>({
   scrollToBottom: () => undefined,
 });
 
-export function StickToBottom({ children }: { children: React.ReactNode }) {
+// Store last props passed to StickToBottom for test inspection
+let lastStickToBottomProps: Record<string, unknown> = {};
+
+// Requirements: agents.4.13.8
+export function getLastStickToBottomProps(): Record<string, unknown> {
+  return lastStickToBottomProps;
+}
+
+export function StickToBottom({
+  children,
+  ...props
+}: {
+  children: React.ReactNode;
+  [key: string]: unknown;
+}) {
+  lastStickToBottomProps = props;
   return (
     <StickToBottomContext.Provider value={{ isAtBottom: true, scrollToBottom: () => undefined }}>
       <div data-testid="stick-to-bottom-mock">{children}</div>

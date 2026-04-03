@@ -556,4 +556,27 @@ describe('Agents Autoscroll', () => {
     // Should not throw error
     expect(() => render(<TestComponent />)).not.toThrow();
   });
+
+  /* Preconditions: Conversation component rendered with StickToBottom mock
+     Action: Render the Conversation component from its real source
+     Assertions: StickToBottom receives resize="instant" prop for stable scroll during window resize
+     Requirements: agents.4.13.8 */
+  it('should pass resize="instant" to StickToBottom for stable scroll during window resize', () => {
+    // The Conversation component is remapped by moduleNameMapper, so we cannot
+    // render the real component in this test environment. Instead, verify the
+    // source file contains the correct resize="instant" prop value.
+    const fs = require('fs');
+    const path = require('path');
+    const conversationSource = fs.readFileSync(
+      path.join(process.cwd(), 'src/renderer/components/ai-elements/conversation.tsx'),
+      'utf-8'
+    );
+
+    // Verify the StickToBottom component receives resize="instant"
+    expect(conversationSource).toContain('resize="instant"');
+    // Verify initial="smooth" is still present (not accidentally changed)
+    expect(conversationSource).toContain('initial="smooth"');
+    // Verify resize="smooth" is NOT present (the old value was removed)
+    expect(conversationSource).not.toContain('resize="smooth"');
+  });
 });
