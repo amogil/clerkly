@@ -100,3 +100,65 @@ After implementation:
 - **Risk: AI Elements update overwriting the change.** Mitigated: The `conversation.tsx` vendor file is NOT modified. The `resize="instant"` override is applied at the call site in `AgentChat.tsx`, which is app-owned code. Updates via `npm run ai-elements:update-all` will not affect this override as long as `Conversation` continues to use `{...props}` spread.
 - **Risk: `resize="instant"` might cause visual jump on collapsible toggle.** When a collapsible block (code_exec, reasoning) is toggled, the content height changes and the instant resize would jump scroll. Mitigation: The `useToggleScrollLock` hook already sets `state.isAtBottom = false` before the toggle, so the library's resize handler sees `isAtBottom === false` and does not trigger `scrollToBottom`. This is validated by existing tests.
 - **Risk: `resize="instant"` might affect the visual quality of scroll when new streaming content grows the container.** Mitigation: From the library source, the `resize` animation is used in the `ResizeObserver` path with `preserveScrollPosition: true` and `wait: true`. The normal `scrollToBottom()` calls from user actions use the base spring animation. However, during streaming, content growth triggers the `ResizeObserver` which would use `resize="instant"`. This actually improves the streaming experience by eliminating the spring-bounce effect during rapid content growth. The scroll stays locked to bottom without animated lag.
+
+---
+
+## Additional Finding: Scroll resets to top after streaming completes
+
+### Problem discovered
+
+While investigating scroll behavior, a new issue was found (unrelated to #60):
+
+**When user creates a new chat and asks a question with a long answer:**
+1. During streaming — chat correctly scrolls down as content arrives
+2. After streaming **completes** — chat **resets to the top** (position 0) without user action
+
+### Root cause (preliminary)
+
+In `src/renderer/hooks/useAgentChat.ts:94-97`:
+```typescript
+onFinish: () => {
+  void syncPersistedMessages();
+},
+```
+
+After streaming completes, `syncPersistedMessages()`:
+1. Calls `window.api.messages.list(agentId)` to reload all messages from DB
+2. Calls `setRawMessages(sortedSnapshots)` with a completely new array
+3. This triggers re-render of `AgentChatInner` which rebuilds the message list
+
+This state update may conflict with `use-stick-to-bottom` internal state, causing scroll reset.
+
+### Why current tests did not catch this
+
+| Test type | What it tests | What it misses |
+|-----------|---------------|----------------|
+| Functional | Adding pre-created messages via `createAgentMessage` | Real LLM streaming |
+| Functional | Autoscroll when messages added | Scroll behavior **after streaming completes** |
+| Unit | `resize="instant"` prop | Streaming completion behavior |
+
+The functional tests use `createAgentMessage` which directly inserts messages into the database — this does NOT simulate real streaming where `use-chat` receives `text-delta` events and the `onFinish` callback triggers `syncPersistedMessages()`.
+
+### Action needed
+
+1. **Create new issue** for scroll-reset-after-streaming (separate from #60)
+2. **Create functional test** that:
+   - Uses `MockLLMServer` for real streaming (like `llm-chat.spec.ts`)
+   - Sends user message via UI
+   - Waits for streaming to complete
+   - Verifies scroll position stays at bottom after completion
+3. **Fix the root cause** — likely optimize `syncPersistedMessages()` or prevent it from causing scroll reset
+
+### Recommended test location
+
+New test in `tests/functional/agent-scroll-position.spec.ts`:
+```typescript
+test('should keep scroll position at bottom after streaming completes', async () => {
+  // Use MockLLMServer with slow streaming
+  // Send user message
+  // Wait for streaming to finish
+  // Verify scroll is still at bottom
+});
+```
+
+This follows the pattern in `tests/functional/llm-chat.spec.ts` which already uses `MockLLMServer` for streaming tests.
