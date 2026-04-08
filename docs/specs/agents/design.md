@@ -2243,7 +2243,7 @@ agents.tsx
   ├── AgentHeader (без изменений)
   ├── [для каждого агента, скрытые через CSS если не активны]
   │     AgentChat (смонтирован всё время, скрыт через CSS, но не размонтируется)
-  │       ├── Conversation (use-stick-to-bottom, трекает скролл сам)
+  │       ├── Conversation resize="instant" (use-stick-to-bottom, трекает скролл сам; resize без анимации сохраняет стабильный viewport при window resize)
   │       │     ├── ConversationContent
   │       │     │     ├── AgentWelcome (если нет сообщений)
   │       │     │     └── motion.div > AgentMessage (для каждого сообщения)

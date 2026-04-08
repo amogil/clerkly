@@ -118,6 +118,7 @@ test.describe('Agent Scroll Position', () => {
     await expect(messages.first()).toBeVisible({ timeout: 5000 });
     await expect(llmResponseActions.last()).toBeVisible({ timeout: 20000 });
     await expect(scrollToBottomBtn).not.toBeVisible({ timeout: 3000 });
+    await expectNoToastError(window);
 
     await expect
       .poll(

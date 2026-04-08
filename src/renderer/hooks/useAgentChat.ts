@@ -16,6 +16,7 @@ import type {
 } from '../../shared/events/types';
 import type { UIMessage } from 'ai';
 
+// Requirements: agents.4.13.9
 function areMessageSnapshotsEqual(previous: MessageSnapshot[], next: MessageSnapshot[]): boolean {
   if (previous.length !== next.length) {
     return false;

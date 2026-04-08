@@ -105,60 +105,30 @@ After implementation:
 
 ## Additional Finding: Scroll resets to top after streaming completes
 
-### Problem discovered
+### Status
 
-While investigating scroll behavior, a new issue was found (unrelated to #60):
+This follow-up issue was addressed within the same PR while implementing issue #60.
 
-**When user creates a new chat and asks a question with a long answer:**
-1. During streaming — chat correctly scrolls down as content arrives
-2. After streaming **completes** — chat **resets to the top** (position 0) without user action
+The branch now includes:
+1. Requirement `agents.4.13.9` describing stable bottom scroll after streaming completion
+2. Hook-side snapshot guard in `src/renderer/hooks/useAgentChat.ts` to avoid redundant persisted-state resets after `onFinish`
+3. Functional coverage in `tests/functional/agent-scroll-position.spec.ts` using real streaming via `MockLLMServer`
+4. Unit coverage in `tests/unit/hooks/useAgentChat.test.ts`
 
-### Root cause (preliminary)
+### Root cause
 
-In `src/renderer/hooks/useAgentChat.ts:94-97`:
-```typescript
-onFinish: () => {
-  void syncPersistedMessages();
-},
-```
+In `src/renderer/hooks/useAgentChat.ts`, `onFinish` calls `syncPersistedMessages()` after streaming completes. Without a snapshot equality guard, this persisted reload can replace the message array with an equivalent new array and trigger an unnecessary re-render right after the stream ends, which previously reset the chat viewport.
 
-After streaming completes, `syncPersistedMessages()`:
-1. Calls `window.api.messages.list(agentId)` to reload all messages from DB
-2. Calls `setRawMessages(sortedSnapshots)` with a completely new array
-3. This triggers re-render of `AgentChatInner` which rebuilds the message list
+### Implemented outcome
 
-This state update may conflict with `use-stick-to-bottom` internal state, causing scroll reset.
+The current implementation keeps the persisted sync, but applies an equality guard before `setRawMessages(...)`. As a result:
+- streaming continues to use real `text-delta` events during the response
+- `onFinish` still reconciles renderer state with persisted DB state
+- equivalent snapshots do not trigger an unnecessary reset render
+- bottom scroll remains stable after streaming finishes when the user stayed pinned to bottom
 
-### Why current tests did not catch this
+### Regression coverage
 
-| Test type | What it tests | What it misses |
-|-----------|---------------|----------------|
-| Functional | Adding pre-created messages via `createAgentMessage` | Real LLM streaming |
-| Functional | Autoscroll when messages added | Scroll behavior **after streaming completes** |
-| Unit | `resize="instant"` prop | Streaming completion behavior |
-
-The functional tests use `createAgentMessage` which directly inserts messages into the database — this does NOT simulate real streaming where `use-chat` receives `text-delta` events and the `onFinish` callback triggers `syncPersistedMessages()`.
-
-### Action needed
-
-1. **Create new issue** for scroll-reset-after-streaming (separate from #60)
-2. **Create functional test** that:
-   - Uses `MockLLMServer` for real streaming (like `llm-chat.spec.ts`)
-   - Sends user message via UI
-   - Waits for streaming to complete
-   - Verifies scroll position stays at bottom after completion
-3. **Fix the root cause** — likely optimize `syncPersistedMessages()` or prevent it from causing scroll reset
-
-### Recommended test location
-
-New test in `tests/functional/agent-scroll-position.spec.ts`:
-```typescript
-test('should keep scroll position at bottom after streaming completes', async () => {
-  // Use MockLLMServer with slow streaming
-  // Send user message
-  // Wait for streaming to finish
-  // Verify scroll is still at bottom
-});
-```
-
-This follows the pattern in `tests/functional/llm-chat.spec.ts` which already uses `MockLLMServer` for streaming tests.
+The implemented tests now cover the exact scenario that was previously called out as missing:
+- `tests/functional/agent-scroll-position.spec.ts` — `should keep scroll position at bottom after streaming completes`
+- `tests/unit/hooks/useAgentChat.test.ts` — guards redundant persisted-sync updates for `agents.4.13.9`
