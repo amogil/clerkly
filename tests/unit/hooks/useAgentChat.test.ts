@@ -17,6 +17,7 @@ const mockSetMessages = jest.fn();
 const mockChatSendMessage = jest.fn().mockResolvedValue(undefined);
 const mockChatStop = jest.fn();
 const mockStatus = { current: 'ready' as string };
+const mockValidateUIMessages = jest.fn(async ({ messages }: { messages: unknown[] }) => messages);
 
 jest.mock('@ai-sdk/react', () => {
   const Chat = jest.fn().mockImplementation(() => ({ id: 'mock-chat' }));
@@ -31,6 +32,10 @@ jest.mock('@ai-sdk/react', () => {
   }));
   return { Chat, useChat };
 });
+
+jest.mock('ai', () => ({
+  validateUIMessages: (payload: { messages: unknown[] }) => mockValidateUIMessages(payload),
+}));
 
 // Mock IPCChatTransport
 jest.mock('../../../src/renderer/lib/IPCChatTransport', () => ({
@@ -113,6 +118,10 @@ describe('useAgentChat hook', () => {
       data: [],
     });
     mockToUIMessages.mockReturnValue([]);
+    mockValidateUIMessages.mockClear();
+    mockValidateUIMessages.mockImplementation(
+      async ({ messages }: { messages: unknown[] }) => messages
+    );
     // Reset setMessages mock to track calls
     mockSetMessages.mockReset();
   });
@@ -170,6 +179,39 @@ describe('useAgentChat hook', () => {
         | undefined;
       expect(typeof firstCall?.onFinish).toBe('function');
       expect(typeof firstCall?.onError).toBe('function');
+    });
+
+    /* Preconditions: agentId provided, persisted snapshots after onFinish are identical to current rawMessages
+       Action: Chat onFinish callback runs after streaming completion
+       Assertions: persisted reload happens without replacing rawMessages reference
+       Requirements: agents.4.13.9 */
+    it('should avoid replacing rawMessages when onFinish reload returns identical snapshots', async () => {
+      const initialSnapshot = makeSnapshot(1, 'llm');
+      mockList.mockResolvedValueOnce({
+        success: true,
+        data: [initialSnapshot],
+      });
+      mockList.mockResolvedValueOnce({
+        success: true,
+        data: [{ ...initialSnapshot }],
+      });
+
+      const { result } = renderHook(() => useAgentChat('agent-1'));
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      const chatOptions = (Chat as unknown as jest.Mock).mock.calls[0]?.[0] as
+        | { onFinish?: () => void }
+        | undefined;
+      expect(typeof chatOptions?.onFinish).toBe('function');
+
+      const rawMessagesBeforeFinish = result.current.rawMessages;
+
+      act(() => {
+        chatOptions?.onFinish?.();
+      });
+
+      await waitFor(() => expect(mockList).toHaveBeenCalledTimes(2));
+      expect(result.current.rawMessages).toBe(rawMessagesBeforeFinish);
     });
 
     /* Preconditions: agentId provided, API returns success:false

@@ -265,6 +265,8 @@
 
 4.13.8. КОГДА размер окна приложения изменяется, ТО позиция скролла чата ДОЛЖНА оставаться стабильной без видимого повторного скроллирования или рывков анимации; ЕСЛИ пользователь находился внизу чата, ТО скролл ДОЛЖЕН мгновенно (без анимации) перемещаться на новую нижнюю позицию; ЕСЛИ пользователь прокрутил вверх, ТО позиция скролла НЕ ДОЛЖНА принудительно сбрасываться вниз
 
+4.13.9. КОГДА потоковый ответ агента завершается, ТО чат ДОЛЖЕН сохранять текущую нижнюю позицию скролла без сброса к началу списка, ЕСЛИ пользователь оставался внизу чата во время стриминга
+
 4.14. Позиция скролла ДОЛЖНА сохраняться для каждого агента независимо
 
 4.14.1. КОГДА пользователь переключается на другого агента, ТО чат предыдущего агента ДОЛЖЕН скрываться через CSS (`absolute inset-0 opacity-0 pointer-events-none`), но НЕ размонтироваться — это сохраняет `scrollTop` в DOM
@@ -352,6 +354,7 @@
 - `tests/functional/agent-messaging.spec.ts` - "should submit new message via Enter key during in-progress"
 - `tests/functional/agent-messaging.spec.ts` - "should display messages in chronological order"
 - `tests/functional/agent-messaging.spec.ts` - "should autoscroll to last message"
+- `tests/functional/agent-scroll-position.spec.ts` - "should keep scroll position at bottom after streaming completes"
 - `tests/functional/auto-expanding-textarea.spec.ts` - "should keep two-line baseline height before overflow threshold"
 - `tests/functional/auto-expanding-textarea.spec.ts` - "should grow height when third fourth and fifth lines are added"
 - `tests/functional/auto-expanding-textarea.spec.ts` - "should stop growing and enable internal scroll at sixth line"

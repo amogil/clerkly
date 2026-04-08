@@ -1289,6 +1289,7 @@ function ActivityIndicator({ isActive }: { isActive: boolean }) {
 - Пользователь прокрутил вверх → новое сообщение → автоскролл НЕ срабатывает (agents.4.13.2)
 - `ConversationScrollButton` показывается когда пользователь не внизу — клик возвращает вниз
 - Скроллбар управляется нативно браузером через `overflow-y: auto` на контейнере `StickToBottom`
+- После завершения потокового ответа `useAgentChat` перечитывает persisted snapshots только при реальном отличии от текущего списка, чтобы не пересоздавать message list и не сбрасывать viewport наверх (agents.4.13.9)
 
 **Стабильность скролла при изменении размера окна (agents.4.13.8):**
 
@@ -2025,7 +2026,7 @@ import { Logo } from '../logo';
 | `tests/unit/components/agents/AgentMessage.test.tsx` | agents.4.10, agents.4.11.1, agents.4.11.3-4.11.5, agents.7.4.5-7.4.9.1, llm-integration.2, llm-integration.7 |
 | `tests/unit/components/agents/AgentReasoningTrigger.test.tsx` | agents.4.11, agents.4.11.2, llm-integration.2, llm-integration.7.2 |
 | `tests/unit/renderer/IPCChatTransport.test.ts` | llm-integration.2, llm-integration.7 |
-| `tests/unit/hooks/useAgentChat.test.ts` | agents.4.24, llm-integration.8.7 |
+| `tests/unit/hooks/useAgentChat.test.ts` | agents.4.13.9, agents.4.24, llm-integration.8.7 |
 | `tests/unit/hooks/useAppCoordinatorState.test.ts` | agents.13.9.2, agents.13.9.3, agents.13.12, agents.13.16, agents.13.18 |
 | `tests/unit/components/agents.test.tsx` | agents.4.22 |
 | `tests/unit/components/agents-autoscroll.test.tsx` | agents.4.13, agents.4.13.8 |
@@ -2039,7 +2040,7 @@ import { Logo } from '../logo';
 |------|----------|------------|
 | `tests/functional/agent-switching.spec.ts` | agents.3 | - |
 | `tests/functional/agent-messaging.spec.ts` | agents.4.2.1, agents.4.2.2, 4.3, 4.4, 4.8, 4.13.1, 4.13.2, 4.13.4, 4.24, 4.24.5 | - |
-| `tests/functional/agent-scroll-position.spec.ts` | agents.4.14.1-4.14.6, agents.5.9 | - |
+| `tests/functional/agent-scroll-position.spec.ts` | agents.4.13.9, agents.4.14.1-4.14.6, agents.5.9 | - |
 | `tests/functional/startup-loader.spec.ts` | agents.13.2, agents.13.9.1-13.9.4, agents.13.10, agents.13.12, agents.13.16, agents.13.18, agents.4.14.5-4.14.6 (startup settled без визуального рывка, без page-level scrollbar во время loader, стабильная ширина в раннем окне после скрытия loader) | - |
 | `tests/functional/settings-ai-agent.spec.ts` | - | Кросс-фича тест для settings; не используется для покрытия agents.* |
 | `tests/functional/all-agents-page.spec.ts` | agents.5 | - |
@@ -2150,6 +2151,7 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 | agents.4.13.4-4.13.6 (scrollbar) | - | Manual |
 | agents.4.13.7 (toggle scroll suppression) | ✓ | ✓ |
 | agents.4.13.8 (resize scroll stability) | ✓ | - |
+| agents.4.13.9 (streaming completion keeps bottom scroll) | ✓ | ✓ |
 | agents.4.14.1, agents.4.14.2, agents.4.14.3, agents.4.14.4, agents.4.14.5, agents.4.14.6 (scroll position) | ✓ | ✓ |
 | agents.4.16, agents.4.17, agents.4.18, agents.4.19, agents.4.20, agents.4.21 (empty state content/animations) | ✓ | ✓ |
 | agents.4.24.1, agents.4.24.2, agents.4.24.3, agents.4.24.4, agents.4.24.5 (stop/cancel flow, cancel+send) | ✓ | ✓ |
