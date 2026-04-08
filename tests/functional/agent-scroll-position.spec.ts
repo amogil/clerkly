@@ -14,8 +14,16 @@ import {
   closeElectron,
   ElectronTestContext,
   expectAgentsVisible,
+  getFreePort,
+  expectNoToastError,
 } from './helpers/electron';
 import type { MockOAuthServer } from './helpers/mock-oauth-server';
+import { MockLLMServer } from './helpers/mock-llm-server';
+import { resetMockLLMServerState } from './helpers/mock-llm-state';
+
+const TEST_CLIENT_ID = 'test-client-id-12345';
+let mockLLMServer: MockLLMServer;
+let mockLLMPort: number;
 
 let context: ElectronTestContext;
 let window: Page;
@@ -23,15 +31,22 @@ let mockOAuthServer: MockOAuthServer;
 
 test.beforeAll(async () => {
   mockOAuthServer = await createMockOAuthServer();
+  mockLLMPort = await getFreePort();
+  mockLLMServer = new MockLLMServer({ port: mockLLMPort });
+  await mockLLMServer.start();
 });
 
 test.afterAll(async () => {
   if (mockOAuthServer) {
     await mockOAuthServer.stop();
   }
+  if (mockLLMServer) {
+    await mockLLMServer.stop();
+  }
 });
 
 test.beforeEach(async () => {
+  resetMockLLMServerState(mockLLMServer);
   mockOAuthServer.setUserProfile({
     id: 'test-scroll-user',
     email: 'scroll.test@example.com',
@@ -60,6 +75,70 @@ test.afterEach(async () => {
 });
 
 test.describe('Agent Scroll Position', () => {
+  /* Preconditions: Mock LLM streaming is enabled, active agent starts at bottom
+     Action: User sends a message and waits for streaming to finish
+     Assertions: Scroll position remains pinned near bottom after final persisted sync completes
+     Requirements: agents.4.13.9 */
+  test('should keep scroll position at bottom after streaming completes', async () => {
+    await closeElectron(context, true, true);
+
+    mockLLMServer.setStreamingMode(true, {
+      content: JSON.stringify({
+        action: {
+          type: 'text',
+          content:
+            'Streaming bottom-lock verification line 1. '.repeat(20) +
+            'Streaming bottom-lock verification line 2. '.repeat(20) +
+            'Streaming bottom-lock verification line 3. '.repeat(20),
+        },
+      }),
+      chunkDelayMs: 60,
+    });
+
+    context = await launchElectron(undefined, {
+      ELECTRON_DISABLE_SECURITY_WARNINGS: 'true',
+      CLERKLY_GOOGLE_API_URL: mockOAuthServer.getBaseUrl(),
+      CLERKLY_OAUTH_CLIENT_ID: TEST_CLIENT_ID,
+      CLERKLY_OAUTH_CLIENT_SECRET: 'test-client-secret-67890',
+      CLERKLY_OPENAI_API_URL: `http://localhost:${mockLLMPort}/v1/responses`,
+      CLERKLY_OPENAI_API_KEY: 'mock-key-for-testing',
+    });
+
+    window = context.window;
+    await completeOAuthFlow(context.app, window, TEST_CLIENT_ID);
+    await expectAgentsVisible(window, 10000);
+    await expectNoToastError(window);
+
+    const { textarea, messagesArea, messages, llmResponseActions, scrollToBottomBtn } =
+      activeChat(window);
+
+    await textarea.fill('Please produce a long streamed answer for scroll stability.');
+    await textarea.press('Enter');
+
+    await expect(messages.first()).toBeVisible({ timeout: 5000 });
+    await expect(llmResponseActions.last()).toBeVisible({ timeout: 20000 });
+    await expect(scrollToBottomBtn).not.toBeVisible({ timeout: 3000 });
+    await expectNoToastError(window);
+
+    await expect
+      .poll(
+        async () => {
+          const { scrollTop, scrollHeight, clientHeight } = await messagesArea
+            .locator('..')
+            .evaluate((el) => ({
+              scrollTop: el.scrollTop,
+              scrollHeight: el.scrollHeight,
+              clientHeight: el.clientHeight,
+            }));
+          return scrollHeight - scrollTop - clientHeight;
+        },
+        { timeout: 10000 }
+      )
+      .toBeLessThan(100);
+
+    await expect(messages.last()).toBeInViewport({ timeout: 3000 });
+  });
+
   /* Preconditions: Agent has enough messages to be scrollable, user is at bottom
      Action: A new message arrives while user stays at bottom
      Assertions: Chat autoscrolls to keep the latest message visible

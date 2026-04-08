@@ -379,7 +379,8 @@ export function AgentChat({
       data-active={isActive ? 'true' : 'false'}
       className={`flex flex-col flex-1 min-h-0${isActive ? '' : ' absolute inset-0 opacity-0 pointer-events-none'}`}
     >
-      <Conversation className="flex-1 min-h-0" contextRef={stickContextRef}>
+      {/* Requirements: agents.4.13.8 — resize="instant" overrides vendor default to prevent scroll jank during window resize */}
+      <Conversation className="flex-1 min-h-0" resize="instant" contextRef={stickContextRef}>
         <AgentChatInner
           agent={agent}
           rateLimitBanner={rateLimitBanner}

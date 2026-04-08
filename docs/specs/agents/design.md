@@ -1275,8 +1275,8 @@ function ActivityIndicator({ isActive }: { isActive: boolean }) {
 `Conversation` (`src/renderer/components/ai-elements/conversation.tsx`) — тонкая обёртка над `StickToBottom` из `use-stick-to-bottom`. Автоматически прокручивает вниз при появлении новых сообщений, если пользователь не прокрутил вверх.
 
 ```tsx
-// Requirements: agents.4.13
-<Conversation className="flex-1 min-h-0">
+// Requirements: agents.4.13, agents.4.13.8
+<Conversation className="flex-1 min-h-0" resize="instant">
   <ConversationContent data-testid="messages-area" className="flex flex-col gap-4 p-6 justify-end min-h-full">
     {/* сообщения */}
   </ConversationContent>
@@ -1289,6 +1289,17 @@ function ActivityIndicator({ isActive }: { isActive: boolean }) {
 - Пользователь прокрутил вверх → новое сообщение → автоскролл НЕ срабатывает (agents.4.13.2)
 - `ConversationScrollButton` показывается когда пользователь не внизу — клик возвращает вниз
 - Скроллбар управляется нативно браузером через `overflow-y: auto` на контейнере `StickToBottom`
+- После завершения потокового ответа `useAgentChat` перечитывает persisted snapshots только при реальном отличии от текущего списка, чтобы не пересоздавать message list и не сбрасывать viewport наверх (agents.4.13.9)
+
+**Стабильность скролла при изменении размера окна (agents.4.13.8):**
+
+Библиотека `use-stick-to-bottom` использует внутренний `ResizeObserver` на content-элементе. При изменении размера окна текст перекомпоновывается (reflow), что изменяет высоту контента и вызывает callback `ResizeObserver`. Если пользователь находится «внизу» (`state.isAtBottom === true`), библиотека вызывает `scrollToBottom()` с анимацией, заданной в prop `resize`.
+
+Prop `resize="instant"` передаётся на уровне вызова `<Conversation>` в компоненте `AgentChat` (`src/renderer/components/agents/AgentChat.tsx`). Компонент `Conversation` (vendor-файл `src/renderer/components/ai-elements/conversation.tsx`) по умолчанию использует `resize="smooth"`, но благодаря spread-оператору `{...props}` в JSX, переданный на месте вызова prop `resize="instant"` переопределяет значение по умолчанию. Это обеспечивает мгновенное (без spring-анимации) перемещение к нижней позиции при resize, устраняя проблему накопления конкурирующих smooth-анимаций.
+
+Prop `initial="smooth"` сохраняется для плавного первого скролла при загрузке.
+
+**Примечание:** файл `conversation.tsx` является vendor-компонентом AI Elements и НЕ модифицируется. Переопределение prop `resize` выполняется исключительно на уровне вызова в `AgentChat.tsx`, что безопасно при обновлениях через `npm run ai-elements:update-all`.
 
 **Скролл при чтении истории:**
 - Скролл работает нативно через `Conversation`
@@ -1298,8 +1309,8 @@ function ActivityIndicator({ isActive }: { isActive: boolean }) {
 
 ```tsx
 {/* Messages Area */}
-{/* Requirements: agents.4.13, agents.13 */}
-<Conversation className="flex-1 min-h-0">
+{/* Requirements: agents.4.13, agents.4.13.8, agents.13 */}
+<Conversation className="flex-1 min-h-0" resize="instant">
   <ConversationContent data-testid="messages-area" className="flex flex-col gap-4 p-6 justify-end min-h-full">
     {messages.length === 0 ? (
       <AgentWelcome onPromptClick={handlePromptClick} />
@@ -2015,10 +2026,10 @@ import { Logo } from '../logo';
 | `tests/unit/components/agents/AgentMessage.test.tsx` | agents.4.10, agents.4.11.1, agents.4.11.3-4.11.5, agents.7.4.5-7.4.9.1, llm-integration.2, llm-integration.7 |
 | `tests/unit/components/agents/AgentReasoningTrigger.test.tsx` | agents.4.11, agents.4.11.2, llm-integration.2, llm-integration.7.2 |
 | `tests/unit/renderer/IPCChatTransport.test.ts` | llm-integration.2, llm-integration.7 |
-| `tests/unit/hooks/useAgentChat.test.ts` | agents.4.24, llm-integration.8.7 |
+| `tests/unit/hooks/useAgentChat.test.ts` | agents.4.13.9, agents.4.24, llm-integration.8.7 |
 | `tests/unit/hooks/useAppCoordinatorState.test.ts` | agents.13.9.2, agents.13.9.3, agents.13.12, agents.13.16, agents.13.18 |
 | `tests/unit/components/agents.test.tsx` | agents.4.22 |
-| `tests/unit/components/agents-autoscroll.test.tsx` | agents.4.13 |
+| `tests/unit/components/agents-autoscroll.test.tsx` | agents.4.13, agents.4.13.8 |
 | `tests/unit/hooks/useToggleScrollLock.test.ts` | agents.4.13.7 |
 | `tests/unit/components/agents-scroll-position.test.tsx` | agents.4.14 |
 | `tests/unit/app/AppCoordinator.test.ts` | agents.13.11-13.15, agents.13.17, navigation.1.1, navigation.1.3 |
@@ -2029,7 +2040,7 @@ import { Logo } from '../logo';
 |------|----------|------------|
 | `tests/functional/agent-switching.spec.ts` | agents.3 | - |
 | `tests/functional/agent-messaging.spec.ts` | agents.4.2.1, agents.4.2.2, 4.3, 4.4, 4.8, 4.13.1, 4.13.2, 4.13.4, 4.24, 4.24.5 | - |
-| `tests/functional/agent-scroll-position.spec.ts` | agents.4.14.1-4.14.6, agents.5.9 | - |
+| `tests/functional/agent-scroll-position.spec.ts` | agents.4.13.9, agents.4.14.1-4.14.6, agents.5.9 | - |
 | `tests/functional/startup-loader.spec.ts` | agents.13.2, agents.13.9.1-13.9.4, agents.13.10, agents.13.12, agents.13.16, agents.13.18, agents.4.14.5-4.14.6 (startup settled без визуального рывка, без page-level scrollbar во время loader, стабильная ширина в раннем окне после скрытия loader) | - |
 | `tests/functional/settings-ai-agent.spec.ts` | - | Кросс-фича тест для settings; не используется для покрытия agents.* |
 | `tests/functional/all-agents-page.spec.ts` | agents.5 | - |
@@ -2139,6 +2150,8 @@ await window.locator(`[data-testid="agent-icon-${firstAgentId}"]`).click();
 | agents.4.13.1-4.13.6 (autoscroll) | ✓ | ✓ |
 | agents.4.13.4-4.13.6 (scrollbar) | - | Manual |
 | agents.4.13.7 (toggle scroll suppression) | ✓ | ✓ |
+| agents.4.13.8 (resize scroll stability) | ✓ | - |
+| agents.4.13.9 (streaming completion keeps bottom scroll) | ✓ | ✓ |
 | agents.4.14.1, agents.4.14.2, agents.4.14.3, agents.4.14.4, agents.4.14.5, agents.4.14.6 (scroll position) | ✓ | ✓ |
 | agents.4.16, agents.4.17, agents.4.18, agents.4.19, agents.4.20, agents.4.21 (empty state content/animations) | ✓ | ✓ |
 | agents.4.24.1, agents.4.24.2, agents.4.24.3, agents.4.24.4, agents.4.24.5 (stop/cancel flow, cancel+send) | ✓ | ✓ |
@@ -2230,7 +2243,7 @@ agents.tsx
   ├── AgentHeader (без изменений)
   ├── [для каждого агента, скрытые через CSS если не активны]
   │     AgentChat (смонтирован всё время, скрыт через CSS, но не размонтируется)
-  │       ├── Conversation (use-stick-to-bottom, трекает скролл сам)
+  │       ├── Conversation resize="instant" (use-stick-to-bottom, трекает скролл сам; resize без анимации сохраняет стабильный viewport при window resize)
   │       │     ├── ConversationContent
   │       │     │     ├── AgentWelcome (если нет сообщений)
   │       │     │     └── motion.div > AgentMessage (для каждого сообщения)

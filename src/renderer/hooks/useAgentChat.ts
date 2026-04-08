@@ -2,7 +2,7 @@
 // src/renderer/hooks/useAgentChat.ts
 // Hook wrapping useChat with IPCChatTransport
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useChat, Chat } from '@ai-sdk/react';
 import { IPCChatTransport } from '../lib/IPCChatTransport';
 import { toUIMessages } from '../lib/messageMapper';
@@ -15,6 +15,22 @@ import type {
   MessageUpdatedPayload,
 } from '../../shared/events/types';
 import type { UIMessage } from 'ai';
+
+// Requirements: agents.4.13.9
+function areMessageSnapshotsEqual(previous: MessageSnapshot[], next: MessageSnapshot[]): boolean {
+  if (previous.length !== next.length) {
+    return false;
+  }
+
+  return previous.every((message, index) => {
+    const other = next[index];
+    if (!other) {
+      return false;
+    }
+
+    return JSON.stringify(message) === JSON.stringify(other);
+  });
+}
 
 // Access window.api with proper typing
 declare const window: Window & {
@@ -69,6 +85,11 @@ export function useAgentChat(agentId: string | null): UseAgentChatResult {
   // ── Initial history state ──────────────────────────────────────────────
   const [rawMessages, setRawMessages] = useState<MessageSnapshot[]>([]);
   const [isLoading, setIsLoading] = useState(() => Boolean(agentId));
+  const rawMessagesRef = useRef<MessageSnapshot[]>([]);
+
+  useEffect(() => {
+    rawMessagesRef.current = rawMessages;
+  }, [rawMessages]);
 
   const syncPersistedMessages = useCallback(async () => {
     if (!agentId) {
@@ -78,8 +99,10 @@ export function useAgentChat(agentId: string | null): UseAgentChatResult {
 
     const result = await window.api.messages.list(agentId);
     if (result.success && result.data) {
-      const snapshots = result.data as MessageSnapshot[];
-      setRawMessages(sortMessageSnapshots(snapshots));
+      const snapshots = sortMessageSnapshots(result.data as MessageSnapshot[]);
+      if (!areMessageSnapshotsEqual(rawMessagesRef.current, snapshots)) {
+        setRawMessages(snapshots);
+      }
     }
   }, [agentId]);
 
